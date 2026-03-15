@@ -1,0 +1,6 @@
+demo
+editor
+*.exe
+ext/nanosvg.h
+ext/nanosvgrast.h
+

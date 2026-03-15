@@ -1,0 +1,920 @@
+// Copyright (c) 2026, mkgui contributors
+// SPDX-License-Identifier: MIT
+
+// ---------------------------------------------------------------------------
+// Event queue
+// ---------------------------------------------------------------------------
+
+#define MKGUI_EVQ_SIZE 256
+
+static struct mkgui_plat_event evq_buf[MKGUI_EVQ_SIZE];
+static uint32_t evq_head;
+static uint32_t evq_tail;
+
+// [=]===^=[ evq_push ]============================================[=]
+static void evq_push(struct mkgui_plat_event *pev) {
+	uint32_t next = (evq_head + 1) % MKGUI_EVQ_SIZE;
+	if(next == evq_tail) {
+		return;
+	}
+	evq_buf[evq_head] = *pev;
+	evq_head = next;
+}
+
+// [=]===^=[ evq_pop ]=============================================[=]
+static uint32_t evq_pop(struct mkgui_plat_event *pev) {
+	if(evq_head == evq_tail) {
+		return 0;
+	}
+	*pev = evq_buf[evq_tail];
+	evq_tail = (evq_tail + 1) % MKGUI_EVQ_SIZE;
+	return 1;
+}
+
+// ---------------------------------------------------------------------------
+// Active context tracking
+// ---------------------------------------------------------------------------
+
+static struct mkgui_ctx *win32_active_ctx;
+
+// ---------------------------------------------------------------------------
+// Key translation
+// ---------------------------------------------------------------------------
+
+// [=]===^=[ platform_translate_vk ]================================[=]
+static uint32_t platform_translate_vk(WPARAM vk) {
+	switch(vk) {
+		case VK_BACK:   { return 0xff08; } break;
+		case VK_TAB:    { return 0xff09; } break;
+		case VK_RETURN: { return 0xff0d; } break;
+		case VK_ESCAPE: { return 0xff1b; } break;
+		case VK_DELETE: { return 0xffff; } break;
+		case VK_HOME:   { return 0xff50; } break;
+		case VK_LEFT:   { return 0xff51; } break;
+		case VK_UP:     { return 0xff52; } break;
+		case VK_RIGHT:  { return 0xff53; } break;
+		case VK_DOWN:   { return 0xff54; } break;
+		case VK_PRIOR:  { return 0xff55; } break;
+		case VK_NEXT:   { return 0xff56; } break;
+		case VK_END:    { return 0xff57; } break;
+		default: break;
+	}
+	return (uint32_t)vk;
+}
+
+// [=]===^=[ platform_get_keymod ]=================================[=]
+static uint32_t platform_get_keymod(void) {
+	uint32_t mod = 0;
+	if(GetKeyState(VK_SHIFT) & 0x8000) {
+		mod |= 0x01;
+	}
+	if(GetKeyState(VK_CONTROL) & 0x8000) {
+		mod |= 0x04;
+	}
+	if(GetKeyState(VK_MENU) & 0x8000) {
+		mod |= 0x08;
+	}
+	return mod;
+}
+
+// ---------------------------------------------------------------------------
+// WndProc
+// ---------------------------------------------------------------------------
+
+// [=]===^=[ wndproc_identify_window ]==============================[=]
+static int32_t wndproc_identify_window(HWND hwnd) {
+	if(!win32_active_ctx) {
+		return -2;
+	}
+	if(hwnd == win32_active_ctx->plat.hwnd) {
+		return -1;
+	}
+	for(uint32_t i = 0; i < win32_active_ctx->popup_count; ++i) {
+		if(win32_active_ctx->popups[i].plat.hwnd == hwnd) {
+			return (int32_t)i;
+		}
+	}
+	if(win32_active_ctx->parent && hwnd == win32_active_ctx->parent->plat.hwnd) {
+		return -3;
+	}
+	return -2;
+}
+
+// [=]===^=[ mkgui_wndproc ]=======================================[=]
+static LRESULT CALLBACK mkgui_wndproc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
+	int32_t wid = wndproc_identify_window(hwnd);
+
+	if(wid == -3) {
+		if(msg == WM_PAINT) {
+			PAINTSTRUCT ps;
+			BeginPaint(hwnd, &ps);
+			EndPaint(hwnd, &ps);
+			win32_active_ctx->parent->dirty = 1;
+			win32_active_ctx->parent->dirty_full = 1;
+			return 0;
+		}
+		return DefWindowProcA(hwnd, msg, wp, lp);
+	}
+
+	if(wid == -2) {
+		return DefWindowProcA(hwnd, msg, wp, lp);
+	}
+
+	struct mkgui_plat_event pev;
+	memset(&pev, 0, sizeof(pev));
+	pev.popup_idx = wid;
+
+	switch(msg) {
+		case WM_PAINT: {
+			PAINTSTRUCT ps;
+			BeginPaint(hwnd, &ps);
+			EndPaint(hwnd, &ps);
+			pev.type = MKGUI_PLAT_EXPOSE;
+			evq_push(&pev);
+			return 0;
+		} break;
+
+		case WM_SIZE: {
+			if(pev.popup_idx < 0) {
+				pev.type = MKGUI_PLAT_RESIZE;
+				pev.width = LOWORD(lp);
+				pev.height = HIWORD(lp);
+				evq_push(&pev);
+			}
+			return 0;
+		} break;
+
+		case WM_MOUSEMOVE: {
+			pev.type = MKGUI_PLAT_MOTION;
+			pev.x = (int16_t)LOWORD(lp);
+			pev.y = (int16_t)HIWORD(lp);
+			evq_push(&pev);
+			return 0;
+		} break;
+
+		case WM_LBUTTONDOWN: {
+			pev.type = MKGUI_PLAT_BUTTON_PRESS;
+			pev.x = (int16_t)LOWORD(lp);
+			pev.y = (int16_t)HIWORD(lp);
+			pev.button = 1;
+			evq_push(&pev);
+			SetCapture(hwnd);
+			return 0;
+		} break;
+
+		case WM_LBUTTONUP: {
+			pev.type = MKGUI_PLAT_BUTTON_RELEASE;
+			pev.x = (int16_t)LOWORD(lp);
+			pev.y = (int16_t)HIWORD(lp);
+			pev.button = 1;
+			evq_push(&pev);
+			ReleaseCapture();
+			return 0;
+		} break;
+
+		case WM_RBUTTONDOWN: {
+			pev.type = MKGUI_PLAT_BUTTON_PRESS;
+			pev.x = (int16_t)LOWORD(lp);
+			pev.y = (int16_t)HIWORD(lp);
+			pev.button = 3;
+			evq_push(&pev);
+			return 0;
+		} break;
+
+		case WM_RBUTTONUP: {
+			pev.type = MKGUI_PLAT_BUTTON_RELEASE;
+			pev.x = (int16_t)LOWORD(lp);
+			pev.y = (int16_t)HIWORD(lp);
+			pev.button = 3;
+			evq_push(&pev);
+			return 0;
+		} break;
+
+		case WM_MOUSEWHEEL: {
+			int16_t delta = (int16_t)HIWORD(wp);
+			pev.type = MKGUI_PLAT_BUTTON_PRESS;
+			POINT pt = { (int16_t)LOWORD(lp), (int16_t)HIWORD(lp) };
+			ScreenToClient(hwnd, &pt);
+			pev.x = pt.x;
+			pev.y = pt.y;
+			pev.button = delta > 0 ? 4 : 5;
+			evq_push(&pev);
+			pev.type = MKGUI_PLAT_BUTTON_RELEASE;
+			evq_push(&pev);
+			return 0;
+		} break;
+
+		case WM_KEYDOWN: {
+			pev.type = MKGUI_PLAT_KEY;
+			pev.keysym = platform_translate_vk(wp);
+			pev.keymod = platform_get_keymod();
+			pev.text[0] = '\0';
+			pev.text_len = 0;
+			evq_push(&pev);
+			return 0;
+		} break;
+
+		case WM_CHAR: {
+			if(wp >= 32 && wp < 127) {
+				pev.type = MKGUI_PLAT_KEY;
+				pev.keysym = (uint32_t)wp;
+				pev.keymod = platform_get_keymod();
+				pev.text[0] = (char)wp;
+				pev.text[1] = '\0';
+				pev.text_len = 1;
+				evq_push(&pev);
+			}
+			return 0;
+		} break;
+
+		case WM_CLOSE: {
+			pev.type = MKGUI_PLAT_CLOSE;
+			evq_push(&pev);
+			return 0;
+		} break;
+
+		case WM_MOUSELEAVE: {
+			pev.type = MKGUI_PLAT_LEAVE;
+			evq_push(&pev);
+			return 0;
+		} break;
+
+		default: break;
+	}
+
+	return DefWindowProcA(hwnd, msg, wp, lp);
+}
+
+// ---------------------------------------------------------------------------
+// Framebuffer helpers
+// ---------------------------------------------------------------------------
+
+// [=]===^=[ platform_fb_create_dib ]==============================[=]
+static uint32_t platform_fb_create_dib(HDC hdc_ref, HDC *hdc_mem, HBITMAP *hbmp, HBITMAP *hbmp_old, uint32_t **pixels, int32_t w, int32_t h) {
+	BITMAPINFO bmi;
+	memset(&bmi, 0, sizeof(bmi));
+	bmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+	bmi.bmiHeader.biWidth = w;
+	bmi.bmiHeader.biHeight = -h;
+	bmi.bmiHeader.biPlanes = 1;
+	bmi.bmiHeader.biBitCount = 32;
+	bmi.bmiHeader.biCompression = BI_RGB;
+
+	*hdc_mem = CreateCompatibleDC(hdc_ref);
+	*hbmp = CreateDIBSection(*hdc_mem, &bmi, DIB_RGB_COLORS, (void **)pixels, NULL, 0);
+	*hbmp_old = (HBITMAP)SelectObject(*hdc_mem, *hbmp);
+	return 1;
+}
+
+// [=]===^=[ platform_fb_destroy_dib ]=============================[=]
+static void platform_fb_destroy_dib(HDC *hdc_mem, HBITMAP *hbmp, HBITMAP *hbmp_old) {
+	if(*hdc_mem) {
+		SelectObject(*hdc_mem, *hbmp_old);
+		DeleteObject(*hbmp);
+		DeleteDC(*hdc_mem);
+		*hdc_mem = NULL;
+		*hbmp = NULL;
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Platform init / destroy
+// ---------------------------------------------------------------------------
+
+static uint32_t wc_registered;
+
+// [=]===^=[ platform_register_class ]=============================[=]
+static void platform_register_class(void) {
+	if(wc_registered) {
+		return;
+	}
+	WNDCLASSEXA wc;
+	memset(&wc, 0, sizeof(wc));
+	wc.cbSize = sizeof(wc);
+	wc.style = CS_OWNDC | CS_DBLCLKS;
+	wc.lpfnWndProc = mkgui_wndproc;
+	wc.hCursor = LoadCursorA(NULL, IDC_ARROW);
+	wc.lpszClassName = "mkgui";
+	RegisterClassExA(&wc);
+	wc_registered = 1;
+}
+
+// [=]===^=[ platform_init ]=======================================[=]
+static uint32_t platform_init(struct mkgui_ctx *ctx, const char *title, int32_t w, int32_t h) {
+	struct mkgui_platform *plat = &ctx->plat;
+	platform_register_class();
+
+	RECT rc = { 0, 0, w, h };
+	AdjustWindowRect(&rc, WS_OVERLAPPEDWINDOW, FALSE);
+
+	plat->hwnd = CreateWindowExA(0, "mkgui", title, WS_OVERLAPPEDWINDOW,
+		CW_USEDEFAULT, CW_USEDEFAULT, rc.right - rc.left, rc.bottom - rc.top,
+		NULL, NULL, GetModuleHandleA(NULL), NULL);
+
+	if(!plat->hwnd) {
+		return 0;
+	}
+
+	ctx->win_w = w;
+	ctx->win_h = h;
+
+	HDC hdc = GetDC(plat->hwnd);
+	platform_fb_create_dib(hdc, &plat->hdc_mem, &plat->hbmp, &plat->hbmp_old, &ctx->pixels, w, h);
+	ReleaseDC(plat->hwnd, hdc);
+
+	plat->cursor_default = LoadCursorA(NULL, IDC_ARROW);
+	plat->cursor_h_resize = LoadCursorA(NULL, IDC_SIZEWE);
+	plat->cursor_active = 0;
+
+	ShowWindow(plat->hwnd, SW_SHOW);
+	UpdateWindow(plat->hwnd);
+
+	win32_active_ctx = ctx;
+	return 1;
+}
+
+// [=]===^=[ platform_init_child ]=================================[=]
+static uint32_t platform_init_child(struct mkgui_ctx *ctx, struct mkgui_ctx *parent, const char *title, int32_t w, int32_t h) {
+	struct mkgui_platform *plat = &ctx->plat;
+	platform_register_class();
+
+	RECT rc = { 0, 0, w, h };
+	AdjustWindowRect(&rc, WS_OVERLAPPEDWINDOW, FALSE);
+
+	plat->hwnd = CreateWindowExA(0, "mkgui", title, WS_OVERLAPPEDWINDOW,
+		CW_USEDEFAULT, CW_USEDEFAULT, rc.right - rc.left, rc.bottom - rc.top,
+		parent->plat.hwnd, NULL, GetModuleHandleA(NULL), NULL);
+
+	if(!plat->hwnd) {
+		return 0;
+	}
+
+	plat->is_child = 1;
+	plat->parent_hwnd = parent->plat.hwnd;
+
+	ctx->win_w = w;
+	ctx->win_h = h;
+
+	HDC hdc = GetDC(plat->hwnd);
+	platform_fb_create_dib(hdc, &plat->hdc_mem, &plat->hbmp, &plat->hbmp_old, &ctx->pixels, w, h);
+	ReleaseDC(plat->hwnd, hdc);
+
+	plat->cursor_default = LoadCursorA(NULL, IDC_ARROW);
+	plat->cursor_h_resize = LoadCursorA(NULL, IDC_SIZEWE);
+	plat->cursor_active = 0;
+
+	ShowWindow(plat->hwnd, SW_SHOW);
+	UpdateWindow(plat->hwnd);
+
+	win32_active_ctx = ctx;
+	return 1;
+}
+
+// [=]===^=[ platform_destroy ]====================================[=]
+static void platform_destroy(struct mkgui_ctx *ctx) {
+	struct mkgui_platform *plat = &ctx->plat;
+	platform_fb_destroy_dib(&plat->hdc_mem, &plat->hbmp, &plat->hbmp_old);
+	if(plat->hwnd) {
+		DestroyWindow(plat->hwnd);
+		plat->hwnd = NULL;
+	}
+	if(win32_active_ctx == ctx) {
+		win32_active_ctx = NULL;
+	}
+}
+
+// [=]===^=[ platform_set_cursor ]=================================[=]
+static void platform_set_cursor(struct mkgui_ctx *ctx, uint32_t cursor_type) {
+	struct mkgui_platform *plat = &ctx->plat;
+	if(plat->cursor_active == cursor_type) {
+		return;
+	}
+	plat->cursor_active = cursor_type;
+	SetCursor(cursor_type ? plat->cursor_h_resize : plat->cursor_default);
+}
+
+// ---------------------------------------------------------------------------
+// Framebuffer resize
+// ---------------------------------------------------------------------------
+
+// [=]===^=[ platform_fb_resize ]==================================[=]
+static void platform_fb_resize(struct mkgui_ctx *ctx) {
+	struct mkgui_platform *plat = &ctx->plat;
+	platform_fb_destroy_dib(&plat->hdc_mem, &plat->hbmp, &plat->hbmp_old);
+	HDC hdc = GetDC(plat->hwnd);
+	platform_fb_create_dib(hdc, &plat->hdc_mem, &plat->hbmp, &plat->hbmp_old, &ctx->pixels, ctx->win_w, ctx->win_h);
+	ReleaseDC(plat->hwnd, hdc);
+}
+
+// ---------------------------------------------------------------------------
+// Blit / flush
+// ---------------------------------------------------------------------------
+
+// [=]===^=[ platform_blit ]=======================================[=]
+static void platform_blit(struct mkgui_ctx *ctx) {
+	struct mkgui_platform *plat = &ctx->plat;
+	HDC hdc = GetDC(plat->hwnd);
+	BitBlt(hdc, 0, 0, ctx->win_w, ctx->win_h, plat->hdc_mem, 0, 0, SRCCOPY);
+	ReleaseDC(plat->hwnd, hdc);
+}
+
+// [=]===^=[ platform_blit_region ]================================[=]
+static void platform_blit_region(struct mkgui_ctx *ctx, int32_t x, int32_t y, int32_t w, int32_t h) {
+	struct mkgui_platform *plat = &ctx->plat;
+	HDC hdc = GetDC(plat->hwnd);
+	BitBlt(hdc, x, y, w, h, plat->hdc_mem, x, y, SRCCOPY);
+	ReleaseDC(plat->hwnd, hdc);
+}
+
+// [=]===^=[ platform_popup_blit ]=================================[=]
+static void platform_popup_blit(struct mkgui_ctx *ctx, struct mkgui_popup *p) {
+	(void)ctx;
+	HDC hdc = GetDC(p->plat.hwnd);
+	BitBlt(hdc, 0, 0, p->w, p->h, p->plat.hdc_mem, 0, 0, SRCCOPY);
+	ReleaseDC(p->plat.hwnd, hdc);
+}
+
+// [=]===^=[ platform_flush ]======================================[=]
+static void platform_flush(struct mkgui_ctx *ctx) {
+	(void)ctx;
+	GdiFlush();
+}
+
+// ---------------------------------------------------------------------------
+// Popup windows
+// ---------------------------------------------------------------------------
+
+// [=]===^=[ platform_popup_init ]=================================[=]
+static uint32_t platform_popup_init(struct mkgui_ctx *ctx, struct mkgui_popup *p, int32_t x, int32_t y, int32_t w, int32_t h) {
+	struct mkgui_platform *plat = &ctx->plat;
+
+	p->plat.hwnd = CreateWindowExA(WS_EX_TOPMOST | WS_EX_TOOLWINDOW, "mkgui", "",
+		WS_POPUP | WS_VISIBLE, x, y, w, h,
+		plat->hwnd, NULL, GetModuleHandleA(NULL), NULL);
+
+	if(!p->plat.hwnd) {
+		return 0;
+	}
+
+	HDC hdc = GetDC(p->plat.hwnd);
+	platform_fb_create_dib(hdc, &p->plat.hdc_mem, &p->plat.hbmp, &p->plat.hbmp_old, &p->pixels, w, h);
+	ReleaseDC(p->plat.hwnd, hdc);
+
+	return 1;
+}
+
+// [=]===^=[ platform_popup_fini ]=================================[=]
+static void platform_popup_fini(struct mkgui_ctx *ctx, struct mkgui_popup *p) {
+	(void)ctx;
+	platform_fb_destroy_dib(&p->plat.hdc_mem, &p->plat.hbmp, &p->plat.hbmp_old);
+	if(p->plat.hwnd) {
+		DestroyWindow(p->plat.hwnd);
+		p->plat.hwnd = NULL;
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Screen size
+// ---------------------------------------------------------------------------
+
+// [=]===^=[ platform_screen_size ]================================[=]
+static void platform_screen_size(struct mkgui_ctx *ctx, int32_t *sw, int32_t *sh) {
+	(void)ctx;
+	*sw = GetSystemMetrics(SM_CXSCREEN);
+	*sh = GetSystemMetrics(SM_CYSCREEN);
+}
+
+// ---------------------------------------------------------------------------
+// Coordinate translation
+// ---------------------------------------------------------------------------
+
+// [=]===^=[ platform_translate_coords ]===========================[=]
+static void platform_translate_coords(struct mkgui_ctx *ctx, int32_t lx, int32_t ly, int32_t *sx, int32_t *sy) {
+	POINT pt = { lx, ly };
+	ClientToScreen(ctx->plat.hwnd, &pt);
+	*sx = pt.x;
+	*sy = pt.y;
+}
+
+// ---------------------------------------------------------------------------
+// Event translation
+// ---------------------------------------------------------------------------
+
+// [=]===^=[ platform_pending ]====================================[=]
+static uint32_t platform_pending(struct mkgui_ctx *ctx) {
+	win32_active_ctx = ctx;
+	MSG msg;
+	while(PeekMessageA(&msg, NULL, 0, 0, PM_REMOVE)) {
+		TranslateMessage(&msg);
+		DispatchMessageA(&msg);
+	}
+	return evq_head != evq_tail;
+}
+
+// [=]===^=[ platform_next_event ]=================================[=]
+static void platform_next_event(struct mkgui_ctx *ctx, struct mkgui_plat_event *pev) {
+	(void)ctx;
+	if(!evq_pop(pev)) {
+		memset(pev, 0, sizeof(*pev));
+		pev->popup_idx = -1;
+		pev->type = MKGUI_PLAT_NONE;
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Font rendering (GDI)
+// ---------------------------------------------------------------------------
+
+static HDC plat_font_dc;
+static HFONT plat_font_handle;
+
+// [=]===^=[ platform_font_init ]==================================[=]
+static void platform_font_init(struct mkgui_ctx *ctx) {
+	plat_font_dc = CreateCompatibleDC(NULL);
+	if(!plat_font_dc) {
+		ctx->font_ascent = 11;
+		ctx->font_height = 13;
+		ctx->char_width = 7;
+		return;
+	}
+
+	plat_font_handle = CreateFontA(
+		-13, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
+		DEFAULT_CHARSET, OUT_TT_PRECIS, CLIP_DEFAULT_PRECIS,
+		ANTIALIASED_QUALITY, DEFAULT_PITCH | FF_DONTCARE,
+		"Segoe UI");
+
+	if(!plat_font_handle) {
+		plat_font_handle = CreateFontA(
+			-13, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
+			DEFAULT_CHARSET, OUT_TT_PRECIS, CLIP_DEFAULT_PRECIS,
+			ANTIALIASED_QUALITY, DEFAULT_PITCH | FF_DONTCARE,
+			"Tahoma");
+	}
+
+	if(!plat_font_handle) {
+		ctx->font_ascent = 11;
+		ctx->font_height = 13;
+		ctx->char_width = 7;
+		return;
+	}
+
+	SelectObject(plat_font_dc, plat_font_handle);
+
+	TEXTMETRICA tm;
+	GetTextMetricsA(plat_font_dc, &tm);
+	ctx->font_ascent = tm.tmAscent;
+	ctx->font_height = tm.tmAscent + tm.tmDescent;
+
+	MAT2 mat = { {0,1}, {0,0}, {0,0}, {0,1} };
+
+	for(uint32_t c = MKGUI_GLYPH_FIRST; c <= MKGUI_GLYPH_LAST; ++c) {
+		GLYPHMETRICS gm;
+		DWORD buf_size = GetGlyphOutlineA(plat_font_dc, c, GGO_GRAY8_BITMAP, &gm, 0, NULL, &mat);
+		if(buf_size == GDI_ERROR || buf_size == 0) {
+			struct mkgui_glyph *g = &ctx->glyphs[c - MKGUI_GLYPH_FIRST];
+			ABC abc;
+			if(GetCharABCWidthsA(plat_font_dc, c, c, &abc)) {
+				g->advance = abc.abcA + (int32_t)abc.abcB + abc.abcC;
+			} else {
+				g->advance = 7;
+			}
+			continue;
+		}
+
+		uint8_t *tmp = (uint8_t *)malloc(buf_size);
+		if(!tmp) {
+			continue;
+		}
+		GetGlyphOutlineA(plat_font_dc, c, GGO_GRAY8_BITMAP, &gm, buf_size, tmp, &mat);
+
+		struct mkgui_glyph *g = &ctx->glyphs[c - MKGUI_GLYPH_FIRST];
+		g->width = (int32_t)gm.gmBlackBoxX;
+		g->height = (int32_t)gm.gmBlackBoxY;
+		g->bearing_x = gm.gmptGlyphOrigin.x;
+		g->bearing_y = gm.gmptGlyphOrigin.y;
+		g->advance = gm.gmCellIncX;
+
+		uint32_t pitch = (gm.gmBlackBoxX + 3) & ~3u;
+		uint32_t bmp_size = (uint32_t)(g->width * g->height);
+		if(bmp_size > MKGUI_GLYPH_MAX_BMP) {
+			bmp_size = MKGUI_GLYPH_MAX_BMP;
+		}
+
+		for(uint32_t y = 0; y < (uint32_t)g->height && y * (uint32_t)g->width < bmp_size; ++y) {
+			for(uint32_t x = 0; x < (uint32_t)g->width; ++x) {
+				uint32_t idx = y * (uint32_t)g->width + x;
+				if(idx >= bmp_size) {
+					break;
+				}
+				uint8_t val = tmp[y * pitch + x];
+				g->bitmap[idx] = (uint8_t)(val * 255 / 64);
+			}
+		}
+
+		free(tmp);
+	}
+
+	ctx->char_width = ctx->glyphs['M' - MKGUI_GLYPH_FIRST].advance;
+	if(ctx->char_width == 0) {
+		ctx->char_width = 7;
+	}
+}
+
+// [=]===^=[ platform_font_fini ]==================================[=]
+static void platform_font_fini(struct mkgui_ctx *ctx) {
+	(void)ctx;
+	if(plat_font_handle) {
+		DeleteObject(plat_font_handle);
+		plat_font_handle = NULL;
+	}
+	if(plat_font_dc) {
+		DeleteDC(plat_font_dc);
+		plat_font_dc = NULL;
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Icon font rendering (GDI)
+// ---------------------------------------------------------------------------
+
+static HANDLE icon_font_res;
+static HFONT icon_font_handle;
+static HDC icon_font_dc;
+static uint32_t icon_font_size;
+
+static const uint8_t *cmap12_groups;
+static uint32_t cmap12_ngroups;
+
+// [=]===^=[ be16 ]================================================[=]
+static uint16_t be16(const uint8_t *p) {
+	return (uint16_t)((p[0] << 8) | p[1]);
+}
+
+// [=]===^=[ be32 ]================================================[=]
+static uint32_t be32(const uint8_t *p) {
+	return ((uint32_t)p[0] << 24) | ((uint32_t)p[1] << 16) | ((uint32_t)p[2] << 8) | p[3];
+}
+
+// [=]===^=[ cmap12_parse ]========================================[=]
+static void cmap12_parse(const uint8_t *data, size_t size) {
+	cmap12_groups = NULL;
+	cmap12_ngroups = 0;
+
+	if(size < 12) {
+		return;
+	}
+	uint16_t num_tables = be16(data + 4);
+	uint32_t cmap_off = 0;
+	for(uint16_t i = 0; i < num_tables; ++i) {
+		uint32_t rec = 12 + i * 16;
+		if(rec + 16 > size) {
+			break;
+		}
+		if(data[rec] == 'c' && data[rec + 1] == 'm' && data[rec + 2] == 'a' && data[rec + 3] == 'p') {
+			cmap_off = be32(data + rec + 8);
+			break;
+		}
+	}
+	if(!cmap_off || cmap_off + 4 > size) {
+		return;
+	}
+
+	uint16_t num_sub = be16(data + cmap_off + 2);
+	for(uint16_t i = 0; i < num_sub; ++i) {
+		uint32_t rec = cmap_off + 4 + i * 8;
+		if(rec + 8 > size) {
+			break;
+		}
+		uint32_t sub_off = cmap_off + be32(data + rec + 4);
+		if(sub_off + 16 > size) {
+			continue;
+		}
+		uint16_t fmt = be16(data + sub_off);
+		if(fmt == 12) {
+			uint32_t ng = be32(data + sub_off + 12);
+			if(sub_off + 16 + ng * 12 > size) {
+				continue;
+			}
+			cmap12_groups = data + sub_off + 16;
+			cmap12_ngroups = ng;
+			return;
+		}
+	}
+}
+
+// [=]===^=[ cmap12_lookup ]=======================================[=]
+static uint32_t cmap12_lookup(uint32_t codepoint) {
+	if(!cmap12_groups || cmap12_ngroups == 0) {
+		return 0;
+	}
+	uint32_t lo = 0;
+	uint32_t hi = cmap12_ngroups - 1;
+	while(lo <= hi) {
+		uint32_t mid = (lo + hi) / 2;
+		const uint8_t *g = cmap12_groups + mid * 12;
+		uint32_t start = be32(g);
+		uint32_t end = be32(g + 4);
+		if(codepoint < start) {
+			if(mid == 0) {
+				break;
+			}
+			hi = mid - 1;
+		} else if(codepoint > end) {
+			lo = mid + 1;
+		} else {
+			uint32_t gid = be32(g + 8);
+			return gid + (codepoint - start);
+		}
+	}
+	return 0;
+}
+
+// [=]===^=[ platform_icon_font_init ]=============================[=]
+static uint32_t platform_icon_font_init(const unsigned char *data, size_t size, uint32_t pixel_size) {
+	if(icon_font_handle) {
+		return 1;
+	}
+
+	cmap12_parse(data, size);
+	if(!cmap12_groups) {
+		fprintf(stderr, "mkgui: MDI font has no cmap format 12 table\n");
+		return 0;
+	}
+
+	DWORD num_fonts = 0;
+	icon_font_res = AddFontMemResourceEx((void *)data, (DWORD)size, 0, &num_fonts);
+	if(!icon_font_res || num_fonts == 0) {
+		fprintf(stderr, "mkgui: cannot load MDI font (%zu bytes)\n", size);
+		return 0;
+	}
+
+	icon_font_handle = CreateFontA(
+		-(int32_t)pixel_size, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
+		DEFAULT_CHARSET, OUT_TT_PRECIS, CLIP_DEFAULT_PRECIS,
+		ANTIALIASED_QUALITY, DEFAULT_PITCH | FF_DONTCARE,
+		"Material Design Icons");
+
+	if(!icon_font_handle) {
+		fprintf(stderr, "mkgui: cannot create MDI font handle\n");
+		return 0;
+	}
+
+	icon_font_dc = CreateCompatibleDC(NULL);
+	SelectObject(icon_font_dc, icon_font_handle);
+	icon_font_size = pixel_size;
+
+	return 1;
+}
+
+// [=]===^=[ platform_icon_render_glyph ]==========================[=]
+static uint32_t platform_icon_render_glyph(uint32_t codepoint, uint32_t color, uint32_t *dst, uint32_t size) {
+	uint32_t glyph_idx = cmap12_lookup(codepoint);
+	if(glyph_idx == 0) {
+		return 0;
+	}
+
+	MAT2 mat = { {0,1}, {0,0}, {0,0}, {0,1} };
+	GLYPHMETRICS gm;
+
+	DWORD buf_size = GetGlyphOutlineW(icon_font_dc, glyph_idx, GGO_GRAY8_BITMAP | GGO_GLYPH_INDEX, &gm, 0, NULL, &mat);
+	if(buf_size == GDI_ERROR || buf_size == 0) {
+		return 0;
+	}
+
+	uint8_t *tmp = (uint8_t *)malloc(buf_size);
+	if(!tmp) {
+		return 0;
+	}
+	GetGlyphOutlineW(icon_font_dc, glyph_idx, GGO_GRAY8_BITMAP | GGO_GLYPH_INDEX, &gm, buf_size, tmp, &mat);
+
+	uint32_t pixels = size * size;
+	memset(dst, 0, pixels * sizeof(uint32_t));
+
+	int32_t gw = (int32_t)gm.gmBlackBoxX;
+	int32_t gh = (int32_t)gm.gmBlackBoxY;
+	int32_t ox = ((int32_t)size - gw) / 2;
+	int32_t oy = ((int32_t)size - gh) / 2;
+	uint32_t pitch = (gm.gmBlackBoxX + 3) & ~3u;
+
+	uint8_t cr = (color >> 16) & 0xff;
+	uint8_t cg = (color >> 8) & 0xff;
+	uint8_t cb = color & 0xff;
+
+	for(int32_t y = 0; y < gh; ++y) {
+		int32_t dy = y + oy;
+		if(dy < 0 || dy >= (int32_t)size) {
+			continue;
+		}
+		for(int32_t x = 0; x < gw; ++x) {
+			int32_t dx = x + ox;
+			if(dx < 0 || dx >= (int32_t)size) {
+				continue;
+			}
+			uint8_t val = tmp[y * pitch + x];
+			if(val > 0) {
+				uint8_t a = (uint8_t)(val * 255 / 64);
+				dst[dy * (int32_t)size + dx] = ((uint32_t)a << 24) | ((uint32_t)cr << 16) | ((uint32_t)cg << 8) | cb;
+			}
+		}
+	}
+
+	free(tmp);
+	return 1;
+}
+
+// ---------------------------------------------------------------------------
+// Clipboard
+// ---------------------------------------------------------------------------
+
+// [=]===^=[ platform_clipboard_set ]==============================[=]
+static void platform_clipboard_set(struct mkgui_ctx *ctx, const char *text, uint32_t len) {
+	if(len >= MKGUI_CLIP_MAX) {
+		len = MKGUI_CLIP_MAX - 1;
+	}
+	memcpy(ctx->clip_text, text, len);
+	ctx->clip_text[len] = '\0';
+	ctx->clip_len = len;
+
+	if(!OpenClipboard(ctx->plat.hwnd)) {
+		return;
+	}
+	EmptyClipboard();
+	HGLOBAL hg = GlobalAlloc(GMEM_MOVEABLE, len + 1);
+	if(hg) {
+		char *p = (char *)GlobalLock(hg);
+		memcpy(p, text, len);
+		p[len] = '\0';
+		GlobalUnlock(hg);
+		SetClipboardData(CF_TEXT, hg);
+	}
+	CloseClipboard();
+}
+
+// [=]===^=[ platform_clipboard_get ]==============================[=]
+static uint32_t platform_clipboard_get(struct mkgui_ctx *ctx, char *buf, uint32_t buf_size) {
+	if(!OpenClipboard(ctx->plat.hwnd)) {
+		return 0;
+	}
+	HANDLE h = GetClipboardData(CF_TEXT);
+	if(!h) {
+		CloseClipboard();
+		return 0;
+	}
+	const char *p = (const char *)GlobalLock(h);
+	if(!p) {
+		CloseClipboard();
+		return 0;
+	}
+	uint32_t len = (uint32_t)strlen(p);
+	if(len >= buf_size) {
+		len = buf_size - 1;
+	}
+	memcpy(buf, p, len);
+	buf[len] = '\0';
+	GlobalUnlock(h);
+	CloseClipboard();
+	return len;
+}
+
+// ---------------------------------------------------------------------------
+// GL view child window
+// ---------------------------------------------------------------------------
+
+// [=]===^=[ platform_glview_create ]==============================[=]
+static uint32_t platform_glview_create(struct mkgui_ctx *ctx, struct mkgui_glview_data *gv, int32_t x, int32_t y, int32_t w, int32_t h) {
+	gv->plat.hwnd = CreateWindowExA(0, "STATIC", "", WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS,
+		x, y, w, h, ctx->plat.hwnd, NULL, GetModuleHandle(NULL), NULL);
+	if(!gv->plat.hwnd) {
+		return 0;
+	}
+	return 1;
+}
+
+// [=]===^=[ platform_glview_destroy ]=============================[=]
+static void platform_glview_destroy(struct mkgui_ctx *ctx, struct mkgui_glview_data *gv) {
+	(void)ctx;
+	if(gv->plat.hwnd) {
+		DestroyWindow(gv->plat.hwnd);
+		gv->plat.hwnd = NULL;
+	}
+}
+
+// [=]===^=[ platform_glview_reposition ]==========================[=]
+static void platform_glview_reposition(struct mkgui_ctx *ctx, struct mkgui_glview_data *gv, int32_t x, int32_t y, int32_t w, int32_t h) {
+	(void)ctx;
+	if(!gv->plat.hwnd) {
+		return;
+	}
+	MoveWindow(gv->plat.hwnd, x, y, w, h, TRUE);
+}
+
+// [=]===^=[ platform_glview_show ]================================[=]
+static void platform_glview_show(struct mkgui_ctx *ctx, struct mkgui_glview_data *gv, uint32_t visible) {
+	(void)ctx;
+	if(!gv->plat.hwnd) {
+		return;
+	}
+	ShowWindow(gv->plat.hwnd, visible ? SW_SHOW : SW_HIDE);
+}
+
