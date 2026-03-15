@@ -3,6 +3,7 @@
 		"demo": true,
 		"demo.exe": true,
 		"editor": true,
-		"editor.exe": true
+		"editor.exe": true,
+		"tools/gen_icons": true,
 	}
 }

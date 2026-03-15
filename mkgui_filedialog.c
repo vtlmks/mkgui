@@ -648,7 +648,6 @@ static uint32_t fd_run_dialog(struct mkgui_ctx *ctx, uint32_t mode, const char *
 			}
 		}
 
-		mkgui_sleep_ms(16);
 	}
 
 	mkgui_destroy_child(dlg);

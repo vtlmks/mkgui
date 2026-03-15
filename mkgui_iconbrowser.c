@@ -47,15 +47,16 @@ static void ib_scan_category(uint32_t cat) {
 	char lo = ib_cat_start[cat];
 	char hi = ib_cat_end[cat];
 
-	for(uint32_t i = 0; i < MDI_ICON_COUNT && ib.count < IB_MAX_ICONS; ++i) {
-		char first = mdi_icons[i].name[0];
+	for(uint32_t i = 0; i < mdi_icon_count && ib.count < IB_MAX_ICONS; ++i) {
+		const char *name = mdi_name_block + mdi_name_offsets[i];
+		char first = name[0];
 		if(first < lo) {
 			continue;
 		}
 		if(first > hi) {
 			break;
 		}
-		strncpy(ib.names[ib.count], mdi_icons[i].name, IB_ICON_NAME - 1);
+		strncpy(ib.names[ib.count], name, IB_ICON_NAME - 1);
 		ib.names[ib.count][IB_ICON_NAME - 1] = '\0';
 		++ib.count;
 	}
@@ -162,8 +163,6 @@ static uint32_t mkgui_icon_browser(struct mkgui_ctx *ctx, char *out, uint32_t ou
 				default: break;
 			}
 		}
-
-		mkgui_sleep_ms(16);
 	}
 
 	mkgui_destroy_child(dlg);

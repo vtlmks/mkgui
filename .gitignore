@@ -3,4 +3,7 @@ editor
 *.exe
 ext/nanosvg.h
 ext/nanosvgrast.h
+tools/gen_icons
+ext/mdi_icons.dat
+mdi_icons.dat
 

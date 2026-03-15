@@ -736,7 +736,9 @@ MKGUI_SPLITTER_THICK    5    // splitter handle thickness
 
 ## Icons
 
-mkgui supports 16x16 icons on toolbar buttons, menu items, buttons, tabs, treeview nodes, and listview cells (via `MKGUI_CELL_ICON_TEXT`). Icons are rendered from the embedded Material Design Icons (MDI) font using the icon's name (e.g. `"folder-open"`, `"content-save"`).
+mkgui uses pre-rasterized icons from the Material Design Icons (MDI) set, stored in an external `mdi_icons.dat` file. This file must be placed next to the executable (or in `ext/` during development). At startup, mkgui looks for it at `mdi_icons.dat` then `ext/mdi_icons.dat`.
+
+Icons are looked up by name (e.g. `"folder-open"`, `"content-save"`) and rendered at the size baked into the `.dat` file (default 18x18). Browse available icons at https://pictogrammers.com/library/mdi/.
 
 ```c
 // Set icon on a widget (toolbar button, menu item, button, tab)
@@ -746,7 +748,39 @@ void mkgui_set_icon(struct mkgui_ctx *ctx, uint32_t widget_id, const char *icon_
 void mkgui_set_treenode_icon(struct mkgui_ctx *ctx, uint32_t widget_id, uint32_t node_id, const char *icon_name);
 ```
 
-Icon names follow the MDI naming convention (e.g. `folder-open`, `content-copy`, `file-document`). The icon is rendered to the left of the widget label. Browse available icons at https://pictogrammers.com/library/mdi/.
+### Generating the icon pack
+
+The icon pack is generated from the MDI TTF font using the `gen_icons` tool:
+
+```bash
+./tools/gen_icons ext/materialdesignicons-webfont.ttf 18 mdi_icons.dat
+```
+
+The second argument is the icon size in pixels. Regenerate with a different size at any time.
+
+### Custom icons
+
+Register custom ARGB icons at any size using `mkgui_icon_add`. Custom icons override `.dat` icons with the same name and are not affected by theme changes (the caller owns the pixel data).
+
+```c
+int32_t mkgui_icon_add(const char *name, const uint32_t *pixels, int32_t w, int32_t h);
+```
+
+- `name` -- icon name (same namespace as MDI names)
+- `pixels` -- ARGB pixel data (alpha in bits 31-24), copied internally
+- `w`, `h` -- icon dimensions (any size)
+- Returns the icon index, or -1 on failure
+
+This is useful for app-specific icons or for providing larger icons (e.g. 24x24) for icon-only toolbars:
+
+```c
+// Load or generate a 24x24 ARGB icon
+uint32_t my_icon[24 * 24];
+load_png("my_save_icon.png", my_icon, 24, 24);
+mkgui_icon_add("content-save", my_icon, 24, 24);
+```
+
+If an icon with the same name already exists, it is replaced.
 
 Override the font with the `MKGUI_FONT` environment variable:
 

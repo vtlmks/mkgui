@@ -493,6 +493,7 @@ struct mkgui_icon {
 	char name[MKGUI_ICON_NAME_LEN];
 	uint32_t *pixels;
 	int32_t w, h;
+	uint32_t custom;
 };
 
 static uint32_t icon_pixels[MKGUI_ICON_PIXEL_POOL];
@@ -501,6 +502,14 @@ static struct mkgui_icon icons[MKGUI_MAX_ICONS];
 static uint32_t icon_count;
 
 static uint32_t icon_text_color;
+
+static uint8_t *mdi_dat;
+static uint32_t mdi_dat_size;
+static uint16_t mdi_icon_size;
+static uint16_t mdi_icon_count;
+static const char *mdi_name_block;
+static const uint32_t *mdi_name_offsets;
+static const uint8_t *mdi_pixel_data;
 
 struct mkgui_ctx {
 	struct mkgui_platform plat;
@@ -2373,6 +2382,7 @@ static void mkgui_destroy(struct mkgui_ctx *ctx) {
 	}
 	platform_font_fini(ctx);
 	platform_destroy(ctx);
+	mdi_dat_free();
 	free(ctx);
 }
 
