@@ -101,7 +101,8 @@ static void render_radio(struct mkgui_ctx *ctx, uint32_t idx) {
 	int32_t outer_r = 7;
 	int32_t inner_r = 6;
 
-	uint32_t border = (ctx->focus_id == w->id) ? ctx->theme.splitter : ctx->theme.widget_border;
+	uint32_t hovered = (ctx->hover_id == w->id);
+	uint32_t border = (ctx->focus_id == w->id || hovered) ? ctx->theme.splitter : ctx->theme.widget_border;
 	draw_aa_circle_ring(ctx->pixels, ctx->win_w, ctx->win_h, cx, cy, outer_r, inner_r, ctx->theme.widget_bg, border);
 
 	if(w->flags & MKGUI_CHECKED) {

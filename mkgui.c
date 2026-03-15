@@ -324,6 +324,7 @@ struct mkgui_slider_data {
 struct mkgui_tabs_data {
 	uint32_t widget_id;
 	uint32_t active_tab;
+	uint32_t hover_tab;
 };
 
 struct mkgui_split_data {
@@ -372,6 +373,7 @@ struct mkgui_spinbox_data {
 	int32_t max_val;
 	int32_t value;
 	int32_t step;
+	int32_t hover_btn;
 };
 
 struct mkgui_progress_data {
@@ -470,6 +472,7 @@ struct mkgui_theme {
 	uint32_t input_bg;
 	uint32_t tab_active;
 	uint32_t tab_inactive;
+	uint32_t tab_hover;
 	uint32_t menu_bg;
 	uint32_t menu_hover;
 	uint32_t scrollbar_bg;
@@ -615,6 +618,7 @@ static struct mkgui_theme default_theme(void) {
 	t.input_bg            = 0xff1a1e21;
 	t.tab_active          = 0xff31363b;
 	t.tab_inactive        = 0xff2a2e32;
+	t.tab_hover           = 0xff353a3f;
 	t.menu_bg             = 0xff31363b;
 	t.menu_hover          = 0xff3daee9;
 	t.scrollbar_bg        = 0xff1d2023;
@@ -643,6 +647,7 @@ static struct mkgui_theme light_theme(void) {
 	t.input_bg              = 0xffffffff;
 	t.tab_active            = 0xffffffff;
 	t.tab_inactive          = 0xffe0e0e0;
+	t.tab_hover             = 0xffebebeb;
 	t.menu_bg               = 0xfffafafa;
 	t.menu_hover            = 0xff3daee9;
 	t.scrollbar_bg          = 0xffe0e0e0;
@@ -1895,13 +1900,13 @@ static void draw_icon_popup(struct mkgui_popup *p, struct mkgui_icon *icon, int3
 #include "mkgui_slider.c"
 #include "mkgui_listview.c"
 #include "mkgui_tabs.c"
+#include "mkgui_radio.c"
 #include "mkgui_menu.c"
 #include "mkgui_split.c"
 #include "mkgui_treeview.c"
 #include "mkgui_statusbar.c"
 #include "mkgui_toolbar.c"
 #include "mkgui_spinbox.c"
-#include "mkgui_radio.c"
 #include "mkgui_progress.c"
 #include "mkgui_textarea.c"
 #include "mkgui_group.c"
@@ -2656,6 +2661,26 @@ static uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 				if(new_hover != ctx->hover_id) {
 					ctx->hover_id = new_hover;
 					dirty_all(ctx);
+				}
+				if(hi >= 0 && ctx->widgets[hi].type == MKGUI_TABS) {
+					struct mkgui_tabs_data *td = find_tabs_data(ctx, ctx->widgets[hi].id);
+					if(td) {
+						uint32_t ht = tab_hit_test(ctx, (uint32_t)hi, ctx->mouse_x, ctx->mouse_y);
+						if(ht != td->hover_tab) {
+							td->hover_tab = ht;
+							dirty_all(ctx);
+						}
+					}
+				}
+				if(hi >= 0 && ctx->widgets[hi].type == MKGUI_SPINBOX) {
+					struct mkgui_spinbox_data *sd = find_spinbox_data(ctx, ctx->widgets[hi].id);
+					if(sd) {
+						int32_t hb = spinbox_btn_hit(ctx, (uint32_t)hi, ctx->mouse_x, ctx->mouse_y);
+						if(hb != sd->hover_btn) {
+							sd->hover_btn = hb;
+							dirty_all(ctx);
+						}
+					}
 				}
 
 				uint32_t want_resize_cursor = 0;

@@ -72,8 +72,9 @@ static void render_checkbox(struct mkgui_ctx *ctx, uint32_t idx) {
 	int32_t by = ry + (rh - box_size) / 2;
 
 	uint32_t focused = (ctx->focus_id == w->id);
+	uint32_t hovered = (ctx->hover_id == w->id);
 	uint32_t bg = (w->flags & MKGUI_CHECKED) ? ctx->theme.splitter : ctx->theme.input_bg;
-	uint32_t border = focused ? ctx->theme.splitter : ctx->theme.widget_border;
+	uint32_t border = (focused || hovered) ? ctx->theme.splitter : ctx->theme.widget_border;
 	draw_patch(ctx, MKGUI_STYLE_SUNKEN, rx, by, box_size, box_size, bg, border);
 
 	if(w->flags & MKGUI_CHECKED) {

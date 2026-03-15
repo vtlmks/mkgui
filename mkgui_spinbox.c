@@ -3,6 +3,23 @@
 
 #define MKGUI_SPINBOX_BTN_W 20
 
+// [=]===^=[ spinbox_btn_hit ]====================================[=]
+static int32_t spinbox_btn_hit(struct mkgui_ctx *ctx, uint32_t idx, int32_t mx, int32_t my) {
+	int32_t rx = ctx->rects[idx].x;
+	int32_t ry = ctx->rects[idx].y;
+	int32_t rw = ctx->rects[idx].w;
+	int32_t rh = ctx->rects[idx].h;
+	int32_t bx = rx + rw - MKGUI_SPINBOX_BTN_W;
+
+	if(mx < bx || mx >= rx + rw) {
+		return 0;
+	}
+	if(my < ry + rh / 2) {
+		return 1;
+	}
+	return -1;
+}
+
 // [=]===^=[ render_spinbox ]=====================================[=]
 static void render_spinbox(struct mkgui_ctx *ctx, uint32_t idx) {
 	struct mkgui_widget *w = &ctx->widgets[idx];
@@ -24,8 +41,10 @@ static void render_spinbox(struct mkgui_ctx *ctx, uint32_t idx) {
 
 	int32_t bx = rx + rw - MKGUI_SPINBOX_BTN_W;
 	int32_t half = rh / 2;
+	int32_t hover_btn = (ctx->hover_id == w->id && sd) ? sd->hover_btn : 0;
 
-	draw_patch(ctx, MKGUI_STYLE_RAISED, bx, ry, MKGUI_SPINBOX_BTN_W, half, ctx->theme.widget_bg, ctx->theme.widget_border);
+	uint32_t up_bg = (hover_btn == 1) ? ctx->theme.widget_hover : ctx->theme.widget_bg;
+	draw_patch(ctx, MKGUI_STYLE_RAISED, bx, ry, MKGUI_SPINBOX_BTN_W, half, up_bg, ctx->theme.widget_border);
 
 	int32_t acx = bx + MKGUI_SPINBOX_BTN_W / 2;
 	int32_t acy = ry + half / 2 - 2;
@@ -33,29 +52,13 @@ static void render_spinbox(struct mkgui_ctx *ctx, uint32_t idx) {
 		draw_hline(ctx->pixels, ctx->win_w, ctx->win_h, acx - j, acy + j, 1 + j * 2, ctx->theme.text);
 	}
 
-	draw_patch(ctx, MKGUI_STYLE_RAISED, bx, ry + half, MKGUI_SPINBOX_BTN_W, rh - half, ctx->theme.widget_bg, ctx->theme.widget_border);
+	uint32_t dn_bg = (hover_btn == -1) ? ctx->theme.widget_hover : ctx->theme.widget_bg;
+	draw_patch(ctx, MKGUI_STYLE_RAISED, bx, ry + half, MKGUI_SPINBOX_BTN_W, rh - half, dn_bg, ctx->theme.widget_border);
 
 	int32_t acy2 = ry + half + (rh - half) / 2 - 2;
 	for(int32_t j = 0; j < 4; ++j) {
 		draw_hline(ctx->pixels, ctx->win_w, ctx->win_h, acx - (3 - j), acy2 + j, 1 + (3 - j) * 2, ctx->theme.text);
 	}
-}
-
-// [=]===^=[ spinbox_btn_hit ]====================================[=]
-static int32_t spinbox_btn_hit(struct mkgui_ctx *ctx, uint32_t idx, int32_t mx, int32_t my) {
-	int32_t rx = ctx->rects[idx].x;
-	int32_t ry = ctx->rects[idx].y;
-	int32_t rw = ctx->rects[idx].w;
-	int32_t rh = ctx->rects[idx].h;
-	int32_t bx = rx + rw - MKGUI_SPINBOX_BTN_W;
-
-	if(mx < bx || mx >= rx + rw) {
-		return 0;
-	}
-	if(my < ry + rh / 2) {
-		return 1;
-	}
-	return -1;
 }
 
 // [=]===^=[ spinbox_adjust ]=====================================[=]

@@ -185,24 +185,9 @@ static void render_menu_popup(struct mkgui_ctx *ctx, struct mkgui_popup *p, uint
 			} else if(mi->flags & MKGUI_MENU_RADIO) {
 				int32_t cx = 8;
 				int32_t cy = iy + MKGUI_ROW_HEIGHT / 2;
-				draw_pixel(p->pixels, p->w, p->h, cx - 1, cy - 3, ctx->theme.text);
-				draw_pixel(p->pixels, p->w, p->h, cx + 0, cy - 3, ctx->theme.text);
-				draw_pixel(p->pixels, p->w, p->h, cx + 1, cy - 3, ctx->theme.text);
-				draw_pixel(p->pixels, p->w, p->h, cx - 2, cy - 2, ctx->theme.text);
-				draw_pixel(p->pixels, p->w, p->h, cx + 2, cy - 2, ctx->theme.text);
-				draw_pixel(p->pixels, p->w, p->h, cx - 3, cy - 1, ctx->theme.text);
-				draw_pixel(p->pixels, p->w, p->h, cx + 3, cy - 1, ctx->theme.text);
-				draw_pixel(p->pixels, p->w, p->h, cx - 3, cy + 0, ctx->theme.text);
-				draw_pixel(p->pixels, p->w, p->h, cx + 3, cy + 0, ctx->theme.text);
-				draw_pixel(p->pixels, p->w, p->h, cx - 3, cy + 1, ctx->theme.text);
-				draw_pixel(p->pixels, p->w, p->h, cx + 3, cy + 1, ctx->theme.text);
-				draw_pixel(p->pixels, p->w, p->h, cx - 2, cy + 2, ctx->theme.text);
-				draw_pixel(p->pixels, p->w, p->h, cx + 2, cy + 2, ctx->theme.text);
-				draw_pixel(p->pixels, p->w, p->h, cx - 1, cy + 3, ctx->theme.text);
-				draw_pixel(p->pixels, p->w, p->h, cx + 0, cy + 3, ctx->theme.text);
-				draw_pixel(p->pixels, p->w, p->h, cx + 1, cy + 3, ctx->theme.text);
+				draw_aa_circle_ring(p->pixels, p->w, p->h, cx, cy, 5, 4, bg, ctx->theme.text);
 				if(mi->flags & MKGUI_CHECKED) {
-					draw_rect_fill(p->pixels, p->w, p->h, cx - 1, cy - 1, 3, 3, ctx->theme.text);
+					draw_aa_circle_fill(p->pixels, p->w, p->h, cx, cy, 3, ctx->theme.text);
 				}
 			}
 
