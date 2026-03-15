@@ -1,5 +1,7 @@
 # mkgui
 
+> **Warning:** This project is under heavy development. APIs are unstable and may change without notice. Not recommended for production use yet.
+
 Minimal GUI toolkit for Linux (X11) and Windows (Win32). Software rendered, single-file unity build. No third-party dependencies beyond FreeType2 and Xlib (Linux) or GDI (Windows).
 
 ## Getting started
