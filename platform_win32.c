@@ -500,6 +500,23 @@ static void platform_translate_coords(struct mkgui_ctx *ctx, int32_t lx, int32_t
 // Event translation
 // ---------------------------------------------------------------------------
 
+// [=]===^=[ platform_wait_event ]=================================[=]
+static void platform_wait_event(struct mkgui_ctx *ctx, int32_t timeout_ms) {
+	if(timeout_ms == 0 || evq_head != evq_tail) {
+		return;
+	}
+	win32_active_ctx = ctx;
+	MSG msg;
+	while(PeekMessageA(&msg, NULL, 0, 0, PM_REMOVE)) {
+		TranslateMessage(&msg);
+		DispatchMessageA(&msg);
+	}
+	if(evq_head != evq_tail) {
+		return;
+	}
+	MsgWaitForMultipleObjects(0, NULL, FALSE, (DWORD)timeout_ms, QS_ALLINPUT);
+}
+
 // [=]===^=[ platform_pending ]====================================[=]
 static uint32_t platform_pending(struct mkgui_ctx *ctx) {
 	win32_active_ctx = ctx;

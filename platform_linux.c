@@ -279,6 +279,17 @@ static void platform_translate_coords(struct mkgui_ctx *ctx, int32_t lx, int32_t
 // Event translation
 // ---------------------------------------------------------------------------
 
+// [=]===^=[ platform_wait_event ]=================================[=]
+static void platform_wait_event(struct mkgui_ctx *ctx, int32_t timeout_ms) {
+	if(timeout_ms == 0 || XPending(ctx->plat.dpy) > 0) {
+		return;
+	}
+	struct pollfd pfd;
+	pfd.fd = ConnectionNumber(ctx->plat.dpy);
+	pfd.events = POLLIN;
+	poll(&pfd, 1, timeout_ms);
+}
+
 // [=]===^=[ platform_pending ]====================================[=]
 static uint32_t platform_pending(struct mkgui_ctx *ctx) {
 	return XPending(ctx->plat.dpy) > 0;

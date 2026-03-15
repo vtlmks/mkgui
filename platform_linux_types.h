@@ -8,6 +8,7 @@
 #include <X11/cursorfont.h>
 #include <X11/extensions/XShm.h>
 #include <sys/shm.h>
+#include <poll.h>
 #include <ft2build.h>
 #include FT_FREETYPE_H
 

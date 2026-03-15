@@ -571,7 +571,6 @@ int main(void) {
 			}
 		}
 
-		mkgui_sleep_ms(16);
 	}
 
 #ifdef _WIN32

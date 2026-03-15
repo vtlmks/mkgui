@@ -1865,7 +1865,6 @@ static void ed_test_gui(void) {
 				running = 0;
 			}
 		}
-		mkgui_sleep_ms(16);
 	}
 
 	mkgui_destroy(test);
@@ -2588,7 +2587,6 @@ int main(void) {
 			prev_press = ctx->press_id;
 		}
 
-		mkgui_sleep_ms(16);
 	}
 
 	mkgui_destroy(ctx);

@@ -584,6 +584,7 @@ struct mkgui_ctx {
 	struct timespec anim_prev;
 #endif
 	uint32_t anim_active;
+	int32_t poll_timeout_ms;
 
 	struct mkgui_glyph glyphs[MKGUI_GLYPH_COUNT];
 	int32_t font_ascent;
@@ -2332,6 +2333,7 @@ static struct mkgui_ctx *mkgui_create(struct mkgui_widget *widgets, uint32_t cou
 	clock_gettime(CLOCK_MONOTONIC, &ctx->anim_prev);
 #endif
 	ctx->anim_time = 0.0;
+	ctx->poll_timeout_ms = -1;
 
 	init_aux_data(ctx);
 
@@ -2411,6 +2413,7 @@ static struct mkgui_ctx *mkgui_create_child(struct mkgui_ctx *parent, struct mkg
 	clock_gettime(CLOCK_MONOTONIC, &ctx->anim_prev);
 #endif
 	ctx->anim_time = 0.0;
+	ctx->poll_timeout_ms = -1;
 
 	init_aux_data(ctx);
 
@@ -2479,6 +2482,20 @@ static uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 				dirty_widget(ctx, i);
 			}
 		}
+	}
+
+	if(!platform_pending(ctx)) {
+		int32_t wait_ms;
+		if(ctx->poll_timeout_ms == 0) {
+			wait_ms = 0;
+
+		} else if(ctx->poll_timeout_ms > 0) {
+			wait_ms = ctx->poll_timeout_ms;
+
+		} else {
+			wait_ms = ctx->anim_active ? 16 : -1;
+		}
+		platform_wait_event(ctx, wait_ms);
 	}
 
 	while(platform_pending(ctx)) {
@@ -3513,6 +3530,11 @@ static uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 	}
 
 	return 0;
+}
+
+// [=]===^=[ mkgui_set_poll_timeout ]==============================[=]
+static void mkgui_set_poll_timeout(struct mkgui_ctx *ctx, int32_t ms) {
+	ctx->poll_timeout_ms = ms;
 }
 
 // ---------------------------------------------------------------------------

@@ -47,7 +47,6 @@ int main(void) {
                 mkgui_label_set(ctx, ID_LBL, "Clicked!");
             }
         }
-        mkgui_sleep_ms(16);
     }
 
     mkgui_destroy(ctx);
@@ -228,16 +227,54 @@ struct mkgui_event {
 struct mkgui_ctx *mkgui_create(struct mkgui_widget *widgets, uint32_t count);
 void mkgui_destroy(struct mkgui_ctx *ctx);
 uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev);
+void mkgui_set_poll_timeout(struct mkgui_ctx *ctx, int32_t ms);
 ```
 
-`mkgui_create` takes a widget array and returns a context. `mkgui_poll` processes platform events and renders when dirty. Returns 1 if an event was written to `ev`, 0 otherwise. Call in a loop:
+`mkgui_create` takes a widget array and returns a context. `mkgui_poll` processes platform events and renders when dirty. Returns 1 if an event was written to `ev`, 0 otherwise.
+
+When the event queue is empty, `mkgui_poll` blocks internally instead of returning immediately. This means no external sleep is needed -- the standard mainloop is simply:
 
 ```c
-while(mkgui_poll(ctx, &ev)) {
-    // handle ev
+while(running) {
+    while(mkgui_poll(ctx, &ev)) {
+        // handle ev
+    }
+    // timeout expired, do per-frame work here if needed
 }
-nanosleep(...); // ~16ms to avoid busy-waiting
 ```
+
+#### Poll timeout modes
+
+`mkgui_set_poll_timeout` controls how long `mkgui_poll` blocks when no events are pending:
+
+| Value | Behavior |
+|-------|----------|
+| `-1` (default) | **Auto mode.** Blocks for 16ms (~60fps) when animated widgets (spinners, progress bars) are visible. Blocks indefinitely when idle -- zero CPU usage. |
+| `> 0` | **Fixed timeout.** Always blocks for the given number of milliseconds. |
+| `0` | **No blocking.** Returns immediately even with no events. The caller owns all timing. |
+
+On Linux, blocking uses `poll()` on the X11 connection fd. On Windows, it uses `MsgWaitForMultipleObjects`. Both wake immediately when a platform event arrives.
+
+**Emulator / real-time example** (caller drives timing):
+
+```c
+mkgui_set_poll_timeout(ctx, 0);
+while(running) {
+    while(mkgui_poll(ctx, &ev)) {
+        // handle ev
+    }
+    emulator_tick();
+    precision_sleep_until_next_frame();
+}
+```
+
+### Sleep
+
+```c
+void mkgui_sleep_ms(uint32_t ms);
+```
+
+Cross-platform sleep helper. Not needed for normal mainloops (mkgui_poll handles timing internally), but available for custom timing code.
 
 ### Label
 
@@ -862,6 +899,7 @@ Key theme colors (dark defaults shown):
 | `input_bg` | `#1a1e21` | Input/textarea/listview background |
 | `tab_active` | `#31363b` | Active tab background |
 | `tab_inactive` | `#2a2e32` | Inactive tab background |
+| `tab_hover` | `#353a3f` | Tab hover highlight |
 | `menu_bg` | `#31363b` | Menu/popup background |
 | `menu_hover` | `#3daee9` | Menu hover highlight |
 | `scrollbar_bg` | `#1d2023` | Scrollbar track |
