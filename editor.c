@@ -224,6 +224,222 @@ struct ed_state {
 static struct ed_state ed;
 
 // ---------------------------------------------------------------------------
+// Property descriptor system
+// ---------------------------------------------------------------------------
+
+enum {
+	ED_PK_LABEL,
+	ED_PK_STRING,
+	ED_PK_STRING_BROWSE,
+	ED_PK_INT32,
+	ED_PK_INT32_PAIR,
+	ED_PK_FLAG,
+	ED_PK_PARENT,
+	ED_PK_ACTION,
+	ED_PK_MENU_TREE,
+	ED_PK_SECTION,
+};
+
+enum {
+	ED_VIS_ALWAYS    = 0,
+	ED_VIS_HAS_CHECK = (1 << 0),
+	ED_VIS_MENUITEM  = (1 << 1),
+	ED_VIS_IN_SPLIT  = (1 << 2),
+	ED_VIS_TABS      = (1 << 3),
+	ED_VIS_MENU      = (1 << 4),
+};
+
+enum {
+	ED_ACT_NONE = 0,
+	ED_ACT_ICON_BROWSE,
+	ED_ACT_ADD_TAB,
+	ED_ACT_REM_TAB,
+	ED_ACT_ADD_ITEM,
+	ED_ACT_REM_ITEM,
+};
+
+struct ed_prop_desc {
+	uint32_t kind;
+	const char *label;
+	uint32_t offset;
+	uint32_t flag_bit;
+	int32_t min_val, max_val;
+	uint32_t vis_mask;
+	uint32_t action;
+	uint32_t widget_id;
+	uint32_t label_id;
+	uint32_t widget_id2;
+	uint32_t label_id2;
+};
+
+static struct ed_prop_desc ed_props[] = {
+	{ ED_PK_LABEL,         "Type:",           0,                                        0,                  0,      0,    ED_VIS_ALWAYS,    ED_ACT_NONE,         ED_PROP_TYPE_VAL,     ED_PROP_TYPE_LBL,    0,                 0 },
+	{ ED_PK_STRING,        "ID:",             offsetof(struct ed_widget, id_name),       0,                  0,      0,    ED_VIS_ALWAYS,    ED_ACT_NONE,         ED_PROP_ID_INP,       ED_PROP_ID_LBL,      0,                 0 },
+	{ ED_PK_STRING,        "Label:",          offsetof(struct ed_widget, label),         0,                  0,      0,    ED_VIS_ALWAYS,    ED_ACT_NONE,         ED_PROP_LABEL_INP,    ED_PROP_LABEL_LBL,   0,                 0 },
+	{ ED_PK_STRING_BROWSE, "Icon:",           offsetof(struct ed_widget, icon),          0,                  0,      0,    ED_VIS_ALWAYS,    ED_ACT_ICON_BROWSE,  ED_PROP_ICON_INP,     ED_PROP_ICON_LBL,    ED_PROP_ICON_BROWSE, ED_PROP_ICON_HBOX },
+	{ ED_PK_PARENT,        "Parent:",         offsetof(struct ed_widget, parent_id),     0,                  0,      0,    ED_VIS_ALWAYS,    ED_ACT_NONE,         ED_PROP_PARENT_DRP,   ED_PROP_PARENT_LBL,  0,                 0 },
+	{ ED_PK_INT32,         "Tab#:",           offsetof(struct ed_widget, tab_order),     0,                  0,      999,  ED_VIS_ALWAYS,    ED_ACT_NONE,         ED_PROP_TAB_SPN,      ED_PROP_TAB_LBL,     0,                 0 },
+	{ ED_PK_INT32_PAIR,    "X:",              offsetof(struct ed_widget, x),             0,                  -9999,  9999, ED_VIS_ALWAYS,    ED_ACT_NONE,         ED_PROP_X_SPN,        ED_PROP_X_LBL,       ED_PROP_Y_SPN,     ED_PROP_Y_LBL },
+	{ ED_PK_INT32_PAIR,    "W:",              offsetof(struct ed_widget, w),             0,                  0,      9999, ED_VIS_ALWAYS,    ED_ACT_NONE,         ED_PROP_W_SPN,        ED_PROP_W_LBL,       ED_PROP_H_SPN,     ED_PROP_H_LBL },
+	{ ED_PK_SECTION,       "Anchors/Flags:",  0,                                        0,                  0,      0,    ED_VIS_ALWAYS,    ED_ACT_NONE,         ED_PROP_FLAGS_LBL,    0,                   0,                 0 },
+	{ ED_PK_FLAG,          "Left",            offsetof(struct ed_widget, flags),         MKGUI_ANCHOR_LEFT,  0,      0,    ED_VIS_ALWAYS,    ED_ACT_NONE,         ED_PROP_FL_LEFT,      0,                   0,                 0 },
+	{ ED_PK_FLAG,          "Top",             offsetof(struct ed_widget, flags),         MKGUI_ANCHOR_TOP,   0,      0,    ED_VIS_ALWAYS,    ED_ACT_NONE,         ED_PROP_FL_TOP,       0,                   0,                 0 },
+	{ ED_PK_FLAG,          "Right",           offsetof(struct ed_widget, flags),         MKGUI_ANCHOR_RIGHT, 0,      0,    ED_VIS_ALWAYS,    ED_ACT_NONE,         ED_PROP_FL_RIGHT,     0,                   0,                 0 },
+	{ ED_PK_FLAG,          "Bottom",          offsetof(struct ed_widget, flags),         MKGUI_ANCHOR_BOTTOM,0,      0,    ED_VIS_ALWAYS,    ED_ACT_NONE,         ED_PROP_FL_BOTTOM,    0,                   0,                 0 },
+	{ ED_PK_FLAG,          "Virtual",         offsetof(struct ed_widget, flags),         MKGUI_VIRTUAL,      0,      0,    ED_VIS_ALWAYS,    ED_ACT_NONE,         ED_PROP_FL_VIRTUAL,   0,                   0,                 0 },
+	{ ED_PK_FLAG,          "Hidden",          offsetof(struct ed_widget, flags),         MKGUI_HIDDEN,       0,      0,    ED_VIS_ALWAYS,    ED_ACT_NONE,         ED_PROP_FL_HIDDEN,    0,                   0,                 0 },
+	{ ED_PK_FLAG,          "Disabled",        offsetof(struct ed_widget, flags),         MKGUI_DISABLED,     0,      0,    ED_VIS_ALWAYS,    ED_ACT_NONE,         ED_PROP_FL_DISABLED,  0,                   0,                 0 },
+	{ ED_PK_FLAG,          "Checked",         offsetof(struct ed_widget, flags),         MKGUI_CHECKED,      0,      0,    ED_VIS_HAS_CHECK, ED_ACT_NONE,         ED_PROP_FL_CHECKED,   0,                   0,                 0 },
+	{ ED_PK_FLAG,          "Sep",             offsetof(struct ed_widget, flags),         MKGUI_SEPARATOR,    0,      0,    ED_VIS_MENUITEM,  ED_ACT_NONE,         ED_PROP_FL_SEPARATOR, 0,                   0,                 0 },
+	{ ED_PK_FLAG,          "MChk",            offsetof(struct ed_widget, flags),         MKGUI_MENU_CHECK,   0,      0,    ED_VIS_MENUITEM,  ED_ACT_NONE,         ED_PROP_FL_MENUCHECK, 0,                   0,                 0 },
+	{ ED_PK_FLAG,          "MRad",            offsetof(struct ed_widget, flags),         MKGUI_MENU_RADIO,   0,      0,    ED_VIS_MENUITEM,  ED_ACT_NONE,         ED_PROP_FL_MENURADIO, 0,                   0,                 0 },
+	{ ED_PK_FLAG,          "RgnTop",          offsetof(struct ed_widget, flags),         MKGUI_REGION_TOP,   0,      0,    ED_VIS_IN_SPLIT,  ED_ACT_NONE,         ED_PROP_FL_REGTOP,    0,                   0,                 0 },
+	{ ED_PK_FLAG,          "RgnBot",          offsetof(struct ed_widget, flags),         MKGUI_REGION_BOTTOM,0,      0,    ED_VIS_IN_SPLIT,  ED_ACT_NONE,         ED_PROP_FL_REGBOT,    0,                   0,                 0 },
+	{ ED_PK_FLAG,          "RgnLeft",         offsetof(struct ed_widget, flags),         MKGUI_REGION_LEFT,  0,      0,    ED_VIS_IN_SPLIT,  ED_ACT_NONE,         ED_PROP_FL_REGLEFT,   0,                   0,                 0 },
+	{ ED_PK_FLAG,          "RgnRight",        offsetof(struct ed_widget, flags),         MKGUI_REGION_RIGHT, 0,      0,    ED_VIS_IN_SPLIT,  ED_ACT_NONE,         ED_PROP_FL_REGRIGHT,  0,                   0,                 0 },
+	{ ED_PK_ACTION,        "Add Tab",         0,                                        0,                  0,      0,    ED_VIS_TABS,      ED_ACT_ADD_TAB,      ED_PROP_ADD_TAB,      0,                   0,                 0 },
+	{ ED_PK_ACTION,        "Remove Tab",      0,                                        0,                  0,      0,    ED_VIS_TABS,      ED_ACT_REM_TAB,      ED_PROP_REM_TAB,      0,                   0,                 0 },
+	{ ED_PK_ACTION,        "Add Item",        0,                                        0,                  0,      0,    ED_VIS_MENU,      ED_ACT_ADD_ITEM,     ED_PROP_ADD_ITEM,     0,                   0,                 0 },
+	{ ED_PK_ACTION,        "Remove Item",     0,                                        0,                  0,      0,    ED_VIS_MENU,      ED_ACT_REM_ITEM,     ED_PROP_REM_ITEM,     0,                   0,                 0 },
+	{ ED_PK_MENU_TREE,     "",                0,                                        0,                  0,      0,    ED_VIS_MENU,      ED_ACT_NONE,         ED_MENU_TREE,         0,                   0,                 0 },
+};
+#define ED_PROP_COUNT (sizeof(ed_props) / sizeof(ed_props[0]))
+
+// [=]===^=[ ed_compute_vis_mask ]=================================[=]
+static uint32_t ed_compute_vis_mask(struct ed_widget *w) {
+	uint32_t mask = 0;
+	if(w->type == MKGUI_CHECKBOX || w->type == MKGUI_RADIO || w->type == MKGUI_MENUITEM) {
+		mask |= ED_VIS_HAS_CHECK;
+	}
+	if(w->type == MKGUI_MENUITEM) {
+		mask |= ED_VIS_MENUITEM;
+	}
+	if(w->type == MKGUI_TABS) {
+		mask |= ED_VIS_TABS;
+	}
+	if(w->type == MKGUI_MENU || w->type == MKGUI_MENUITEM) {
+		mask |= ED_VIS_MENU;
+	}
+	for(uint32_t i = 0; i < ed.widget_count; ++i) {
+		if(ed.widgets[i].id == w->parent_id) {
+			uint32_t pt = ed.widgets[i].type;
+			if(pt == MKGUI_HSPLIT || pt == MKGUI_VSPLIT) {
+				mask |= ED_VIS_IN_SPLIT;
+			}
+			break;
+		}
+	}
+	return mask;
+}
+
+// [=]===^=[ ed_prop_visible ]=====================================[=]
+static uint32_t ed_prop_visible(struct ed_prop_desc *p, uint32_t vis_mask) {
+	return p->vis_mask == ED_VIS_ALWAYS || (vis_mask & p->vis_mask);
+}
+
+// [=]===^=[ ed_set_widget_vis ]===================================[=]
+static void ed_set_widget_vis(struct mkgui_ctx *ctx, uint32_t id, uint32_t visible) {
+	if(!id) {
+		return;
+	}
+	struct mkgui_widget *w = find_widget(ctx, id);
+	if(w) {
+		if(visible) {
+			w->flags &= ~MKGUI_HIDDEN;
+		} else {
+			w->flags |= MKGUI_HIDDEN;
+		}
+	}
+}
+
+// [=]===^=[ ed_sync_prop_value ]==================================[=]
+static void ed_sync_prop_value(struct mkgui_ctx *ctx, struct ed_prop_desc *p, struct ed_widget *w) {
+	switch(p->kind) {
+		case ED_PK_LABEL: {
+			mkgui_label_set(ctx, p->widget_id, ed_type_name(w->type));
+		} break;
+
+		case ED_PK_STRING:
+		case ED_PK_STRING_BROWSE: {
+			const char *val = (const char *)((char *)w + p->offset);
+			mkgui_input_set(ctx, p->widget_id, val);
+		} break;
+
+		case ED_PK_INT32: {
+			int32_t val = *(int32_t *)((char *)w + p->offset);
+			mkgui_spinbox_set(ctx, p->widget_id, val);
+		} break;
+
+		case ED_PK_INT32_PAIR: {
+			int32_t *vals = (int32_t *)((char *)w + p->offset);
+			mkgui_spinbox_set(ctx, p->widget_id, vals[0]);
+			mkgui_spinbox_set(ctx, p->widget_id2, vals[1]);
+		} break;
+
+		case ED_PK_FLAG: {
+			struct mkgui_widget *fl = find_widget(ctx, p->widget_id);
+			if(fl) {
+				if(w->flags & p->flag_bit) {
+					fl->flags |= MKGUI_CHECKED;
+				} else {
+					fl->flags &= ~MKGUI_CHECKED;
+				}
+			}
+		} break;
+
+		default: break;
+	}
+}
+
+// [=]===^=[ ed_read_prop_value ]==================================[=]
+static void ed_read_prop_value(struct mkgui_ctx *ctx, struct ed_prop_desc *p, struct ed_widget *w) {
+	switch(p->kind) {
+		case ED_PK_STRING:
+		case ED_PK_STRING_BROWSE: {
+			const char *val = mkgui_input_get(ctx, p->widget_id);
+			if(val) {
+				char *dst = (char *)w + p->offset;
+				size_t cap;
+				if(p->offset == offsetof(struct ed_widget, id_name)) {
+					cap = sizeof(w->id_name);
+				} else if(p->offset == offsetof(struct ed_widget, label)) {
+					cap = sizeof(w->label);
+				} else {
+					cap = sizeof(w->icon);
+				}
+				size_t slen = strlen(val);
+				if(slen >= cap) {
+					slen = cap - 1;
+				}
+				memcpy(dst, val, slen);
+				dst[slen] = '\0';
+			}
+		} break;
+
+		case ED_PK_INT32: {
+			int32_t *dst = (int32_t *)((char *)w + p->offset);
+			*dst = mkgui_spinbox_get(ctx, p->widget_id);
+		} break;
+
+		case ED_PK_INT32_PAIR: {
+			int32_t *vals = (int32_t *)((char *)w + p->offset);
+			vals[0] = mkgui_spinbox_get(ctx, p->widget_id);
+			vals[1] = mkgui_spinbox_get(ctx, p->widget_id2);
+		} break;
+
+		case ED_PK_FLAG: {
+			if(mkgui_checkbox_get(ctx, p->widget_id)) {
+				w->flags |= p->flag_bit;
+			} else {
+				w->flags &= ~p->flag_bit;
+			}
+		} break;
+
+		default: break;
+	}
+}
+
+// ---------------------------------------------------------------------------
 // Tab state helpers
 // ---------------------------------------------------------------------------
 
@@ -1784,116 +2000,37 @@ static void ed_update_prop_group_h(struct mkgui_ctx *ctx) {
 
 // [=]===^=[ ed_sync_props ]======================================[=]
 static void ed_sync_props(struct mkgui_ctx *ctx) {
-	if(ed.selected < 0 || (uint32_t)ed.selected >= ed.widget_count) {
-		mkgui_label_set(ctx, ED_PROP_TYPE_VAL, "(none)");
-		mkgui_input_set(ctx, ED_PROP_ID_INP, "");
-		mkgui_input_set(ctx, ED_PROP_LABEL_INP, "");
-		mkgui_input_set(ctx, ED_PROP_ICON_INP, "");
-		mkgui_spinbox_set(ctx, ED_PROP_X_SPN, 0);
-		mkgui_spinbox_set(ctx, ED_PROP_Y_SPN, 0);
-		mkgui_spinbox_set(ctx, ED_PROP_W_SPN, 0);
-		mkgui_spinbox_set(ctx, ED_PROP_H_SPN, 0);
-		mkgui_spinbox_set(ctx, ED_PROP_TAB_SPN, 0);
-		struct mkgui_widget *hb;
-		hb = find_widget(ctx, ED_PROP_BTN_HBOX); if(hb) { hb->flags |= MKGUI_HIDDEN; }
-		hb = find_widget(ctx, ED_PROP_ADD_TAB);  if(hb) { hb->flags |= MKGUI_HIDDEN; }
-		hb = find_widget(ctx, ED_PROP_REM_TAB);  if(hb) { hb->flags |= MKGUI_HIDDEN; }
-		hb = find_widget(ctx, ED_PROP_ADD_ITEM); if(hb) { hb->flags |= MKGUI_HIDDEN; }
-		hb = find_widget(ctx, ED_PROP_REM_ITEM); if(hb) { hb->flags |= MKGUI_HIDDEN; }
-		hb = find_widget(ctx, ED_MENU_TREE);     if(hb) { hb->flags |= MKGUI_HIDDEN; }
-		ed_update_prop_group_h(ctx);
-		return;
+	struct ed_widget *w = NULL;
+	uint32_t vis = 0;
+	if(ed.selected >= 0 && (uint32_t)ed.selected < ed.widget_count) {
+		w = &ed.widgets[ed.selected];
+		vis = ed_compute_vis_mask(w);
 	}
 
-	struct ed_widget *w = &ed.widgets[ed.selected];
-	mkgui_label_set(ctx, ED_PROP_TYPE_VAL, ed_type_name(w->type));
-	mkgui_input_set(ctx, ED_PROP_ID_INP, w->id_name);
-	mkgui_input_set(ctx, ED_PROP_LABEL_INP, w->label);
-	mkgui_input_set(ctx, ED_PROP_ICON_INP, w->icon);
-	mkgui_spinbox_set(ctx, ED_PROP_X_SPN, w->x);
-	mkgui_spinbox_set(ctx, ED_PROP_Y_SPN, w->y);
-	mkgui_spinbox_set(ctx, ED_PROP_W_SPN, w->w);
-	mkgui_spinbox_set(ctx, ED_PROP_H_SPN, w->h);
-	mkgui_spinbox_set(ctx, ED_PROP_TAB_SPN, (int32_t)w->tab_order);
-
-	struct mkgui_widget *fl;
-	fl = find_widget(ctx, ED_PROP_FL_LEFT);
-	if(fl) { if(w->flags & MKGUI_ANCHOR_LEFT) { fl->flags |= MKGUI_CHECKED; } else { fl->flags &= ~MKGUI_CHECKED; } }
-	fl = find_widget(ctx, ED_PROP_FL_TOP);
-	if(fl) { if(w->flags & MKGUI_ANCHOR_TOP) { fl->flags |= MKGUI_CHECKED; } else { fl->flags &= ~MKGUI_CHECKED; } }
-	fl = find_widget(ctx, ED_PROP_FL_RIGHT);
-	if(fl) { if(w->flags & MKGUI_ANCHOR_RIGHT) { fl->flags |= MKGUI_CHECKED; } else { fl->flags &= ~MKGUI_CHECKED; } }
-	fl = find_widget(ctx, ED_PROP_FL_BOTTOM);
-	if(fl) { if(w->flags & MKGUI_ANCHOR_BOTTOM) { fl->flags |= MKGUI_CHECKED; } else { fl->flags &= ~MKGUI_CHECKED; } }
-	fl = find_widget(ctx, ED_PROP_FL_VIRTUAL);
-	if(fl) { if(w->flags & MKGUI_VIRTUAL) { fl->flags |= MKGUI_CHECKED; } else { fl->flags &= ~MKGUI_CHECKED; } }
-	fl = find_widget(ctx, ED_PROP_FL_HIDDEN);
-	if(fl) { if(w->flags & MKGUI_HIDDEN) { fl->flags |= MKGUI_CHECKED; } else { fl->flags &= ~MKGUI_CHECKED; } }
-	fl = find_widget(ctx, ED_PROP_FL_DISABLED);
-	if(fl) { if(w->flags & MKGUI_DISABLED) { fl->flags |= MKGUI_CHECKED; } else { fl->flags &= ~MKGUI_CHECKED; } }
-	fl = find_widget(ctx, ED_PROP_FL_CHECKED);
-	if(fl) { if(w->flags & MKGUI_CHECKED) { fl->flags |= MKGUI_CHECKED; } else { fl->flags &= ~MKGUI_CHECKED; } }
-	fl = find_widget(ctx, ED_PROP_FL_SEPARATOR);
-	if(fl) { if(w->flags & MKGUI_SEPARATOR) { fl->flags |= MKGUI_CHECKED; } else { fl->flags &= ~MKGUI_CHECKED; } }
-	fl = find_widget(ctx, ED_PROP_FL_MENUCHECK);
-	if(fl) { if(w->flags & MKGUI_MENU_CHECK) { fl->flags |= MKGUI_CHECKED; } else { fl->flags &= ~MKGUI_CHECKED; } }
-	fl = find_widget(ctx, ED_PROP_FL_MENURADIO);
-	if(fl) { if(w->flags & MKGUI_MENU_RADIO) { fl->flags |= MKGUI_CHECKED; } else { fl->flags &= ~MKGUI_CHECKED; } }
-	fl = find_widget(ctx, ED_PROP_FL_REGTOP);
-	if(fl) { if(w->flags & MKGUI_REGION_TOP) { fl->flags |= MKGUI_CHECKED; } else { fl->flags &= ~MKGUI_CHECKED; } }
-	fl = find_widget(ctx, ED_PROP_FL_REGBOT);
-	if(fl) { if(w->flags & MKGUI_REGION_BOTTOM) { fl->flags |= MKGUI_CHECKED; } else { fl->flags &= ~MKGUI_CHECKED; } }
-	fl = find_widget(ctx, ED_PROP_FL_REGLEFT);
-	if(fl) { if(w->flags & MKGUI_REGION_LEFT) { fl->flags |= MKGUI_CHECKED; } else { fl->flags &= ~MKGUI_CHECKED; } }
-	fl = find_widget(ctx, ED_PROP_FL_REGRIGHT);
-	if(fl) { if(w->flags & MKGUI_REGION_RIGHT) { fl->flags |= MKGUI_CHECKED; } else { fl->flags &= ~MKGUI_CHECKED; } }
-
-	uint32_t is_menuitem = (w->type == MKGUI_MENUITEM);
-	uint32_t has_check = (w->type == MKGUI_CHECKBOX || w->type == MKGUI_RADIO || is_menuitem);
-	uint32_t in_split = 0;
-	{
-		int32_t pi = ed_find_widget(w->parent_id);
-		if(pi >= 0) {
-			uint32_t pt = ed.widgets[pi].type;
-			in_split = (pt == MKGUI_HSPLIT || pt == MKGUI_VSPLIT);
+	uint32_t btn_hbox_visible = 0;
+	for(uint32_t i = 0; i < ED_PROP_COUNT; ++i) {
+		struct ed_prop_desc *p = &ed_props[i];
+		uint32_t show = w && ed_prop_visible(p, vis);
+		ed_set_widget_vis(ctx, p->widget_id, show);
+		ed_set_widget_vis(ctx, p->label_id, show);
+		ed_set_widget_vis(ctx, p->widget_id2, show);
+		ed_set_widget_vis(ctx, p->label_id2, show);
+		if(show && w) {
+			ed_sync_prop_value(ctx, p, w);
+			if(p->kind == ED_PK_ACTION) {
+				btn_hbox_visible = 1;
+			}
 		}
 	}
+	ed_set_widget_vis(ctx, ED_PROP_BTN_HBOX, btn_hbox_visible);
 
-	fl = find_widget(ctx, ED_PROP_FL_CHECKED);
-	if(fl) { if(has_check) { fl->flags &= ~MKGUI_HIDDEN; } else { fl->flags |= MKGUI_HIDDEN; } }
-	fl = find_widget(ctx, ED_PROP_FL_SEPARATOR);
-	if(fl) { if(is_menuitem) { fl->flags &= ~MKGUI_HIDDEN; } else { fl->flags |= MKGUI_HIDDEN; } }
-	fl = find_widget(ctx, ED_PROP_FL_MENUCHECK);
-	if(fl) { if(is_menuitem) { fl->flags &= ~MKGUI_HIDDEN; } else { fl->flags |= MKGUI_HIDDEN; } }
-	fl = find_widget(ctx, ED_PROP_FL_MENURADIO);
-	if(fl) { if(is_menuitem) { fl->flags &= ~MKGUI_HIDDEN; } else { fl->flags |= MKGUI_HIDDEN; } }
-	fl = find_widget(ctx, ED_PROP_FL_REGTOP);
-	if(fl) { if(in_split) { fl->flags &= ~MKGUI_HIDDEN; } else { fl->flags |= MKGUI_HIDDEN; } }
-	fl = find_widget(ctx, ED_PROP_FL_REGBOT);
-	if(fl) { if(in_split) { fl->flags &= ~MKGUI_HIDDEN; } else { fl->flags |= MKGUI_HIDDEN; } }
-	fl = find_widget(ctx, ED_PROP_FL_REGLEFT);
-	if(fl) { if(in_split) { fl->flags &= ~MKGUI_HIDDEN; } else { fl->flags |= MKGUI_HIDDEN; } }
-	fl = find_widget(ctx, ED_PROP_FL_REGRIGHT);
-	if(fl) { if(in_split) { fl->flags &= ~MKGUI_HIDDEN; } else { fl->flags |= MKGUI_HIDDEN; } }
+	if(!w) {
+		mkgui_label_set(ctx, ED_PROP_TYPE_VAL, "(none)");
+	}
 
 	ed_sync_parent_dropdown(ctx);
-
-	uint32_t show_btns = (w->type == MKGUI_TABS || w->type == MKGUI_MENU || w->type == MKGUI_MENUITEM);
-	struct mkgui_widget *btn;
-	btn = find_widget(ctx, ED_PROP_BTN_HBOX);
-	if(btn) { if(show_btns) { btn->flags &= ~MKGUI_HIDDEN; } else { btn->flags |= MKGUI_HIDDEN; } }
-	btn = find_widget(ctx, ED_PROP_ADD_TAB);
-	if(btn) { if(w->type == MKGUI_TABS) { btn->flags &= ~MKGUI_HIDDEN; } else { btn->flags |= MKGUI_HIDDEN; } }
-	btn = find_widget(ctx, ED_PROP_REM_TAB);
-	if(btn) { if(w->type == MKGUI_TABS) { btn->flags &= ~MKGUI_HIDDEN; } else { btn->flags |= MKGUI_HIDDEN; } }
-	btn = find_widget(ctx, ED_PROP_ADD_ITEM);
-	if(btn) { if(w->type == MKGUI_MENU || w->type == MKGUI_MENUITEM) { btn->flags &= ~MKGUI_HIDDEN; } else { btn->flags |= MKGUI_HIDDEN; } }
-	btn = find_widget(ctx, ED_PROP_REM_ITEM);
-	if(btn) { if(w->type == MKGUI_MENU || w->type == MKGUI_MENUITEM) { btn->flags &= ~MKGUI_HIDDEN; } else { btn->flags |= MKGUI_HIDDEN; } }
-
 	ed_sync_menu_tree(ctx);
 	ed_update_prop_group_h(ctx);
-
 	dirty_all(ctx);
 }
 
@@ -1903,60 +2040,10 @@ static void ed_read_props(struct mkgui_ctx *ctx) {
 		return;
 	}
 	struct ed_widget *w = &ed.widgets[ed.selected];
-
-	const char *id_str = mkgui_input_get(ctx, ED_PROP_ID_INP);
-	if(id_str && id_str[0]) {
-		size_t slen = strlen(id_str);
-		if(slen >= sizeof(w->id_name)) {
-			slen = sizeof(w->id_name) - 1;
-		}
-		memcpy(w->id_name, id_str, slen);
-		w->id_name[slen] = '\0';
-	}
-
-	const char *lbl_str = mkgui_input_get(ctx, ED_PROP_LABEL_INP);
-	if(lbl_str) {
-		size_t slen = strlen(lbl_str);
-		if(slen >= MKGUI_MAX_TEXT) {
-			slen = MKGUI_MAX_TEXT - 1;
-		}
-		memcpy(w->label, lbl_str, slen);
-		w->label[slen] = '\0';
-	}
-
-	const char *icon_str = mkgui_input_get(ctx, ED_PROP_ICON_INP);
-	if(icon_str) {
-		size_t slen = strlen(icon_str);
-		if(slen >= MKGUI_ICON_NAME_LEN) {
-			slen = MKGUI_ICON_NAME_LEN - 1;
-		}
-		memcpy(w->icon, icon_str, slen);
-		w->icon[slen] = '\0';
-	}
-
-	w->x = mkgui_spinbox_get(ctx, ED_PROP_X_SPN);
-	w->y = mkgui_spinbox_get(ctx, ED_PROP_Y_SPN);
-	w->w = mkgui_spinbox_get(ctx, ED_PROP_W_SPN);
-	w->h = mkgui_spinbox_get(ctx, ED_PROP_H_SPN);
-	w->tab_order = (uint32_t)mkgui_spinbox_get(ctx, ED_PROP_TAB_SPN);
-
 	w->flags = 0;
-	if(mkgui_checkbox_get(ctx, ED_PROP_FL_LEFT))      { w->flags |= MKGUI_ANCHOR_LEFT; }
-	if(mkgui_checkbox_get(ctx, ED_PROP_FL_TOP))        { w->flags |= MKGUI_ANCHOR_TOP; }
-	if(mkgui_checkbox_get(ctx, ED_PROP_FL_RIGHT))      { w->flags |= MKGUI_ANCHOR_RIGHT; }
-	if(mkgui_checkbox_get(ctx, ED_PROP_FL_BOTTOM))     { w->flags |= MKGUI_ANCHOR_BOTTOM; }
-	if(mkgui_checkbox_get(ctx, ED_PROP_FL_VIRTUAL))    { w->flags |= MKGUI_VIRTUAL; }
-	if(mkgui_checkbox_get(ctx, ED_PROP_FL_HIDDEN))     { w->flags |= MKGUI_HIDDEN; }
-	if(mkgui_checkbox_get(ctx, ED_PROP_FL_DISABLED))   { w->flags |= MKGUI_DISABLED; }
-	if(mkgui_checkbox_get(ctx, ED_PROP_FL_CHECKED))    { w->flags |= MKGUI_CHECKED; }
-	if(mkgui_checkbox_get(ctx, ED_PROP_FL_SEPARATOR))  { w->flags |= MKGUI_SEPARATOR; }
-	if(mkgui_checkbox_get(ctx, ED_PROP_FL_MENUCHECK)) { w->flags |= MKGUI_MENU_CHECK; }
-	if(mkgui_checkbox_get(ctx, ED_PROP_FL_MENURADIO)) { w->flags |= MKGUI_MENU_RADIO; }
-	if(mkgui_checkbox_get(ctx, ED_PROP_FL_REGTOP))    { w->flags |= MKGUI_REGION_TOP; }
-	if(mkgui_checkbox_get(ctx, ED_PROP_FL_REGBOT))    { w->flags |= MKGUI_REGION_BOTTOM; }
-	if(mkgui_checkbox_get(ctx, ED_PROP_FL_REGLEFT))   { w->flags |= MKGUI_REGION_LEFT; }
-	if(mkgui_checkbox_get(ctx, ED_PROP_FL_REGRIGHT))   { w->flags |= MKGUI_REGION_RIGHT; }
-
+	for(uint32_t i = 0; i < ED_PROP_COUNT; ++i) {
+		ed_read_prop_value(ctx, &ed_props[i], w);
+	}
 	dirty_all(ctx);
 }
 
@@ -2402,11 +2489,15 @@ int main(void) {
 	mkgui_statusbar_set(ctx, ED_STATUSBAR, 0, "Ready");
 	mkgui_statusbar_set(ctx, ED_STATUSBAR, 1, "Grid: 8px");
 
-	mkgui_spinbox_setup(ctx, ED_PROP_X_SPN, -9999, 9999, 0, 1);
-	mkgui_spinbox_setup(ctx, ED_PROP_Y_SPN, -9999, 9999, 0, 1);
-	mkgui_spinbox_setup(ctx, ED_PROP_W_SPN, 0, 9999, 0, 1);
-	mkgui_spinbox_setup(ctx, ED_PROP_H_SPN, 0, 9999, 0, 1);
-	mkgui_spinbox_setup(ctx, ED_PROP_TAB_SPN, 0, 999, 0, 1);
+	for(uint32_t pi = 0; pi < ED_PROP_COUNT; ++pi) {
+		struct ed_prop_desc *p = &ed_props[pi];
+		if(p->kind == ED_PK_INT32) {
+			mkgui_spinbox_setup(ctx, p->widget_id, p->min_val, p->max_val, 0, 1);
+		} else if(p->kind == ED_PK_INT32_PAIR) {
+			mkgui_spinbox_setup(ctx, p->widget_id, p->min_val, p->max_val, 0, 1);
+			mkgui_spinbox_setup(ctx, p->widget_id2, p->min_val, p->max_val, 0, 1);
+		}
+	}
 
 	ed_sync_tree(ctx);
 	ed_sync_props(ctx);
@@ -2463,30 +2554,46 @@ int main(void) {
 					} else if(ev.id == ED_MI_EXIT) {
 						running = 0;
 
-					} else if(ev.id == ED_PROP_ICON_BROWSE) {
-						char icon_name[64];
-						if(mkgui_icon_browser(ctx, icon_name, sizeof(icon_name))) {
-							mkgui_input_set(ctx, ED_PROP_ICON_INP, icon_name);
-							if(ed.selected >= 0) {
-								strncpy(ed.widgets[ed.selected].icon, icon_name, MKGUI_ICON_NAME_LEN - 1);
-								ed.widgets[ed.selected].icon[MKGUI_ICON_NAME_LEN - 1] = '\0';
-								ed_push_undo();
+					} else {
+						uint32_t handled = 0;
+						for(uint32_t pi = 0; pi < ED_PROP_COUNT && !handled; ++pi) {
+							if(ed_props[pi].widget_id != ev.id) {
+								continue;
+							}
+							if(ed_props[pi].kind == ED_PK_ACTION || ed_props[pi].kind == ED_PK_STRING_BROWSE) {
+								switch(ed_props[pi].action) {
+									case ED_ACT_ICON_BROWSE: {
+										char icon_name[64];
+										if(mkgui_icon_browser(ctx, icon_name, sizeof(icon_name))) {
+											mkgui_input_set(ctx, ED_PROP_ICON_INP, icon_name);
+											if(ed.selected >= 0) {
+												strncpy(ed.widgets[ed.selected].icon, icon_name, MKGUI_ICON_NAME_LEN - 1);
+												ed.widgets[ed.selected].icon[MKGUI_ICON_NAME_LEN - 1] = '\0';
+												ed_push_undo();
+											}
+										}
+									} break;
+
+									case ED_ACT_ADD_TAB: {
+										ed_add_tab_to_tabs(ctx);
+									} break;
+
+									case ED_ACT_REM_TAB: {
+										ed_remove_tab_from_tabs(ctx);
+									} break;
+
+									case ED_ACT_ADD_ITEM: {
+										ed_add_menu_item(ctx);
+									} break;
+
+									case ED_ACT_REM_ITEM: {
+										ed_remove_menu_item(ctx);
+									} break;
+								}
+								handled = 1;
 							}
 						}
-
-					} else if(ev.id == ED_PROP_ADD_TAB) {
-						ed_add_tab_to_tabs(ctx);
-
-					} else if(ev.id == ED_PROP_REM_TAB) {
-						ed_remove_tab_from_tabs(ctx);
-
-					} else if(ev.id == ED_PROP_ADD_ITEM) {
-						ed_add_menu_item(ctx);
-
-					} else if(ev.id == ED_PROP_REM_ITEM) {
-						ed_remove_menu_item(ctx);
-
-					} else {
+						if(!handled) {
 						for(uint32_t pi = 0; pi < widget_pal_count; ++pi) {
 							if(ev.id == ED_PAL_FIRST + pi) {
 								ed.placement_type = ed_widgets[pi].type;
@@ -2506,6 +2613,7 @@ int main(void) {
 								mkgui_statusbar_set(ctx, ED_STATUSBAR, 0, buf);
 								break;
 							}
+						}
 						}
 					}
 				} break;
@@ -2634,22 +2742,25 @@ int main(void) {
 
 				case MKGUI_EVENT_SPINBOX_CHANGED:
 				case MKGUI_EVENT_INPUT_CHANGED: {
-					if(ev.id >= ED_PROP_X_SPN && ev.id <= ED_PROP_TAB_SPN) {
-						ed_read_props(ctx);
-					}
-					if(ev.id == ED_PROP_ICON_INP) {
-						ed_read_props(ctx);
-					}
-					if(ev.id == ED_PROP_ID_INP || ev.id == ED_PROP_LABEL_INP) {
-						ed_read_props(ctx);
-						ed_sync_tree(ctx);
-						ed_sync_menu_tree(ctx);
+					for(uint32_t pi = 0; pi < ED_PROP_COUNT; ++pi) {
+						struct ed_prop_desc *p = &ed_props[pi];
+						if(p->widget_id == ev.id || p->widget_id2 == ev.id) {
+							ed_read_props(ctx);
+							if(p->offset == offsetof(struct ed_widget, id_name) || p->offset == offsetof(struct ed_widget, label)) {
+								ed_sync_tree(ctx);
+								ed_sync_menu_tree(ctx);
+							}
+							break;
+						}
 					}
 				} break;
 
 				case MKGUI_EVENT_CHECKBOX_CHANGED: {
-					if(ev.id >= ED_PROP_FL_LEFT && ev.id <= ED_PROP_FL_REGRIGHT) {
-						ed_read_props(ctx);
+					for(uint32_t pi = 0; pi < ED_PROP_COUNT; ++pi) {
+						if(ed_props[pi].widget_id == ev.id && ed_props[pi].kind == ED_PK_FLAG) {
+							ed_read_props(ctx);
+							break;
+						}
 					}
 				} break;
 

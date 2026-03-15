@@ -228,6 +228,7 @@ enum {
 	MKGUI_EVENT_LISTVIEW_COL_REORDER,
 	MKGUI_EVENT_LISTVIEW_SELECT,
 	MKGUI_EVENT_LISTVIEW_DBLCLICK,
+	MKGUI_EVENT_LISTVIEW_REORDER,
 	MKGUI_EVENT_INPUT_CHANGED,
 	MKGUI_EVENT_CHECKBOX_CHANGED,
 	MKGUI_EVENT_DROPDOWN_CHANGED,
@@ -291,6 +292,7 @@ enum {
 	MKGUI_CELL_ICON_TEXT,
 	MKGUI_CELL_SIZE,
 	MKGUI_CELL_DATE,
+	MKGUI_CELL_CHECKBOX,
 };
 
 struct mkgui_column {
@@ -314,6 +316,10 @@ struct mkgui_listview_data {
 	int32_t sort_dir;
 	int32_t header_height;
 	uint32_t col_order[MKGUI_MAX_COLS];
+	int32_t drag_source;
+	int32_t drag_target;
+	int32_t drag_start_y;
+	uint32_t drag_active;
 };
 
 struct mkgui_input_data {
@@ -2650,7 +2656,7 @@ static uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 		}
 	}
 
-	if(!platform_pending(ctx) && !ctx->close_requested) {
+	if(!platform_pending(ctx) && !ctx->close_requested && !ctx->dirty) {
 		int32_t wait_ms;
 		if(ctx->poll_timeout_ms == 0) {
 			wait_ms = 0;
@@ -2938,6 +2944,30 @@ static uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 									tv->drag_target = node_idx;
 								} else {
 									tv->drag_target = -1;
+								}
+								dirty_all(ctx);
+							}
+						}
+					}
+				}
+				for(uint32_t lvi = 0; lvi < ctx->listv_count; ++lvi) {
+					struct mkgui_listview_data *lv = &ctx->listvs[lvi];
+					if(lv->drag_source >= 0 && ctx->press_id == lv->widget_id) {
+						int32_t dy = ctx->mouse_y - lv->drag_start_y;
+						if(dy < 0) {
+							dy = -dy;
+						}
+						if(!lv->drag_active && dy > 4) {
+							lv->drag_active = 1;
+						}
+						if(lv->drag_active) {
+							int32_t lidx = find_widget_idx(ctx, lv->widget_id);
+							if(lidx >= 0) {
+								int32_t tgt = listview_row_hit(ctx, (uint32_t)lidx, ctx->mouse_x, ctx->mouse_y);
+								if(tgt >= 0 && tgt != lv->drag_source) {
+									lv->drag_target = tgt;
+								} else {
+									lv->drag_target = -1;
 								}
 								dirty_all(ctx);
 							}
@@ -3351,9 +3381,15 @@ static uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 										struct mkgui_listview_data *lv = find_listv_data(ctx, hw->id);
 										if(lv) {
 											lv->selected_row = row;
+											lv->drag_source = row;
+											lv->drag_target = -1;
+											lv->drag_start_y = ctx->mouse_y;
+											lv->drag_active = 0;
+											int32_t col = listview_col_hit(ctx, (uint32_t)hi, ctx->mouse_x);
 											ev->type = MKGUI_EVENT_LISTVIEW_SELECT;
 											ev->id = hw->id;
 											ev->value = row;
+											ev->col = col;
 											dirty_all(ctx);
 											return 1;
 										}
@@ -3522,6 +3558,25 @@ static uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 					tv->drag_active = 0;
 					tv->drag_source = -1;
 					tv->drag_target = -1;
+				}
+				for(uint32_t lvi = 0; lvi < ctx->listv_count; ++lvi) {
+					struct mkgui_listview_data *lv = &ctx->listvs[lvi];
+					if(lv->drag_active && lv->drag_target >= 0) {
+						int32_t src = lv->drag_source;
+						int32_t tgt = lv->drag_target;
+						lv->drag_active = 0;
+						lv->drag_source = -1;
+						lv->drag_target = -1;
+						dirty_all(ctx);
+						ev->type = MKGUI_EVENT_LISTVIEW_REORDER;
+						ev->id = lv->widget_id;
+						ev->value = src;
+						ev->col = tgt;
+						return 1;
+					}
+					lv->drag_active = 0;
+					lv->drag_source = -1;
+					lv->drag_target = -1;
 				}
 
 				ctx->drag_select_id = 0;
