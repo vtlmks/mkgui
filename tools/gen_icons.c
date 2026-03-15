@@ -1,4 +1,4 @@
-// Copyright (c) 2026, mkgui contributors
+// Copyright (c) 2026, Peter Fors
 // SPDX-License-Identifier: MIT
 //
 // Generates mdi_icons.dat from the MDI TTF font.

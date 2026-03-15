@@ -1,4 +1,4 @@
-// Copyright (c) 2026, mkgui contributors
+// Copyright (c) 2026, Peter Fors
 // SPDX-License-Identifier: MIT
 
 #ifdef _WIN32

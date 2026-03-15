@@ -1,4 +1,4 @@
-// Copyright (c) 2026, mkgui contributors
+// Copyright (c) 2026, Peter Fors
 // SPDX-License-Identifier: MIT
 
 #define MKGUI_TOOLTIP_DELAY 30
