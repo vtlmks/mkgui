@@ -1,0 +1,8 @@
+{
+	"files.exclude": {
+		"demo": true,
+		"demo.exe": true,
+		"editor": true,
+		"editor.exe": true
+	}
+}
