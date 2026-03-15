@@ -51,6 +51,7 @@
 
 #define MKGUI_KEY_BACKSPACE  0xFF08
 #define MKGUI_KEY_TAB        0xFF09
+#define MKGUI_KEY_ISO_LEFT_TAB 0xFE20
 #define MKGUI_KEY_RETURN     0xFF0D
 #define MKGUI_KEY_ESCAPE     0xFF1B
 #define MKGUI_KEY_SPACE      0x0020
@@ -196,6 +197,7 @@ enum {
 	MKGUI_SCROLLBAR_HORIZ = (1 << 20),
 	MKGUI_IMAGE_STRETCH = (1 << 21),
 	MKGUI_SCROLL        = (1 << 22),
+	MKGUI_NO_PAD        = (1 << 23),
 };
 
 // ---------------------------------------------------------------------------
@@ -219,6 +221,7 @@ enum {
 	MKGUI_EVENT_TREEVIEW_SELECT,
 	MKGUI_EVENT_TREEVIEW_EXPAND,
 	MKGUI_EVENT_TREEVIEW_COLLAPSE,
+	MKGUI_EVENT_TREEVIEW_MOVE,
 	MKGUI_EVENT_SPINBOX_CHANGED,
 	MKGUI_EVENT_RADIO_CHANGED,
 	MKGUI_EVENT_TEXTAREA_CHANGED,
@@ -354,6 +357,11 @@ struct mkgui_treeview_data {
 	uint32_t node_cap;
 	int32_t selected_node;
 	int32_t scroll_y;
+	int32_t drag_source;
+	int32_t drag_target;
+	int32_t drag_pos;
+	uint32_t drag_active;
+	int32_t drag_start_y;
 };
 
 struct mkgui_statusbar_section {
@@ -374,6 +382,11 @@ struct mkgui_spinbox_data {
 	int32_t value;
 	int32_t step;
 	int32_t hover_btn;
+	uint32_t editing;
+	char edit_buf[32];
+	uint32_t edit_len;
+	int32_t repeat_dir;
+	uint32_t repeat_next_ms;
 };
 
 struct mkgui_progress_data {
@@ -388,6 +401,8 @@ struct mkgui_textarea_data {
 	uint32_t text_len;
 	uint32_t text_cap;
 	uint32_t cursor;
+	uint32_t sel_start;
+	uint32_t sel_end;
 	int32_t scroll_y;
 	int32_t scroll_x;
 };
@@ -570,6 +585,7 @@ struct mkgui_ctx {
 	int32_t drag_col_resize_col;
 	int32_t drag_col_resize_start_x;
 	int32_t drag_col_resize_start_w;
+	uint32_t drag_select_id;
 	int32_t mouse_x, mouse_y;
 	uint32_t mouse_btn;
 	uint32_t dirty;
@@ -1304,7 +1320,8 @@ static uint32_t is_focusable(struct mkgui_widget *w) {
 		case MKGUI_SPINBOX:
 		case MKGUI_RADIO:
 		case MKGUI_TEXTAREA:
-		case MKGUI_ITEMVIEW: {
+		case MKGUI_ITEMVIEW:
+		case MKGUI_TABS: {
 			return 1;
 		} break;
 
@@ -1523,11 +1540,22 @@ static void layout_widgets(struct mkgui_ctx *ctx) {
 			}
 
 			if(parent->type == MKGUI_VBOX || parent->type == MKGUI_HBOX || parent->type == MKGUI_FORM) {
-				if(parent->flags & MKGUI_PANEL_BORDER) {
-					px += MKGUI_BOX_PAD;
-					py += MKGUI_BOX_PAD;
-					pw -= MKGUI_BOX_PAD * 2;
-					ph -= MKGUI_BOX_PAD * 2;
+				if(!(parent->flags & MKGUI_NO_PAD)) {
+					uint32_t nested = 0;
+					for(uint32_t gp = 0; gp < ctx->widget_count; ++gp) {
+						if(ctx->widgets[gp].id == parent->parent_id) {
+							if(ctx->widgets[gp].type == MKGUI_VBOX || ctx->widgets[gp].type == MKGUI_HBOX || ctx->widgets[gp].type == MKGUI_FORM || ctx->widgets[gp].type == MKGUI_GROUP || ctx->widgets[gp].type == MKGUI_TABS) {
+								nested = 1;
+							}
+							break;
+						}
+					}
+					if(!nested || (parent->flags & MKGUI_PANEL_BORDER)) {
+						px += MKGUI_BOX_PAD;
+						py += MKGUI_BOX_PAD;
+						pw -= MKGUI_BOX_PAD * 2;
+						ph -= MKGUI_BOX_PAD * 2;
+					}
 				}
 				uint32_t child_count = 0;
 				for(uint32_t j = 0; j < ctx->widget_count; ++j) {
@@ -2475,13 +2503,27 @@ static uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 #endif
 	ctx->anim_time += dt;
 
+	for(uint32_t si = 0; si < ctx->spinbox_count; ++si) {
+		struct mkgui_spinbox_data *sd = &ctx->spinboxes[si];
+		if(sd->repeat_dir && ctx->press_id) {
+			uint32_t now_ms = mkgui_time_ms();
+			if(now_ms >= sd->repeat_next_ms) {
+				int32_t delta = (sd->repeat_dir > 0) ? sd->step : -sd->step;
+				if(spinbox_adjust(ctx, ev, sd->widget_id, delta)) {
+					sd->repeat_next_ms = now_ms + 80;
+					return 1;
+				}
+			}
+		}
+	}
+
 	ctx->anim_active = 0;
 	for(uint32_t i = 0; i < ctx->widget_count; ++i) {
 		struct mkgui_widget *w = &ctx->widgets[i];
 		if(!widget_visible(ctx, i)) {
 			continue;
 		}
-		if(w->type == MKGUI_SPINNER) {
+		if(w->type == MKGUI_SPINNER || w->type == MKGUI_GLVIEW) {
 			ctx->anim_active = 1;
 			dirty_widget(ctx, i);
 		}
@@ -2491,6 +2533,11 @@ static uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 				ctx->anim_active = 1;
 				dirty_widget(ctx, i);
 			}
+		}
+	}
+	for(uint32_t si = 0; si < ctx->spinbox_count; ++si) {
+		if(ctx->spinboxes[si].repeat_dir) {
+			ctx->anim_active = 1;
 		}
 	}
 
@@ -2572,9 +2619,64 @@ static uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 				ctx->mouse_x = pev.x;
 				ctx->mouse_y = pev.y;
 
+				if(ctx->drag_select_id) {
+					int32_t dsi = find_widget_idx(ctx, ctx->drag_select_id);
+					if(dsi >= 0 && ctx->widgets[dsi].type == MKGUI_INPUT) {
+						struct mkgui_input_data *inp = find_input_data(ctx, ctx->drag_select_id);
+						if(inp) {
+							const char *display = inp->text;
+							char masked_buf[MKGUI_MAX_TEXT];
+							if(ctx->widgets[dsi].flags & MKGUI_PASSWORD) {
+								uint32_t mlen = (uint32_t)strlen(inp->text);
+								for(uint32_t mi = 0; mi < mlen && mi < MKGUI_MAX_TEXT - 1; ++mi) {
+									masked_buf[mi] = '*';
+								}
+								masked_buf[mlen < MKGUI_MAX_TEXT - 1 ? mlen : MKGUI_MAX_TEXT - 1] = '\0';
+								display = masked_buf;
+							}
+							inp->cursor = input_hit_cursor(ctx, inp, display, ctx->rects[dsi].x, ctx->mouse_x);
+							inp->sel_end = inp->cursor;
+							dirty_all(ctx);
+						}
+
+					} else if(dsi >= 0 && ctx->widgets[dsi].type == MKGUI_TEXTAREA) {
+						struct mkgui_textarea_data *ta = find_textarea_data(ctx, ctx->drag_select_id);
+						if(ta) {
+							int32_t ry = ctx->rects[dsi].y;
+							int32_t rh = ctx->rects[dsi].h;
+							if(ctx->mouse_y < ry + 1) {
+								ta->scroll_y -= MKGUI_ROW_HEIGHT;
+								if(ta->scroll_y < 0) {
+									ta->scroll_y = 0;
+								}
+
+							} else if(ctx->mouse_y > ry + rh - 1) {
+								int32_t content_h = (int32_t)textarea_line_count(ta) * MKGUI_ROW_HEIGHT;
+								int32_t view_h = rh - 2;
+								int32_t max_scroll = content_h - view_h;
+								if(max_scroll > 0) {
+									ta->scroll_y += MKGUI_ROW_HEIGHT;
+									if(ta->scroll_y > max_scroll) {
+										ta->scroll_y = max_scroll;
+									}
+								}
+							}
+							ta->cursor = textarea_hit_pos(ctx, ta, ctx->rects[dsi].x, ctx->rects[dsi].y, ctx->rects[dsi].h, ctx->mouse_x, ctx->mouse_y);
+							ta->sel_end = ta->cursor;
+							dirty_all(ctx);
+						}
+					}
+					break;
+				}
+
 				if(ctx->drag_scrollbar_id) {
 					int32_t dsi = find_widget_idx(ctx, ctx->drag_scrollbar_id);
-					if(dsi >= 0 && ctx->widgets[dsi].type == MKGUI_SCROLLBAR) {
+					if(dsi >= 0 && ctx->widgets[dsi].type == MKGUI_TEXTAREA) {
+						struct mkgui_textarea_data *ta = find_textarea_data(ctx, ctx->drag_scrollbar_id);
+						if(ta) {
+							textarea_scroll_drag(ctx, (uint32_t)dsi, ta, ctx->mouse_y, ctx->drag_scrollbar_offset);
+						}
+					} else if(dsi >= 0 && ctx->widgets[dsi].type == MKGUI_SCROLLBAR) {
 						scrollbar_drag_to(ctx, ctx->drag_scrollbar_id, ctx->mouse_x, ctx->mouse_y);
 					} else if(dsi >= 0 && ctx->widgets[dsi].type == MKGUI_ITEMVIEW) {
 						itemview_scroll_to_mouse(ctx, ctx->drag_scrollbar_id, ctx->mouse_x, ctx->mouse_y);
@@ -2699,6 +2801,42 @@ static uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 						}
 					}
 				}
+				for(uint32_t tvi = 0; tvi < ctx->treeview_count; ++tvi) {
+					struct mkgui_treeview_data *tv = &ctx->treeviews[tvi];
+					if(tv->drag_source >= 0 && ctx->press_id == tv->widget_id) {
+						int32_t dy = ctx->mouse_y - tv->drag_start_y;
+						if(dy < 0) {
+							dy = -dy;
+						}
+						if(!tv->drag_active && dy > 4) {
+							tv->drag_active = 1;
+						}
+						if(tv->drag_active) {
+							int32_t tidx = find_widget_idx(ctx, tv->widget_id);
+							if(tidx >= 0) {
+								int32_t node_idx = treeview_row_hit(ctx, (uint32_t)tidx, ctx->mouse_y);
+								if(node_idx >= 0 && node_idx != tv->drag_source) {
+									int32_t ry = ctx->rects[tidx].y;
+									int32_t local_y = ctx->mouse_y - ry - 1 + tv->scroll_y;
+									int32_t row_local = local_y % MKGUI_ROW_HEIGHT;
+									int32_t third = MKGUI_ROW_HEIGHT / 3;
+									if(row_local < third) {
+										tv->drag_pos = 0;
+									} else if(row_local > MKGUI_ROW_HEIGHT - third) {
+										tv->drag_pos = 1;
+									} else {
+										tv->drag_pos = 2;
+									}
+									tv->drag_target = node_idx;
+								} else {
+									tv->drag_target = -1;
+								}
+								dirty_all(ctx);
+							}
+						}
+					}
+				}
+
 				if(hi >= 0 && ctx->widgets[hi].type == MKGUI_SPINBOX) {
 					struct mkgui_spinbox_data *sd = find_spinbox_data(ctx, ctx->widgets[hi].id);
 					if(sd) {
@@ -2848,7 +2986,31 @@ static uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 						struct mkgui_spinbox_data *sd = find_spinbox_data(ctx, ctx->widgets[hi].id);
 						if(sd) {
 							int32_t step = (pev.button == 4) ? sd->step : -sd->step;
-							spinbox_adjust(ctx, ev, ctx->widgets[hi].id, step);
+							if(spinbox_adjust(ctx, ev, ctx->widgets[hi].id, step)) {
+								return 1;
+							}
+						}
+
+					} else if(hi >= 0 && ctx->widgets[hi].type == MKGUI_SLIDER) {
+						struct mkgui_slider_data *sd = find_slider_data(ctx, ctx->widgets[hi].id);
+						if(sd) {
+							int32_t range = sd->max_val - sd->min_val;
+							int32_t step = range / 20;
+							if(step < 1) {
+								step = 1;
+							}
+							sd->value += (pev.button == 4) ? -step : step;
+							if(sd->value < sd->min_val) {
+								sd->value = sd->min_val;
+							}
+							if(sd->value > sd->max_val) {
+								sd->value = sd->max_val;
+							}
+							dirty_all(ctx);
+							ev->type = MKGUI_EVENT_SLIDER_CHANGED;
+							ev->id = ctx->widgets[hi].id;
+							ev->value = sd->value;
+							return 1;
 						}
 
 					} else if(hi >= 0 && ctx->widgets[hi].type == MKGUI_TEXTAREA) {
@@ -2978,15 +3140,59 @@ static uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 				if(hi >= 0) {
 					struct mkgui_widget *hw = &ctx->widgets[hi];
 
+					if(hw->flags & MKGUI_DISABLED) {
+						break;
+					}
+
 					if(is_focusable(hw)) {
+						spinbox_focus_lost(ctx);
 						ctx->focus_id = hw->id;
 
 					} else {
+						spinbox_focus_lost(ctx);
 						ctx->focus_id = 0;
 					}
 
 					ctx->press_id = hw->id;
 					dirty_all(ctx);
+
+					if(hw->type == MKGUI_INPUT) {
+						struct mkgui_input_data *inp = find_input_data(ctx, hw->id);
+						if(inp) {
+							const char *display = inp->text;
+							char masked_buf[MKGUI_MAX_TEXT];
+							if(hw->flags & MKGUI_PASSWORD) {
+								uint32_t mlen = (uint32_t)strlen(inp->text);
+								for(uint32_t mi = 0; mi < mlen && mi < MKGUI_MAX_TEXT - 1; ++mi) {
+									masked_buf[mi] = '*';
+								}
+								masked_buf[mlen < MKGUI_MAX_TEXT - 1 ? mlen : MKGUI_MAX_TEXT - 1] = '\0';
+								display = masked_buf;
+							}
+							inp->cursor = input_hit_cursor(ctx, inp, display, ctx->rects[hi].x, ctx->mouse_x);
+							input_clear_selection(inp);
+							ctx->drag_select_id = hw->id;
+							dirty_all(ctx);
+						}
+					}
+
+					if(hw->type == MKGUI_TEXTAREA) {
+						struct mkgui_textarea_data *ta = find_textarea_data(ctx, hw->id);
+						if(ta && textarea_has_scrollbar(ctx, (uint32_t)hi, ta)) {
+							int32_t sb_off = textarea_sb_hit(ctx, (uint32_t)hi, ta, ctx->mouse_x, ctx->mouse_y);
+							if(sb_off >= 0) {
+								ctx->drag_scrollbar_id = hw->id;
+								ctx->drag_scrollbar_offset = sb_off;
+								break;
+							}
+						}
+						if(ta) {
+							ta->cursor = textarea_hit_pos(ctx, ta, ctx->rects[hi].x, ctx->rects[hi].y, ctx->rects[hi].h, ctx->mouse_x, ctx->mouse_y);
+							textarea_clear_selection(ta);
+							ctx->drag_select_id = hw->id;
+							dirty_all(ctx);
+						}
+					}
 
 					if(hw->type == MKGUI_TABS) {
 						uint32_t tab_id = tab_hit_test(ctx, (uint32_t)hi, ctx->mouse_x, ctx->mouse_y);
@@ -3138,6 +3344,11 @@ static uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 
 								} else {
 									tv->selected_node = (int32_t)tv->nodes[node_idx].id;
+									tv->drag_source = node_idx;
+									tv->drag_target = -1;
+									tv->drag_pos = 0;
+									tv->drag_active = 0;
+									tv->drag_start_y = ctx->mouse_y;
 									dirty_all(ctx);
 									ev->type = MKGUI_EVENT_TREEVIEW_SELECT;
 									ev->id = hw->id;
@@ -3153,6 +3364,8 @@ static uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 						if(dir != 0) {
 							struct mkgui_spinbox_data *sd = find_spinbox_data(ctx, hw->id);
 							if(sd) {
+								sd->repeat_dir = dir;
+								sd->repeat_next_ms = mkgui_time_ms() + 400;
 								int32_t delta = (dir > 0) ? sd->step : -sd->step;
 								spinbox_adjust(ctx, ev, hw->id, delta);
 								return ev->type != MKGUI_EVENT_NONE;
@@ -3161,6 +3374,7 @@ static uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 					}
 
 				} else {
+					spinbox_focus_lost(ctx);
 					ctx->focus_id = 0;
 				}
 			} break;
@@ -3169,6 +3383,34 @@ static uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 				if(pev.button >= 4) {
 					break;
 				}
+
+				for(uint32_t si = 0; si < ctx->spinbox_count; ++si) {
+					ctx->spinboxes[si].repeat_dir = 0;
+				}
+
+				for(uint32_t tvi = 0; tvi < ctx->treeview_count; ++tvi) {
+					struct mkgui_treeview_data *tv = &ctx->treeviews[tvi];
+					if(tv->drag_active && tv->drag_target >= 0) {
+						int32_t src_id = (int32_t)tv->nodes[tv->drag_source].id;
+						int32_t tgt_id = (int32_t)tv->nodes[tv->drag_target].id;
+						int32_t pos = tv->drag_pos;
+						tv->drag_active = 0;
+						tv->drag_source = -1;
+						tv->drag_target = -1;
+						dirty_all(ctx);
+						ev->type = MKGUI_EVENT_TREEVIEW_MOVE;
+						ev->id = tv->widget_id;
+						ev->value = src_id;
+						ev->col = tgt_id;
+						ev->keysym = (uint32_t)pos;
+						return 1;
+					}
+					tv->drag_active = 0;
+					tv->drag_source = -1;
+					tv->drag_target = -1;
+				}
+
+				ctx->drag_select_id = 0;
 
 				if(ctx->drag_col_resize_id) {
 					ctx->drag_col_resize_id = 0;
@@ -3282,19 +3524,26 @@ static uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 					break;
 				}
 
-				if(ks == MKGUI_KEY_TAB) {
+				if(ks == MKGUI_KEY_TAB || ks == MKGUI_KEY_ISO_LEFT_TAB) {
+					uint32_t reverse = (pev.keymod & MKGUI_MOD_SHIFT) || (ks == MKGUI_KEY_ISO_LEFT_TAB);
 					uint32_t start_idx = 0;
 					if(ctx->focus_id) {
 						for(uint32_t i = 0; i < ctx->widget_count; ++i) {
 							if(ctx->widgets[i].id == ctx->focus_id) {
-								start_idx = i + 1;
+								start_idx = reverse ? (i + ctx->widget_count - 1) : (i + 1);
 								break;
 							}
 						}
 					}
 					for(uint32_t i = 0; i < ctx->widget_count; ++i) {
-						uint32_t idx = (start_idx + i) % ctx->widget_count;
+						uint32_t idx;
+						if(reverse) {
+							idx = (start_idx + ctx->widget_count - i) % ctx->widget_count;
+						} else {
+							idx = (start_idx + i) % ctx->widget_count;
+						}
 						if(widget_visible(ctx, idx) && is_focusable(&ctx->widgets[idx])) {
+							spinbox_focus_lost(ctx);
 							ctx->focus_id = ctx->widgets[idx].id;
 							dirty_all(ctx);
 							break;
@@ -3305,16 +3554,82 @@ static uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 
 				if((pev.keymod & 4) && ctx->focus_id) {
 					struct mkgui_widget *fw = find_widget(ctx, ctx->focus_id);
+					if(fw && (ks == 'a' || ks == 'A')) {
+						if(fw->type == MKGUI_INPUT) {
+							struct mkgui_input_data *inp = find_input_data(ctx, ctx->focus_id);
+							if(inp) {
+								inp->sel_start = 0;
+								inp->sel_end = (uint32_t)strlen(inp->text);
+								inp->cursor = inp->sel_end;
+								dirty_all(ctx);
+							}
+
+						} else if(fw->type == MKGUI_TEXTAREA) {
+							struct mkgui_textarea_data *ta = find_textarea_data(ctx, ctx->focus_id);
+							if(ta) {
+								ta->sel_start = 0;
+								ta->sel_end = ta->text_len;
+								ta->cursor = ta->text_len;
+								dirty_all(ctx);
+							}
+						}
+						break;
+					}
+
 					if(fw && (ks == 'c' || ks == 'C')) {
 						if(fw->type == MKGUI_INPUT && !(fw->flags & MKGUI_PASSWORD)) {
 							struct mkgui_input_data *inp = find_input_data(ctx, ctx->focus_id);
 							if(inp) {
-								platform_clipboard_set(ctx, inp->text, (uint32_t)strlen(inp->text));
+								if(input_has_selection(inp)) {
+									uint32_t lo, hi;
+									input_sel_range(inp, &lo, &hi);
+									platform_clipboard_set(ctx, inp->text + lo, hi - lo);
+								} else {
+									platform_clipboard_set(ctx, inp->text, (uint32_t)strlen(inp->text));
+								}
 							}
+
 						} else if(fw->type == MKGUI_TEXTAREA) {
 							struct mkgui_textarea_data *ta = find_textarea_data(ctx, ctx->focus_id);
 							if(ta) {
-								platform_clipboard_set(ctx, ta->text, ta->text_len);
+								if(textarea_has_selection(ta)) {
+									uint32_t lo, hi;
+									textarea_sel_range(ta, &lo, &hi);
+									platform_clipboard_set(ctx, ta->text + lo, hi - lo);
+								} else {
+									platform_clipboard_set(ctx, ta->text, ta->text_len);
+								}
+							}
+						}
+						break;
+					}
+
+					if(fw && (ks == 'x' || ks == 'X') && !(fw->flags & MKGUI_READONLY)) {
+						if(fw->type == MKGUI_INPUT && !(fw->flags & MKGUI_PASSWORD)) {
+							struct mkgui_input_data *inp = find_input_data(ctx, ctx->focus_id);
+							if(inp && input_has_selection(inp)) {
+								uint32_t lo, hi;
+								input_sel_range(inp, &lo, &hi);
+								platform_clipboard_set(ctx, inp->text + lo, hi - lo);
+								input_delete_selection(inp);
+								dirty_all(ctx);
+								ev->type = MKGUI_EVENT_INPUT_CHANGED;
+								ev->id = ctx->focus_id;
+								return 1;
+							}
+
+						} else if(fw->type == MKGUI_TEXTAREA) {
+							struct mkgui_textarea_data *ta = find_textarea_data(ctx, ctx->focus_id);
+							if(ta && textarea_has_selection(ta)) {
+								uint32_t lo, hi;
+								textarea_sel_range(ta, &lo, &hi);
+								platform_clipboard_set(ctx, ta->text + lo, hi - lo);
+								textarea_delete_selection(ta);
+								dirty_all(ctx);
+								textarea_scroll_to_cursor(ctx, ctx->focus_id);
+								ev->type = MKGUI_EVENT_TEXTAREA_CHANGED;
+								ev->id = ctx->focus_id;
+								return 1;
 							}
 						}
 						break;
@@ -3327,6 +3642,9 @@ static uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 							if(fw->type == MKGUI_INPUT) {
 								struct mkgui_input_data *inp = find_input_data(ctx, ctx->focus_id);
 								if(inp) {
+									if(input_has_selection(inp)) {
+										input_delete_selection(inp);
+									}
 									for(uint32_t ci = 0; ci < clip_len; ++ci) {
 										if(clip_buf[ci] == '\n' || clip_buf[ci] == '\r') {
 											clip_buf[ci] = ' ';
@@ -3337,15 +3655,20 @@ static uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 										memmove(&inp->text[inp->cursor + clip_len], &inp->text[inp->cursor], text_len - inp->cursor + 1);
 										memcpy(&inp->text[inp->cursor], clip_buf, clip_len);
 										inp->cursor += clip_len;
+										input_clear_selection(inp);
 										dirty_all(ctx);
 										ev->type = MKGUI_EVENT_INPUT_CHANGED;
 										ev->id = ctx->focus_id;
 										return 1;
 									}
 								}
+
 							} else if(fw->type == MKGUI_TEXTAREA) {
 								struct mkgui_textarea_data *ta = find_textarea_data(ctx, ctx->focus_id);
 								if(ta) {
+									if(textarea_has_selection(ta)) {
+										textarea_delete_selection(ta);
+									}
 									for(uint32_t ci = 0; ci < clip_len; ++ci) {
 										if(clip_buf[ci] == '\r') {
 											memmove(&clip_buf[ci], &clip_buf[ci + 1], clip_len - ci - 1);
@@ -3359,6 +3682,7 @@ static uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 									ta->cursor += clip_len;
 									ta->text_len += clip_len;
 									ta->text[ta->text_len] = '\0';
+									textarea_clear_selection(ta);
 									dirty_all(ctx);
 									textarea_scroll_to_cursor(ctx, ctx->focus_id);
 									ev->type = MKGUI_EVENT_TEXTAREA_CHANGED;
@@ -3376,7 +3700,7 @@ static uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 					if(fw) {
 						switch(fw->type) {
 							case MKGUI_INPUT: {
-								if(handle_input_key(ctx, ev, ks, pev.text, pev.text_len)) {
+								if(handle_input_key(ctx, ev, ks, pev.keymod, pev.text, pev.text_len)) {
 									return 1;
 								}
 							} break;
@@ -3418,7 +3742,7 @@ static uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 							} break;
 
 							case MKGUI_SPINBOX: {
-								if(handle_spinbox_key(ctx, ev, ks)) {
+								if(handle_spinbox_key(ctx, ev, ks, pev.text, pev.text_len)) {
 									return 1;
 								}
 							} break;
@@ -3430,7 +3754,7 @@ static uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 							} break;
 
 							case MKGUI_TEXTAREA: {
-								if(handle_textarea_key(ctx, ev, ks, pev.text, pev.text_len)) {
+								if(handle_textarea_key(ctx, ev, ks, pev.keymod, pev.text, pev.text_len)) {
 									return 1;
 								}
 							} break;
@@ -3442,6 +3766,12 @@ static uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 									if(fi >= 0 && handle_itemview_key(ctx, iv, (uint32_t)fi, ks, ev)) {
 										return 1;
 									}
+								}
+							} break;
+
+							case MKGUI_TABS: {
+								if(handle_tabs_key(ctx, ev, ks)) {
+									return 1;
 								}
 							} break;
 

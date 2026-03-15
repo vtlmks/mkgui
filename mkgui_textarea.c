@@ -57,6 +57,40 @@ static void textarea_ensure_cap(struct mkgui_textarea_data *ta, uint32_t needed)
 	ta->text_cap = new_cap;
 }
 
+// [=]===^=[ textarea_has_selection ]==============================[=]
+static uint32_t textarea_has_selection(struct mkgui_textarea_data *ta) {
+	return ta->sel_start != ta->sel_end;
+}
+
+// [=]===^=[ textarea_sel_range ]=================================[=]
+static void textarea_sel_range(struct mkgui_textarea_data *ta, uint32_t *lo, uint32_t *hi) {
+	if(ta->sel_start < ta->sel_end) {
+		*lo = ta->sel_start;
+		*hi = ta->sel_end;
+	} else {
+		*lo = ta->sel_end;
+		*hi = ta->sel_start;
+	}
+}
+
+// [=]===^=[ textarea_clear_selection ]============================[=]
+static void textarea_clear_selection(struct mkgui_textarea_data *ta) {
+	ta->sel_start = ta->cursor;
+	ta->sel_end = ta->cursor;
+}
+
+// [=]===^=[ textarea_delete_selection ]===========================[=]
+static void textarea_delete_selection(struct mkgui_textarea_data *ta) {
+	uint32_t lo, hi;
+	textarea_sel_range(ta, &lo, &hi);
+	memmove(&ta->text[lo], &ta->text[hi], ta->text_len - hi);
+	ta->text_len -= (hi - lo);
+	ta->text[ta->text_len] = '\0';
+	ta->cursor = lo;
+	ta->sel_start = lo;
+	ta->sel_end = lo;
+}
+
 // [=]===^=[ textarea_insert_char ]===============================[=]
 static void textarea_insert_char(struct mkgui_textarea_data *ta, char ch) {
 	textarea_ensure_cap(ta, ta->text_len + 2);
@@ -75,6 +109,60 @@ static void textarea_delete_char(struct mkgui_textarea_data *ta, uint32_t pos) {
 	memmove(&ta->text[pos], &ta->text[pos + 1], ta->text_len - pos - 1);
 	--ta->text_len;
 	ta->text[ta->text_len] = '\0';
+}
+
+// [=]===^=[ textarea_pos_to_line ]================================[=]
+static uint32_t textarea_pos_to_line(struct mkgui_textarea_data *ta, uint32_t pos) {
+	uint32_t line = 0;
+	for(uint32_t i = 0; i < pos && i < ta->text_len; ++i) {
+		if(ta->text[i] == '\n') {
+			++line;
+		}
+	}
+	return line;
+}
+
+// [=]===^=[ textarea_hit_pos ]====================================[=]
+static uint32_t textarea_hit_pos(struct mkgui_ctx *ctx, struct mkgui_textarea_data *ta, int32_t rx, int32_t ry, int32_t rh, int32_t mx, int32_t my) {
+	int32_t local_y = my - (ry + 1) + ta->scroll_y;
+	int32_t hit_line = local_y / MKGUI_ROW_HEIGHT;
+	if(hit_line < 0) {
+		hit_line = 0;
+	}
+
+	uint32_t line = 0;
+	uint32_t line_start = 0;
+	for(uint32_t i = 0; i <= ta->text_len; ++i) {
+		if(i == ta->text_len || ta->text[i] == '\n') {
+			if((int32_t)line == hit_line) {
+				uint32_t len = i - line_start;
+				int32_t base_x = rx + 4 - ta->scroll_x;
+				char tmp[MKGUI_MAX_TEXTAREA_LINE];
+				if(len >= MKGUI_MAX_TEXTAREA_LINE) {
+					len = MKGUI_MAX_TEXTAREA_LINE - 1;
+				}
+				for(uint32_t j = 0; j <= len; ++j) {
+					memcpy(tmp, &ta->text[line_start], j);
+					tmp[j] = '\0';
+					int32_t w = text_width(ctx, tmp);
+					if(base_x + w >= mx) {
+						if(j > 0) {
+							tmp[j - 1] = '\0';
+							int32_t prev_w = text_width(ctx, tmp);
+							if(mx - (base_x + prev_w) < (base_x + w) - mx) {
+								return line_start + j - 1;
+							}
+						}
+						return line_start + j;
+					}
+				}
+				return line_start + len;
+			}
+			line_start = i + 1;
+			++line;
+		}
+	}
+	return ta->text_len;
 }
 
 // [=]===^=[ render_textarea ]====================================[=]
@@ -98,10 +186,18 @@ static void render_textarea(struct mkgui_ctx *ctx, uint32_t idx) {
 	int32_t clip_left = rx + 1;
 	int32_t clip_right = rx + rw - 1;
 
+	uint32_t has_sel = (focused && textarea_has_selection(ta));
+	uint32_t sel_lo = 0, sel_hi = 0;
+	if(has_sel) {
+		textarea_sel_range(ta, &sel_lo, &sel_hi);
+	}
+
 	uint32_t line = 0;
 	uint32_t line_start = 0;
 	uint32_t cursor_line = textarea_cursor_line(ta);
 	uint32_t cursor_col = ta->cursor - textarea_line_start(ta, ta->cursor);
+
+	uint32_t tc = (w->flags & MKGUI_DISABLED) ? ctx->theme.text_disabled : ctx->theme.text;
 
 	for(uint32_t i = 0; i <= ta->text_len; ++i) {
 		if(i == ta->text_len || ta->text[i] == '\n') {
@@ -111,22 +207,53 @@ static void render_textarea(struct mkgui_ctx *ctx, uint32_t idx) {
 				int32_t ty = draw_y + (MKGUI_ROW_HEIGHT - ctx->font_height) / 2;
 				int32_t tx = rx + 4 - ta->scroll_x;
 
-				if(ty >= clip_top && ty + ctx->font_height <= clip_bottom) {
-					uint32_t len = i - line_start;
-					char line_buf[MKGUI_MAX_TEXTAREA_LINE];
-					if(len >= MKGUI_MAX_TEXTAREA_LINE) {
-						len = MKGUI_MAX_TEXTAREA_LINE - 1;
+				uint32_t len = i - line_start;
+				char line_buf[MKGUI_MAX_TEXTAREA_LINE];
+				if(len >= MKGUI_MAX_TEXTAREA_LINE) {
+					len = MKGUI_MAX_TEXTAREA_LINE - 1;
+				}
+				memcpy(line_buf, &ta->text[line_start], len);
+				line_buf[len] = '\0';
+
+				if(has_sel && sel_lo < i && sel_hi > line_start) {
+					uint32_t s0 = sel_lo > line_start ? sel_lo - line_start : 0;
+					uint32_t s1 = sel_hi < i ? sel_hi - line_start : len;
+
+					char tmp[MKGUI_MAX_TEXTAREA_LINE];
+					memcpy(tmp, line_buf, s0);
+					tmp[s0] = '\0';
+					int32_t sx1 = tx + text_width(ctx, tmp);
+
+					memcpy(tmp, line_buf, s1);
+					tmp[s1] = '\0';
+					int32_t sx2 = tx + text_width(ctx, tmp);
+
+					int32_t cx1 = sx1 < clip_left ? clip_left : sx1;
+					int32_t cx2 = sx2 > clip_right ? clip_right : sx2;
+					if(cx2 > cx1) {
+						draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, cx1, draw_y, cx2 - cx1, MKGUI_ROW_HEIGHT, ctx->theme.selection);
 					}
-					memcpy(line_buf, &ta->text[line_start], len);
-					line_buf[len] = '\0';
-					push_text_clip(tx, ty, line_buf, ctx->theme.text, clip_left, clip_top, clip_right, clip_bottom);
+
+					if(ty >= clip_top && ty + ctx->font_height <= clip_bottom) {
+						push_text_clip(tx, ty, line_buf, tc, clip_left, clip_top, clip_right, clip_bottom);
+
+						char sel_buf[MKGUI_MAX_TEXTAREA_LINE];
+						uint32_t sel_len = s1 - s0;
+						memcpy(sel_buf, &line_buf[s0], sel_len);
+						sel_buf[sel_len] = '\0';
+						push_text_clip(sx1, ty, sel_buf, ctx->theme.sel_text, cx1, clip_top, cx2, clip_bottom);
+					}
+
+				} else {
+					if(ty >= clip_top && ty + ctx->font_height <= clip_bottom) {
+						push_text_clip(tx, ty, line_buf, tc, clip_left, clip_top, clip_right, clip_bottom);
+					}
 				}
 
-				if(ctx->focus_id == w->id && line == cursor_line) {
-					uint32_t line_len = i - line_start;
+				if(focused && line == cursor_line) {
 					uint32_t clen = cursor_col;
-					if(clen > line_len) {
-						clen = line_len;
+					if(clen > len) {
+						clen = len;
 					}
 					char cursor_buf[512];
 					if(clen > sizeof(cursor_buf) - 1) {
@@ -162,6 +289,66 @@ static void render_textarea(struct mkgui_ctx *ctx, uint32_t idx) {
 	}
 }
 
+// [=]===^=[ textarea_has_scrollbar ]==============================[=]
+static uint32_t textarea_has_scrollbar(struct mkgui_ctx *ctx, uint32_t idx, struct mkgui_textarea_data *ta) {
+	int32_t rh = ctx->rects[idx].h;
+	int32_t content_h = (int32_t)textarea_line_count(ta) * MKGUI_ROW_HEIGHT;
+	return content_h > rh - 2;
+}
+
+// [=]===^=[ textarea_sb_hit ]========================================[=]
+static int32_t textarea_sb_hit(struct mkgui_ctx *ctx, uint32_t idx, struct mkgui_textarea_data *ta, int32_t mx, int32_t my) {
+	int32_t rx = ctx->rects[idx].x;
+	int32_t ry = ctx->rects[idx].y;
+	int32_t rw = ctx->rects[idx].w;
+	int32_t rh = ctx->rects[idx].h;
+	int32_t sb_x = rx + rw - MKGUI_SCROLLBAR_W;
+	if(mx < sb_x || mx >= rx + rw) {
+		return -1;
+	}
+	int32_t content_h = (int32_t)textarea_line_count(ta) * MKGUI_ROW_HEIGHT;
+	int32_t view_h = rh - 2;
+	int32_t thumb_h = (int32_t)((int64_t)view_h * view_h / content_h);
+	if(thumb_h < 20) {
+		thumb_h = 20;
+	}
+	int32_t max_scroll = content_h - view_h;
+	if(max_scroll <= 0) {
+		return -1;
+	}
+	int32_t thumb_y = ry + 1 + (int32_t)((int64_t)ta->scroll_y * (view_h - thumb_h) / max_scroll);
+	return my - thumb_y;
+}
+
+// [=]===^=[ textarea_scroll_drag ]=================================[=]
+static void textarea_scroll_drag(struct mkgui_ctx *ctx, uint32_t idx, struct mkgui_textarea_data *ta, int32_t my, int32_t offset) {
+	int32_t ry = ctx->rects[idx].y;
+	int32_t rh = ctx->rects[idx].h;
+	int32_t content_h = (int32_t)textarea_line_count(ta) * MKGUI_ROW_HEIGHT;
+	int32_t view_h = rh - 2;
+	int32_t thumb_h = (int32_t)((int64_t)view_h * view_h / content_h);
+	if(thumb_h < 20) {
+		thumb_h = 20;
+	}
+	int32_t max_scroll = content_h - view_h;
+	if(max_scroll <= 0) {
+		return;
+	}
+	int32_t track = view_h - thumb_h;
+	if(track <= 0) {
+		return;
+	}
+	int32_t thumb_pos = my - offset - (ry + 1);
+	ta->scroll_y = (int32_t)((int64_t)thumb_pos * max_scroll / track);
+	if(ta->scroll_y < 0) {
+		ta->scroll_y = 0;
+	}
+	if(ta->scroll_y > max_scroll) {
+		ta->scroll_y = max_scroll;
+	}
+	dirty_all(ctx);
+}
+
 // [=]===^=[ textarea_scroll_to_cursor ]=========================[=]
 static void textarea_scroll_to_cursor(struct mkgui_ctx *ctx, uint32_t widget_id) {
 	struct mkgui_textarea_data *ta = find_textarea_data(ctx, widget_id);
@@ -189,14 +376,25 @@ static void textarea_scroll_to_cursor(struct mkgui_ctx *ctx, uint32_t widget_id)
 }
 
 // [=]===^=[ handle_textarea_key ]================================[=]
-static uint32_t handle_textarea_key(struct mkgui_ctx *ctx, struct mkgui_event *ev, uint32_t ks, const char *buf, int32_t len) {
+static uint32_t handle_textarea_key(struct mkgui_ctx *ctx, struct mkgui_event *ev, uint32_t ks, uint32_t keymod, const char *buf, int32_t len) {
 	struct mkgui_textarea_data *ta = find_textarea_data(ctx, ctx->focus_id);
 	if(!ta) {
 		return 0;
 	}
 
+	struct mkgui_widget *w = find_widget(ctx, ctx->focus_id);
+	uint32_t readonly = (w && (w->flags & MKGUI_READONLY));
+	uint32_t shift = (keymod & MKGUI_MOD_SHIFT);
+
 	if(ks == MKGUI_KEY_RETURN) {
+		if(readonly) {
+			return 0;
+		}
+		if(textarea_has_selection(ta)) {
+			textarea_delete_selection(ta);
+		}
 		textarea_insert_char(ta, '\n');
+		textarea_clear_selection(ta);
 		dirty_all(ctx);
 		textarea_scroll_to_cursor(ctx, ctx->focus_id);
 		ev->type = MKGUI_EVENT_TEXTAREA_CHANGED;
@@ -205,9 +403,21 @@ static uint32_t handle_textarea_key(struct mkgui_ctx *ctx, struct mkgui_event *e
 	}
 
 	if(ks == MKGUI_KEY_BACKSPACE) {
+		if(readonly) {
+			return 0;
+		}
+		if(textarea_has_selection(ta)) {
+			textarea_delete_selection(ta);
+			dirty_all(ctx);
+			textarea_scroll_to_cursor(ctx, ctx->focus_id);
+			ev->type = MKGUI_EVENT_TEXTAREA_CHANGED;
+			ev->id = ctx->focus_id;
+			return 1;
+		}
 		if(ta->cursor > 0) {
 			--ta->cursor;
 			textarea_delete_char(ta, ta->cursor);
+			textarea_clear_selection(ta);
 			dirty_all(ctx);
 			textarea_scroll_to_cursor(ctx, ctx->focus_id);
 			ev->type = MKGUI_EVENT_TEXTAREA_CHANGED;
@@ -218,6 +428,17 @@ static uint32_t handle_textarea_key(struct mkgui_ctx *ctx, struct mkgui_event *e
 	}
 
 	if(ks == MKGUI_KEY_DELETE) {
+		if(readonly) {
+			return 0;
+		}
+		if(textarea_has_selection(ta)) {
+			textarea_delete_selection(ta);
+			dirty_all(ctx);
+			textarea_scroll_to_cursor(ctx, ctx->focus_id);
+			ev->type = MKGUI_EVENT_TEXTAREA_CHANGED;
+			ev->id = ctx->focus_id;
+			return 1;
+		}
 		if(ta->cursor < ta->text_len) {
 			textarea_delete_char(ta, ta->cursor);
 			dirty_all(ctx);
@@ -231,18 +452,28 @@ static uint32_t handle_textarea_key(struct mkgui_ctx *ctx, struct mkgui_event *e
 	if(ks == MKGUI_KEY_LEFT) {
 		if(ta->cursor > 0) {
 			--ta->cursor;
-			dirty_all(ctx);
-			textarea_scroll_to_cursor(ctx, ctx->focus_id);
 		}
+		if(shift) {
+			ta->sel_end = ta->cursor;
+		} else {
+			textarea_clear_selection(ta);
+		}
+		dirty_all(ctx);
+		textarea_scroll_to_cursor(ctx, ctx->focus_id);
 		return 0;
 	}
 
 	if(ks == MKGUI_KEY_RIGHT) {
 		if(ta->cursor < ta->text_len) {
 			++ta->cursor;
-			dirty_all(ctx);
-			textarea_scroll_to_cursor(ctx, ctx->focus_id);
 		}
+		if(shift) {
+			ta->sel_end = ta->cursor;
+		} else {
+			textarea_clear_selection(ta);
+		}
+		dirty_all(ctx);
+		textarea_scroll_to_cursor(ctx, ctx->focus_id);
 		return 0;
 	}
 
@@ -253,9 +484,14 @@ static uint32_t handle_textarea_key(struct mkgui_ctx *ctx, struct mkgui_event *e
 			uint32_t prev_ls = textarea_line_start(ta, ls - 1);
 			uint32_t prev_len = ls - 1 - prev_ls;
 			ta->cursor = prev_ls + (col < prev_len ? col : prev_len);
-			dirty_all(ctx);
-			textarea_scroll_to_cursor(ctx, ctx->focus_id);
 		}
+		if(shift) {
+			ta->sel_end = ta->cursor;
+		} else {
+			textarea_clear_selection(ta);
+		}
+		dirty_all(ctx);
+		textarea_scroll_to_cursor(ctx, ctx->focus_id);
 		return 0;
 	}
 
@@ -268,28 +504,50 @@ static uint32_t handle_textarea_key(struct mkgui_ctx *ctx, struct mkgui_event *e
 			uint32_t next_le = textarea_line_end(ta, next_ls);
 			uint32_t next_len = next_le - next_ls;
 			ta->cursor = next_ls + (col < next_len ? col : next_len);
-			dirty_all(ctx);
-			textarea_scroll_to_cursor(ctx, ctx->focus_id);
 		}
+		if(shift) {
+			ta->sel_end = ta->cursor;
+		} else {
+			textarea_clear_selection(ta);
+		}
+		dirty_all(ctx);
+		textarea_scroll_to_cursor(ctx, ctx->focus_id);
 		return 0;
 	}
 
 	if(ks == MKGUI_KEY_HOME) {
 		ta->cursor = textarea_line_start(ta, ta->cursor);
+		if(shift) {
+			ta->sel_end = ta->cursor;
+		} else {
+			textarea_clear_selection(ta);
+		}
 		dirty_all(ctx);
 		return 0;
 	}
 
 	if(ks == MKGUI_KEY_END) {
 		ta->cursor = textarea_line_end(ta, ta->cursor);
+		if(shift) {
+			ta->sel_end = ta->cursor;
+		} else {
+			textarea_clear_selection(ta);
+		}
 		dirty_all(ctx);
 		return 0;
 	}
 
 	if(len > 0 && (uint8_t)buf[0] >= 32) {
+		if(readonly) {
+			return 0;
+		}
+		if(textarea_has_selection(ta)) {
+			textarea_delete_selection(ta);
+		}
 		for(int32_t i = 0; i < len; ++i) {
 			textarea_insert_char(ta, buf[i]);
 		}
+		textarea_clear_selection(ta);
 		dirty_all(ctx);
 		textarea_scroll_to_cursor(ctx, ctx->focus_id);
 		ev->type = MKGUI_EVENT_TEXTAREA_CHANGED;
@@ -312,6 +570,8 @@ static void mkgui_textarea_set(struct mkgui_ctx *ctx, uint32_t id, const char *t
 	ta->text[slen] = '\0';
 	ta->text_len = slen;
 	ta->cursor = 0;
+	ta->sel_start = 0;
+	ta->sel_end = 0;
 	ta->scroll_y = 0;
 	ta->scroll_x = 0;
 	dirty_all(ctx);

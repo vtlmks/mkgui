@@ -276,7 +276,7 @@ static void render_listview(struct mkgui_ctx *ctx, uint32_t idx) {
 				if(lv->row_cb) {
 					lv->row_cb((uint32_t)row_idx, c, cell_buf, sizeof(cell_buf), lv->userdata);
 				}
-				uint32_t tc = (row_idx == lv->selected_row) ? ctx->theme.sel_text : ctx->theme.text;
+				uint32_t tc = (row_idx == lv->selected_row) ? ctx->theme.sel_text : ((w->flags & MKGUI_DISABLED) ? ctx->theme.text_disabled : ctx->theme.text);
 				int32_t col_w = lv->columns[c].width;
 				render_cell(ctx, lv, c, cell_buf, cx, ty, col_w, clip_top, clip_bottom, tc, row_y);
 				cx += col_w;

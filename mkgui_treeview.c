@@ -150,11 +150,37 @@ static void render_treeview(struct mkgui_ctx *ctx, uint32_t idx) {
 		}
 		int32_t ty = row_y + (MKGUI_ROW_HEIGHT - ctx->font_height) / 2;
 		if(ty >= clip_top && ty + ctx->font_height <= clip_bottom) {
-			uint32_t tc = ((int32_t)tv->nodes[i].id == tv->selected_node) ? ctx->theme.sel_text : ctx->theme.text;
+			uint32_t tc = ((int32_t)tv->nodes[i].id == tv->selected_node) ? ctx->theme.sel_text : ((w->flags & MKGUI_DISABLED) ? ctx->theme.text_disabled : ctx->theme.text);
 			push_text_clip(text_x, ty, tv->nodes[i].label, tc, rx + 1, clip_top, rx + rw - 1, clip_bottom);
 		}
 	}
 
+	if(tv->drag_active && tv->drag_target >= 0 && (uint32_t)tv->drag_target < tv->node_count) {
+		uint32_t depth = treeview_node_depth(tv, (uint32_t)tv->drag_target);
+		int32_t indent = (int32_t)(depth * MKGUI_TREE_INDENT) + MKGUI_TREE_INDENT + 4;
+		int32_t vis = 0;
+		for(uint32_t i = 0; i < (uint32_t)tv->drag_target; ++i) {
+			if(treeview_node_visible(tv, i)) {
+				++vis;
+			}
+		}
+		if(treeview_node_visible(tv, (uint32_t)tv->drag_target)) {
+			int32_t line_y;
+			if(tv->drag_pos == 0) {
+				line_y = ry + 1 - tv->scroll_y + vis * MKGUI_ROW_HEIGHT;
+			} else if(tv->drag_pos == 2) {
+				indent = (int32_t)((depth + 1) * MKGUI_TREE_INDENT) + MKGUI_TREE_INDENT + 4;
+				line_y = ry + 1 - tv->scroll_y + vis * MKGUI_ROW_HEIGHT + MKGUI_ROW_HEIGHT / 2;
+			} else {
+				line_y = ry + 1 - tv->scroll_y + (vis + 1) * MKGUI_ROW_HEIGHT;
+			}
+			if(line_y >= clip_top && line_y < clip_bottom) {
+				draw_hline(ctx->pixels, ctx->win_w, ctx->win_h, rx + indent, line_y, rw - indent - 2, ctx->theme.accent);
+				draw_hline(ctx->pixels, ctx->win_w, ctx->win_h, rx + indent, line_y - 1, rw - indent - 2, ctx->theme.accent);
+				draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, rx + indent - 2, line_y - 2, 5, 5, ctx->theme.accent);
+			}
+		}
+	}
 }
 
 // [=]===^=[ treeview_visible_count ]=============================[=]
@@ -384,4 +410,14 @@ static uint32_t mkgui_treeview_add(struct mkgui_ctx *ctx, uint32_t widget_id, ui
 static int32_t mkgui_treeview_get_selected(struct mkgui_ctx *ctx, uint32_t id) {
 	struct mkgui_treeview_data *tv = find_treeview_data(ctx, id);
 	return tv ? tv->selected_node : -1;
+}
+
+// [=]===^=[ mkgui_treeview_select ]==============================[=]
+static void mkgui_treeview_select(struct mkgui_ctx *ctx, uint32_t widget_id, int32_t node_id) {
+	struct mkgui_treeview_data *tv = find_treeview_data(ctx, widget_id);
+	if(!tv) {
+		return;
+	}
+	tv->selected_node = node_id;
+	dirty_all(ctx);
 }

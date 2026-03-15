@@ -71,22 +71,26 @@ static void render_checkbox(struct mkgui_ctx *ctx, uint32_t idx) {
 	int32_t box_size = 16;
 	int32_t by = ry + (rh - box_size) / 2;
 
+	uint32_t disabled = (w->flags & MKGUI_DISABLED);
 	uint32_t focused = (ctx->focus_id == w->id);
-	uint32_t hovered = (ctx->hover_id == w->id);
-	uint32_t bg = (w->flags & MKGUI_CHECKED) ? ctx->theme.splitter : ctx->theme.input_bg;
+	uint32_t hovered = (!disabled && ctx->hover_id == w->id);
+	uint32_t pressed = (!disabled && ctx->press_id == w->id);
+	uint32_t bg = (w->flags & MKGUI_CHECKED) ? (disabled ? ctx->theme.widget_border : ctx->theme.splitter) : (pressed ? ctx->theme.widget_press : ctx->theme.input_bg);
 	uint32_t border = (focused || hovered) ? ctx->theme.splitter : ctx->theme.widget_border;
 	draw_patch(ctx, MKGUI_STYLE_SUNKEN, rx, by, box_size, box_size, bg, border);
 
 	if(w->flags & MKGUI_CHECKED) {
 		int32_t cx = rx + box_size / 2;
 		int32_t cy = by + box_size / 2;
-		draw_aa_line(ctx->pixels, ctx->win_w, ctx->win_h, cx - 4, cy - 1, cx - 1, cy + 3, ctx->theme.sel_text, 2);
-		draw_aa_line(ctx->pixels, ctx->win_w, ctx->win_h, cx - 1, cy + 3, cx + 5, cy - 4, ctx->theme.sel_text, 2);
+		uint32_t check_color = disabled ? ctx->theme.text_disabled : ctx->theme.sel_text;
+		draw_aa_line(ctx->pixels, ctx->win_w, ctx->win_h, cx - 4, cy - 1, cx - 1, cy + 3, check_color, 2);
+		draw_aa_line(ctx->pixels, ctx->win_w, ctx->win_h, cx - 1, cy + 3, cx + 5, cy - 4, check_color, 2);
 	}
 
 	int32_t rw = ctx->rects[idx].w;
 	int32_t ty = ry + (rh - ctx->font_height) / 2;
-	push_text_clip(rx + box_size + 6, ty, w->label, ctx->theme.text, rx, ry, rx + rw, ry + rh);
+	uint32_t tc = disabled ? ctx->theme.text_disabled : ctx->theme.text;
+	push_text_clip(rx + box_size + 6, ty, w->label, tc, rx, ry, rx + rw, ry + rh);
 }
 
 // [=]===^=[ handle_checkbox_key ]===============================[=]

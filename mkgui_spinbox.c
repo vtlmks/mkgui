@@ -20,6 +20,49 @@ static int32_t spinbox_btn_hit(struct mkgui_ctx *ctx, uint32_t idx, int32_t mx, 
 	return -1;
 }
 
+// [=]===^=[ spinbox_commit_edit ]=================================[=]
+static void spinbox_commit_edit(struct mkgui_spinbox_data *sd) {
+	if(!sd->editing) {
+		return;
+	}
+	sd->editing = 0;
+	sd->edit_buf[sd->edit_len] = '\0';
+	if(sd->edit_len == 0 || (sd->edit_len == 1 && sd->edit_buf[0] == '-')) {
+		return;
+	}
+	int32_t v = 0;
+	uint32_t neg = 0;
+	uint32_t i = 0;
+	if(sd->edit_buf[0] == '-') {
+		neg = 1;
+		i = 1;
+	}
+	for(; i < sd->edit_len; ++i) {
+		v = v * 10 + (sd->edit_buf[i] - '0');
+	}
+	if(neg) {
+		v = -v;
+	}
+	if(v < sd->min_val) {
+		v = sd->min_val;
+	}
+	if(v > sd->max_val) {
+		v = sd->max_val;
+	}
+	sd->value = v;
+}
+
+// [=]===^=[ spinbox_focus_lost ]===================================[=]
+static void spinbox_focus_lost(struct mkgui_ctx *ctx) {
+	if(!ctx->focus_id) {
+		return;
+	}
+	struct mkgui_spinbox_data *sd = find_spinbox_data(ctx, ctx->focus_id);
+	if(sd && sd->editing) {
+		spinbox_commit_edit(sd);
+	}
+}
+
 // [=]===^=[ render_spinbox ]=====================================[=]
 static void render_spinbox(struct mkgui_ctx *ctx, uint32_t idx) {
 	struct mkgui_widget *w = &ctx->widgets[idx];
@@ -28,20 +71,36 @@ static void render_spinbox(struct mkgui_ctx *ctx, uint32_t idx) {
 	int32_t rw = ctx->rects[idx].w;
 	int32_t rh = ctx->rects[idx].h;
 
+	uint32_t disabled = (w->flags & MKGUI_DISABLED);
 	uint32_t focused = (ctx->focus_id == w->id);
 	draw_patch(ctx, MKGUI_STYLE_SUNKEN, rx, ry, rw, rh, ctx->theme.input_bg, focused ? ctx->theme.splitter : ctx->theme.widget_border);
 
 	struct mkgui_spinbox_data *sd = find_spinbox_data(ctx, w->id);
+	uint32_t tc = disabled ? ctx->theme.text_disabled : ctx->theme.text;
 	if(sd) {
-		char buf[64];
-		snprintf(buf, sizeof(buf), "%d", sd->value);
+		const char *display;
+		char val_buf[64];
+		if(sd->editing && focused) {
+			sd->edit_buf[sd->edit_len] = '\0';
+			display = sd->edit_buf;
+		} else {
+			snprintf(val_buf, sizeof(val_buf), "%d", sd->value);
+			display = val_buf;
+		}
 		int32_t ty = ry + (rh - ctx->font_height) / 2;
-		push_text_clip(rx + 4, ty, buf, ctx->theme.text, rx + 1, ry + 1, rx + rw - MKGUI_SPINBOX_BTN_W, ry + rh - 1);
+		int32_t text_right = rx + rw - MKGUI_SPINBOX_BTN_W;
+		push_text_clip(rx + 4, ty, display, tc, rx + 1, ry + 1, text_right, ry + rh - 1);
+		if(sd->editing && focused) {
+			int32_t cur_x = rx + 4 + text_width(ctx, display);
+			if(cur_x < text_right) {
+				draw_vline(ctx->pixels, ctx->win_w, ctx->win_h, cur_x, ry + 3, rh - 6, tc);
+			}
+		}
 	}
 
 	int32_t bx = rx + rw - MKGUI_SPINBOX_BTN_W;
 	int32_t half = rh / 2;
-	int32_t hover_btn = (ctx->hover_id == w->id && sd) ? sd->hover_btn : 0;
+	int32_t hover_btn = (!disabled && ctx->hover_id == w->id && sd) ? sd->hover_btn : 0;
 
 	uint32_t up_bg = (hover_btn == 1) ? ctx->theme.widget_hover : ctx->theme.widget_bg;
 	draw_patch(ctx, MKGUI_STYLE_RAISED, bx, ry, MKGUI_SPINBOX_BTN_W, half, up_bg, ctx->theme.widget_border);
@@ -49,7 +108,7 @@ static void render_spinbox(struct mkgui_ctx *ctx, uint32_t idx) {
 	int32_t acx = bx + MKGUI_SPINBOX_BTN_W / 2;
 	int32_t acy = ry + half / 2 - 2;
 	for(int32_t j = 0; j < 4; ++j) {
-		draw_hline(ctx->pixels, ctx->win_w, ctx->win_h, acx - j, acy + j, 1 + j * 2, ctx->theme.text);
+		draw_hline(ctx->pixels, ctx->win_w, ctx->win_h, acx - j, acy + j, 1 + j * 2, tc);
 	}
 
 	uint32_t dn_bg = (hover_btn == -1) ? ctx->theme.widget_hover : ctx->theme.widget_bg;
@@ -57,7 +116,7 @@ static void render_spinbox(struct mkgui_ctx *ctx, uint32_t idx) {
 
 	int32_t acy2 = ry + half + (rh - half) / 2 - 2;
 	for(int32_t j = 0; j < 4; ++j) {
-		draw_hline(ctx->pixels, ctx->win_w, ctx->win_h, acx - (3 - j), acy2 + j, 1 + (3 - j) * 2, ctx->theme.text);
+		draw_hline(ctx->pixels, ctx->win_w, ctx->win_h, acx - (3 - j), acy2 + j, 1 + (3 - j) * 2, tc);
 	}
 }
 
@@ -86,23 +145,80 @@ static uint32_t spinbox_adjust(struct mkgui_ctx *ctx, struct mkgui_event *ev, ui
 }
 
 // [=]===^=[ handle_spinbox_key ]=================================[=]
-static uint32_t handle_spinbox_key(struct mkgui_ctx *ctx, struct mkgui_event *ev, uint32_t ks) {
+static uint32_t handle_spinbox_key(struct mkgui_ctx *ctx, struct mkgui_event *ev, uint32_t ks, const char *text, int32_t text_len) {
 	struct mkgui_spinbox_data *sd = find_spinbox_data(ctx, ctx->focus_id);
 	if(!sd) {
 		return 0;
 	}
-	if(ks == MKGUI_KEY_UP) {
-		return spinbox_adjust(ctx, ev, ctx->focus_id, sd->step);
+
+	if(ks == MKGUI_KEY_ESCAPE) {
+		sd->editing = 0;
+		dirty_all(ctx);
+		return 1;
 	}
-	if(ks == MKGUI_KEY_DOWN) {
-		return spinbox_adjust(ctx, ev, ctx->focus_id, -sd->step);
+
+	if(ks == MKGUI_KEY_RETURN) {
+		if(sd->editing) {
+			spinbox_commit_edit(sd);
+			dirty_all(ctx);
+			ev->type = MKGUI_EVENT_SPINBOX_CHANGED;
+			ev->id = ctx->focus_id;
+			ev->value = sd->value;
+			return 1;
+		}
+		return 0;
 	}
-	if(ks == MKGUI_KEY_HOME) {
-		return spinbox_adjust(ctx, ev, ctx->focus_id, sd->min_val - sd->value);
+
+	if(!sd->editing) {
+		if(ks == MKGUI_KEY_UP) {
+			return spinbox_adjust(ctx, ev, ctx->focus_id, sd->step);
+		}
+		if(ks == MKGUI_KEY_DOWN) {
+			return spinbox_adjust(ctx, ev, ctx->focus_id, -sd->step);
+		}
+		if(ks == MKGUI_KEY_HOME) {
+			return spinbox_adjust(ctx, ev, ctx->focus_id, sd->min_val - sd->value);
+		}
+		if(ks == MKGUI_KEY_END) {
+			return spinbox_adjust(ctx, ev, ctx->focus_id, sd->max_val - sd->value);
+		}
 	}
-	if(ks == MKGUI_KEY_END) {
-		return spinbox_adjust(ctx, ev, ctx->focus_id, sd->max_val - sd->value);
+
+	if(ks == MKGUI_KEY_BACKSPACE) {
+		if(sd->editing && sd->edit_len > 0) {
+			--sd->edit_len;
+			dirty_all(ctx);
+			return 1;
+		}
+		return 0;
 	}
+
+	if(text_len > 0) {
+		for(int32_t i = 0; i < text_len; ++i) {
+			char c = text[i];
+			uint32_t is_digit = (c >= '0' && c <= '9');
+			uint32_t is_minus = (c == '-' && sd->min_val < 0);
+			if(!is_digit && !is_minus) {
+				continue;
+			}
+			if(!sd->editing) {
+				sd->editing = 1;
+				sd->edit_len = 0;
+			}
+			if(is_minus) {
+				if(sd->edit_len == 0) {
+					sd->edit_buf[sd->edit_len++] = '-';
+				}
+			} else {
+				if(sd->edit_len < sizeof(sd->edit_buf) - 1) {
+					sd->edit_buf[sd->edit_len++] = c;
+				}
+			}
+		}
+		dirty_all(ctx);
+		return 1;
+	}
+
 	return 0;
 }
 

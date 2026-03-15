@@ -14,6 +14,8 @@ static void render_slider(struct mkgui_ctx *ctx, uint32_t idx) {
 		return;
 	}
 
+	uint32_t disabled = (w->flags & MKGUI_DISABLED);
+
 	int32_t track_y = ry + rh / 2 - 2;
 	draw_rounded_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, rx, track_y, rw, 4, ctx->theme.widget_border, 2);
 
@@ -22,14 +24,16 @@ static void render_slider(struct mkgui_ctx *ctx, uint32_t idx) {
 		range = 1;
 	}
 	int32_t thumb_x = rx + (int32_t)((int64_t)(sd->value - sd->min_val) * (rw - 10) / range);
-	uint32_t thumb_color = (ctx->focus_id == w->id) ? ctx->theme.sel_text : ctx->theme.splitter;
-	draw_patch(ctx, MKGUI_STYLE_RAISED, thumb_x, ry + 2, 10, rh - 4, thumb_color, ctx->theme.splitter);
+	uint32_t thumb_color = disabled ? ctx->theme.widget_border : ((ctx->focus_id == w->id) ? ctx->theme.sel_text : ctx->theme.splitter);
+	uint32_t thumb_border = disabled ? ctx->theme.widget_border : ctx->theme.splitter;
+	draw_patch(ctx, MKGUI_STYLE_RAISED, thumb_x, ry + 2, 10, rh - 4, thumb_color, thumb_border);
 
+	uint32_t tc = disabled ? ctx->theme.text_disabled : ctx->theme.text;
 	char buf[64];
 	snprintf(buf, sizeof(buf), "%s: %d", w->label, sd->value);
 	int32_t ty = ry - ctx->font_height - 2;
 	if(ty >= 0) {
-		push_text_clip(rx, ty, buf, ctx->theme.text, rx, ty, rx + rw, ry + rh);
+		push_text_clip(rx, ty, buf, tc, rx, ty, rx + rw, ry + rh);
 	}
 }
 

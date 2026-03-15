@@ -56,9 +56,10 @@ static void render_tabs(struct mkgui_ctx *ctx, uint32_t idx) {
 		}
 		int32_t tw = tab_calc_width(ctx, child);
 		uint32_t active = (td && td->active_tab == child->id);
+		uint32_t focused_tab = (active && ctx->focus_id == w->id);
 		uint32_t hovered = (!active && hover_tab == child->id);
 		uint32_t bg = active ? ctx->theme.tab_active : (hovered ? ctx->theme.tab_hover : ctx->theme.tab_inactive);
-		uint32_t bd = active ? ctx->theme.widget_border : (hovered ? ctx->theme.tab_hover : ctx->theme.tab_inactive);
+		uint32_t bd = active ? (focused_tab ? ctx->theme.splitter : ctx->theme.widget_border) : (hovered ? ctx->theme.tab_hover : ctx->theme.tab_inactive);
 		draw_rounded_rect(ctx->pixels, ctx->win_w, ctx->win_h, tx, ry, tw, MKGUI_TAB_HEIGHT, bg, bd, ctx->theme.corner_radius);
 		if(active) {
 			draw_hline(ctx->pixels, ctx->win_w, ctx->win_h, tx, ry, tw, ctx->theme.splitter);
@@ -76,4 +77,66 @@ static void render_tabs(struct mkgui_ctx *ctx, uint32_t idx) {
 	}
 
 	draw_hline(ctx->pixels, ctx->win_w, ctx->win_h, rx, ry + MKGUI_TAB_HEIGHT - 1, rw, ctx->theme.widget_border);
+}
+
+// [=]===^=[ handle_tabs_key ]======================================[=]
+static uint32_t handle_tabs_key(struct mkgui_ctx *ctx, struct mkgui_event *ev, uint32_t ks) {
+	struct mkgui_widget *w = find_widget(ctx, ctx->focus_id);
+	if(!w) {
+		return 0;
+	}
+	if(ks != MKGUI_KEY_LEFT && ks != MKGUI_KEY_RIGHT) {
+		return 0;
+	}
+
+	struct mkgui_tabs_data *td = find_tabs_data(ctx, w->id);
+	if(!td) {
+		return 0;
+	}
+
+	int32_t cur = -1;
+	int32_t count = 0;
+	for(uint32_t i = 0; i < ctx->widget_count; ++i) {
+		struct mkgui_widget *child = &ctx->widgets[i];
+		if(child->type != MKGUI_TAB || child->parent_id != w->id) {
+			continue;
+		}
+		if(child->id == td->active_tab) {
+			cur = count;
+		}
+		++count;
+	}
+	if(count <= 1 || cur < 0) {
+		return 0;
+	}
+
+	int32_t next = cur + (ks == MKGUI_KEY_LEFT ? -1 : 1);
+	if(next < 0) {
+		next = count - 1;
+	}
+	if(next >= count) {
+		next = 0;
+	}
+
+	struct mkgui_widget *tab = NULL;
+	int32_t n = 0;
+	for(uint32_t i = 0; i < ctx->widget_count; ++i) {
+		struct mkgui_widget *child = &ctx->widgets[i];
+		if(child->type == MKGUI_TAB && child->parent_id == w->id) {
+			if(n == next) {
+				tab = child;
+				break;
+			}
+			++n;
+		}
+	}
+	if(tab && tab->id != td->active_tab) {
+		td->active_tab = tab->id;
+		dirty_all(ctx);
+		ev->type = MKGUI_EVENT_TAB_CHANGED;
+		ev->id = w->id;
+		ev->value = (int32_t)tab->id;
+		return 1;
+	}
+	return 0;
 }

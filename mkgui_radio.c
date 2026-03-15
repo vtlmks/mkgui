@@ -101,17 +101,22 @@ static void render_radio(struct mkgui_ctx *ctx, uint32_t idx) {
 	int32_t outer_r = 7;
 	int32_t inner_r = 6;
 
-	uint32_t hovered = (ctx->hover_id == w->id);
+	uint32_t disabled = (w->flags & MKGUI_DISABLED);
+	uint32_t hovered = (!disabled && ctx->hover_id == w->id);
+	uint32_t pressed = (!disabled && ctx->press_id == w->id);
 	uint32_t border = (ctx->focus_id == w->id || hovered) ? ctx->theme.splitter : ctx->theme.widget_border;
-	draw_aa_circle_ring(ctx->pixels, ctx->win_w, ctx->win_h, cx, cy, outer_r, inner_r, ctx->theme.widget_bg, border);
+	uint32_t fill = pressed ? ctx->theme.widget_press : ctx->theme.widget_bg;
+	draw_aa_circle_ring(ctx->pixels, ctx->win_w, ctx->win_h, cx, cy, outer_r, inner_r, fill, border);
 
 	if(w->flags & MKGUI_CHECKED) {
-		draw_aa_circle_fill(ctx->pixels, ctx->win_w, ctx->win_h, cx, cy, 4, ctx->theme.splitter);
+		uint32_t dot_color = disabled ? ctx->theme.widget_border : ctx->theme.splitter;
+		draw_aa_circle_fill(ctx->pixels, ctx->win_w, ctx->win_h, cx, cy, 4, dot_color);
 	}
 
 	int32_t rw = ctx->rects[idx].w;
 	int32_t ty = ry + (rh - ctx->font_height) / 2;
-	push_text_clip(rx + 22, ty, w->label, ctx->theme.text, rx, ry, rx + rw, ry + rh);
+	uint32_t tc = disabled ? ctx->theme.text_disabled : ctx->theme.text;
+	push_text_clip(rx + 22, ty, w->label, tc, rx, ry, rx + rw, ry + rh);
 }
 
 // [=]===^=[ handle_radio_click ]=================================[=]

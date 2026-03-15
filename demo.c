@@ -388,7 +388,7 @@ int main(void) {
 	}
 #endif
 
-	float gl_angle = 0.0f;
+	float gl_speed = 30.0f;
 
 	struct mkgui_event ev;
 	uint32_t running = 1;
@@ -550,7 +550,7 @@ int main(void) {
 				glMatrixMode(GL_MODELVIEW);
 				glLoadIdentity();
 				glTranslatef(0.0f, 0.0f, -3.0f);
-				glRotatef(gl_angle, 0.4f, 1.0f, 0.2f);
+				glRotatef((float)ctx->anim_time * gl_speed, 0.4f, 1.0f, 0.2f);
 
 				glEnable(GL_DEPTH_TEST);
 				glBegin(GL_QUADS);
@@ -567,8 +567,7 @@ int main(void) {
 #else
 				glXSwapBuffers(mkgui_glview_get_x11_display(ctx), mkgui_glview_get_x11_window(ctx, ID_GLVIEW1));
 #endif
-				gl_angle += 0.5f;
-			}
+				}
 		}
 
 	}

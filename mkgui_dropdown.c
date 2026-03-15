@@ -11,8 +11,9 @@ static void render_dropdown(struct mkgui_ctx *ctx, uint32_t idx) {
 	int32_t rw = ctx->rects[idx].w;
 	int32_t rh = ctx->rects[idx].h;
 
+	uint32_t disabled = (w->flags & MKGUI_DISABLED);
 	uint32_t bg = ctx->theme.widget_bg;
-	if(ctx->hover_id == w->id) {
+	if(!disabled && ctx->hover_id == w->id) {
 		bg = ctx->theme.widget_hover;
 	}
 	uint32_t border = (ctx->focus_id == w->id) ? ctx->theme.splitter : ctx->theme.widget_border;
@@ -23,13 +24,14 @@ static void render_dropdown(struct mkgui_ctx *ctx, uint32_t idx) {
 	if(dd && dd->selected >= 0 && dd->selected < (int32_t)dd->item_count) {
 		text = dd->items[dd->selected];
 	}
+	uint32_t tc = disabled ? ctx->theme.text_disabled : ctx->theme.text;
 	int32_t ty = ry + (rh - ctx->font_height) / 2;
-	push_text_clip(rx + 4, ty, text, ctx->theme.text, rx + 1, ry + 1, rx + rw - 16, ry + rh - 1);
+	push_text_clip(rx + 4, ty, text, tc, rx + 1, ry + 1, rx + rw - 16, ry + rh - 1);
 
 	int32_t ax = rx + rw - 14;
 	int32_t ay = ry + rh / 2 - 2;
 	for(int32_t j = 0; j < 5; ++j) {
-		draw_hline(ctx->pixels, ctx->win_w, ctx->win_h, ax + j, ay + j, 9 - j * 2, ctx->theme.text);
+		draw_hline(ctx->pixels, ctx->win_w, ctx->win_h, ax + j, ay + j, 9 - j * 2, tc);
 	}
 }
 

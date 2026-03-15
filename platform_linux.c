@@ -281,18 +281,27 @@ static void platform_translate_coords(struct mkgui_ctx *ctx, int32_t lx, int32_t
 
 // [=]===^=[ platform_wait_event ]=================================[=]
 static void platform_wait_event(struct mkgui_ctx *ctx, int32_t timeout_ms) {
-	if(timeout_ms == 0 || XPending(ctx->plat.dpy) > 0) {
+	if(timeout_ms == 0) {
 		return;
 	}
+	if(XEventsQueued(ctx->plat.dpy, QueuedAlready) > 0) {
+		return;
+	}
+	XFlush(ctx->plat.dpy);
 	struct pollfd pfd;
 	pfd.fd = ConnectionNumber(ctx->plat.dpy);
 	pfd.events = POLLIN;
-	poll(&pfd, 1, timeout_ms);
+	if(poll(&pfd, 1, timeout_ms) > 0) {
+		XEventsQueued(ctx->plat.dpy, QueuedAfterReading);
+	}
 }
 
 // [=]===^=[ platform_pending ]====================================[=]
 static uint32_t platform_pending(struct mkgui_ctx *ctx) {
-	return XPending(ctx->plat.dpy) > 0;
+	if(XEventsQueued(ctx->plat.dpy, QueuedAlready) > 0) {
+		return 1;
+	}
+	return 0;
 }
 
 // [=]===^=[ platform_translate_keysym ]===========================[=]
