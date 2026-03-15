@@ -131,6 +131,20 @@ static uint32_t mkgui_time_ms(void) {
 #endif
 }
 
+// [=]===^=[ mkgui_time_us ]=======================================[=]
+static double mkgui_time_us(void) {
+#ifdef _WIN32
+	LARGE_INTEGER freq, now;
+	QueryPerformanceFrequency(&freq);
+	QueryPerformanceCounter(&now);
+	return (double)now.QuadPart / (double)freq.QuadPart * 1e6;
+#else
+	struct timespec ts;
+	clock_gettime(CLOCK_MONOTONIC, &ts);
+	return (double)ts.tv_sec * 1e6 + (double)ts.tv_nsec * 1e-3;
+#endif
+}
+
 // ---------------------------------------------------------------------------
 // Widget types
 // ---------------------------------------------------------------------------
@@ -164,6 +178,7 @@ enum {
 	MKGUI_SCROLLBAR,
 	MKGUI_IMAGE,
 	MKGUI_GLVIEW,
+	MKGUI_CANVAS,
 	MKGUI_VBOX,
 	MKGUI_HBOX,
 	MKGUI_FORM,
@@ -456,6 +471,14 @@ struct mkgui_glview_data {
 	struct mkgui_glview_platform plat;
 };
 
+typedef void (*mkgui_canvas_cb)(struct mkgui_ctx *ctx, uint32_t id, uint32_t *pixels, int32_t x, int32_t y, int32_t w, int32_t h, void *userdata);
+
+struct mkgui_canvas_data {
+	uint32_t widget_id;
+	mkgui_canvas_cb callback;
+	void *userdata;
+};
+
 struct mkgui_glyph {
 	int32_t width;
 	int32_t height;
@@ -569,6 +592,8 @@ struct mkgui_ctx {
 	uint32_t image_count;
 	struct mkgui_glview_data glviews[8];
 	uint32_t glview_count;
+	struct mkgui_canvas_data canvases[16];
+	uint32_t canvas_count;
 
 	struct mkgui_popup popups[MKGUI_MAX_POPUPS];
 	uint32_t popup_count;
@@ -609,7 +634,12 @@ struct mkgui_ctx {
 	struct timespec anim_prev;
 #endif
 	uint32_t anim_active;
+	uint32_t close_requested;
 	int32_t poll_timeout_ms;
+
+	double perf_layout_us;
+	double perf_render_us;
+	double perf_blit_us;
 
 	struct mkgui_glyph glyphs[MKGUI_GLYPH_COUNT];
 	int32_t font_ascent;
@@ -1264,6 +1294,16 @@ static struct mkgui_itemview_data *find_itemview_data(struct mkgui_ctx *ctx, uin
 	return NULL;
 }
 
+// [=]===^=[ find_canvas_data ]===================================[=]
+static struct mkgui_canvas_data *find_canvas_data(struct mkgui_ctx *ctx, uint32_t widget_id) {
+	for(uint32_t i = 0; i < ctx->canvas_count; ++i) {
+		if(ctx->canvases[i].widget_id == widget_id) {
+			return &ctx->canvases[i];
+		}
+	}
+	return NULL;
+}
+
 // ---------------------------------------------------------------------------
 // Widget visibility
 // ---------------------------------------------------------------------------
@@ -1463,8 +1503,65 @@ static struct mkgui_box_scroll *find_box_scroll(struct mkgui_ctx *ctx, uint32_t 
 	return NULL;
 }
 
+// ---------------------------------------------------------------------------
+// Layout index (pre-built per layout pass for O(1) lookups)
+// ---------------------------------------------------------------------------
+
+#define LAYOUT_HASH_SIZE 2048
+#define LAYOUT_HASH_MASK (LAYOUT_HASH_SIZE - 1)
+
+static struct {
+	uint32_t id;
+	int32_t idx;
+} layout_id_map[LAYOUT_HASH_SIZE];
+
+static int32_t layout_parent[MKGUI_MAX_WIDGETS];
+static int32_t layout_first_child[MKGUI_MAX_WIDGETS];
+static int32_t layout_next_sibling[MKGUI_MAX_WIDGETS];
+
+// [=]===^=[ layout_find_idx ]====================================[=]
+static int32_t layout_find_idx(uint32_t id) {
+	uint32_t h = (id * 2654435761u) & LAYOUT_HASH_MASK;
+	for(;;) {
+		if(layout_id_map[h].idx < 0) {
+			return -1;
+		}
+		if(layout_id_map[h].id == id) {
+			return layout_id_map[h].idx;
+		}
+		h = (h + 1) & LAYOUT_HASH_MASK;
+	}
+}
+
+// [=]===^=[ layout_build_index ]==================================[=]
+static void layout_build_index(struct mkgui_ctx *ctx) {
+	for(uint32_t i = 0; i < LAYOUT_HASH_SIZE; ++i) {
+		layout_id_map[i].idx = -1;
+	}
+	for(uint32_t i = 0; i < ctx->widget_count; ++i) {
+		uint32_t h = (ctx->widgets[i].id * 2654435761u) & LAYOUT_HASH_MASK;
+		while(layout_id_map[h].idx >= 0) {
+			h = (h + 1) & LAYOUT_HASH_MASK;
+		}
+		layout_id_map[h].id = ctx->widgets[i].id;
+		layout_id_map[h].idx = (int32_t)i;
+		layout_first_child[i] = -1;
+		layout_next_sibling[i] = -1;
+	}
+	for(int32_t i = (int32_t)ctx->widget_count - 1; i >= 0; --i) {
+		int32_t pidx = layout_find_idx(ctx->widgets[i].parent_id);
+		layout_parent[i] = pidx;
+		if(pidx >= 0 && pidx != i) {
+			layout_next_sibling[i] = layout_first_child[pidx];
+			layout_first_child[pidx] = i;
+		}
+	}
+}
+
 // [=]===^=[ layout_widgets ]====================================[=]
 static void layout_widgets(struct mkgui_ctx *ctx) {
+	layout_build_index(ctx);
+
 	for(uint32_t i = 0; i < ctx->widget_count; ++i) {
 		struct mkgui_widget *w = &ctx->widgets[i];
 		if(w->type == MKGUI_WINDOW) {
@@ -1482,7 +1579,7 @@ static void layout_widgets(struct mkgui_ctx *ctx) {
 				continue;
 			}
 
-			int32_t pidx = find_widget_idx(ctx, w->parent_id);
+			int32_t pidx = layout_parent[i];
 			if(pidx < 0) {
 				continue;
 			}
@@ -1541,13 +1638,12 @@ static void layout_widgets(struct mkgui_ctx *ctx) {
 
 			if(parent->type == MKGUI_VBOX || parent->type == MKGUI_HBOX || parent->type == MKGUI_FORM) {
 				if(!(parent->flags & MKGUI_NO_PAD)) {
+					int32_t gpidx = layout_parent[pidx];
 					uint32_t nested = 0;
-					for(uint32_t gp = 0; gp < ctx->widget_count; ++gp) {
-						if(ctx->widgets[gp].id == parent->parent_id) {
-							if(ctx->widgets[gp].type == MKGUI_VBOX || ctx->widgets[gp].type == MKGUI_HBOX || ctx->widgets[gp].type == MKGUI_FORM || ctx->widgets[gp].type == MKGUI_GROUP || ctx->widgets[gp].type == MKGUI_TABS) {
-								nested = 1;
-							}
-							break;
+					if(gpidx >= 0) {
+						uint32_t gpt = ctx->widgets[gpidx].type;
+						if(gpt == MKGUI_VBOX || gpt == MKGUI_HBOX || gpt == MKGUI_FORM || gpt == MKGUI_GROUP || gpt == MKGUI_TABS) {
+							nested = 1;
 						}
 					}
 					if(!nested || (parent->flags & MKGUI_PANEL_BORDER)) {
@@ -1558,8 +1654,8 @@ static void layout_widgets(struct mkgui_ctx *ctx) {
 					}
 				}
 				uint32_t child_count = 0;
-				for(uint32_t j = 0; j < ctx->widget_count; ++j) {
-					if(ctx->widgets[j].parent_id == parent->id && j != (uint32_t)pidx && !(ctx->widgets[j].flags & MKGUI_HIDDEN)) {
+				for(int32_t j = layout_first_child[pidx]; j >= 0; j = layout_next_sibling[j]) {
+					if(!(ctx->widgets[j].flags & MKGUI_HIDDEN)) {
 						++child_count;
 					}
 				}
@@ -1570,8 +1666,8 @@ static void layout_widgets(struct mkgui_ctx *ctx) {
 
 					int32_t fixed_total = 0;
 					uint32_t flex_count = 0;
-					for(uint32_t j = 0; j < ctx->widget_count; ++j) {
-						if(ctx->widgets[j].parent_id == parent->id && j != (uint32_t)pidx && !(ctx->widgets[j].flags & MKGUI_HIDDEN)) {
+					for(int32_t j = layout_first_child[pidx]; j >= 0; j = layout_next_sibling[j]) {
+						if(!(ctx->widgets[j].flags & MKGUI_HIDDEN)) {
 							if(ctx->widgets[j].h > 0) {
 								fixed_total += ctx->widgets[j].h;
 							} else {
@@ -1598,10 +1694,10 @@ static void layout_widgets(struct mkgui_ctx *ctx) {
 
 					int32_t scroll_off = (bs && needs_scroll) ? bs->scroll_y : 0;
 					int32_t cy = py - scroll_off;
-					for(uint32_t j = 0; j < ctx->widget_count; ++j) {
-						if(ctx->widgets[j].parent_id == parent->id && j != (uint32_t)pidx && !(ctx->widgets[j].flags & MKGUI_HIDDEN)) {
+					for(int32_t j = layout_first_child[pidx]; j >= 0; j = layout_next_sibling[j]) {
+						if(!(ctx->widgets[j].flags & MKGUI_HIDDEN)) {
 							int32_t ch = ctx->widgets[j].h > 0 ? ctx->widgets[j].h : flex_h;
-							if(j == i) {
+							if(j == (int32_t)i) {
 								ctx->rects[i].x = px;
 								ctx->rects[i].y = cy;
 								ctx->rects[i].w = pw;
@@ -1615,8 +1711,8 @@ static void layout_widgets(struct mkgui_ctx *ctx) {
 				} else if(parent->type == MKGUI_HBOX) {
 					int32_t fixed_total = 0;
 					uint32_t flex_count = 0;
-					for(uint32_t j = 0; j < ctx->widget_count; ++j) {
-						if(ctx->widgets[j].parent_id == parent->id && j != (uint32_t)pidx && !(ctx->widgets[j].flags & MKGUI_HIDDEN)) {
+					for(int32_t j = layout_first_child[pidx]; j >= 0; j = layout_next_sibling[j]) {
+						if(!(ctx->widgets[j].flags & MKGUI_HIDDEN)) {
 							if(ctx->widgets[j].w > 0) {
 								fixed_total += ctx->widgets[j].w;
 							} else {
@@ -1632,10 +1728,10 @@ static void layout_widgets(struct mkgui_ctx *ctx) {
 					int32_t flex_w = flex_count > 0 ? remaining / (int32_t)flex_count : 0;
 
 					int32_t cx = px;
-					for(uint32_t j = 0; j < ctx->widget_count; ++j) {
-						if(ctx->widgets[j].parent_id == parent->id && j != (uint32_t)pidx && !(ctx->widgets[j].flags & MKGUI_HIDDEN)) {
+					for(int32_t j = layout_first_child[pidx]; j >= 0; j = layout_next_sibling[j]) {
+						if(!(ctx->widgets[j].flags & MKGUI_HIDDEN)) {
 							int32_t cw = ctx->widgets[j].w > 0 ? ctx->widgets[j].w : flex_w;
-							if(j == i) {
+							if(j == (int32_t)i) {
 								ctx->rects[i].x = cx;
 								ctx->rects[i].y = py;
 								ctx->rects[i].w = cw;
@@ -1649,8 +1745,8 @@ static void layout_widgets(struct mkgui_ctx *ctx) {
 				} else {
 					int32_t label_w = 0;
 					uint32_t pair_idx = 0;
-					for(uint32_t j = 0; j < ctx->widget_count; ++j) {
-						if(ctx->widgets[j].parent_id == parent->id && j != (uint32_t)pidx && !(ctx->widgets[j].flags & MKGUI_HIDDEN)) {
+					for(int32_t j = layout_first_child[pidx]; j >= 0; j = layout_next_sibling[j]) {
+						if(!(ctx->widgets[j].flags & MKGUI_HIDDEN)) {
 							if((pair_idx & 1) == 0) {
 								int32_t tw = text_width(ctx, ctx->widgets[j].label) + 8;
 								if(tw > label_w) {
@@ -1662,13 +1758,13 @@ static void layout_widgets(struct mkgui_ctx *ctx) {
 					}
 
 					pair_idx = 0;
-					for(uint32_t j = 0; j < ctx->widget_count; ++j) {
-						if(ctx->widgets[j].parent_id == parent->id && j != (uint32_t)pidx && !(ctx->widgets[j].flags & MKGUI_HIDDEN)) {
+					for(int32_t j = layout_first_child[pidx]; j >= 0; j = layout_next_sibling[j]) {
+						if(!(ctx->widgets[j].flags & MKGUI_HIDDEN)) {
 							int32_t row = (int32_t)(pair_idx / 2);
 							int32_t row_h = 24;
 							uint32_t is_label = (pair_idx & 1) == 0;
 
-							if(j == i) {
+							if(j == (int32_t)i) {
 								if(is_label) {
 									ctx->rects[i].x = px;
 									ctx->rects[i].y = py + row * (row_h + MKGUI_BOX_GAP);
@@ -1954,6 +2050,7 @@ static void draw_icon_popup(struct mkgui_popup *p, struct mkgui_icon *icon, int3
 #include "mkgui_scrollbar.c"
 #include "mkgui_image.c"
 #include "mkgui_glview.c"
+#include "mkgui_canvas.c"
 #include "mkgui_tooltip.c"
 
 // ---------------------------------------------------------------------------
@@ -2058,6 +2155,10 @@ static void render_widget(struct mkgui_ctx *ctx, uint32_t idx) {
 
 		case MKGUI_GLVIEW: {
 			render_glview(ctx, idx);
+		} break;
+
+		case MKGUI_CANVAS: {
+			render_canvas(ctx, idx);
 		} break;
 
 		case MKGUI_VBOX:
@@ -2310,6 +2411,14 @@ static void init_aux_data(struct mkgui_ctx *ctx) {
 				}
 			} break;
 
+			case MKGUI_CANVAS: {
+				if(ctx->canvas_count < 16) {
+					struct mkgui_canvas_data *cd = &ctx->canvases[ctx->canvas_count++];
+					memset(cd, 0, sizeof(*cd));
+					cd->widget_id = w->id;
+				}
+			} break;
+
 			default: {
 			} break;
 		}
@@ -2541,7 +2650,7 @@ static uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 		}
 	}
 
-	if(!platform_pending(ctx)) {
+	if(!platform_pending(ctx) && !ctx->close_requested) {
 		int32_t wait_ms;
 		if(ctx->poll_timeout_ms == 0) {
 			wait_ms = 0;
@@ -2573,7 +2682,6 @@ static uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 					platform_fb_resize(ctx);
 					dirty_all(ctx);
 					ev->type = MKGUI_EVENT_RESIZE;
-					return 1;
 				}
 			} break;
 
@@ -3361,14 +3469,20 @@ static uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 
 					if(hw->type == MKGUI_SPINBOX) {
 						int32_t dir = spinbox_btn_hit(ctx, (uint32_t)hi, ctx->mouse_x, ctx->mouse_y);
-						if(dir != 0) {
-							struct mkgui_spinbox_data *sd = find_spinbox_data(ctx, hw->id);
-							if(sd) {
+						struct mkgui_spinbox_data *sd = find_spinbox_data(ctx, hw->id);
+						if(sd) {
+							if(dir != 0) {
 								sd->repeat_dir = dir;
 								sd->repeat_next_ms = mkgui_time_ms() + 400;
 								int32_t delta = (dir > 0) ? sd->step : -sd->step;
 								spinbox_adjust(ctx, ev, hw->id, delta);
 								return ev->type != MKGUI_EVENT_NONE;
+
+							} else {
+								sd->editing = 1;
+								snprintf(sd->edit_buf, sizeof(sd->edit_buf), "%d", sd->value);
+								sd->edit_len = (uint32_t)strlen(sd->edit_buf);
+								dirty_all(ctx);
 							}
 						}
 					}
@@ -3789,6 +3903,7 @@ static uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 
 			case MKGUI_PLAT_CLOSE: {
 				ev->type = MKGUI_EVENT_CLOSE;
+				ctx->close_requested = 1;
 				return 1;
 			} break;
 
@@ -3808,8 +3923,10 @@ static uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 	}
 
 	if(ctx->dirty) {
+		double t0 = mkgui_time_us();
 		layout_widgets(ctx);
 		glview_sync_all(ctx);
+		double t1 = mkgui_time_us();
 		render_widgets(ctx);
 		if(ctx->render_cb) {
 			ctx->render_cb(ctx, ctx->render_cb_data);
@@ -3817,6 +3934,7 @@ static uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 		flush_text(ctx);
 		render_tooltip(ctx);
 		flush_text(ctx);
+		double t2 = mkgui_time_us();
 
 		if(ctx->dirty_full || ctx->render_cb) {
 			platform_blit(ctx);
@@ -3825,6 +3943,10 @@ static uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 			dirty_bounds(ctx, &bx, &by, &bw, &bh);
 			platform_blit_region(ctx, bx, by, bw, bh);
 		}
+		double t3 = mkgui_time_us();
+		ctx->perf_layout_us = t1 - t0;
+		ctx->perf_render_us = t2 - t1;
+		ctx->perf_blit_us = t3 - t2;
 
 		for(uint32_t pi = 0; pi < ctx->popup_count; ++pi) {
 			struct mkgui_popup *p = &ctx->popups[pi];
@@ -3869,7 +3991,7 @@ static uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 		ctx->parent->dirty_count = 0;
 	}
 
-	return 0;
+	return ev->type != MKGUI_EVENT_NONE;
 }
 
 // [=]===^=[ mkgui_set_poll_timeout ]==============================[=]

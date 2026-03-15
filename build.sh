@@ -55,6 +55,11 @@ set -e
 	$CC $CFLAGS editor.c -o editor $LINUX_LIBS
 ) &
 
+# Build Linux benchmark
+(
+	$CC $CFLAGS benchmark.c -o benchmark $LINUX_LIBS
+) &
+
 # Build Windows demo
 if command -v $WINCC &>/dev/null; then
 	(

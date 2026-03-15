@@ -160,13 +160,13 @@ static uint32_t handle_spinbox_key(struct mkgui_ctx *ctx, struct mkgui_event *ev
 	if(ks == MKGUI_KEY_RETURN) {
 		if(sd->editing) {
 			spinbox_commit_edit(sd);
-			dirty_all(ctx);
 			ev->type = MKGUI_EVENT_SPINBOX_CHANGED;
 			ev->id = ctx->focus_id;
 			ev->value = sd->value;
-			return 1;
 		}
-		return 0;
+		ctx->focus_id = 0;
+		dirty_all(ctx);
+		return 1;
 	}
 
 	if(!sd->editing) {
