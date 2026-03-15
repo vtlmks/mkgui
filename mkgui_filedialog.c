@@ -543,7 +543,7 @@ static uint32_t fd_run_dialog(struct mkgui_ctx *ctx, uint32_t mode, const char *
 		{ MKGUI_INPUT,      FD_ID_PATH_INPUT,   "",         "",             FD_ID_WINDOW,  50,  4,  20, 24, MKGUI_ANCHOR_LEFT | MKGUI_ANCHOR_TOP | MKGUI_ANCHOR_RIGHT },
 		{ MKGUI_VSPLIT, FD_ID_SPLIT,     "",         "",             FD_ID_WINDOW,   0, 32,   0, FD_BOTTOM_H, MKGUI_ANCHOR_LEFT | MKGUI_ANCHOR_TOP | MKGUI_ANCHOR_RIGHT | MKGUI_ANCHOR_BOTTOM },
 		{ MKGUI_LISTVIEW,   FD_ID_BOOKMARKS,    "",         "",             FD_ID_SPLIT, 0,  0,   0,  0, MKGUI_REGION_LEFT },
-		{ MKGUI_LISTVIEW,   FD_ID_FILES,        "",         "",             FD_ID_SPLIT, 0,  0,   0,  0, MKGUI_REGION_RIGHT | MKGUI_VIRTUAL },
+		{ MKGUI_LISTVIEW,   FD_ID_FILES,        "",         "",             FD_ID_SPLIT, 0,  0,   0,  0, MKGUI_REGION_RIGHT },
 		{ MKGUI_LABEL,      FD_ID_NAME_LABEL,  "File name:", "",           FD_ID_WINDOW,   8,  40, 70, 24, MKGUI_ANCHOR_BOTTOM | name_flags },
 		{ MKGUI_INPUT,      FD_ID_NAME_INPUT,   "",         "",             FD_ID_WINDOW,  80,  40, 110, 24, MKGUI_ANCHOR_LEFT | MKGUI_ANCHOR_BOTTOM | MKGUI_ANCHOR_RIGHT | name_flags },
 		{ MKGUI_BUTTON,     FD_ID_BTN_CONFIRM,  "",         "",             FD_ID_WINDOW, 100,   8, 80, 28, MKGUI_ANCHOR_BOTTOM | MKGUI_ANCHOR_RIGHT },

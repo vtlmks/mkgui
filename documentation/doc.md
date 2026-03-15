@@ -60,6 +60,8 @@ Your application is a single `.c` file that includes `mkgui.c`. All functions ar
 
 Widget hierarchy is expressed via `parent_id`. Every widget has a unique integer `id`. The first widget must be `MKGUI_WINDOW` with `parent_id = 0`.
 
+Multiple independent windows are supported by creating multiple `mkgui_ctx` instances.
+
 ## Widget definition
 
 ```c
@@ -87,10 +89,10 @@ struct mkgui_widget {
 | `MKGUI_RADIO` | Radio button (mutually exclusive within parent). Emits `MKGUI_EVENT_RADIO_CHANGED`. |
 | `MKGUI_DROPDOWN` | Drop-down selector. Emits `MKGUI_EVENT_DROPDOWN_CHANGED`. |
 | `MKGUI_SLIDER` | Horizontal slider. Emits `MKGUI_EVENT_SLIDER_CHANGED`. |
-| `MKGUI_SPINBOX` | Numeric input with +/- buttons. Emits `MKGUI_EVENT_SPINBOX_CHANGED`. |
+| `MKGUI_SPINBOX` | Numeric input with +/- buttons. Emits `MKGUI_EVENT_SPINBOX_CHANGED`. Click the text area to type directly, Enter to confirm (clears focus), Escape to cancel editing. |
 | `MKGUI_PROGRESS` | Progress bar with animated shimmer effect. No events. |
 | `MKGUI_SPINNER` | Animated spinning arc indicator. No events, no setup needed. |
-| `MKGUI_LISTVIEW` | Scrollable multi-column list with virtual mode and per-column cell types. Emits `MKGUI_EVENT_LISTVIEW_SELECT`, `_DBLCLICK`, `_SORT`, `_COL_REORDER`. |
+| `MKGUI_LISTVIEW` | Scrollable multi-column list with virtual rows and per-column cell types. Emits `MKGUI_EVENT_LISTVIEW_SELECT`, `_DBLCLICK`, `_SORT`, `_COL_REORDER`, `_REORDER`. |
 | `MKGUI_ITEMVIEW` | Multi-mode item view (icon, thumbnail, compact, detail). Emits `MKGUI_EVENT_ITEMVIEW_SELECT`, `_DBLCLICK`. |
 | `MKGUI_TREEVIEW` | Hierarchical tree. Emits `MKGUI_EVENT_TREEVIEW_SELECT`, `_EXPAND`, `_COLLAPSE`. |
 | `MKGUI_TABS` | Tab container. Children must be `MKGUI_TAB`. Emits `MKGUI_EVENT_TAB_CHANGED`. |
@@ -99,13 +101,14 @@ struct mkgui_widget {
 | `MKGUI_MENUITEM` | Menu entry. Parent is `MKGUI_MENU` or another `MKGUI_MENUITEM` (submenu). Leaf items emit `MKGUI_EVENT_MENU`. |
 | `MKGUI_TOOLBAR` | Toolbar bar. Children are `MKGUI_BUTTON`. |
 | `MKGUI_STATUSBAR` | Status bar with sections. |
-| `MKGUI_SPLITTER_H` | Horizontal splitter. Children use `MKGUI_REGION_TOP`/`MKGUI_REGION_BOTTOM`. |
-| `MKGUI_SPLITTER_V` | Vertical splitter. Children use `MKGUI_REGION_LEFT`/`MKGUI_REGION_RIGHT`. |
+| `MKGUI_HSPLIT` | Horizontal splitter. Children use `MKGUI_REGION_TOP`/`MKGUI_REGION_BOTTOM`. |
+| `MKGUI_VSPLIT` | Vertical splitter. Children use `MKGUI_REGION_LEFT`/`MKGUI_REGION_RIGHT`. |
 | `MKGUI_GROUP` | Group box container. Draws a thin rounded border with a label in the top edge. Children are inset inside the frame. |
 | `MKGUI_PANEL` | Plain container. No border by default. Use `MKGUI_PANEL_BORDER` for a border, `MKGUI_PANEL_SUNKEN` for a recessed look. Children positioned relative to panel. |
 | `MKGUI_SCROLLBAR` | Standalone scrollbar. Vertical by default, `MKGUI_SCROLLBAR_HORIZ` for horizontal. Emits `MKGUI_EVENT_SCROLL`. |
 | `MKGUI_IMAGE` | Displays ARGB pixel data. Centered by default, `MKGUI_IMAGE_STRETCH` to fill. `MKGUI_PANEL_BORDER` for a border. |
-| `MKGUI_GLVIEW` | OpenGL viewport. Creates a native child window for GL rendering. The user creates their own GL context. |
+| `MKGUI_GLVIEW` | OpenGL viewport. Creates a native child window for GL rendering. The user creates their own GL context. Automatically triggers 60fps redraws when visible. |
+| `MKGUI_CANVAS` | Custom drawing area. Calls a user callback with clipping set to the widget rect. Supports `MKGUI_PANEL_BORDER`. |
 | `MKGUI_VBOX` | Vertical box layout. Stacks children top-to-bottom. Children with `h=0` flex to fill remaining space. |
 | `MKGUI_HBOX` | Horizontal box layout. Stacks children left-to-right. Children with `w=0` flex to fill remaining space. |
 | `MKGUI_FORM` | Two-column form layout. Children are paired: odd=label, even=control. Label column auto-sizes to widest label. |
@@ -146,38 +149,39 @@ Combine horizontal and vertical anchors freely. Common patterns:
 | `MKGUI_ANCHOR_RIGHT` | `1 << 2` | Pin/stretch to right edge |
 | `MKGUI_ANCHOR_BOTTOM` | `1 << 3` | Pin/stretch to bottom edge |
 
-### State flags
-
-| Flag | Value | Description |
-|------|-------|-------------|
-| `MKGUI_VIRTUAL` | `1 << 4` | Listview uses callback for rows |
-| `MKGUI_HIDDEN` | `1 << 9` | Widget not visible |
-| `MKGUI_DISABLED` | `1 << 10` | Widget not interactive |
-| `MKGUI_CHECKED` | `1 << 11` | Checked state (checkbox, radio, menu check/radio) |
-| `MKGUI_PASSWORD` | `1 << 12` | Input shows dots |
-| `MKGUI_READONLY` | `1 << 13` | Input not editable |
-
 ### Splitter region flags
 
 | Flag | Value | Description |
 |------|-------|-------------|
-| `MKGUI_REGION_TOP` | `1 << 5` | Top region of horizontal splitter |
-| `MKGUI_REGION_BOTTOM` | `1 << 6` | Bottom region |
-| `MKGUI_REGION_LEFT` | `1 << 7` | Left region of vertical splitter |
-| `MKGUI_REGION_RIGHT` | `1 << 8` | Right region |
+| `MKGUI_REGION_TOP` | `1 << 4` | Top region of horizontal splitter |
+| `MKGUI_REGION_BOTTOM` | `1 << 5` | Bottom region |
+| `MKGUI_REGION_LEFT` | `1 << 6` | Left region of vertical splitter |
+| `MKGUI_REGION_RIGHT` | `1 << 7` | Right region |
+
+### State flags
+
+| Flag | Value | Description |
+|------|-------|-------------|
+| `MKGUI_HIDDEN` | `1 << 8` | Widget not visible |
+| `MKGUI_DISABLED` | `1 << 9` | Widget not interactive |
+| `MKGUI_CHECKED` | `1 << 10` | Checked state (checkbox, radio, menu check/radio) |
+| `MKGUI_PASSWORD` | `1 << 11` | Input shows dots |
+| `MKGUI_READONLY` | `1 << 12` | Input not editable |
 
 ### Special flags
 
 | Flag | Value | Description |
 |------|-------|-------------|
-| `MKGUI_SEPARATOR` | `1 << 14` | Menu item is a separator line (renders as horizontal rule, not a clickable item) |
-| `MKGUI_TOOLBAR_SEP` | `1 << 15` | Toolbar separator (before this button) |
-| `MKGUI_MENU_CHECK` | `1 << 16` | Menu item with checkbox indicator |
-| `MKGUI_MENU_RADIO` | `1 << 17` | Menu item with radio indicator |
-| `MKGUI_PANEL_BORDER` | `1 << 18` | Draw border on panel, image, or glview |
-| `MKGUI_PANEL_SUNKEN` | `1 << 19` | Recessed background on panel |
-| `MKGUI_SCROLLBAR_HORIZ` | `1 << 20` | Horizontal scrollbar (default is vertical) |
-| `MKGUI_IMAGE_STRETCH` | `1 << 21` | Stretch image to fill widget area |
+| `MKGUI_SEPARATOR` | `1 << 13` | Menu item is a separator line |
+| `MKGUI_TOOLBAR_SEP` | `1 << 14` | Toolbar separator (before this button) |
+| `MKGUI_MENU_CHECK` | `1 << 15` | Menu item with checkbox indicator |
+| `MKGUI_MENU_RADIO` | `1 << 16` | Menu item with radio indicator |
+| `MKGUI_PANEL_BORDER` | `1 << 17` | Draw border on panel, image, canvas, or glview |
+| `MKGUI_PANEL_SUNKEN` | `1 << 18` | Recessed background on panel |
+| `MKGUI_SCROLLBAR_HORIZ` | `1 << 19` | Horizontal scrollbar (default is vertical) |
+| `MKGUI_IMAGE_STRETCH` | `1 << 20` | Stretch image to fill widget area |
+| `MKGUI_SCROLL` | `1 << 21` | Enable scrolling on VBOX (adds scrollbar when content overflows) |
+| `MKGUI_NO_PAD` | `1 << 22` | Suppress automatic container padding |
 
 ## Events
 
@@ -186,38 +190,39 @@ struct mkgui_event {
     uint32_t type;    // MKGUI_EVENT_*
     uint32_t id;      // widget that triggered the event
     int32_t  value;   // event-specific value
-    int32_t  col;     // column (listview sort)
+    int32_t  col;     // column (listview events)
     uint32_t keysym;  // key code (key events)
     uint32_t keymod;  // modifier mask (key events)
 };
 ```
 
-| Event | Trigger | value |
-|-------|---------|-------|
-| `MKGUI_EVENT_CLOSE` | Window close | -- |
-| `MKGUI_EVENT_RESIZE` | Window resized | -- |
-| `MKGUI_EVENT_CLICK` | Button pressed | -- |
-| `MKGUI_EVENT_MENU` | Menu item selected | -- |
-| `MKGUI_EVENT_TAB_CHANGED` | Tab switched | tab id |
-| `MKGUI_EVENT_CHECKBOX_CHANGED` | Checkbox toggled | 0 or 1 |
-| `MKGUI_EVENT_RADIO_CHANGED` | Radio selected | -- |
-| `MKGUI_EVENT_DROPDOWN_CHANGED` | Dropdown changed | selected index |
-| `MKGUI_EVENT_SLIDER_CHANGED` | Slider moved | new value |
-| `MKGUI_EVENT_SPINBOX_CHANGED` | Spinbox changed | new value |
-| `MKGUI_EVENT_INPUT_CHANGED` | Input text changed | -- |
-| `MKGUI_EVENT_TEXTAREA_CHANGED` | Textarea changed | -- |
-| `MKGUI_EVENT_LISTVIEW_SELECT` | Row selected | row index |
-| `MKGUI_EVENT_LISTVIEW_DBLCLICK` | Row double-clicked | row index |
-| `MKGUI_EVENT_LISTVIEW_SORT` | Column header clicked | sort direction (col field = column) |
-| `MKGUI_EVENT_LISTVIEW_COL_REORDER` | Column dragged to new position | -- |
-| `MKGUI_EVENT_TREEVIEW_SELECT` | Tree node selected | node id |
-| `MKGUI_EVENT_TREEVIEW_EXPAND` | Tree node expanded | node id |
-| `MKGUI_EVENT_TREEVIEW_COLLAPSE` | Tree node collapsed | node id |
-| `MKGUI_EVENT_SPLITTER_MOVED` | Splitter dragged | -- |
-| `MKGUI_EVENT_KEY` | Key pressed | keysym, keymod |
-| `MKGUI_EVENT_ITEMVIEW_SELECT` | Item selected | item index |
-| `MKGUI_EVENT_ITEMVIEW_DBLCLICK` | Item double-clicked | item index |
-| `MKGUI_EVENT_SCROLL` | Scrollbar value changed | scroll position |
+| Event | Trigger | value | col |
+|-------|---------|-------|-----|
+| `MKGUI_EVENT_CLOSE` | Window close | -- | -- |
+| `MKGUI_EVENT_RESIZE` | Window resized | -- | -- |
+| `MKGUI_EVENT_CLICK` | Button pressed | -- | -- |
+| `MKGUI_EVENT_MENU` | Menu item selected | -- | -- |
+| `MKGUI_EVENT_TAB_CHANGED` | Tab switched | tab id | -- |
+| `MKGUI_EVENT_CHECKBOX_CHANGED` | Checkbox toggled | 0 or 1 | -- |
+| `MKGUI_EVENT_RADIO_CHANGED` | Radio selected | -- | -- |
+| `MKGUI_EVENT_DROPDOWN_CHANGED` | Dropdown changed | selected index | -- |
+| `MKGUI_EVENT_SLIDER_CHANGED` | Slider moved | new value | -- |
+| `MKGUI_EVENT_SPINBOX_CHANGED` | Spinbox changed | new value | -- |
+| `MKGUI_EVENT_INPUT_CHANGED` | Input text changed | -- | -- |
+| `MKGUI_EVENT_TEXTAREA_CHANGED` | Textarea changed | -- | -- |
+| `MKGUI_EVENT_LISTVIEW_SELECT` | Row clicked | row index | column index |
+| `MKGUI_EVENT_LISTVIEW_DBLCLICK` | Row double-clicked | row index | -- |
+| `MKGUI_EVENT_LISTVIEW_SORT` | Column header clicked | sort direction | column index |
+| `MKGUI_EVENT_LISTVIEW_COL_REORDER` | Column dragged to new position | -- | -- |
+| `MKGUI_EVENT_LISTVIEW_REORDER` | Row dragged to new position | source row | target row |
+| `MKGUI_EVENT_TREEVIEW_SELECT` | Tree node selected | node id | -- |
+| `MKGUI_EVENT_TREEVIEW_EXPAND` | Tree node expanded | node id | -- |
+| `MKGUI_EVENT_TREEVIEW_COLLAPSE` | Tree node collapsed | node id | -- |
+| `MKGUI_EVENT_SPLITTER_MOVED` | Splitter dragged | -- | -- |
+| `MKGUI_EVENT_KEY` | Key pressed | keysym, keymod | -- |
+| `MKGUI_EVENT_ITEMVIEW_SELECT` | Item selected | item index | -- |
+| `MKGUI_EVENT_ITEMVIEW_DBLCLICK` | Item double-clicked | item index | -- |
+| `MKGUI_EVENT_SCROLL` | Scrollbar value changed | scroll position | -- |
 
 ## API reference
 
@@ -232,7 +237,7 @@ void mkgui_set_poll_timeout(struct mkgui_ctx *ctx, int32_t ms);
 
 `mkgui_create` takes a widget array and returns a context. `mkgui_poll` processes platform events and renders when dirty. Returns 1 if an event was written to `ev`, 0 otherwise.
 
-When the event queue is empty, `mkgui_poll` blocks internally instead of returning immediately. This means no external sleep is needed -- the standard mainloop is simply:
+When the event queue is empty and the widget tree is not dirty, `mkgui_poll` blocks internally instead of returning immediately. This means no external sleep is needed -- the standard mainloop is simply:
 
 ```c
 while(running) {
@@ -243,13 +248,18 @@ while(running) {
 }
 ```
 
+`mkgui_poll` never blocks when:
+- Platform events are pending
+- The widget tree is dirty (needs rendering)
+- A close event has been delivered
+
 #### Poll timeout modes
 
 `mkgui_set_poll_timeout` controls how long `mkgui_poll` blocks when no events are pending:
 
 | Value | Behavior |
 |-------|----------|
-| `-1` (default) | **Auto mode.** Blocks for 16ms (~60fps) when animated widgets (spinners, progress bars) are visible. Blocks indefinitely when idle -- zero CPU usage. |
+| `-1` (default) | **Auto mode.** Blocks for 16ms (~60fps) when animated widgets (spinners, progress bars, glviews) are visible. Blocks indefinitely when idle -- zero CPU usage. |
 | `> 0` | **Fixed timeout.** Always blocks for the given number of milliseconds. |
 | `0` | **No blocking.** Returns immediately even with no events. The caller owns all timing. |
 
@@ -266,6 +276,16 @@ while(running) {
     emulator_tick();
     precision_sleep_until_next_frame();
 }
+```
+
+### Performance timing
+
+After each `mkgui_poll` call that renders, the context contains timing data for the last frame:
+
+```c
+ctx->perf_layout_us   // layout calculation time in microseconds
+ctx->perf_render_us   // widget rendering time in microseconds
+ctx->perf_blit_us     // framebuffer blit time in microseconds
 ```
 
 ### Sleep
@@ -329,6 +349,8 @@ int32_t mkgui_spinbox_get(struct mkgui_ctx *ctx, uint32_t id);
 void mkgui_spinbox_set(struct mkgui_ctx *ctx, uint32_t id, int32_t value);
 ```
 
+Click the text area to enter edit mode (cursor appears, existing value is pre-filled). Type a new value and press Enter to confirm (clears focus) or Escape to cancel. Use up/down arrow keys or the +/- buttons to step.
+
 ### Progress
 
 ```c
@@ -367,6 +389,8 @@ void mkgui_listview_set_cell_type(struct mkgui_ctx *ctx, uint32_t id, uint32_t c
 void mkgui_listview_visible_range(struct mkgui_ctx *ctx, uint32_t id, int32_t *first, int32_t *last);
 ```
 
+The listview is fully virtual -- it never owns data. The row callback is invoked only for visible rows during rendering. For datasets with frequently changing data (e.g. download progress), use `mkgui_listview_visible_range` to check if the changed row is currently visible before dirtying the widget.
+
 #### Column definition
 
 ```c
@@ -388,24 +412,19 @@ Cell type can be set in the column struct at setup time, or changed later via `m
 | `MKGUI_CELL_ICON_TEXT` | Icon followed by text | `"icon-name\tLabel"` (tab-separated; icon name is an MDI icon name) |
 | `MKGUI_CELL_SIZE` | Right-aligned formatted file size | Byte count as string (e.g. `"1048576"` renders as `"1.0 MB"`) |
 | `MKGUI_CELL_DATE` | Formatted date/time | Unix timestamp as string (e.g. `"1741900800"` renders as `"2025-03-14 00:00"`) |
+| `MKGUI_CELL_CHECKBOX` | Centered checkbox | `"1"` for checked, `"0"` for unchecked |
 
 Cell progress bars are non-animated (no shimmer), using `theme.accent` for the fill. They are purely data-driven via the row callback.
 
-#### Virtual mode
+#### Row drag-and-drop reordering
 
-Use the `MKGUI_VIRTUAL` flag for large datasets. The callback is invoked only for visible rows during rendering. For datasets with frequently changing data (e.g. download progress), use `mkgui_listview_visible_range` to check if the changed row is currently visible before dirtying the widget:
-
-```c
-int32_t first, last;
-mkgui_listview_visible_range(ctx, ID_LIST, &first, &last);
-if(changed_row >= first && changed_row <= last) {
-    dirty_widget(ctx, find_widget_idx(ctx, ID_LIST));
-}
-```
+Rows can be reordered by dragging. Click and drag a row 4+ pixels vertically to start a drag. A horizontal accent-colored line shows the drop position. On release, `MKGUI_EVENT_LISTVIEW_REORDER` is emitted with `ev->value = source_row` and `ev->col = target_row`. The application is responsible for reordering its data array.
 
 #### Column interaction
 
 Column headers support drag-and-drop reordering and resize. Drag a header to a new position to rearrange columns. A short click (< 4px movement) sorts by that column instead. Drag the divider between columns to resize (minimum 20px, cursor changes to a resize arrow on hover). The column order maps display positions to logical column indices -- the row callback always receives the logical column index regardless of display order. Use `mkgui_listview_get_col_order` / `mkgui_listview_set_col_order` and `mkgui_listview_get_col_width` / `mkgui_listview_set_col_width` to save and restore layouts.
+
+Sorting is application-side. When a header is clicked, `MKGUI_EVENT_LISTVIEW_SORT` is emitted with `ev->col` set to the column and `ev->value` set to the sort direction (1 ascending, -1 descending). The listview tracks the sort arrow visual internally but the application must sort its data and call `dirty_all`.
 
 ### Itemview
 
@@ -498,6 +517,33 @@ int32_t widths[] = { -1, 150, 100 };  // 3 sections: flexible, 150px, 100px
 mkgui_statusbar_setup(ctx, ID_SB, 3, widths);
 ```
 
+### Canvas
+
+Custom drawing widget with automatic clipping.
+
+```c
+typedef void (*mkgui_canvas_cb)(struct mkgui_ctx *ctx, uint32_t id, uint32_t *pixels,
+                                 int32_t x, int32_t y, int32_t w, int32_t h, void *userdata);
+
+void mkgui_canvas_set_callback(struct mkgui_ctx *ctx, uint32_t id, mkgui_canvas_cb callback, void *userdata);
+```
+
+```c
+{ MKGUI_CANVAS, ID_CANVAS, "", "", ID_PARENT, 10, 10, 400, 300, MKGUI_PANEL_BORDER }
+```
+
+The callback receives the pixel buffer and the widget's rect. All `draw_*` functions respect the clip rect, which is automatically set to the widget bounds before the callback and restored after. Use `MKGUI_PANEL_BORDER` to draw a border before the callback runs.
+
+```c
+void my_draw(struct mkgui_ctx *ctx, uint32_t id, uint32_t *pixels,
+             int32_t x, int32_t y, int32_t w, int32_t h, void *userdata) {
+    draw_rect_fill(pixels, ctx->win_w, ctx->win_h, x, y, w, h, 0xFF2A2A2A);
+    // ... custom drawing ...
+}
+
+mkgui_canvas_set_callback(ctx, ID_CANVAS, my_draw, NULL);
+```
+
 ## Menus
 
 Menus are built from a `MKGUI_MENU` (the bar) containing `MKGUI_MENUITEM` entries. Submenus are menu items whose parent is another menu item:
@@ -539,9 +585,9 @@ Toolbar buttons emit `MKGUI_EVENT_CLICK`. When a toolbar button has a label but 
 ## Splitters
 
 ```c
-{ MKGUI_SPLITTER_V, ID_SPLIT, "", "", ID_WIN, 0, 0, 500, 400, 0 },
-{ MKGUI_TREEVIEW,   ID_TREE,  "", "", ID_SPLIT, 0, 0, 200, 400, MKGUI_REGION_LEFT },
-{ MKGUI_LISTVIEW,   ID_LIST,  "", "", ID_SPLIT, 0, 0, 300, 400, MKGUI_REGION_RIGHT },
+{ MKGUI_VSPLIT,   ID_SPLIT, "", "", ID_WIN, 0, 0, 500, 400, 0 },
+{ MKGUI_TREEVIEW, ID_TREE,  "", "", ID_SPLIT, 0, 0, 200, 400, MKGUI_REGION_LEFT },
+{ MKGUI_LISTVIEW, ID_LIST,  "", "", ID_SPLIT, 0, 0, 300, 400, MKGUI_REGION_RIGHT },
 ```
 
 The divider is draggable. Children sized automatically based on their region flag.
@@ -563,8 +609,8 @@ Children use coordinates relative to the group's content area (inside the border
 A plain container without the group box border/title. Useful for layout grouping. Children are positioned relative to the panel.
 
 ```c
-{ MKGUI_PANEL, ID_PANEL, "", ID_TAB1, 10, 10, 300, 200, MKGUI_PANEL_BORDER | MKGUI_PANEL_SUNKEN },
-{ MKGUI_BUTTON, ID_BTN,  "OK", ID_PANEL, 10, 10, 80, 28, 0 },
+{ MKGUI_PANEL, ID_PANEL, "", "", ID_TAB1, 10, 10, 300, 200, MKGUI_PANEL_BORDER | MKGUI_PANEL_SUNKEN },
+{ MKGUI_BUTTON, ID_BTN,  "OK", "", ID_PANEL, 10, 10, 80, 28, 0 },
 ```
 
 Flags: `MKGUI_PANEL_BORDER` draws a rounded border, `MKGUI_PANEL_SUNKEN` darkens the background.
@@ -574,7 +620,7 @@ Flags: `MKGUI_PANEL_BORDER` draws a rounded border, `MKGUI_PANEL_SUNKEN` darkens
 Standalone scrollbar widget. Vertical by default.
 
 ```c
-{ MKGUI_SCROLLBAR, ID_SB, "", ID_TAB1, 10, 10, MKGUI_SCROLLBAR_W, 200, 0 },
+{ MKGUI_SCROLLBAR, ID_SB, "", "", ID_TAB1, 10, 10, MKGUI_SCROLLBAR_W, 200, 0 },
 ```
 
 ```c
@@ -594,7 +640,7 @@ Use `MKGUI_SCROLLBAR_HORIZ` flag for a horizontal scrollbar. Emits `MKGUI_EVENT_
 Displays ARGB pixel data. The image is centered in the widget and scaled down to fit (never scaled up) by default.
 
 ```c
-{ MKGUI_IMAGE, ID_IMG, "", ID_TAB1, 10, 10, 200, 200, MKGUI_PANEL_BORDER },
+{ MKGUI_IMAGE, ID_IMG, "", "", ID_TAB1, 10, 10, 200, 200, MKGUI_PANEL_BORDER },
 ```
 
 ```c
@@ -606,10 +652,10 @@ Pixels are ARGB format (alpha in bits 31-24). The widget copies the pixel data i
 
 ## GL View
 
-Embeds an OpenGL viewport. mkgui creates a native child window; the user creates their own GL context and renders to it.
+Embeds an OpenGL viewport. mkgui creates a native child window; the user creates their own GL context and renders to it. The widget automatically triggers 60fps redraws when visible on the active tab.
 
 ```c
-{ MKGUI_GLVIEW, ID_GL, "", ID_TAB1, 10, 10, 400, 300, MKGUI_PANEL_BORDER },
+{ MKGUI_GLVIEW, ID_GL, "", "", ID_TAB1, 10, 10, 400, 300, MKGUI_PANEL_BORDER },
 ```
 
 ```c
@@ -649,18 +695,26 @@ glViewport(0, 0, w, h);
 glXSwapBuffers(dpy, win);
 ```
 
-mkgui does not link against OpenGL. The user brings their own GL loader and context creation. The widget automatically repositions/resizes the child window when the layout changes (e.g. window resize, tab switch).
+mkgui does not link against OpenGL. The user brings their own GL loader and context creation. The widget automatically repositions/resizes the child window when the layout changes (e.g. window resize, tab switch). GL animations should use `ctx->anim_time` (wall-clock seconds) for time-based motion rather than per-frame increments.
 
 ## Auto-layout containers
 
-Three container types provide automatic child positioning. Children's `x, y` values are ignored -- the container controls placement. Use `MKGUI_PANEL_BORDER` for a visible border (adds 4px internal padding).
+Three container types provide automatic child positioning. Children's `x, y` values are ignored -- the container controls placement.
+
+### Container padding
+
+Layout containers (VBOX, HBOX, FORM) automatically apply 6px internal padding following these rules:
+- **Top-level containers** (parent is a window, tab, panel, etc.): 6px padding on all sides
+- **Nested containers** (parent is another VBOX/HBOX/FORM/GROUP/TABS): no padding (parent's gap provides spacing)
+- **Containers with `MKGUI_PANEL_BORDER`**: always have padding regardless of nesting (the border creates a visual boundary)
+- Use `MKGUI_NO_PAD` to explicitly suppress padding on any container
 
 ### VBox
 
-Stacks children vertically with 4px gap. Each child gets the full container width. Children with `h > 0` get a fixed height. Children with `h = 0` flex to share remaining vertical space equally.
+Stacks children vertically with 6px gap. Each child gets the full container width. Children with `h > 0` get a fixed height. Children with `h = 0` flex to share remaining vertical space equally. Use `MKGUI_SCROLL` to enable vertical scrolling when content overflows.
 
 ```c
-{ MKGUI_VBOX,   ID_VBOX,  "", "", ID_TAB1, 10, 10, 300, 400, MKGUI_PANEL_BORDER },
+{ MKGUI_VBOX,   ID_VBOX,  "", "", ID_TAB1, 10, 10, 300, 400, 0 },
 { MKGUI_BUTTON, ID_BTN1,  "Fixed (28px)", "", ID_VBOX, 0, 0, 0, 28, 0 },
 { MKGUI_INPUT,  ID_INP1,  "",             "", ID_VBOX, 0, 0, 0, 24, 0 },
 { MKGUI_BUTTON, ID_BTN2,  "Flex (fills)", "", ID_VBOX, 0, 0, 0,  0, 0 },
@@ -668,7 +722,7 @@ Stacks children vertically with 4px gap. Each child gets the full container widt
 
 ### HBox
 
-Stacks children horizontally with 4px gap. Each child gets the full container height. Children with `w > 0` get a fixed width. Children with `w = 0` flex to share remaining horizontal space equally.
+Stacks children horizontally with 6px gap. Each child gets the full container height. Children with `w > 0` get a fixed width. Children with `w = 0` flex to share remaining horizontal space equally.
 
 ```c
 { MKGUI_HBOX,   ID_HBOX, "", "", ID_TAB1, 10, 10, 600, 300, 0 },
@@ -679,10 +733,10 @@ Stacks children horizontally with 4px gap. Each child gets the full container he
 
 ### Form
 
-Two-column form layout for label+control pairs. Children are paired in order: 1st is label, 2nd is control, 3rd is label, 4th is control, etc. The label column auto-sizes to the widest label. Each row is 24px tall with 4px gap.
+Two-column form layout for label+control pairs. Children are paired in order: 1st is label, 2nd is control, 3rd is label, 4th is control, etc. The label column auto-sizes to the widest label. Each row is 24px tall with 6px gap.
 
 ```c
-{ MKGUI_FORM,     ID_FORM,  "", "", ID_TAB1, 10, 10, 400, 200, MKGUI_PANEL_BORDER },
+{ MKGUI_FORM,     ID_FORM,  "", "", ID_TAB1, 10, 10, 400, 200, 0 },
 { MKGUI_LABEL,    ID_LBL1,  "Name:",    "", ID_FORM, 0, 0, 0, 0, 0 },
 { MKGUI_INPUT,    ID_INP1,  "",          "", ID_FORM, 0, 0, 0, 0, 0 },
 { MKGUI_LABEL,    ID_LBL2,  "Email:",   "", ID_FORM, 0, 0, 0, 0, 0 },
@@ -705,7 +759,7 @@ Containers can be nested. For example, an HBOX containing a VBOX and a FORM side
 { MKGUI_BUTTON, ID_BTN, "OK", "", ID_TAB1, 10, 10, 80, 28, 0 },
 ```
 
-Only widgets parented to the active tab are visible. Animated widgets (spinners, progress bars) on inactive tabs do not consume CPU.
+Only widgets parented to the active tab are visible. Animated widgets (spinners, progress bars, glviews) on inactive tabs do not consume CPU.
 
 ## Key constants
 
@@ -731,7 +785,9 @@ MKGUI_MENU_HEIGHT      22    // menu bar height
 MKGUI_TOOLBAR_HEIGHT   28    // toolbar height
 MKGUI_STATUSBAR_HEIGHT 22    // statusbar height
 MKGUI_SCROLLBAR_W      14    // scrollbar width
-MKGUI_SPLITTER_THICK    5    // splitter handle thickness
+MKGUI_SPLIT_THICK       5    // splitter handle thickness
+MKGUI_BOX_GAP           6    // gap between children in layout containers
+MKGUI_BOX_PAD           6    // internal padding in layout containers
 ```
 
 ## Icons
@@ -888,7 +944,7 @@ All widget rendering is software-based (no GPU). The framebuffer is blitted to t
 
 ### Dirty rectangle tracking
 
-mkgui uses dirty rectangle tracking to minimize CPU usage. Only regions that have changed are re-rendered and blitted. When two dirty rects are close together, they are merged if the union area is less than 1.5x the sum of individual areas. Animated widgets (spinners, progress bars) only dirty their own rect. Widgets on inactive tabs or hidden parents do not trigger redraws.
+mkgui uses dirty rectangle tracking to minimize CPU usage. Only regions that have changed are re-rendered and blitted. When two dirty rects are close together, they are merged if the union area is less than 1.5x the sum of individual areas. Animated widgets (spinners, progress bars, glviews) only dirty their own rect. Widgets on inactive tabs or hidden parents do not trigger redraws.
 
 ### Antialiased drawing
 
@@ -947,7 +1003,7 @@ Key theme colors (dark defaults shown):
 
 ## Complete example
 
-See [demo.c](demo.c) for a full working application demonstrating all widget types.
+See [demo.c](../demo.c) for a full working application demonstrating all widget types.
 
 ## License
 
