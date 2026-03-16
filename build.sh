@@ -73,9 +73,12 @@ if command -v $WINCC &>/dev/null; then
 	) &
 fi
 
+# Build gen_icons tool and generate icon pack
+(
+	$CC -std=c99 -O2 -Wall tools/gen_icons.c -o tools/gen_icons $(pkg-config --cflags freetype2) $(pkg-config --libs freetype2)
+) &
+
 wait
 
-# Build gen_icons tool and generate icon pack
-$CC -std=c99 -O2 -Wall tools/gen_icons.c -o tools/gen_icons $(pkg-config --cflags freetype2) $(pkg-config --libs freetype2)
 
 ./tools/gen_icons ext/materialdesignicons-webfont.ttf 18 mdi_icons.dat
