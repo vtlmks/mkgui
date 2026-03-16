@@ -4192,6 +4192,7 @@ static uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 
 	if(ctx->parent && ctx->parent->dirty) {
 		layout_widgets(ctx->parent);
+		glview_sync_all(ctx->parent);
 		render_widgets(ctx->parent);
 		if(ctx->parent->render_cb) {
 			ctx->parent->render_cb(ctx->parent, ctx->parent->render_cb_data);

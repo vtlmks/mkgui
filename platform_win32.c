@@ -410,8 +410,11 @@ static void platform_fb_resize(struct mkgui_ctx *ctx) {
 // Blit / flush
 // ---------------------------------------------------------------------------
 
-// [=]===^=[ platform_exclude_glviews ]=============================[=]
-static void platform_exclude_glviews(struct mkgui_ctx *ctx, HDC hdc) {
+// [=]===^=[ platform_blit ]=======================================[=]
+static void platform_blit(struct mkgui_ctx *ctx) {
+	struct mkgui_platform *plat = &ctx->plat;
+	HDC hdc = GetDC(plat->hwnd);
+	SelectClipRgn(hdc, NULL);
 	for(uint32_t i = 0; i < ctx->glview_count; ++i) {
 		if(ctx->glviews[i].plat.hwnd && ctx->glviews[i].visible) {
 			int32_t gx = ctx->glviews[i].last_x;
@@ -421,13 +424,6 @@ static void platform_exclude_glviews(struct mkgui_ctx *ctx, HDC hdc) {
 			ExcludeClipRect(hdc, gx, gy, gx + gw, gy + gh);
 		}
 	}
-}
-
-// [=]===^=[ platform_blit ]=======================================[=]
-static void platform_blit(struct mkgui_ctx *ctx) {
-	struct mkgui_platform *plat = &ctx->plat;
-	HDC hdc = GetDC(plat->hwnd);
-	platform_exclude_glviews(ctx, hdc);
 	BitBlt(hdc, 0, 0, ctx->win_w, ctx->win_h, plat->hdc_mem, 0, 0, SRCCOPY);
 	ReleaseDC(plat->hwnd, hdc);
 }
@@ -436,7 +432,16 @@ static void platform_blit(struct mkgui_ctx *ctx) {
 static void platform_blit_region(struct mkgui_ctx *ctx, int32_t x, int32_t y, int32_t w, int32_t h) {
 	struct mkgui_platform *plat = &ctx->plat;
 	HDC hdc = GetDC(plat->hwnd);
-	platform_exclude_glviews(ctx, hdc);
+	SelectClipRgn(hdc, NULL);
+	for(uint32_t i = 0; i < ctx->glview_count; ++i) {
+		if(ctx->glviews[i].plat.hwnd && ctx->glviews[i].visible) {
+			int32_t gx = ctx->glviews[i].last_x;
+			int32_t gy = ctx->glviews[i].last_y;
+			int32_t gw = ctx->glviews[i].last_w;
+			int32_t gh = ctx->glviews[i].last_h;
+			ExcludeClipRect(hdc, gx, gy, gx + gw, gy + gh);
+		}
+	}
 	BitBlt(hdc, x, y, w, h, plat->hdc_mem, x, y, SRCCOPY);
 	ReleaseDC(plat->hwnd, hdc);
 }
