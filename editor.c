@@ -1634,19 +1634,19 @@ static void ed_draw_widget(struct mkgui_ctx *ctx, uint32_t idx) {
 
 static struct {
 	uint32_t id;
-	int32_t idx;
+	uint32_t idx;
 } ed_layout_id_map[ED_LAYOUT_HASH_SIZE];
 
-static int32_t ed_layout_parent[ED_MAX_WIDGETS];
-static int32_t ed_layout_first_child[ED_MAX_WIDGETS];
-static int32_t ed_layout_next_sibling[ED_MAX_WIDGETS];
+static uint32_t ed_layout_parent[ED_MAX_WIDGETS];
+static uint32_t ed_layout_first_child[ED_MAX_WIDGETS];
+static uint32_t ed_layout_next_sibling[ED_MAX_WIDGETS];
 
 // [=]===^=[ ed_layout_find_idx ]=================================[=]
-static int32_t ed_layout_find_idx(uint32_t id) {
+static uint32_t ed_layout_find_idx(uint32_t id) {
 	uint32_t h = (id * 2654435761u) & ED_LAYOUT_HASH_MASK;
 	for(;;) {
-		if(ed_layout_id_map[h].idx < 0) {
-			return -1;
+		if(ed_layout_id_map[h].idx == UINT32_MAX) {
+			return UINT32_MAX;
 		}
 		if(ed_layout_id_map[h].id == id) {
 			return ed_layout_id_map[h].idx;
@@ -1658,22 +1658,24 @@ static int32_t ed_layout_find_idx(uint32_t id) {
 // [=]===^=[ ed_layout_build_index ]==============================[=]
 static void ed_layout_build_index(void) {
 	for(uint32_t i = 0; i < ED_LAYOUT_HASH_SIZE; ++i) {
-		ed_layout_id_map[i].idx = -1;
+		ed_layout_id_map[i].idx = UINT32_MAX;
 	}
 	for(uint32_t i = 0; i < ed.widget_count; ++i) {
 		uint32_t h = (ed.widgets[i].id * 2654435761u) & ED_LAYOUT_HASH_MASK;
-		while(ed_layout_id_map[h].idx >= 0) {
+		while(ed_layout_id_map[h].idx != UINT32_MAX) {
 			h = (h + 1) & ED_LAYOUT_HASH_MASK;
 		}
 		ed_layout_id_map[h].id = ed.widgets[i].id;
-		ed_layout_id_map[h].idx = (int32_t)i;
-		ed_layout_first_child[i] = -1;
-		ed_layout_next_sibling[i] = -1;
+		ed_layout_id_map[h].idx = i;
+		ed_layout_first_child[i] = UINT32_MAX;
+		ed_layout_next_sibling[i] = UINT32_MAX;
 	}
-	for(int32_t i = (int32_t)ed.widget_count - 1; i >= 0; --i) {
-		int32_t pidx = ed_layout_find_idx(ed.widgets[i].parent_id);
+	uint32_t i = ed.widget_count;
+	while(i > 0) {
+		--i;
+		uint32_t pidx = ed_layout_find_idx(ed.widgets[i].parent_id);
 		ed_layout_parent[i] = pidx;
-		if(pidx >= 0 && pidx != i) {
+		if(pidx < ed.widget_count && pidx != i) {
 			ed_layout_next_sibling[i] = ed_layout_first_child[pidx];
 			ed_layout_first_child[pidx] = i;
 		}
@@ -1681,7 +1683,7 @@ static void ed_layout_build_index(void) {
 }
 
 // [=]===^=[ ed_layout_child_area ]===============================[=]
-static void ed_layout_child_area(struct mkgui_ctx *ctx, int32_t pidx, int32_t cidx, int32_t px, int32_t py, int32_t pw, int32_t ph) {
+static void ed_layout_child_area(struct mkgui_ctx *ctx, uint32_t pidx, uint32_t cidx, int32_t px, int32_t py, int32_t pw, int32_t ph) {
 	struct ed_widget *w = &ed.widgets[cidx];
 	struct ed_widget *parent = &ed.widgets[pidx];
 
@@ -1768,7 +1770,7 @@ static void ed_layout_child_area(struct mkgui_ctx *ctx, int32_t pidx, int32_t ci
 }
 
 // [=]===^=[ ed_layout_node ]=====================================[=]
-static void ed_layout_node(struct mkgui_ctx *ctx, int32_t idx) {
+static void ed_layout_node(struct mkgui_ctx *ctx, uint32_t idx) {
 	struct ed_widget *w = &ed.widgets[idx];
 
 	int32_t px = ed_rects[idx].x;
@@ -1779,7 +1781,7 @@ static void ed_layout_node(struct mkgui_ctx *ctx, int32_t idx) {
 	if(w->type == MKGUI_WINDOW) {
 		int32_t top_y = py;
 		int32_t bot_y = py + ph;
-		for(int32_t c = ed_layout_first_child[idx]; c >= 0; c = ed_layout_next_sibling[c]) {
+		for(uint32_t c = ed_layout_first_child[idx]; c < ed.widget_count; c = ed_layout_next_sibling[c]) {
 			if(ed.widgets[c].type == MKGUI_MENU) {
 				ed_rects[c].x = px;
 				ed_rects[c].y = top_y;
@@ -1788,7 +1790,7 @@ static void ed_layout_node(struct mkgui_ctx *ctx, int32_t idx) {
 				top_y += MKGUI_MENU_HEIGHT;
 			}
 		}
-		for(int32_t c = ed_layout_first_child[idx]; c >= 0; c = ed_layout_next_sibling[c]) {
+		for(uint32_t c = ed_layout_first_child[idx]; c < ed.widget_count; c = ed_layout_next_sibling[c]) {
 			if(ed.widgets[c].type == MKGUI_TOOLBAR) {
 				ed_rects[c].x = px;
 				ed_rects[c].y = top_y;
@@ -1797,7 +1799,7 @@ static void ed_layout_node(struct mkgui_ctx *ctx, int32_t idx) {
 				top_y += MKGUI_TOOLBAR_HEIGHT;
 			}
 		}
-		for(int32_t c = ed_layout_first_child[idx]; c >= 0; c = ed_layout_next_sibling[c]) {
+		for(uint32_t c = ed_layout_first_child[idx]; c < ed.widget_count; c = ed_layout_next_sibling[c]) {
 			if(ed.widgets[c].type == MKGUI_STATUSBAR) {
 				bot_y -= MKGUI_STATUSBAR_HEIGHT;
 				ed_rects[c].x = px;
@@ -1827,9 +1829,9 @@ static void ed_layout_node(struct mkgui_ctx *ctx, int32_t idx) {
 
 	if(w->type == MKGUI_VBOX || w->type == MKGUI_HBOX || w->type == MKGUI_FORM) {
 		if(!(w->flags & MKGUI_NO_PAD)) {
-			int32_t gpidx = ed_layout_parent[idx];
+			uint32_t gpidx = ed_layout_parent[idx];
 			uint32_t nested = 0;
-			if(gpidx >= 0) {
+			if(gpidx < ed.widget_count) {
 				uint32_t gpt = ed.widgets[gpidx].type;
 				if(gpt == MKGUI_VBOX || gpt == MKGUI_HBOX || gpt == MKGUI_FORM || gpt == MKGUI_GROUP || gpt == MKGUI_TABS) {
 					nested = 1;
@@ -1844,7 +1846,7 @@ static void ed_layout_node(struct mkgui_ctx *ctx, int32_t idx) {
 		}
 
 		uint32_t child_count = 0;
-		for(int32_t j = ed_layout_first_child[idx]; j >= 0; j = ed_layout_next_sibling[j]) {
+		for(uint32_t j = ed_layout_first_child[idx]; j < ed.widget_count; j = ed_layout_next_sibling[j]) {
 			if(!(ed.widgets[j].flags & MKGUI_HIDDEN)) {
 				++child_count;
 			}
@@ -1853,7 +1855,7 @@ static void ed_layout_node(struct mkgui_ctx *ctx, int32_t idx) {
 		if(w->type == MKGUI_VBOX) {
 			int32_t fixed_total = 0;
 			uint32_t flex_count = 0;
-			for(int32_t j = ed_layout_first_child[idx]; j >= 0; j = ed_layout_next_sibling[j]) {
+			for(uint32_t j = ed_layout_first_child[idx]; j < ed.widget_count; j = ed_layout_next_sibling[j]) {
 				if(!(ed.widgets[j].flags & MKGUI_HIDDEN)) {
 					if(ed.widgets[j].h > 0) {
 						fixed_total += ed.widgets[j].h;
@@ -1871,13 +1873,13 @@ static void ed_layout_node(struct mkgui_ctx *ctx, int32_t idx) {
 			int32_t vflex_rem = (flex_count > 0) ? (remaining - flex_h * (int32_t)flex_count) : 0;
 			uint32_t vflex_idx = 0;
 			int32_t cy = py;
-			for(int32_t j = ed_layout_first_child[idx]; j >= 0; j = ed_layout_next_sibling[j]) {
+			for(uint32_t j = ed_layout_first_child[idx]; j < ed.widget_count; j = ed_layout_next_sibling[j]) {
 				if(!(ed.widgets[j].flags & MKGUI_HIDDEN)) {
 					int32_t ch;
 					if(ed.widgets[j].h > 0) {
 						ch = ed.widgets[j].h;
 					} else {
-						ch = flex_h + ((int32_t)vflex_idx < vflex_rem ? 1 : 0);
+						ch = flex_h + (vflex_idx < (uint32_t)vflex_rem ? 1 : 0);
 						++vflex_idx;
 					}
 					ed_rects[j].x = px;
@@ -1891,7 +1893,7 @@ static void ed_layout_node(struct mkgui_ctx *ctx, int32_t idx) {
 		} else if(w->type == MKGUI_HBOX) {
 			int32_t fixed_total = 0;
 			uint32_t flex_count = 0;
-			for(int32_t j = ed_layout_first_child[idx]; j >= 0; j = ed_layout_next_sibling[j]) {
+			for(uint32_t j = ed_layout_first_child[idx]; j < ed.widget_count; j = ed_layout_next_sibling[j]) {
 				if(!(ed.widgets[j].flags & MKGUI_HIDDEN)) {
 					if(ed.widgets[j].w > 0) {
 						fixed_total += ed.widgets[j].w;
@@ -1909,13 +1911,13 @@ static void ed_layout_node(struct mkgui_ctx *ctx, int32_t idx) {
 			int32_t flex_rem = (flex_count > 0) ? (remaining - flex_w * (int32_t)flex_count) : 0;
 			uint32_t flex_idx = 0;
 			int32_t cx = px;
-			for(int32_t j = ed_layout_first_child[idx]; j >= 0; j = ed_layout_next_sibling[j]) {
+			for(uint32_t j = ed_layout_first_child[idx]; j < ed.widget_count; j = ed_layout_next_sibling[j]) {
 				if(!(ed.widgets[j].flags & MKGUI_HIDDEN)) {
 					int32_t cw;
 					if(ed.widgets[j].w > 0) {
 						cw = ed.widgets[j].w;
 					} else {
-						cw = flex_w + ((int32_t)flex_idx < flex_rem ? 1 : 0);
+						cw = flex_w + (flex_idx < (uint32_t)flex_rem ? 1 : 0);
 						++flex_idx;
 					}
 					ed_rects[j].x = cx;
@@ -1929,7 +1931,7 @@ static void ed_layout_node(struct mkgui_ctx *ctx, int32_t idx) {
 		} else {
 			int32_t label_w = 0;
 			uint32_t pair_idx = 0;
-			for(int32_t j = ed_layout_first_child[idx]; j >= 0; j = ed_layout_next_sibling[j]) {
+			for(uint32_t j = ed_layout_first_child[idx]; j < ed.widget_count; j = ed_layout_next_sibling[j]) {
 				if(!(ed.widgets[j].flags & MKGUI_HIDDEN)) {
 					if((pair_idx & 1) == 0) {
 						int32_t tw = text_width(ctx, ed.widgets[j].label) + 8;
@@ -1941,20 +1943,20 @@ static void ed_layout_node(struct mkgui_ctx *ctx, int32_t idx) {
 				}
 			}
 			pair_idx = 0;
-			for(int32_t j = ed_layout_first_child[idx]; j >= 0; j = ed_layout_next_sibling[j]) {
+			for(uint32_t j = ed_layout_first_child[idx]; j < ed.widget_count; j = ed_layout_next_sibling[j]) {
 				if(!(ed.widgets[j].flags & MKGUI_HIDDEN)) {
-					int32_t row = (int32_t)(pair_idx / 2);
-					int32_t row_h = 24;
+					uint32_t row = pair_idx / 2;
+					int32_t row_y = py + (int32_t)row * (24 + MKGUI_BOX_GAP);
 					if((pair_idx & 1) == 0) {
 						ed_rects[j].x = px;
-						ed_rects[j].y = py + row * (row_h + MKGUI_BOX_GAP);
+						ed_rects[j].y = row_y;
 						ed_rects[j].w = label_w;
-						ed_rects[j].h = row_h;
+						ed_rects[j].h = 24;
 					} else {
 						ed_rects[j].x = px + label_w;
-						ed_rects[j].y = py + row * (row_h + MKGUI_BOX_GAP);
+						ed_rects[j].y = row_y;
 						ed_rects[j].w = pw - label_w;
-						ed_rects[j].h = row_h;
+						ed_rects[j].h = 24;
 					}
 					++pair_idx;
 				}
@@ -1963,7 +1965,7 @@ static void ed_layout_node(struct mkgui_ctx *ctx, int32_t idx) {
 
 	} else if(w->type == MKGUI_TOOLBAR) {
 		int32_t bx = px + 2;
-		for(int32_t c = ed_layout_first_child[idx]; c >= 0; c = ed_layout_next_sibling[c]) {
+		for(uint32_t c = ed_layout_first_child[idx]; c < ed.widget_count; c = ed_layout_next_sibling[c]) {
 			struct ed_widget *btn = &ed.widgets[c];
 			if(btn->type != MKGUI_BUTTON) {
 				continue;
@@ -1985,7 +1987,7 @@ static void ed_layout_node(struct mkgui_ctx *ctx, int32_t idx) {
 		}
 
 	} else {
-		for(int32_t c = ed_layout_first_child[idx]; c >= 0; c = ed_layout_next_sibling[c]) {
+		for(uint32_t c = ed_layout_first_child[idx]; c < ed.widget_count; c = ed_layout_next_sibling[c]) {
 			uint32_t ct = ed.widgets[c].type;
 			if(ct == MKGUI_MENUITEM || (ed.widgets[c].flags & MKGUI_HIDDEN)) {
 				continue;
@@ -1997,7 +1999,7 @@ static void ed_layout_node(struct mkgui_ctx *ctx, int32_t idx) {
 		}
 	}
 
-	for(int32_t c = ed_layout_first_child[idx]; c >= 0; c = ed_layout_next_sibling[c]) {
+	for(uint32_t c = ed_layout_first_child[idx]; c < ed.widget_count; c = ed_layout_next_sibling[c]) {
 		if(ed.widgets[c].type != MKGUI_MENUITEM && !(ed.widgets[c].flags & MKGUI_HIDDEN)) {
 			ed_layout_node(ctx, c);
 		}
@@ -2040,24 +2042,24 @@ static void ed_render_canvas(struct mkgui_ctx *ctx, uint32_t id, uint32_t *pixel
 
 	// Layout using tree-walk algorithm (mirrors layout_node in mkgui.c)
 	ed_layout_build_index();
-	int32_t ed_win_idx = -1;
+	uint32_t ed_win_idx = UINT32_MAX;
 	int32_t ed_win_save_y = 0, ed_win_save_h = 0;
 	for(uint32_t i = 0; i < ed.widget_count; ++i) {
 		if(ed.widgets[i].type == MKGUI_WINDOW) {
-			ed_win_idx = (int32_t)i;
+			ed_win_idx = i;
 			ed_rects[i].x = win_x;
 			ed_rects[i].y = win_y;
 			ed_rects[i].w = ed.canvas_w;
 			ed_rects[i].h = ed.canvas_h;
 			ed_win_save_y = win_y;
 			ed_win_save_h = ed.canvas_h;
-			ed_layout_node(ctx, (int32_t)i);
+			ed_layout_node(ctx, i);
 			break;
 		}
 	}
 
 	// Restore window rect for rendering (chrome reservation shrinks it)
-	if(ed_win_idx >= 0) {
+	if(ed_win_idx < ed.widget_count) {
 		ed_rects[ed_win_idx].y = ed_win_save_y;
 		ed_rects[ed_win_idx].h = ed_win_save_h;
 	}
