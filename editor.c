@@ -3127,7 +3127,8 @@ int main(void) {
 				} break;
 
 				case MKGUI_EVENT_SPINBOX_CHANGED:
-				case MKGUI_EVENT_INPUT_CHANGED: {
+				case MKGUI_EVENT_INPUT_CHANGED:
+				case MKGUI_EVENT_INPUT_SUBMIT: {
 					for(uint32_t pi = 0; pi < ED_PROP_COUNT; ++pi) {
 						struct ed_prop_desc *p = &ed_props[pi];
 						if(p->widget_id == ev.id || p->widget_id2 == ev.id) {

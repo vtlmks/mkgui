@@ -7,7 +7,39 @@ static int32_t tab_calc_width(struct mkgui_ctx *ctx, struct mkgui_widget *child)
 	if(widget_icon_idx(child) >= 0) {
 		tw += MKGUI_ICON_SIZE + 4;
 	}
+	if(child->flags & MKGUI_TAB_CLOSABLE) {
+		tw += 16;
+	}
 	return tw;
+}
+
+// [=]===^=[ tab_close_hit_test ]=================================[=]
+static uint32_t tab_close_hit_test(struct mkgui_ctx *ctx, uint32_t tabs_idx, int32_t mx, int32_t my) {
+	struct mkgui_widget *w = &ctx->widgets[tabs_idx];
+	int32_t rx = ctx->rects[tabs_idx].x;
+	int32_t ry = ctx->rects[tabs_idx].y;
+
+	if(my < ry || my >= ry + MKGUI_TAB_HEIGHT) {
+		return 0;
+	}
+
+	int32_t tx = rx;
+	for(uint32_t i = 0; i < ctx->widget_count; ++i) {
+		struct mkgui_widget *child = &ctx->widgets[i];
+		if(child->type != MKGUI_TAB || child->parent_id != w->id) {
+			continue;
+		}
+		int32_t tw = tab_calc_width(ctx, child);
+		if(mx >= tx && mx < tx + tw && (child->flags & MKGUI_TAB_CLOSABLE)) {
+			int32_t bx = tx + tw - 16;
+			int32_t by = ry + (MKGUI_TAB_HEIGHT - 10) / 2;
+			if(mx >= bx && mx < bx + 10 && my >= by && my < by + 10) {
+				return child->id;
+			}
+		}
+		tx += tw;
+	}
+	return 0;
 }
 
 // [=]===^=[ tab_hit_test ]======================================[=]
@@ -73,6 +105,13 @@ static void render_tabs(struct mkgui_ctx *ctx, uint32_t idx) {
 		}
 		int32_t tty = ry + (MKGUI_TAB_HEIGHT - ctx->font_height) / 2;
 		push_text_clip(cx, tty, child->label, ctx->theme.text, tx, ry, tx + tw, ry + MKGUI_TAB_HEIGHT);
+		if(child->flags & MKGUI_TAB_CLOSABLE) {
+			int32_t bx = tx + tw - 14;
+			int32_t by = ry + (MKGUI_TAB_HEIGHT - 10) / 2;
+			uint32_t clr = ctx->theme.text_disabled;
+			draw_aa_line(ctx->pixels, ctx->win_w, ctx->win_h, bx, by, bx + 8, by + 8, clr, 2);
+			draw_aa_line(ctx->pixels, ctx->win_w, ctx->win_h, bx + 8, by, bx, by + 8, clr, 2);
+		}
 		tx += tw;
 	}
 

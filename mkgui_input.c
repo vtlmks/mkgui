@@ -149,7 +149,7 @@ static uint32_t handle_input_key(struct mkgui_ctx *ctx, struct mkgui_event *ev, 
 	if(ks == MKGUI_KEY_RETURN) {
 		ctx->focus_id = 0;
 		dirty_all(ctx);
-		ev->type = MKGUI_EVENT_INPUT_CHANGED;
+		ev->type = MKGUI_EVENT_INPUT_SUBMIT;
 		ev->id = w ? w->id : 0;
 		return 1;
 	}

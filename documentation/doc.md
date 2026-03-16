@@ -82,20 +82,20 @@ struct mkgui_widget {
 | Type | Description |
 |------|-------------|
 | `MKGUI_WINDOW` | Root window. Must be first widget. |
-| `MKGUI_BUTTON` | Push button. Emits `MKGUI_EVENT_CLICK`. |
+| `MKGUI_BUTTON` | Push button. Emits `MKGUI_EVENT_CLICK`, `MKGUI_EVENT_BUTTON_DBLCLICK` on double-click. |
 | `MKGUI_LABEL` | Static text. |
-| `MKGUI_INPUT` | Single-line text input. Emits `MKGUI_EVENT_INPUT_CHANGED`. |
-| `MKGUI_TEXTAREA` | Multi-line text editor. Emits `MKGUI_EVENT_TEXTAREA_CHANGED`. |
+| `MKGUI_INPUT` | Single-line text input. Emits `MKGUI_EVENT_INPUT_CHANGED`, `MKGUI_EVENT_INPUT_SUBMIT` on Enter. |
+| `MKGUI_TEXTAREA` | Multi-line text editor. Emits `MKGUI_EVENT_TEXTAREA_CHANGED`, `MKGUI_EVENT_TEXTAREA_CURSOR` on cursor movement. |
 | `MKGUI_CHECKBOX` | Toggle checkbox. Emits `MKGUI_EVENT_CHECKBOX_CHANGED`. |
 | `MKGUI_RADIO` | Radio button (mutually exclusive within parent). Emits `MKGUI_EVENT_RADIO_CHANGED`. |
 | `MKGUI_DROPDOWN` | Drop-down selector. Emits `MKGUI_EVENT_DROPDOWN_CHANGED`. |
-| `MKGUI_SLIDER` | Horizontal slider. Emits `MKGUI_EVENT_SLIDER_CHANGED`. |
+| `MKGUI_SLIDER` | Horizontal slider. Emits `MKGUI_EVENT_SLIDER_START`, `MKGUI_EVENT_SLIDER_CHANGED`, `MKGUI_EVENT_SLIDER_END`. |
 | `MKGUI_SPINBOX` | Numeric input with +/- buttons. Emits `MKGUI_EVENT_SPINBOX_CHANGED`. Click the text area to type directly, Enter to confirm (clears focus), Escape to cancel editing. |
 | `MKGUI_PROGRESS` | Progress bar with animated shimmer effect. No events. |
 | `MKGUI_SPINNER` | Animated spinning arc indicator. No events, no setup needed. |
 | `MKGUI_LISTVIEW` | Scrollable multi-column list with virtual rows and per-column cell types. Emits `MKGUI_EVENT_LISTVIEW_SELECT`, `_DBLCLICK`, `_SORT`, `_COL_REORDER`, `_REORDER`. |
 | `MKGUI_ITEMVIEW` | Multi-mode item view (icon, thumbnail, compact, detail). Emits `MKGUI_EVENT_ITEMVIEW_SELECT`, `_DBLCLICK`. |
-| `MKGUI_TREEVIEW` | Hierarchical tree. Emits `MKGUI_EVENT_TREEVIEW_SELECT`, `_EXPAND`, `_COLLAPSE`. |
+| `MKGUI_TREEVIEW` | Hierarchical tree. Emits `MKGUI_EVENT_TREEVIEW_SELECT`, `_DBLCLICK`, `_EXPAND`, `_COLLAPSE`. |
 | `MKGUI_TABS` | Tab container. Children must be `MKGUI_TAB`. Emits `MKGUI_EVENT_TAB_CHANGED`. |
 | `MKGUI_TAB` | Individual tab page (parent must be `MKGUI_TABS`). |
 | `MKGUI_MENU` | Menu bar. Children are top-level `MKGUI_MENUITEM`. |
@@ -184,6 +184,7 @@ Combine horizontal and vertical anchors freely. Common patterns:
 | `MKGUI_IMAGE_STRETCH` | `1 << 20` | Stretch image to fill widget area |
 | `MKGUI_SCROLL` | `1 << 21` | Enable scrolling on VBOX (adds scrollbar when content overflows) |
 | `MKGUI_NO_PAD` | `1 << 22` | Suppress automatic container padding |
+| `MKGUI_TAB_CLOSABLE` | `1 << 23` | Show close button on tab (emits `MKGUI_EVENT_TAB_CLOSE`) |
 
 ## Events
 
@@ -225,6 +226,20 @@ struct mkgui_event {
 | `MKGUI_EVENT_ITEMVIEW_SELECT` | Item selected | item index | -- |
 | `MKGUI_EVENT_ITEMVIEW_DBLCLICK` | Item double-clicked | item index | -- |
 | `MKGUI_EVENT_SCROLL` | Scrollbar value changed | scroll position | -- |
+| `MKGUI_EVENT_CONTEXT` | Right-click on widget | mouse x | mouse y |
+| `MKGUI_EVENT_INPUT_SUBMIT` | Enter pressed in input | -- | -- |
+| `MKGUI_EVENT_FOCUS` | Widget gained focus | -- | -- |
+| `MKGUI_EVENT_UNFOCUS` | Widget lost focus | -- | -- |
+| `MKGUI_EVENT_HOVER_ENTER` | Mouse entered widget | -- | -- |
+| `MKGUI_EVENT_HOVER_LEAVE` | Mouse left widget | -- | -- |
+| `MKGUI_EVENT_SLIDER_START` | Slider drag started | initial value | -- |
+| `MKGUI_EVENT_SLIDER_END` | Slider drag ended | final value | -- |
+| `MKGUI_EVENT_TREEVIEW_DBLCLICK` | Tree node double-clicked | node id | -- |
+| `MKGUI_EVENT_TEXTAREA_CURSOR` | Textarea cursor moved | cursor position | -- |
+| `MKGUI_EVENT_DRAG_START` | DnD drag started | source id/row | -- |
+| `MKGUI_EVENT_DRAG_END` | DnD drag cancelled | -- | -- |
+| `MKGUI_EVENT_BUTTON_DBLCLICK` | Button double-clicked | -- | -- |
+| `MKGUI_EVENT_TAB_CLOSE` | Tab close button clicked | tab id | -- |
 
 ## API reference
 

@@ -1,6 +1,45 @@
 // Copyright (c) 2026, Peter Fors
 // SPDX-License-Identifier: MIT
 
+// [=]===^=[ lv_multi_sel_find ]=================================[=]
+static int32_t lv_multi_sel_find(struct mkgui_listview_data *lv, int32_t row) {
+	uint32_t lo = 0, hi = lv->multi_sel_count;
+	while(lo < hi) {
+		uint32_t mid = (lo + hi) / 2;
+		if(lv->multi_sel[mid] < row) {
+			lo = mid + 1;
+		} else {
+			hi = mid;
+		}
+	}
+	return (lo < lv->multi_sel_count && lv->multi_sel[lo] == row) ? (int32_t)lo : -1;
+}
+
+// [=]===^=[ lv_multi_sel_toggle ]================================[=]
+static void lv_multi_sel_toggle(struct mkgui_listview_data *lv, int32_t row) {
+	int32_t idx = lv_multi_sel_find(lv, row);
+	if(idx >= 0) {
+		memmove(&lv->multi_sel[idx], &lv->multi_sel[idx + 1], (lv->multi_sel_count - (uint32_t)idx - 1) * sizeof(int32_t));
+		--lv->multi_sel_count;
+	} else {
+		if(lv->multi_sel_count >= MKGUI_MAX_MULTI_SEL) {
+			return;
+		}
+		uint32_t lo = 0, hi = lv->multi_sel_count;
+		while(lo < hi) {
+			uint32_t mid = (lo + hi) / 2;
+			if(lv->multi_sel[mid] < row) {
+				lo = mid + 1;
+			} else {
+				hi = mid;
+			}
+		}
+		memmove(&lv->multi_sel[lo + 1], &lv->multi_sel[lo], (lv->multi_sel_count - lo) * sizeof(int32_t));
+		lv->multi_sel[lo] = row;
+		++lv->multi_sel_count;
+	}
+}
+
 // [=]===^=[ listview_header_hit ]===============================[=]
 static int32_t listview_header_hit(struct mkgui_ctx *ctx, uint32_t idx, int32_t mx, int32_t my) {
 	int32_t rx = ctx->rects[idx].x;
@@ -276,8 +315,12 @@ static void render_listview(struct mkgui_ctx *ctx, uint32_t idx) {
 		}
 		int32_t draw_h = draw_end - draw_y;
 
+		uint32_t is_selected = ((uint32_t)row_idx == (uint32_t)lv->selected_row);
+		if(!is_selected && (w->flags & MKGUI_MULTI_SELECT)) {
+			is_selected = (lv_multi_sel_find(lv, row_idx) >= 0);
+		}
 		uint32_t row_bg = (row_idx & 1) ? ctx->theme.listview_alt : ctx->theme.input_bg;
-		if(row_idx == lv->selected_row) {
+		if(is_selected) {
 			row_bg = ctx->theme.selection;
 		}
 		draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, rx + 1, draw_y, rw - 2 - MKGUI_SCROLLBAR_W, draw_h, row_bg);
@@ -291,7 +334,7 @@ static void render_listview(struct mkgui_ctx *ctx, uint32_t idx) {
 				if(lv->row_cb) {
 					lv->row_cb((uint32_t)row_idx, c, cell_buf, sizeof(cell_buf), lv->userdata);
 				}
-				uint32_t tc = (row_idx == lv->selected_row) ? ctx->theme.sel_text : ((w->flags & MKGUI_DISABLED) ? ctx->theme.text_disabled : ctx->theme.text);
+				uint32_t tc = is_selected ? ctx->theme.sel_text : ((w->flags & MKGUI_DISABLED) ? ctx->theme.text_disabled : ctx->theme.text);
 				int32_t col_w = lv->columns[c].width;
 				render_cell(ctx, lv, c, cell_buf, cx, ty, col_w, clip_top, clip_bottom, tc, row_y);
 				cx += col_w;
@@ -685,6 +728,39 @@ static void mkgui_listview_set_rows(struct mkgui_ctx *ctx, uint32_t id, uint32_t
 static int32_t mkgui_listview_get_selected(struct mkgui_ctx *ctx, uint32_t id) {
 	struct mkgui_listview_data *lv = find_listv_data(ctx, id);
 	return lv ? lv->selected_row : -1;
+}
+
+// [=]===^=[ mkgui_listview_get_multi_sel ]======================[=]
+static uint32_t mkgui_listview_get_multi_sel(struct mkgui_ctx *ctx, uint32_t id, const int32_t **out) {
+	struct mkgui_listview_data *lv = find_listv_data(ctx, id);
+	if(!lv) {
+		if(out) {
+			*out = NULL;
+		}
+		return 0;
+	}
+	if(out) {
+		*out = lv->multi_sel;
+	}
+	return lv->multi_sel_count;
+}
+
+// [=]===^=[ mkgui_listview_is_selected ]========================[=]
+static uint32_t mkgui_listview_is_selected(struct mkgui_ctx *ctx, uint32_t id, int32_t row) {
+	struct mkgui_listview_data *lv = find_listv_data(ctx, id);
+	if(!lv) {
+		return 0;
+	}
+	return (lv_multi_sel_find(lv, row) >= 0) ? 1 : 0;
+}
+
+// [=]===^=[ mkgui_listview_clear_selection ]=====================[=]
+static void mkgui_listview_clear_selection(struct mkgui_ctx *ctx, uint32_t id) {
+	struct mkgui_listview_data *lv = find_listv_data(ctx, id);
+	if(lv) {
+		lv->multi_sel_count = 0;
+		lv->selected_row = -1;
+	}
 }
 
 // [=]===^=[ mkgui_listview_get_col_order ]======================[=]

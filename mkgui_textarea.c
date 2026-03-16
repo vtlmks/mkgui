@@ -460,7 +460,10 @@ static uint32_t handle_textarea_key(struct mkgui_ctx *ctx, struct mkgui_event *e
 		}
 		dirty_all(ctx);
 		textarea_scroll_to_cursor(ctx, ctx->focus_id);
-		return 0;
+		ev->type = MKGUI_EVENT_TEXTAREA_CURSOR;
+		ev->id = ctx->focus_id;
+		ev->value = (int32_t)ta->cursor;
+		return 1;
 	}
 
 	if(ks == MKGUI_KEY_RIGHT) {
@@ -474,7 +477,10 @@ static uint32_t handle_textarea_key(struct mkgui_ctx *ctx, struct mkgui_event *e
 		}
 		dirty_all(ctx);
 		textarea_scroll_to_cursor(ctx, ctx->focus_id);
-		return 0;
+		ev->type = MKGUI_EVENT_TEXTAREA_CURSOR;
+		ev->id = ctx->focus_id;
+		ev->value = (int32_t)ta->cursor;
+		return 1;
 	}
 
 	if(ks == MKGUI_KEY_UP) {
@@ -492,7 +498,10 @@ static uint32_t handle_textarea_key(struct mkgui_ctx *ctx, struct mkgui_event *e
 		}
 		dirty_all(ctx);
 		textarea_scroll_to_cursor(ctx, ctx->focus_id);
-		return 0;
+		ev->type = MKGUI_EVENT_TEXTAREA_CURSOR;
+		ev->id = ctx->focus_id;
+		ev->value = (int32_t)ta->cursor;
+		return 1;
 	}
 
 	if(ks == MKGUI_KEY_DOWN) {
@@ -512,7 +521,10 @@ static uint32_t handle_textarea_key(struct mkgui_ctx *ctx, struct mkgui_event *e
 		}
 		dirty_all(ctx);
 		textarea_scroll_to_cursor(ctx, ctx->focus_id);
-		return 0;
+		ev->type = MKGUI_EVENT_TEXTAREA_CURSOR;
+		ev->id = ctx->focus_id;
+		ev->value = (int32_t)ta->cursor;
+		return 1;
 	}
 
 	if(ks == MKGUI_KEY_HOME) {
@@ -523,7 +535,10 @@ static uint32_t handle_textarea_key(struct mkgui_ctx *ctx, struct mkgui_event *e
 			textarea_clear_selection(ta);
 		}
 		dirty_all(ctx);
-		return 0;
+		ev->type = MKGUI_EVENT_TEXTAREA_CURSOR;
+		ev->id = ctx->focus_id;
+		ev->value = (int32_t)ta->cursor;
+		return 1;
 	}
 
 	if(ks == MKGUI_KEY_END) {
@@ -534,7 +549,10 @@ static uint32_t handle_textarea_key(struct mkgui_ctx *ctx, struct mkgui_event *e
 			textarea_clear_selection(ta);
 		}
 		dirty_all(ctx);
-		return 0;
+		ev->type = MKGUI_EVENT_TEXTAREA_CURSOR;
+		ev->id = ctx->focus_id;
+		ev->value = (int32_t)ta->cursor;
+		return 1;
 	}
 
 	if(len > 0 && (uint8_t)buf[0] >= 32) {
