@@ -1,8 +1,6 @@
 // Copyright (c) 2026, Peter Fors
 // SPDX-License-Identifier: MIT
 
-#define MKGUI_STATUSBAR_HEIGHT 22
-
 // [=]===^=[ render_statusbar ]===================================[=]
 static void render_statusbar(struct mkgui_ctx *ctx, uint32_t idx) {
 	struct mkgui_widget *w = &ctx->widgets[idx];

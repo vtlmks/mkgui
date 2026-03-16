@@ -1,7 +1,6 @@
 // Copyright (c) 2026, Peter Fors
 // SPDX-License-Identifier: MIT
 
-#define MKGUI_TOOLBAR_HEIGHT 28
 #define MKGUI_TOOLBAR_BTN_W  28
 #define MKGUI_TOOLBAR_SEP_W  8
 
@@ -13,8 +12,7 @@ static void render_toolbar(struct mkgui_ctx *ctx, uint32_t idx) {
 	int32_t rw = ctx->rects[idx].w;
 	int32_t rh = ctx->rects[idx].h;
 
-	draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, rx, ry, rw, rh, ctx->theme.header_bg);
-	draw_hline(ctx->pixels, ctx->win_w, ctx->win_h, rx, ry + rh - 1, rw, ctx->theme.widget_border);
+	draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, rx, ry, rw, rh, ctx->theme.bg);
 
 	int32_t bx = rx + 2;
 	for(uint32_t i = 0; i < ctx->widget_count; ++i) {

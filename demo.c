@@ -118,7 +118,7 @@ int main(void) {
 	struct mkgui_widget widgets[] = {
 		{ MKGUI_WINDOW,   ID_WINDOW,    "mkgui demo",       "",  0,           0,  0, 1000, 700, 0 },
 
-		{ MKGUI_MENU,     ID_MENU,      "",                  "", ID_WINDOW,   0,  0,  0, MKGUI_MENU_HEIGHT, MKGUI_ANCHOR_LEFT | MKGUI_ANCHOR_TOP | MKGUI_ANCHOR_RIGHT },
+		{ MKGUI_MENU,     ID_MENU,      "",                  "", ID_WINDOW,   0, 0, 0, 0, 0 },
 		{ MKGUI_MENUITEM, ID_FILE_MENU, "File",              "", ID_MENU,     0,  0,  0,  0, 0 },
 		{ MKGUI_MENUITEM, ID_EDIT_MENU, "Edit",              "", ID_MENU,     0,  0,  0,  0, 0 },
 		{ MKGUI_MENUITEM, ID_VIEW_MENU, "View",              "", ID_MENU,     0,  0,  0,  0, 0 },
@@ -139,12 +139,12 @@ int main(void) {
 		{ MKGUI_MENUITEM, ID_VIEW_LARGE,"Large",             "",             ID_VIEW_MENU,0,  0,  0,  0, MKGUI_MENU_RADIO },
 		{ MKGUI_MENUITEM, ID_HELP_ABOUT,"About",             "information",  ID_HELP_MENU,0,  0,  0,  0, 0 },
 
-		{ MKGUI_TOOLBAR,  ID_TOOLBAR,   "",                  "", ID_WINDOW,   0, MKGUI_MENU_HEIGHT, 0, MKGUI_TOOLBAR_HEIGHT, MKGUI_ANCHOR_LEFT | MKGUI_ANCHOR_TOP | MKGUI_ANCHOR_RIGHT },
+		{ MKGUI_TOOLBAR,  ID_TOOLBAR,   "",                  "", ID_WINDOW,   0, 0, 0, 0, 0 },
 		{ MKGUI_BUTTON,   ID_TB_NEW,    "New",               "file-plus",  ID_TOOLBAR,  0,  0,  0,  0, 0 },
 		{ MKGUI_BUTTON,   ID_TB_OPEN,   "Open",              "folder-open", ID_TOOLBAR,  0,  0,  0,  0, MKGUI_TOOLBAR_SEP },
 		{ MKGUI_BUTTON,   ID_TB_SAVE,   "Save",              "content-save", ID_TOOLBAR,  0,  0,  0,  0, 0 },
 
-		{ MKGUI_TABS,     ID_TABS,      "",                  "", ID_WINDOW,   0, MKGUI_MENU_HEIGHT + MKGUI_TOOLBAR_HEIGHT, 0, MKGUI_STATUSBAR_HEIGHT, MKGUI_ANCHOR_LEFT | MKGUI_ANCHOR_TOP | MKGUI_ANCHOR_RIGHT | MKGUI_ANCHOR_BOTTOM },
+		{ MKGUI_TABS,     ID_TABS,      "",                  "", ID_WINDOW,   0, 0, 0, 0, MKGUI_ANCHOR_LEFT | MKGUI_ANCHOR_TOP | MKGUI_ANCHOR_RIGHT | MKGUI_ANCHOR_BOTTOM },
 		{ MKGUI_TAB,      ID_TAB1,      "General",           "cog",       ID_TABS, 0, 0, 0, 0, 0 },
 		{ MKGUI_TAB,      ID_TAB3,      "Tree / Text",       "folder",    ID_TABS, 0, 0, 0, 0, 0 },
 		{ MKGUI_TAB,      ID_TAB4,      "Listview",          "view-list", ID_TABS, 0, 0, 0, 0, 0 },
@@ -234,7 +234,7 @@ int main(void) {
 		{ MKGUI_LABEL,    ID_GL_LBL,    "OpenGL:",           "", ID_TAB6_RVBOX, 0, 0, 0, 20, 0 },
 		{ MKGUI_GLVIEW,   ID_GLVIEW1,   "",                  "", ID_TAB6_RVBOX, 0, 0, 0, 0, MKGUI_PANEL_BORDER },
 
-		{ MKGUI_STATUSBAR, ID_STATUSBAR, "Ready",            "", ID_WINDOW, 0, 0, 0, MKGUI_STATUSBAR_HEIGHT, MKGUI_ANCHOR_LEFT | MKGUI_ANCHOR_BOTTOM | MKGUI_ANCHOR_RIGHT },
+		{ MKGUI_STATUSBAR, ID_STATUSBAR, "Ready",            "", ID_WINDOW, 0, 0, 0, 0, 0 },
 	};
 
 	uint32_t widget_count = sizeof(widgets) / sizeof(widgets[0]);

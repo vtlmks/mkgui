@@ -128,14 +128,15 @@ Widget `x, y, w, h` are interpreted differently depending on anchor flags:
 Combine horizontal and vertical anchors freely. Common patterns:
 
 ```c
-// Menu bar: fill width, fixed height at top
-{ MKGUI_MENU, ..., "", "", 0, 0, 0, 22, MKGUI_ANCHOR_LEFT | MKGUI_ANCHOR_TOP | MKGUI_ANCHOR_RIGHT }
+// Menu, toolbar, and statusbar are auto-positioned by the layout engine.
+// No anchors or offsets needed -- just parent them to the window:
+{ MKGUI_MENU,      ID_MENU, "",  "", ID_WINDOW, 0, 0, 0, 0, 0 },
+{ MKGUI_TOOLBAR,   ID_TB,   "",  "", ID_WINDOW, 0, 0, 0, 0, 0 },
+{ MKGUI_STATUSBAR, ID_SB,   "",  "", ID_WINDOW, 0, 0, 0, 0, 0 },
 
-// Status bar: fill width, fixed height at bottom
-{ MKGUI_STATUSBAR, ..., "", "", 0, 0, 0, 22, MKGUI_ANCHOR_LEFT | MKGUI_ANCHOR_BOTTOM | MKGUI_ANCHOR_RIGHT }
-
-// Fill remaining area (below menu+toolbar, above statusbar)
-{ MKGUI_TABS, ..., "", "", 0, 50, 0, 22, MKGUI_ANCHOR_LEFT | MKGUI_ANCHOR_TOP | MKGUI_ANCHOR_RIGHT | MKGUI_ANCHOR_BOTTOM }
+// Other children of the window get the remaining content area automatically:
+{ MKGUI_TABS, ID_TABS, "", "", ID_WINDOW, 0, 0, 0, 0,
+  MKGUI_ANCHOR_LEFT | MKGUI_ANCHOR_TOP | MKGUI_ANCHOR_RIGHT | MKGUI_ANCHOR_BOTTOM }
 ```
 
 ## Flags
@@ -698,6 +699,17 @@ glXSwapBuffers(dpy, win);
 ```
 
 mkgui does not link against OpenGL. The user brings their own GL loader and context creation. The widget automatically repositions/resizes the child window when the layout changes (e.g. window resize, tab switch). GL animations should use `ctx->anim_time` (wall-clock seconds) for time-based motion rather than per-frame increments.
+
+## Window chrome auto-layout
+
+When a `MKGUI_WINDOW` has menu, toolbar, or statusbar children, the layout engine automatically positions them and reserves their space:
+
+- **Menu** -- placed at the very top, full window width
+- **Toolbar** -- placed below the menu, full window width
+- **Statusbar** -- placed at the very bottom, full window width
+- **All other children** -- positioned in the remaining content area between toolbar and statusbar
+
+No anchor flags or manual offsets are needed on menu, toolbar, or statusbar widgets. Simply parent them to the window with zero position/size/flags. The content area is computed automatically.
 
 ## Auto-layout containers
 

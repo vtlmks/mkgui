@@ -39,6 +39,9 @@
 #define MKGUI_GLYPH_COUNT    (MKGUI_GLYPH_LAST - MKGUI_GLYPH_FIRST + 1)
 #define MKGUI_GLYPH_MAX_BMP  1024
 
+#define MKGUI_TOOLBAR_HEIGHT  28
+#define MKGUI_STATUSBAR_HEIGHT 22
+
 #define MKGUI_ICON_SIZE       18
 #define MKGUI_ICON_PIXELS     (MKGUI_ICON_SIZE * MKGUI_ICON_SIZE)
 #define MKGUI_MAX_ICONS       2048
@@ -1665,6 +1668,40 @@ static void layout_node(struct mkgui_ctx *ctx, int32_t idx) {
 	int32_t pw = ctx->rects[idx].w;
 	int32_t ph = ctx->rects[idx].h;
 
+	if(w->type == MKGUI_WINDOW) {
+		int32_t top_y = py;
+		int32_t bot_y = py + ph;
+		for(int32_t c = layout_first_child[idx]; c >= 0; c = layout_next_sibling[c]) {
+			if(ctx->widgets[c].type == MKGUI_MENU) {
+				ctx->rects[c].x = px;
+				ctx->rects[c].y = top_y;
+				ctx->rects[c].w = pw;
+				ctx->rects[c].h = MKGUI_MENU_HEIGHT;
+				top_y += MKGUI_MENU_HEIGHT;
+			}
+		}
+		for(int32_t c = layout_first_child[idx]; c >= 0; c = layout_next_sibling[c]) {
+			if(ctx->widgets[c].type == MKGUI_TOOLBAR) {
+				ctx->rects[c].x = px;
+				ctx->rects[c].y = top_y;
+				ctx->rects[c].w = pw;
+				ctx->rects[c].h = MKGUI_TOOLBAR_HEIGHT;
+				top_y += MKGUI_TOOLBAR_HEIGHT;
+			}
+		}
+		for(int32_t c = layout_first_child[idx]; c >= 0; c = layout_next_sibling[c]) {
+			if(ctx->widgets[c].type == MKGUI_STATUSBAR) {
+				bot_y -= MKGUI_STATUSBAR_HEIGHT;
+				ctx->rects[c].x = px;
+				ctx->rects[c].y = bot_y;
+				ctx->rects[c].w = pw;
+				ctx->rects[c].h = MKGUI_STATUSBAR_HEIGHT;
+			}
+		}
+		py = top_y;
+		ph = bot_y - top_y;
+	}
+
 	if(w->type == MKGUI_TAB) {
 		px += 2;
 		py += MKGUI_TAB_HEIGHT + 2;
@@ -1836,11 +1873,39 @@ static void layout_node(struct mkgui_ctx *ctx, int32_t idx) {
 			}
 		}
 
+	} else if(w->type == MKGUI_TOOLBAR) {
+		int32_t bx = px + 2;
+		for(int32_t c = layout_first_child[idx]; c >= 0; c = layout_next_sibling[c]) {
+			struct mkgui_widget *btn = &ctx->widgets[c];
+			if(btn->type != MKGUI_BUTTON) {
+				continue;
+			}
+			if(btn->flags & MKGUI_TOOLBAR_SEP) {
+				bx += 8;
+			}
+			int32_t tw = text_width(ctx, btn->label);
+			int32_t icon_w = btn->icon[0] ? 22 : 0;
+			int32_t btn_w = icon_w + tw + 12;
+			if(btn_w < 28) {
+				btn_w = 28;
+			}
+			ctx->rects[c].x = bx;
+			ctx->rects[c].y = py + 2;
+			ctx->rects[c].w = btn_w;
+			ctx->rects[c].h = ph - 4;
+			bx += btn_w + 2;
+		}
+
 	} else {
 		for(int32_t c = layout_first_child[idx]; c >= 0; c = layout_next_sibling[c]) {
-			if(ctx->widgets[c].type != MKGUI_MENUITEM && !(ctx->widgets[c].flags & MKGUI_HIDDEN)) {
-				layout_child_area(ctx, idx, c, px, py, pw, ph);
+			uint32_t ct = ctx->widgets[c].type;
+			if(ct == MKGUI_MENUITEM || (ctx->widgets[c].flags & MKGUI_HIDDEN)) {
+				continue;
 			}
+			if(w->type == MKGUI_WINDOW && (ct == MKGUI_MENU || ct == MKGUI_TOOLBAR || ct == MKGUI_STATUSBAR)) {
+				continue;
+			}
+			layout_child_area(ctx, idx, c, px, py, pw, ph);
 		}
 	}
 
