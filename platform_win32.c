@@ -2,40 +2,28 @@
 // SPDX-License-Identifier: MIT
 
 // ---------------------------------------------------------------------------
-// Event queue
+// Per-ctx event queue helpers
 // ---------------------------------------------------------------------------
 
-#define MKGUI_EVQ_SIZE 256
-
-static struct mkgui_plat_event evq_buf[MKGUI_EVQ_SIZE];
-static uint32_t evq_head;
-static uint32_t evq_tail;
-
-// [=]===^=[ evq_push ]============================================[=]
-static void evq_push(struct mkgui_plat_event *pev) {
-	uint32_t next = (evq_head + 1) % MKGUI_EVQ_SIZE;
-	if(next == evq_tail) {
+// [=]===^=[ evq_push_ctx ]========================================[=]
+static void evq_push_ctx(struct mkgui_platform *plat, struct mkgui_plat_event *pev) {
+	uint32_t next = (plat->evq_head + 1) % MKGUI_EVQ_SIZE;
+	if(next == plat->evq_tail) {
 		return;
 	}
-	evq_buf[evq_head] = *pev;
-	evq_head = next;
+	plat->evq_buf[plat->evq_head] = *pev;
+	plat->evq_head = next;
 }
 
-// [=]===^=[ evq_pop ]=============================================[=]
-static uint32_t evq_pop(struct mkgui_plat_event *pev) {
-	if(evq_head == evq_tail) {
+// [=]===^=[ evq_pop_ctx ]=========================================[=]
+static uint32_t evq_pop_ctx(struct mkgui_platform *plat, struct mkgui_plat_event *pev) {
+	if(plat->evq_head == plat->evq_tail) {
 		return 0;
 	}
-	*pev = evq_buf[evq_tail];
-	evq_tail = (evq_tail + 1) % MKGUI_EVQ_SIZE;
+	*pev = plat->evq_buf[plat->evq_tail];
+	plat->evq_tail = (plat->evq_tail + 1) % MKGUI_EVQ_SIZE;
 	return 1;
 }
-
-// ---------------------------------------------------------------------------
-// Active context tracking
-// ---------------------------------------------------------------------------
-
-static struct mkgui_ctx *win32_active_ctx;
 
 // ---------------------------------------------------------------------------
 // Key translation
@@ -81,48 +69,36 @@ static uint32_t platform_get_keymod(void) {
 // WndProc
 // ---------------------------------------------------------------------------
 
-// [=]===^=[ wndproc_identify_window ]==============================[=]
-static int32_t wndproc_identify_window(HWND hwnd) {
-	if(!win32_active_ctx) {
-		return -2;
-	}
-	if(hwnd == win32_active_ctx->plat.hwnd) {
-		return -1;
-	}
-	for(uint32_t i = 0; i < win32_active_ctx->popup_count; ++i) {
-		if(win32_active_ctx->popups[i].plat.hwnd == hwnd) {
-			return (int32_t)i;
+// [=]===^=[ wndproc_find_owner ]===================================[=]
+static struct mkgui_ctx *wndproc_find_owner(HWND hwnd, int32_t *popup_idx) {
+	*popup_idx = -1;
+	for(uint32_t i = 0; i < window_registry_count; ++i) {
+		struct mkgui_ctx *c = window_registry[i];
+		if(c->plat.hwnd == hwnd) {
+			return c;
+		}
+		for(uint32_t p = 0; p < c->popup_count; ++p) {
+			if(c->popups[p].plat.hwnd == hwnd) {
+				*popup_idx = (int32_t)p;
+				return c;
+			}
 		}
 	}
-	if(win32_active_ctx->parent && hwnd == win32_active_ctx->parent->plat.hwnd) {
-		return -3;
-	}
-	return -2;
+	return NULL;
 }
 
 // [=]===^=[ mkgui_wndproc ]=======================================[=]
 static LRESULT CALLBACK mkgui_wndproc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
-	int32_t wid = wndproc_identify_window(hwnd);
+	int32_t popup_idx = -1;
+	struct mkgui_ctx *owner = wndproc_find_owner(hwnd, &popup_idx);
 
-	if(wid == -3) {
-		if(msg == WM_PAINT) {
-			PAINTSTRUCT ps;
-			BeginPaint(hwnd, &ps);
-			EndPaint(hwnd, &ps);
-			win32_active_ctx->parent->dirty = 1;
-			win32_active_ctx->parent->dirty_full = 1;
-			return 0;
-		}
-		return DefWindowProcA(hwnd, msg, wp, lp);
-	}
-
-	if(wid == -2) {
+	if(!owner) {
 		return DefWindowProcA(hwnd, msg, wp, lp);
 	}
 
 	struct mkgui_plat_event pev;
 	memset(&pev, 0, sizeof(pev));
-	pev.popup_idx = wid;
+	pev.popup_idx = popup_idx;
 
 	switch(msg) {
 		case WM_PAINT: {
@@ -130,7 +106,7 @@ static LRESULT CALLBACK mkgui_wndproc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 			BeginPaint(hwnd, &ps);
 			EndPaint(hwnd, &ps);
 			pev.type = MKGUI_PLAT_EXPOSE;
-			evq_push(&pev);
+			evq_push_ctx(&owner->plat, &pev);
 			return 0;
 		} break;
 
@@ -139,7 +115,7 @@ static LRESULT CALLBACK mkgui_wndproc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 				pev.type = MKGUI_PLAT_RESIZE;
 				pev.width = LOWORD(lp);
 				pev.height = HIWORD(lp);
-				evq_push(&pev);
+				evq_push_ctx(&owner->plat, &pev);
 			}
 			return 0;
 		} break;
@@ -148,7 +124,7 @@ static LRESULT CALLBACK mkgui_wndproc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 			pev.type = MKGUI_PLAT_MOTION;
 			pev.x = (int16_t)LOWORD(lp);
 			pev.y = (int16_t)HIWORD(lp);
-			evq_push(&pev);
+			evq_push_ctx(&owner->plat, &pev);
 			return 0;
 		} break;
 
@@ -157,7 +133,8 @@ static LRESULT CALLBACK mkgui_wndproc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 			pev.x = (int16_t)LOWORD(lp);
 			pev.y = (int16_t)HIWORD(lp);
 			pev.button = 1;
-			evq_push(&pev);
+			pev.keymod = platform_get_keymod();
+			evq_push_ctx(&owner->plat, &pev);
 			SetCapture(hwnd);
 			return 0;
 		} break;
@@ -167,7 +144,7 @@ static LRESULT CALLBACK mkgui_wndproc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 			pev.x = (int16_t)LOWORD(lp);
 			pev.y = (int16_t)HIWORD(lp);
 			pev.button = 1;
-			evq_push(&pev);
+			evq_push_ctx(&owner->plat, &pev);
 			ReleaseCapture();
 			return 0;
 		} break;
@@ -177,7 +154,7 @@ static LRESULT CALLBACK mkgui_wndproc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 			pev.x = (int16_t)LOWORD(lp);
 			pev.y = (int16_t)HIWORD(lp);
 			pev.button = 3;
-			evq_push(&pev);
+			evq_push_ctx(&owner->plat, &pev);
 			return 0;
 		} break;
 
@@ -186,7 +163,7 @@ static LRESULT CALLBACK mkgui_wndproc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 			pev.x = (int16_t)LOWORD(lp);
 			pev.y = (int16_t)HIWORD(lp);
 			pev.button = 3;
-			evq_push(&pev);
+			evq_push_ctx(&owner->plat, &pev);
 			return 0;
 		} break;
 
@@ -198,9 +175,9 @@ static LRESULT CALLBACK mkgui_wndproc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 			pev.x = pt.x;
 			pev.y = pt.y;
 			pev.button = delta > 0 ? 4 : 5;
-			evq_push(&pev);
+			evq_push_ctx(&owner->plat, &pev);
 			pev.type = MKGUI_PLAT_BUTTON_RELEASE;
-			evq_push(&pev);
+			evq_push_ctx(&owner->plat, &pev);
 			return 0;
 		} break;
 
@@ -210,7 +187,7 @@ static LRESULT CALLBACK mkgui_wndproc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 			pev.keymod = platform_get_keymod();
 			pev.text[0] = '\0';
 			pev.text_len = 0;
-			evq_push(&pev);
+			evq_push_ctx(&owner->plat, &pev);
 			return 0;
 		} break;
 
@@ -222,20 +199,20 @@ static LRESULT CALLBACK mkgui_wndproc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 				pev.text[0] = (char)wp;
 				pev.text[1] = '\0';
 				pev.text_len = 1;
-				evq_push(&pev);
+				evq_push_ctx(&owner->plat, &pev);
 			}
 			return 0;
 		} break;
 
 		case WM_CLOSE: {
 			pev.type = MKGUI_PLAT_CLOSE;
-			evq_push(&pev);
+			evq_push_ctx(&owner->plat, &pev);
 			return 0;
 		} break;
 
 		case WM_MOUSELEAVE: {
 			pev.type = MKGUI_PLAT_LEAVE;
-			evq_push(&pev);
+			evq_push_ctx(&owner->plat, &pev);
 			return 0;
 		} break;
 
@@ -329,7 +306,6 @@ static uint32_t platform_init(struct mkgui_ctx *ctx, const char *title, int32_t 
 	ShowWindow(plat->hwnd, SW_SHOW);
 	UpdateWindow(plat->hwnd);
 
-	win32_active_ctx = ctx;
 	return 1;
 }
 
@@ -366,7 +342,6 @@ static uint32_t platform_init_child(struct mkgui_ctx *ctx, struct mkgui_ctx *par
 	ShowWindow(plat->hwnd, SW_SHOW);
 	UpdateWindow(plat->hwnd);
 
-	win32_active_ctx = ctx;
 	return 1;
 }
 
@@ -377,9 +352,6 @@ static void platform_destroy(struct mkgui_ctx *ctx) {
 	if(plat->hwnd) {
 		DestroyWindow(plat->hwnd);
 		plat->hwnd = NULL;
-	}
-	if(win32_active_ctx == ctx) {
-		win32_active_ctx = NULL;
 	}
 }
 
@@ -520,18 +492,22 @@ static void platform_translate_coords(struct mkgui_ctx *ctx, int32_t lx, int32_t
 // Event translation
 // ---------------------------------------------------------------------------
 
-// [=]===^=[ platform_wait_event ]=================================[=]
-static void platform_wait_event(struct mkgui_ctx *ctx, int32_t timeout_ms) {
-	if(timeout_ms == 0 || evq_head != evq_tail) {
-		return;
-	}
-	win32_active_ctx = ctx;
+// [=]===^=[ platform_pump_messages ]===============================[=]
+static void platform_pump_messages(void) {
 	MSG msg;
 	while(PeekMessageA(&msg, NULL, 0, 0, PM_REMOVE)) {
 		TranslateMessage(&msg);
 		DispatchMessageA(&msg);
 	}
-	if(evq_head != evq_tail) {
+}
+
+// [=]===^=[ platform_wait_event ]=================================[=]
+static void platform_wait_event(struct mkgui_ctx *ctx, int32_t timeout_ms) {
+	if(timeout_ms == 0 || ctx->plat.evq_head != ctx->plat.evq_tail) {
+		return;
+	}
+	platform_pump_messages();
+	if(ctx->plat.evq_head != ctx->plat.evq_tail) {
 		return;
 	}
 	MsgWaitForMultipleObjects(0, NULL, FALSE, (DWORD)timeout_ms, QS_ALLINPUT);
@@ -539,19 +515,13 @@ static void platform_wait_event(struct mkgui_ctx *ctx, int32_t timeout_ms) {
 
 // [=]===^=[ platform_pending ]====================================[=]
 static uint32_t platform_pending(struct mkgui_ctx *ctx) {
-	win32_active_ctx = ctx;
-	MSG msg;
-	while(PeekMessageA(&msg, NULL, 0, 0, PM_REMOVE)) {
-		TranslateMessage(&msg);
-		DispatchMessageA(&msg);
-	}
-	return evq_head != evq_tail;
+	platform_pump_messages();
+	return ctx->plat.evq_head != ctx->plat.evq_tail;
 }
 
 // [=]===^=[ platform_next_event ]=================================[=]
 static void platform_next_event(struct mkgui_ctx *ctx, struct mkgui_plat_event *pev) {
-	(void)ctx;
-	if(!evq_pop(pev)) {
+	if(!evq_pop_ctx(&ctx->plat, pev)) {
 		memset(pev, 0, sizeof(*pev));
 		pev->popup_idx = -1;
 		pev->type = MKGUI_PLAT_NONE;

@@ -12,6 +12,8 @@
 #include <ft2build.h>
 #include FT_FREETYPE_H
 
+#define MKGUI_DEFERRED_SIZE 64
+
 struct mkgui_platform {
 	Display *dpy;
 	Window root;
@@ -31,6 +33,9 @@ struct mkgui_platform {
 	Cursor cursor_h_resize;
 	uint32_t cursor_active;
 	uint32_t is_child;
+	struct mkgui_plat_event deferred[MKGUI_DEFERRED_SIZE];
+	uint32_t deferred_head;
+	uint32_t deferred_tail;
 };
 
 struct mkgui_popup_platform {

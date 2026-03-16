@@ -72,14 +72,14 @@ static void demo_row_cb(uint32_t row, uint32_t col, char *buf, uint32_t buf_size
 }
 
 static const char *demo_file_names[] = {
-	"README.md", "Makefile", "main.c", "util.c", "render.c",
-	"window.c", "defs.h", "types.h", "config.h", "build.sh",
-	"test.c", "debug.c", "parser.c", "lexer.c", "codegen.c",
-	"init.c", "cleanup.c", "alloc.c", "io.c", "net.c",
-	"thread.c", "mutex.c", "queue.c", "hash.c", "list.c",
-	"sort.c", "search.c", "compress.c", "crypto.c", "base64.c",
-	"json.c", "xml.c", "csv.c", "log.c", "timer.c",
-	"signal.c", "pipe.c", "socket.c", "http.c", "tls.c",
+	"README.md", "Makefile", "main.c", "util.h", "render.cpp",
+	"build.sh", "style.css", "index.html", "app.js", "config.json",
+	"data.xml", "report.pdf", "photo.jpg", "logo.png", "banner.gif",
+	"diagram.svg", "movie.mp4", "clip.avi", "song.mp3", "alert.wav",
+	"backup.zip", "source.tar.gz", "notes.txt", "slides.pptx", "budget.xlsx",
+	"letter.docx", "records.csv", "schema.sql", "server.py", "main.rs",
+	"hello.go", "App.java", "gem.rb", "init.lua", "test.ts",
+	"math.f90", "stats.r", "page.php", "Cargo.toml", "Dockerfile",
 };
 #define DEMO_FILE_COUNT (sizeof(demo_file_names) / sizeof(demo_file_names[0]))
 
@@ -97,20 +97,84 @@ static void demo_itemview_label(uint32_t item, char *buf, uint32_t buf_size, voi
 static void demo_itemview_icon(uint32_t item, char *buf, uint32_t buf_size, void *userdata) {
 	(void)userdata;
 	const char *name = item < DEMO_FILE_COUNT ? demo_file_names[item] : "file.dat";
-	uint32_t len = (uint32_t)strlen(name);
-	if(len > 2 && name[len - 2] == '.' && name[len - 1] == 'c') {
-		snprintf(buf, buf_size, "language-c");
-	} else if(len > 2 && name[len - 2] == '.' && name[len - 1] == 'h') {
-		snprintf(buf, buf_size, "language-c");
-	} else if(len > 3 && strcmp(name + len - 3, ".md") == 0) {
-		snprintf(buf, buf_size, "file-document");
-	} else if(len > 3 && strcmp(name + len - 3, ".sh") == 0) {
-		snprintf(buf, buf_size, "script-text");
-	} else if(strcmp(name, "Makefile") == 0) {
-		snprintf(buf, buf_size, "file-cog");
-	} else {
-		snprintf(buf, buf_size, "file-document-outline");
+	const char *dot = strrchr(name, '.');
+	const char *icon = "file-document-outline";
+	if(strcmp(name, "Makefile") == 0 || strcmp(name, "Dockerfile") == 0) {
+		icon = "file-cog";
+	} else if(dot) {
+		if(strcmp(dot, ".c") == 0 || strcmp(dot, ".h") == 0) {
+			icon = "language-c";
+		} else if(strcmp(dot, ".cpp") == 0 || strcmp(dot, ".hpp") == 0) {
+			icon = "language-cpp";
+		} else if(strcmp(dot, ".py") == 0) {
+			icon = "language-python";
+		} else if(strcmp(dot, ".rs") == 0) {
+			icon = "language-rust";
+		} else if(strcmp(dot, ".go") == 0) {
+			icon = "language-go";
+		} else if(strcmp(dot, ".java") == 0) {
+			icon = "language-java";
+		} else if(strcmp(dot, ".js") == 0) {
+			icon = "language-javascript";
+		} else if(strcmp(dot, ".ts") == 0) {
+			icon = "language-typescript";
+		} else if(strcmp(dot, ".rb") == 0) {
+			icon = "language-ruby";
+		} else if(strcmp(dot, ".lua") == 0) {
+			icon = "language-lua";
+		} else if(strcmp(dot, ".php") == 0) {
+			icon = "language-php";
+		} else if(strcmp(dot, ".r") == 0) {
+			icon = "language-r";
+		} else if(strcmp(dot, ".f90") == 0) {
+			icon = "language-fortran";
+		} else if(strcmp(dot, ".swift") == 0) {
+			icon = "language-swift";
+		} else if(strcmp(dot, ".kt") == 0) {
+			icon = "language-kotlin";
+		} else if(strcmp(dot, ".cs") == 0) {
+			icon = "language-csharp";
+		} else if(strcmp(dot, ".css") == 0) {
+			icon = "language-css3";
+		} else if(strcmp(dot, ".html") == 0 || strcmp(dot, ".htm") == 0) {
+			icon = "language-html5";
+		} else if(strcmp(dot, ".md") == 0) {
+			icon = "language-markdown";
+		} else if(strcmp(dot, ".json") == 0 || strcmp(dot, ".toml") == 0) {
+			icon = "code-json";
+		} else if(strcmp(dot, ".xml") == 0) {
+			icon = "xml";
+		} else if(strcmp(dot, ".sh") == 0) {
+			icon = "script-text";
+		} else if(strcmp(dot, ".sql") == 0) {
+			icon = "database";
+		} else if(strcmp(dot, ".pdf") == 0) {
+			icon = "file-pdf-box";
+		} else if(strcmp(dot, ".jpg") == 0 || strcmp(dot, ".jpeg") == 0) {
+			icon = "file-jpg-box";
+		} else if(strcmp(dot, ".png") == 0) {
+			icon = "file-png-box";
+		} else if(strcmp(dot, ".gif") == 0) {
+			icon = "file-gif-box";
+		} else if(strcmp(dot, ".svg") == 0 || strcmp(dot, ".bmp") == 0) {
+			icon = "file-image";
+		} else if(strcmp(dot, ".mp4") == 0 || strcmp(dot, ".avi") == 0 || strcmp(dot, ".mkv") == 0) {
+			icon = "file-video";
+		} else if(strcmp(dot, ".mp3") == 0 || strcmp(dot, ".wav") == 0 || strcmp(dot, ".ogg") == 0 || strcmp(dot, ".flac") == 0) {
+			icon = "file-music";
+		} else if(strcmp(dot, ".zip") == 0 || strcmp(dot, ".gz") == 0 || strcmp(dot, ".7z") == 0) {
+			icon = "folder-zip";
+		} else if(strcmp(dot, ".xlsx") == 0 || strcmp(dot, ".xls") == 0 || strcmp(dot, ".csv") == 0) {
+			icon = "file-excel";
+		} else if(strcmp(dot, ".docx") == 0 || strcmp(dot, ".doc") == 0) {
+			icon = "file-word";
+		} else if(strcmp(dot, ".pptx") == 0 || strcmp(dot, ".ppt") == 0) {
+			icon = "file-powerpoint";
+		} else if(strcmp(dot, ".txt") == 0 || strcmp(dot, ".log") == 0) {
+			icon = "file-document-outline";
+		}
 	}
+	snprintf(buf, buf_size, "%s", icon);
 }
 
 // [=]===^=[ main ]==============================================[=]
@@ -532,6 +596,7 @@ int main(void) {
 				}
 		}
 
+		mkgui_wait(ctx);
 	}
 
 #ifdef _WIN32

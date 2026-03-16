@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 //
 // Generates mdi_icons.dat from the MDI TTF font.
-// Usage: gen_icons <ttf_path> <icon_size> <output.dat>
+// Usage: gen_icons <ttf_path> <icon_size> <output.dat> [subset.txt]
 
 #include <stdint.h>
 #include <stdio.h>
@@ -12,6 +12,8 @@
 #include FT_FREETYPE_H
 
 #include "../ext/mdi_icons.h"
+
+#define MAX_SUBSET 4096
 
 // [=]===^=[ render_glyph ]===========================================[=]
 static uint32_t render_glyph(FT_Face face, uint32_t codepoint, uint8_t *dst, uint32_t size) {
@@ -51,21 +53,96 @@ static uint32_t render_glyph(FT_Face face, uint32_t codepoint, uint8_t *dst, uin
 	return 1;
 }
 
+// [=]===^=[ load_subset ]===============================================[=]
+static uint32_t load_subset(const char *path, uint32_t *indices, uint32_t max_count) {
+	FILE *fp = fopen(path, "r");
+	if(!fp) {
+		fprintf(stderr, "cannot open subset file: %s\n", path);
+		return 0;
+	}
+
+	uint32_t count = 0;
+	char line[256];
+	while(fgets(line, sizeof(line), fp)) {
+		char *p = line;
+		while(*p == ' ' || *p == '\t') {
+			++p;
+		}
+		if(*p == '#' || *p == '\n' || *p == '\0') {
+			continue;
+		}
+		char *end = p + strlen(p) - 1;
+		while(end > p && (*end == '\n' || *end == '\r' || *end == ' ' || *end == '\t')) {
+			*end-- = '\0';
+		}
+		if(*p == '\0') {
+			continue;
+		}
+		uint32_t found = 0;
+		for(uint32_t i = 0; i < MDI_ICON_COUNT; ++i) {
+			if(strcmp(mdi_icons[i].name, p) == 0) {
+				if(count < max_count) {
+					indices[count++] = i;
+				}
+				found = 1;
+				break;
+			}
+		}
+		if(!found) {
+			fprintf(stderr, "warning: icon not found: %s\n", p);
+		}
+	}
+
+	fclose(fp);
+
+	for(uint32_t i = 1; i < count; ++i) {
+		uint32_t key = indices[i];
+		uint32_t j = i;
+		while(j > 0 && indices[j - 1] > key) {
+			indices[j] = indices[j - 1];
+			--j;
+		}
+		indices[j] = key;
+	}
+
+	uint32_t deduped = 0;
+	for(uint32_t i = 0; i < count; ++i) {
+		if(deduped == 0 || indices[i] != indices[deduped - 1]) {
+			indices[deduped++] = indices[i];
+		}
+	}
+
+	return deduped;
+}
+
 // [=]===^=[ main ]====================================================[=]
 int main(int argc, char **argv) {
-	if(argc != 4) {
-		fprintf(stderr, "usage: gen_icons <ttf_path> <icon_size> <output.dat>\n");
+	if(argc < 4 || argc > 5) {
+		fprintf(stderr, "usage: gen_icons <ttf_path> <icon_size> <output.dat> [subset.txt]\n");
 		return 1;
 	}
 
 	const char *ttf_path = argv[1];
 	uint32_t icon_size = (uint32_t)atoi(argv[2]);
 	const char *out_path = argv[3];
+	const char *subset_path = argc > 4 ? argv[4] : NULL;
 
 	if(icon_size < 8 || icon_size > 64) {
 		fprintf(stderr, "icon_size must be 8-64\n");
 		return 1;
 	}
+
+	uint32_t subset_indices[MAX_SUBSET];
+	uint32_t subset_count = 0;
+	if(subset_path) {
+		subset_count = load_subset(subset_path, subset_indices, MAX_SUBSET);
+		if(subset_count == 0) {
+			fprintf(stderr, "subset file empty or failed to load\n");
+			return 1;
+		}
+	}
+
+	uint32_t icon_count = subset_count > 0 ? subset_count : MDI_ICON_COUNT;
 
 	FT_Library ft;
 	FT_Face face;
@@ -80,8 +157,9 @@ int main(int argc, char **argv) {
 	FT_Set_Pixel_Sizes(face, 0, icon_size);
 
 	uint32_t name_block_size = 0;
-	for(uint32_t i = 0; i < MDI_ICON_COUNT; ++i) {
-		name_block_size += (uint32_t)strlen(mdi_icons[i].name) + 1;
+	for(uint32_t i = 0; i < icon_count; ++i) {
+		uint32_t idx = subset_count > 0 ? subset_indices[i] : i;
+		name_block_size += (uint32_t)strlen(mdi_icons[idx].name) + 1;
 	}
 	uint32_t name_block_padded = (name_block_size + 3) & ~3u;
 
@@ -94,17 +172,18 @@ int main(int argc, char **argv) {
 	// header: magic + icon_size + icon_count
 	fwrite("MKIC", 1, 4, fp);
 	uint16_t sz = (uint16_t)icon_size;
-	uint16_t cnt = (uint16_t)MDI_ICON_COUNT;
+	uint16_t cnt = (uint16_t)icon_count;
 	fwrite(&sz, 2, 1, fp);
 	fwrite(&cnt, 2, 1, fp);
 
 	// name block (packed null-terminated strings, sorted)
-	uint32_t *name_offsets = calloc(MDI_ICON_COUNT, sizeof(uint32_t));
+	uint32_t *name_offsets = calloc(icon_count, sizeof(uint32_t));
 	uint32_t off = 0;
-	for(uint32_t i = 0; i < MDI_ICON_COUNT; ++i) {
+	for(uint32_t i = 0; i < icon_count; ++i) {
+		uint32_t idx = subset_count > 0 ? subset_indices[i] : i;
 		name_offsets[i] = off;
-		uint32_t len = (uint32_t)strlen(mdi_icons[i].name) + 1;
-		fwrite(mdi_icons[i].name, 1, len, fp);
+		uint32_t len = (uint32_t)strlen(mdi_icons[idx].name) + 1;
+		fwrite(mdi_icons[idx].name, 1, len, fp);
 		off += len;
 	}
 	// pad to 4-byte boundary
@@ -114,7 +193,7 @@ int main(int argc, char **argv) {
 	}
 
 	// name offset table
-	fwrite(name_offsets, sizeof(uint32_t), MDI_ICON_COUNT, fp);
+	fwrite(name_offsets, sizeof(uint32_t), icon_count, fp);
 
 	// pixel data: 8bpp alpha bitmaps
 	uint32_t pixel_count = icon_size * icon_size;
@@ -122,9 +201,10 @@ int main(int argc, char **argv) {
 	uint32_t rendered = 0;
 	uint32_t failed = 0;
 
-	for(uint32_t i = 0; i < MDI_ICON_COUNT; ++i) {
+	for(uint32_t i = 0; i < icon_count; ++i) {
+		uint32_t idx = subset_count > 0 ? subset_indices[i] : i;
 		memset(buf, 0, pixel_count);
-		if(render_glyph(face, mdi_icons[i].codepoint, buf, icon_size)) {
+		if(render_glyph(face, mdi_icons[idx].codepoint, buf, icon_size)) {
 			++rendered;
 		} else {
 			++failed;

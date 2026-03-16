@@ -163,6 +163,7 @@ static uint32_t mkgui_icon_browser(struct mkgui_ctx *ctx, char *out, uint32_t ou
 				default: break;
 			}
 		}
+		mkgui_wait(dlg);
 	}
 
 	mkgui_destroy_child(dlg);

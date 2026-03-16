@@ -54,6 +54,7 @@ static int32_t dlg_run(struct mkgui_ctx *parent, struct mkgui_widget *widgets, u
 				default: break;
 			}
 		}
+		mkgui_wait(dlg);
 	}
 
 	mkgui_destroy_child(dlg);
@@ -165,6 +166,7 @@ static uint32_t mkgui_input_dialog(struct mkgui_ctx *ctx, const char *title, con
 				default: break;
 			}
 		}
+		mkgui_wait(dlg);
 	}
 
 	if(result) {

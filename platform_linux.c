@@ -296,8 +296,31 @@ static void platform_wait_event(struct mkgui_ctx *ctx, int32_t timeout_ms) {
 	}
 }
 
+// [=]===^=[ platform_deferred_push ]==============================[=]
+static void platform_deferred_push(struct mkgui_ctx *ctx, struct mkgui_plat_event *pev) {
+	uint32_t next = (ctx->plat.deferred_head + 1) % MKGUI_DEFERRED_SIZE;
+	if(next == ctx->plat.deferred_tail) {
+		return;
+	}
+	ctx->plat.deferred[ctx->plat.deferred_head] = *pev;
+	ctx->plat.deferred_head = next;
+}
+
+// [=]===^=[ platform_deferred_pop ]===============================[=]
+static uint32_t platform_deferred_pop(struct mkgui_ctx *ctx, struct mkgui_plat_event *pev) {
+	if(ctx->plat.deferred_head == ctx->plat.deferred_tail) {
+		return 0;
+	}
+	*pev = ctx->plat.deferred[ctx->plat.deferred_tail];
+	ctx->plat.deferred_tail = (ctx->plat.deferred_tail + 1) % MKGUI_DEFERRED_SIZE;
+	return 1;
+}
+
 // [=]===^=[ platform_pending ]====================================[=]
 static uint32_t platform_pending(struct mkgui_ctx *ctx) {
+	if(ctx->plat.deferred_head != ctx->plat.deferred_tail) {
+		return 1;
+	}
 	if(XEventsQueued(ctx->plat.dpy, QueuedAlready) > 0) {
 		return 1;
 	}
@@ -309,91 +332,57 @@ static uint32_t platform_translate_keysym(KeySym ks) {
 	return (uint32_t)ks;
 }
 
-// [=]===^=[ platform_next_event ]=================================[=]
-static void platform_next_event(struct mkgui_ctx *ctx, struct mkgui_plat_event *pev) {
-	XEvent xev;
-	XNextEvent(ctx->plat.dpy, &xev);
-
-	memset(pev, 0, sizeof(*pev));
-	pev->popup_idx = -1;
-
-	if(xev.xany.window != ctx->plat.win) {
-		for(uint32_t i = 0; i < ctx->popup_count; ++i) {
-			if(ctx->popups[i].plat.xwin == xev.xany.window) {
-				pev->popup_idx = (int32_t)i;
-				break;
-			}
-		}
-		if(pev->popup_idx < 0) {
-			if(ctx->parent && xev.xany.window == ctx->parent->plat.win) {
-				if(xev.type == Expose) {
-					ctx->parent->dirty = 1;
-					ctx->parent->dirty_full = 1;
-				} else if(xev.type == ConfigureNotify) {
-					int32_t nw = xev.xconfigure.width;
-					int32_t nh = xev.xconfigure.height;
-					if(nw != ctx->parent->win_w || nh != ctx->parent->win_h) {
-						ctx->parent->win_w = nw;
-						ctx->parent->win_h = nh;
-						platform_fb_resize(ctx->parent);
-						ctx->parent->dirty = 1;
-						ctx->parent->dirty_full = 1;
-					}
-				}
-			}
-			pev->type = MKGUI_PLAT_NONE;
-			return;
-		}
-	}
-
-	switch(xev.type) {
+// [=]===^=[ platform_translate_xevent ]===========================[=]
+static void platform_translate_xevent(struct mkgui_ctx *owner, XEvent *xev, struct mkgui_plat_event *pev) {
+	switch(xev->type) {
 		case Expose: {
 			pev->type = MKGUI_PLAT_EXPOSE;
 		} break;
 
 		case ConfigureNotify: {
-			if(xev.xconfigure.window == ctx->plat.win) {
+			if(xev->xconfigure.window == owner->plat.win) {
 				pev->type = MKGUI_PLAT_RESIZE;
-				pev->width = xev.xconfigure.width;
-				pev->height = xev.xconfigure.height;
+				pev->width = xev->xconfigure.width;
+				pev->height = xev->xconfigure.height;
 			}
 		} break;
 
 		case MotionNotify: {
 			pev->type = MKGUI_PLAT_MOTION;
-			pev->x = xev.xmotion.x;
-			pev->y = xev.xmotion.y;
+			pev->x = xev->xmotion.x;
+			pev->y = xev->xmotion.y;
 		} break;
 
 		case ButtonPress: {
 			pev->type = MKGUI_PLAT_BUTTON_PRESS;
-			pev->x = xev.xbutton.x;
-			pev->y = xev.xbutton.y;
-			pev->button = xev.xbutton.button;
+			pev->x = xev->xbutton.x;
+			pev->y = xev->xbutton.y;
+			pev->button = xev->xbutton.button;
+			pev->keymod = xev->xbutton.state;
 		} break;
 
 		case ButtonRelease: {
 			pev->type = MKGUI_PLAT_BUTTON_RELEASE;
-			pev->x = xev.xbutton.x;
-			pev->y = xev.xbutton.y;
-			pev->button = xev.xbutton.button;
+			pev->x = xev->xbutton.x;
+			pev->y = xev->xbutton.y;
+			pev->button = xev->xbutton.button;
 		} break;
 
 		case KeyPress: {
 			char buf[32];
 			KeySym ks;
-			int32_t len = XLookupString(&xev.xkey, buf, sizeof(buf) - 1, &ks, NULL);
+			int32_t len = XLookupString(&xev->xkey, buf, sizeof(buf) - 1, &ks, NULL);
 			buf[len] = '\0';
 
 			pev->type = MKGUI_PLAT_KEY;
 			pev->keysym = platform_translate_keysym(ks);
-			pev->keymod = xev.xkey.state;
+			pev->keymod = xev->xkey.state;
 			memcpy(pev->text, buf, (uint32_t)(len + 1));
 			pev->text_len = len;
 		} break;
 
 		case ClientMessage: {
-			if((Atom)xev.xclient.data.l[0] == ctx->plat.wm_delete) {
+			if((Atom)xev->xclient.data.l[0] == owner->plat.wm_delete) {
 				pev->type = MKGUI_PLAT_CLOSE;
 			}
 		} break;
@@ -403,7 +392,7 @@ static void platform_next_event(struct mkgui_ctx *ctx, struct mkgui_plat_event *
 		} break;
 
 		case SelectionRequest: {
-			XSelectionRequestEvent *req = &xev.xselectionrequest;
+			XSelectionRequestEvent *req = &xev->xselectionrequest;
 			XSelectionEvent resp;
 			memset(&resp, 0, sizeof(resp));
 			resp.type = SelectionNotify;
@@ -413,19 +402,19 @@ static void platform_next_event(struct mkgui_ctx *ctx, struct mkgui_plat_event *
 			resp.time = req->time;
 			resp.property = None;
 
-			if(req->target == ctx->plat.targets) {
-				Atom supported[] = { ctx->plat.utf8_string, XA_STRING };
-				XChangeProperty(ctx->plat.dpy, req->requestor, req->property, XA_ATOM, 32,
+			if(req->target == owner->plat.targets) {
+				Atom supported[] = { owner->plat.utf8_string, XA_STRING };
+				XChangeProperty(owner->plat.dpy, req->requestor, req->property, XA_ATOM, 32,
 					PropModeReplace, (unsigned char *)supported, 2);
 				resp.property = req->property;
-			} else if(req->target == ctx->plat.utf8_string || req->target == XA_STRING) {
-				XChangeProperty(ctx->plat.dpy, req->requestor, req->property, req->target, 8,
-					PropModeReplace, (unsigned char *)ctx->clip_text, (int)ctx->clip_len);
+			} else if(req->target == owner->plat.utf8_string || req->target == XA_STRING) {
+				XChangeProperty(owner->plat.dpy, req->requestor, req->property, req->target, 8,
+					PropModeReplace, (unsigned char *)owner->clip_text, (int)owner->clip_len);
 				resp.property = req->property;
 			}
 
-			XSendEvent(ctx->plat.dpy, req->requestor, False, 0, (XEvent *)&resp);
-			XFlush(ctx->plat.dpy);
+			XSendEvent(owner->plat.dpy, req->requestor, False, 0, (XEvent *)&resp);
+			XFlush(owner->plat.dpy);
 			pev->type = MKGUI_PLAT_NONE;
 		} break;
 
@@ -437,6 +426,85 @@ static void platform_next_event(struct mkgui_ctx *ctx, struct mkgui_plat_event *
 			pev->type = MKGUI_PLAT_NONE;
 		} break;
 	}
+}
+
+// [=]===^=[ platform_find_window_owner ]==========================[=]
+static struct mkgui_ctx *platform_find_window_owner(Window xwin, int32_t *popup_idx) {
+	*popup_idx = -1;
+	for(uint32_t i = 0; i < window_registry_count; ++i) {
+		struct mkgui_ctx *c = window_registry[i];
+		if(c->plat.win == xwin) {
+			return c;
+		}
+		for(uint32_t p = 0; p < c->popup_count; ++p) {
+			if(c->popups[p].plat.xwin == xwin) {
+				*popup_idx = (int32_t)p;
+				return c;
+			}
+		}
+	}
+	return NULL;
+}
+
+// [=]===^=[ platform_next_event ]=================================[=]
+static void platform_next_event(struct mkgui_ctx *ctx, struct mkgui_plat_event *pev) {
+	memset(pev, 0, sizeof(*pev));
+	pev->popup_idx = -1;
+
+	if(platform_deferred_pop(ctx, pev)) {
+		return;
+	}
+
+	XEvent xev;
+	XNextEvent(ctx->plat.dpy, &xev);
+
+	if(xev.xany.window == ctx->plat.win) {
+		platform_translate_xevent(ctx, &xev, pev);
+		return;
+	}
+
+	for(uint32_t i = 0; i < ctx->popup_count; ++i) {
+		if(ctx->popups[i].plat.xwin == xev.xany.window) {
+			pev->popup_idx = (int32_t)i;
+			platform_translate_xevent(ctx, &xev, pev);
+			return;
+		}
+	}
+
+	if(ctx->parent && xev.xany.window == ctx->parent->plat.win) {
+		if(xev.type == Expose) {
+			ctx->parent->dirty = 1;
+			ctx->parent->dirty_full = 1;
+		} else if(xev.type == ConfigureNotify) {
+			int32_t nw = xev.xconfigure.width;
+			int32_t nh = xev.xconfigure.height;
+			if(nw != ctx->parent->win_w || nh != ctx->parent->win_h) {
+				ctx->parent->win_w = nw;
+				ctx->parent->win_h = nh;
+				platform_fb_resize(ctx->parent);
+				ctx->parent->dirty = 1;
+				ctx->parent->dirty_full = 1;
+			}
+		}
+		pev->type = MKGUI_PLAT_NONE;
+		return;
+	}
+
+	int32_t foreign_popup = -1;
+	struct mkgui_ctx *owner = platform_find_window_owner(xev.xany.window, &foreign_popup);
+	if(owner && owner != ctx) {
+		struct mkgui_plat_event foreign;
+		memset(&foreign, 0, sizeof(foreign));
+		foreign.popup_idx = foreign_popup;
+		platform_translate_xevent(owner, &xev, &foreign);
+		if(foreign.type != MKGUI_PLAT_NONE) {
+			platform_deferred_push(owner, &foreign);
+		}
+		pev->type = MKGUI_PLAT_NONE;
+		return;
+	}
+
+	pev->type = MKGUI_PLAT_NONE;
 }
 
 // ---------------------------------------------------------------------------

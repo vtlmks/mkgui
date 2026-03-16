@@ -609,6 +609,7 @@ struct mkgui_ctx {
 
 	uint32_t hover_id;
 	uint32_t press_id;
+	uint32_t press_mod;
 	uint32_t focus_id;
 	uint32_t drag_scrollbar_id;
 	int32_t drag_scrollbar_offset;
@@ -1643,8 +1644,7 @@ static void layout_child_area(struct mkgui_ctx *ctx, uint32_t pidx, uint32_t cid
 	if(w->type == MKGUI_TAB) {
 		rx = px; ry = py; rw = pw; rh = ph;
 	}
-	if((parent->type == MKGUI_HSPLIT || parent->type == MKGUI_VSPLIT) &&
-	   (flags & (MKGUI_REGION_TOP | MKGUI_REGION_BOTTOM | MKGUI_REGION_LEFT | MKGUI_REGION_RIGHT))) {
+	if((parent->type == MKGUI_HSPLIT || parent->type == MKGUI_VSPLIT) && (flags & (MKGUI_REGION_TOP | MKGUI_REGION_BOTTOM | MKGUI_REGION_LEFT | MKGUI_REGION_RIGHT))) {
 		rx = px; ry = py; rw = pw; rh = ph;
 	}
 
@@ -1975,6 +1975,32 @@ static int32_t hit_test(struct mkgui_ctx *ctx, int32_t mx, int32_t my) {
 		}
 	}
 	return -1;
+}
+
+// ---------------------------------------------------------------------------
+// Window registry
+// ---------------------------------------------------------------------------
+
+#define MKGUI_MAX_WINDOWS 16
+
+static struct mkgui_ctx *window_registry[MKGUI_MAX_WINDOWS];
+static uint32_t window_registry_count;
+
+// [=]===^=[ window_register ]====================================[=]
+static void window_register(struct mkgui_ctx *ctx) {
+	if(window_registry_count < MKGUI_MAX_WINDOWS) {
+		window_registry[window_registry_count++] = ctx;
+	}
+}
+
+// [=]===^=[ window_unregister ]==================================[=]
+static void window_unregister(struct mkgui_ctx *ctx) {
+	for(uint32_t i = 0; i < window_registry_count; ++i) {
+		if(window_registry[i] == ctx) {
+			window_registry[i] = window_registry[--window_registry_count];
+			return;
+		}
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -2560,6 +2586,7 @@ static struct mkgui_ctx *mkgui_create(struct mkgui_widget *widgets, uint32_t cou
 	ctx->poll_timeout_ms = -1;
 
 	init_aux_data(ctx);
+	window_register(ctx);
 
 	return ctx;
 }
@@ -2577,6 +2604,7 @@ static void mkgui_destroy(struct mkgui_ctx *ctx) {
 	if(!ctx) {
 		return;
 	}
+	window_unregister(ctx);
 	popup_destroy_all(ctx);
 	for(uint32_t i = 0; i < ctx->treeview_count; ++i) {
 		free(ctx->treeviews[i].nodes);
@@ -2641,6 +2669,7 @@ static struct mkgui_ctx *mkgui_create_child(struct mkgui_ctx *parent, struct mkg
 	ctx->poll_timeout_ms = -1;
 
 	init_aux_data(ctx);
+	window_register(ctx);
 
 	return ctx;
 }
@@ -2650,6 +2679,7 @@ static void mkgui_destroy_child(struct mkgui_ctx *ctx) {
 	if(!ctx) {
 		return;
 	}
+	window_unregister(ctx);
 	popup_destroy_all(ctx);
 	for(uint32_t i = 0; i < ctx->treeview_count; ++i) {
 		free(ctx->treeviews[i].nodes);
@@ -2724,20 +2754,6 @@ static uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 		if(ctx->spinboxes[si].repeat_dir) {
 			ctx->anim_active = 1;
 		}
-	}
-
-	if(!platform_pending(ctx) && !ctx->close_requested && !ctx->dirty) {
-		int32_t wait_ms;
-		if(ctx->poll_timeout_ms == 0) {
-			wait_ms = 0;
-
-		} else if(ctx->poll_timeout_ms > 0) {
-			wait_ms = ctx->poll_timeout_ms;
-
-		} else {
-			wait_ms = ctx->anim_active ? 16 : -1;
-		}
-		platform_wait_event(ctx, wait_ms);
 	}
 
 	while(platform_pending(ctx)) {
@@ -3411,6 +3427,7 @@ static uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 					}
 
 					ctx->press_id = hw->id;
+					ctx->press_mod = pev.keymod;
 					dirty_all(ctx);
 
 					if(hw->type == MKGUI_INPUT) {
@@ -4192,24 +4209,85 @@ static uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 		ctx->dirty_count = 0;
 	}
 
-	if(ctx->parent && ctx->parent->dirty) {
-		layout_widgets(ctx->parent);
-		glview_sync_all(ctx->parent);
-		render_widgets(ctx->parent);
-		if(ctx->parent->render_cb) {
-			ctx->parent->render_cb(ctx->parent, ctx->parent->render_cb_data);
+	if(ctx->parent) {
+		struct mkgui_ctx *p = ctx->parent;
+#ifdef _WIN32
+		int64_t pnow;
+		QueryPerformanceCounter((LARGE_INTEGER *)&pnow);
+		double p_dt = (double)(pnow - p->anim_prev) / (double)p->perf_freq;
+		p->anim_prev = pnow;
+#else
+		struct timespec pnow;
+		clock_gettime(CLOCK_MONOTONIC, &pnow);
+		double p_dt = (double)(pnow.tv_sec - p->anim_prev.tv_sec) + (double)(pnow.tv_nsec - p->anim_prev.tv_nsec) * 1e-9;
+		p->anim_prev = pnow;
+#endif
+		p->anim_time += p_dt;
+		p->anim_active = 0;
+		for(uint32_t i = 0; i < p->widget_count; ++i) {
+			struct mkgui_widget *w = &p->widgets[i];
+			if(!widget_visible(p, i)) {
+				continue;
+			}
+			if(w->type == MKGUI_SPINNER || w->type == MKGUI_GLVIEW) {
+				p->anim_active = 1;
+				dirty_widget(p, i);
+			}
+			if(w->type == MKGUI_PROGRESS) {
+				struct mkgui_progress_data *pd = find_progress_data(p, w->id);
+				if(pd && pd->value > 0 && pd->value < pd->max_val) {
+					p->anim_active = 1;
+					dirty_widget(p, i);
+				}
+			}
 		}
-		flush_text(ctx->parent);
-		render_tooltip(ctx->parent);
-		flush_text(ctx->parent);
-		platform_blit(ctx->parent);
-		platform_flush(ctx->parent);
-		ctx->parent->dirty = 0;
-		ctx->parent->dirty_full = 0;
-		ctx->parent->dirty_count = 0;
+		if(p->anim_active && !ctx->anim_active) {
+			ctx->anim_active = 1;
+		}
+		if(p->dirty) {
+			layout_widgets(p);
+			glview_sync_all(p);
+			render_widgets(p);
+			if(p->render_cb) {
+				p->render_cb(p, p->render_cb_data);
+			}
+			flush_text(p);
+			render_tooltip(p);
+			flush_text(p);
+			platform_blit(p);
+			platform_flush(p);
+			p->dirty = 0;
+			p->dirty_full = 0;
+			p->dirty_count = 0;
+		}
 	}
 
 	return ev->type != MKGUI_EVENT_NONE;
+}
+
+// [=]===^=[ mkgui_wait ]=========================================[=]
+static void mkgui_wait(struct mkgui_ctx *ctx) {
+	if(platform_pending(ctx) || ctx->close_requested || ctx->dirty) {
+		return;
+	}
+	if(ctx->poll_timeout_ms == 0) {
+		return;
+	}
+	if(ctx->poll_timeout_ms > 0) {
+		platform_wait_event(ctx, ctx->poll_timeout_ms);
+		return;
+	}
+	uint32_t any_anim = ctx->anim_active;
+	if(!any_anim) {
+		for(uint32_t i = 0; i < window_registry_count; ++i) {
+			struct mkgui_ctx *c = window_registry[i];
+			if(c->anim_active || c->dirty) {
+				any_anim = 1;
+				break;
+			}
+		}
+	}
+	platform_wait_event(ctx, any_anim ? 16 : -1);
 }
 
 // [=]===^=[ mkgui_set_poll_timeout ]==============================[=]

@@ -1,0 +1,135 @@
+# mkgui essential icon subset
+# One icon name per line. Lines starting with # are comments.
+
+# ------------------------------------------------------------------
+# Common actions
+# ------------------------------------------------------------------
+file-plus
+folder-open
+content-save
+content-cut
+content-copy
+content-paste
+delete
+undo
+redo
+magnify
+refresh
+close
+check
+plus
+minus
+pencil
+printer
+eye
+
+# ------------------------------------------------------------------
+# Navigation
+# ------------------------------------------------------------------
+arrow-left
+arrow-right
+arrow-up
+arrow-down
+chevron-left
+chevron-right
+chevron-up
+chevron-down
+menu
+home
+monitor
+download
+
+# ------------------------------------------------------------------
+# UI / status
+# ------------------------------------------------------------------
+alert
+information
+help-circle
+cog
+grid
+brightness-6
+dock-bottom
+exit-to-app
+view-list
+wrench
+
+# ------------------------------------------------------------------
+# Folders
+# ------------------------------------------------------------------
+folder
+folder-open
+folder-zip
+
+# ------------------------------------------------------------------
+# File types - documents
+# ------------------------------------------------------------------
+file-document
+file-document-outline
+file-document-multiple
+file-pdf-box
+file-word
+file-excel
+file-powerpoint
+file-table
+file-delimited
+file-chart
+
+# ------------------------------------------------------------------
+# File types - code & scripts
+# ------------------------------------------------------------------
+language-c
+language-cpp
+language-python
+language-java
+language-javascript
+language-typescript
+language-rust
+language-go
+language-ruby
+language-html5
+language-css3
+language-lua
+language-haskell
+language-markdown
+language-swift
+language-kotlin
+language-csharp
+language-fortran
+language-r
+language-php
+file-code
+file-code-outline
+file-cog
+script-text
+code-json
+code-tags
+code-braces
+xml
+web
+console
+
+# ------------------------------------------------------------------
+# File types - media
+# ------------------------------------------------------------------
+file-image
+file-gif-box
+file-jpg-box
+file-png-box
+file-music
+file-video
+
+# ------------------------------------------------------------------
+# File types - data & archives
+# ------------------------------------------------------------------
+archive
+database
+file-lock
+file-key
+file-certificate
+
+# ------------------------------------------------------------------
+# File types - misc
+# ------------------------------------------------------------------
+file-plus
+file-check
+file-alert

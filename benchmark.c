@@ -129,6 +129,7 @@ int32_t main(int32_t argc, char **argv) {
 			total_render = 0.0;
 			total_blit = 0.0;
 		}
+		mkgui_wait(ctx);
 	}
 
 	mkgui_destroy(ctx);

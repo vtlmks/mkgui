@@ -954,9 +954,10 @@ static int32_t ed_add_widget(uint32_t type, int32_t x, int32_t y) {
 
 		case MKGUI_FORM: {
 			w->x = 0;
-			w->w = ed.canvas_w;
-			w->h = 200;
-			w->flags = MKGUI_ANCHOR_LEFT | MKGUI_ANCHOR_RIGHT;
+			w->y = 0;
+			w->w = 0;
+			w->h = 0;
+			w->flags = MKGUI_ANCHOR_LEFT | MKGUI_ANCHOR_TOP | MKGUI_ANCHOR_RIGHT | MKGUI_ANCHOR_BOTTOM;
 		} break;
 
 		default: {
@@ -2596,7 +2597,7 @@ static void ed_generate_code(void) {
 // ---------------------------------------------------------------------------
 
 // [=]===^=[ ed_test_gui ]========================================[=]
-static void ed_test_gui(void) {
+static void ed_test_gui(struct mkgui_ctx *editor_ctx) {
 	if(ed.widget_count == 0) {
 		return;
 	}
@@ -2619,11 +2620,26 @@ static void ed_test_gui(void) {
 		tw->flags = ew->flags;
 	}
 
-	struct mkgui_ctx *test = mkgui_create(test_widgets, ed.widget_count);
+	int32_t test_w = 800, test_h = 600;
+	const char *test_title = "Test";
+	for(uint32_t i = 0; i < ed.widget_count; ++i) {
+		if(test_widgets[i].type == MKGUI_WINDOW) {
+			if(test_widgets[i].w > 0) {
+				test_w = test_widgets[i].w;
+			}
+			if(test_widgets[i].h > 0) {
+				test_h = test_widgets[i].h;
+			}
+			if(test_widgets[i].label[0]) {
+				test_title = test_widgets[i].label;
+			}
+			break;
+		}
+	}
+	struct mkgui_ctx *test = mkgui_create_child(editor_ctx, test_widgets, ed.widget_count, test_title, test_w, test_h);
 	if(!test) {
 		return;
 	}
-
 
 	struct mkgui_event ev;
 	uint32_t running = 1;
@@ -2633,9 +2649,10 @@ static void ed_test_gui(void) {
 				running = 0;
 			}
 		}
+		mkgui_wait(test);
 	}
 
-	mkgui_destroy(test);
+	mkgui_destroy_child(test);
 }
 
 // ---------------------------------------------------------------------------
@@ -2887,7 +2904,7 @@ int main(void) {
 						mkgui_statusbar_set(ctx, ED_STATUSBAR, 0, "Code generated");
 
 					} else if(ev.id == ED_TB_TEST) {
-						ed_test_gui();
+						ed_test_gui(ctx);
 						dirty_all(ctx);
 
 					} else if(ev.id == ED_TB_UNDO || ev.id == ED_MI_UNDO) {
@@ -3090,23 +3107,19 @@ int main(void) {
 							memcpy(&ed.widgets[insert_at], block, block_count * sizeof(struct ed_widget));
 							ed.widget_count += block_count;
 						}
-						struct ed_widget tmp = block[0];
-						int32_t new_pidx = ed_find_widget(tmp.parent_id);
+						int32_t new_pidx = ed_find_widget(ed.widgets[insert_at].parent_id);
 						if(new_pidx >= 0) {
 							uint32_t pt = ed.widgets[new_pidx].type;
 							if(pt == MKGUI_HBOX || pt == MKGUI_VBOX) {
-								tmp.w = 0;
-								tmp.h = 0;
-								tmp.flags &= ~(MKGUI_ANCHOR_LEFT | MKGUI_ANCHOR_TOP | MKGUI_ANCHOR_RIGHT | MKGUI_ANCHOR_BOTTOM);
+								ed.widgets[insert_at].w = 0;
+								ed.widgets[insert_at].h = 0;
+								ed.widgets[insert_at].flags &= ~(MKGUI_ANCHOR_LEFT | MKGUI_ANCHOR_TOP | MKGUI_ANCHOR_RIGHT | MKGUI_ANCHOR_BOTTOM);
 							} else if(pt == MKGUI_FORM) {
-								tmp.w = 0;
-								tmp.h = 24;
-								tmp.flags &= ~(MKGUI_ANCHOR_LEFT | MKGUI_ANCHOR_TOP | MKGUI_ANCHOR_RIGHT | MKGUI_ANCHOR_BOTTOM);
+								ed.widgets[insert_at].w = 0;
+								ed.widgets[insert_at].h = 24;
+								ed.widgets[insert_at].flags &= ~(MKGUI_ANCHOR_LEFT | MKGUI_ANCHOR_TOP | MKGUI_ANCHOR_RIGHT | MKGUI_ANCHOR_BOTTOM);
 							}
 						}
-						memmove(&ed.widgets[insert_at + 1], &ed.widgets[insert_at], (ed.widget_count - insert_at) * sizeof(struct ed_widget));
-						ed.widgets[insert_at] = tmp;
-						++ed.widget_count;
 						ed.selected = (int32_t)insert_at;
 						ed_sync_tree(ctx);
 						ed_sync_props(ctx);
@@ -3250,7 +3263,21 @@ int main(void) {
 						int32_t screen_x = local_x + ed_win_x;
 						int32_t screen_y = local_y + ed_win_y;
 						uint32_t new_parent = 0;
-						if(is_chrome) {
+						uint32_t ctrl_target = 0;
+						if(!is_chrome && (ctx->press_mod & MKGUI_MOD_CONTROL) && ed.selected >= 0 && (uint32_t)ed.selected < ed.widget_count) {
+							uint32_t st = ed.widgets[ed.selected].type;
+							if(st == MKGUI_VBOX || st == MKGUI_HBOX || st == MKGUI_FORM || st == MKGUI_GROUP || st == MKGUI_PANEL || st == MKGUI_WINDOW || st == MKGUI_TABS || st == MKGUI_TAB) {
+								ctrl_target = ed.widgets[ed.selected].id;
+								new_parent = ctrl_target;
+								if(st == MKGUI_TABS) {
+									uint32_t active = ed_get_active_tab(new_parent);
+									if(active) {
+										new_parent = active;
+									}
+								}
+							}
+						}
+						if(!new_parent && is_chrome) {
 							for(uint32_t j = 0; j < ed.widget_count; ++j) {
 								if(ed.widgets[j].type == MKGUI_WINDOW) {
 									new_parent = ed.widgets[j].id;
@@ -3322,7 +3349,11 @@ int main(void) {
 							ed.widgets[pos] = tmp;
 							new_idx = (int32_t)pos;
 						}
-						ed.selected = new_idx;
+						if(ctrl_target) {
+							ed.selected = ed_find_widget(ctrl_target);
+						} else {
+							ed.selected = new_idx;
+						}
 						ed_sync_tree(ctx);
 						ed_sync_props(ctx);
 					}
@@ -3562,6 +3593,7 @@ int main(void) {
 			prev_press = ctx->press_id;
 		}
 
+		mkgui_wait(ctx);
 	}
 
 	mkgui_destroy(ctx);

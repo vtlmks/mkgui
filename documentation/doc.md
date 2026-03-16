@@ -47,6 +47,7 @@ int main(void) {
                 mkgui_label_set(ctx, ID_LBL, "Clicked!");
             }
         }
+        mkgui_wait(ctx);
     }
 
     mkgui_destroy(ctx);
@@ -60,7 +61,7 @@ Your application is a single `.c` file that includes `mkgui.c`. All functions ar
 
 Widget hierarchy is expressed via `parent_id`. Every widget has a unique integer `id`. The first widget must be `MKGUI_WINDOW` with `parent_id = 0`.
 
-Multiple independent windows are supported by creating multiple `mkgui_ctx` instances.
+Multiple windows are supported via `mkgui_create_child()`. See [Multi-window](#multi-window) below.
 
 ## Widget definition
 
@@ -233,38 +234,40 @@ struct mkgui_event {
 struct mkgui_ctx *mkgui_create(struct mkgui_widget *widgets, uint32_t count);
 void mkgui_destroy(struct mkgui_ctx *ctx);
 uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev);
+void mkgui_wait(struct mkgui_ctx *ctx);
 void mkgui_set_poll_timeout(struct mkgui_ctx *ctx, int32_t ms);
 ```
 
-`mkgui_create` takes a widget array and returns a context. `mkgui_poll` processes platform events and renders when dirty. Returns 1 if an event was written to `ev`, 0 otherwise.
+`mkgui_create` takes a widget array and returns a context. `mkgui_poll` processes pending platform events and renders when dirty. Returns 1 if an event was written to `ev`, 0 otherwise. `mkgui_poll` is non-blocking -- it returns immediately when there are no more events to process.
 
-When the event queue is empty and the widget tree is not dirty, `mkgui_poll` blocks internally instead of returning immediately. This means no external sleep is needed -- the standard mainloop is simply:
+`mkgui_wait` handles frame pacing. It blocks until the next event arrives or the next animation frame is due. Call it once per iteration of the main loop, after all `mkgui_poll` calls:
 
 ```c
 while(running) {
     while(mkgui_poll(ctx, &ev)) {
         // handle ev
     }
-    // timeout expired, do per-frame work here if needed
+    mkgui_wait(ctx);
 }
 ```
 
-`mkgui_poll` never blocks when:
-- Platform events are pending
-- The widget tree is dirty (needs rendering)
-- A close event has been delivered
+`mkgui_wait` is smart about timing:
+- If any registered window has pending events or is dirty, it returns immediately
+- If any registered window has animations (spinners, progress bars, GL views), it waits up to 16ms (~60fps)
+- If everything is idle, it blocks indefinitely until an event arrives (zero CPU usage)
+- It wakes immediately when a platform event arrives (mouse click, key press, expose)
 
-#### Poll timeout modes
+On Linux, blocking uses `poll()` on the X11 connection fd. On Windows, it uses `MsgWaitForMultipleObjects`.
 
-`mkgui_set_poll_timeout` controls how long `mkgui_poll` blocks when no events are pending:
+#### Wait timeout modes
+
+`mkgui_set_poll_timeout` controls how long `mkgui_wait` blocks:
 
 | Value | Behavior |
 |-------|----------|
-| `-1` (default) | **Auto mode.** Blocks for 16ms (~60fps) when animated widgets (spinners, progress bars, glviews) are visible. Blocks indefinitely when idle -- zero CPU usage. |
-| `> 0` | **Fixed timeout.** Always blocks for the given number of milliseconds. |
-| `0` | **No blocking.** Returns immediately even with no events. The caller owns all timing. |
-
-On Linux, blocking uses `poll()` on the X11 connection fd. On Windows, it uses `MsgWaitForMultipleObjects`. Both wake immediately when a platform event arrives.
+| `-1` (default) | **Auto mode.** Waits 16ms (~60fps) when animated widgets are visible. Blocks indefinitely when idle -- zero CPU usage. |
+| `> 0` | **Fixed timeout.** Always waits for the given number of milliseconds. Use `5` for 200Hz, `8` for 120Hz, `16` for 60Hz. |
+| `0` | **No blocking.** `mkgui_wait` returns immediately. The caller owns all timing. |
 
 **Emulator / real-time example** (caller drives timing):
 
@@ -278,6 +281,8 @@ while(running) {
     precision_sleep_until_next_frame();
 }
 ```
+
+When the caller owns timing (emulators, games), omit `mkgui_wait` and use your own frame pacing instead.
 
 ### Performance timing
 
@@ -945,7 +950,8 @@ Returns 1 if the user confirmed, 0 if cancelled. The second argument is the defa
 Dialogs open as separate, WM-decorated X11 windows (not overlays). They are:
 - **Resizable** -- drag the window border to see more sidebar entries or file list rows (minimum size 400x300, initial 720x500)
 - **Movable** -- drag the title bar to reposition, e.g. to see the main window underneath when naming a file
-- **Modal** -- set as transient-for the main window; closing the main window also closes the dialog
+- **Modal** -- set as transient-for the main window; the main window does not accept input while the dialog is open
+- **Parent stays alive** -- the parent window continues to repaint and animate (spinners, progress bars, GL views) while the dialog is open
 
 The dialog window is centered on the parent window when opened.
 
@@ -969,6 +975,103 @@ The save dialog adds a "File name:" input row at the bottom. Clicking a file in 
 uint32_t mkgui_open_dialog(struct mkgui_ctx *ctx);
 uint32_t mkgui_save_dialog(struct mkgui_ctx *ctx, const char *default_name);
 const char *mkgui_dialog_path(struct mkgui_ctx *ctx, uint32_t index);
+```
+
+## Multi-window
+
+mkgui supports multiple windows through child contexts. All child windows share the parent's platform connection (X11 Display / Win32 message loop), so events are routed correctly without any manual pump logic. The parent window stays visually updated (including animations) while child windows are open.
+
+### Creating a child window
+
+```c
+struct mkgui_ctx *child = mkgui_create_child(parent_ctx, widgets, count, "Title", 640, 480);
+```
+
+`mkgui_create_child` creates a new window that shares the parent's display connection, font data, and theme. The child window is set as transient-for the parent (window managers typically keep it above the parent).
+
+Destroy child windows with `mkgui_destroy_child(child)` instead of `mkgui_destroy()`. The parent must outlive all its children.
+
+### Modal windows
+
+A modal window runs its own event loop, blocking the caller. The parent window does not receive input, but continues to repaint and animate (spinners, progress bars, GL views).
+
+```c
+// Create a modal dialog
+struct mkgui_ctx *dlg = mkgui_create_child(ctx, dlg_widgets, dlg_count,
+                                            "Settings", 400, 300);
+if(!dlg) return;
+
+struct mkgui_event ev;
+uint32_t running = 1;
+while(running) {
+    while(mkgui_poll(dlg, &ev)) {
+        if(ev.type == MKGUI_EVENT_CLOSE) {
+            running = 0;
+        }
+        // handle dialog events...
+    }
+    mkgui_wait(dlg);
+}
+// Parent animations kept running the whole time
+
+mkgui_destroy_child(dlg);
+```
+
+The built-in dialogs (`mkgui_message_box`, `mkgui_confirm_dialog`, `mkgui_input_dialog`, `mkgui_open_dialog`, `mkgui_save_dialog`) all use this pattern internally.
+
+### Non-modal windows
+
+For windows that should both be interactive simultaneously, poll both contexts in the same loop:
+
+```c
+struct mkgui_ctx *main_ctx = mkgui_create(main_widgets, main_count);
+struct mkgui_ctx *tool_ctx = mkgui_create_child(main_ctx, tool_widgets, tool_count,
+                                                 "Tools", 300, 400);
+
+struct mkgui_event ev;
+uint32_t running = 1;
+while(running) {
+    while(mkgui_poll(main_ctx, &ev)) {
+        if(ev.type == MKGUI_EVENT_CLOSE) running = 0;
+        // handle main window events...
+    }
+    while(mkgui_poll(tool_ctx, &ev)) {
+        if(ev.type == MKGUI_EVENT_CLOSE) {
+            // hide or destroy the tool window
+        }
+        // handle tool window events...
+    }
+    mkgui_wait(main_ctx);  // one wait paces the whole loop
+}
+
+mkgui_destroy_child(tool_ctx);
+mkgui_destroy(main_ctx);
+```
+
+Both windows accept input, animate, and repaint independently. Events that arrive for one window while the other is polling are automatically routed to the correct context via an internal deferred event queue.
+
+### How it works
+
+All windows created with `mkgui_create_child` share the parent's X11 Display connection (or Win32 message thread). A global window registry maps platform window handles to their owning `mkgui_ctx`. When `mkgui_poll` pulls an event from the shared connection:
+
+1. If the event belongs to the calling context or its popups, it is processed normally
+2. If the event belongs to the parent, expose/resize events trigger a parent repaint (keeping it visually fresh during modal dialogs)
+3. If the event belongs to a different registered context, it is translated and pushed to that context's deferred event queue, where it will be consumed on that context's next `mkgui_poll` call
+
+This means no manual event pumping, no timeout hacks, and no frame rate issues between windows.
+
+### API reference
+
+```c
+// Create a child window sharing the parent's platform connection
+struct mkgui_ctx *mkgui_create_child(struct mkgui_ctx *parent,
+                                      struct mkgui_widget *widgets,
+                                      uint32_t count,
+                                      const char *title,
+                                      int32_t w, int32_t h);
+
+// Destroy a child window (do not use mkgui_destroy for children)
+void mkgui_destroy_child(struct mkgui_ctx *ctx);
 ```
 
 ## Rendering
