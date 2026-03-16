@@ -1515,11 +1515,27 @@ static void ed_render_canvas(struct mkgui_ctx *ctx, uint32_t id, uint32_t *pixel
 			int32_t pw = ed_rects[pidx].w;
 			int32_t ph = ed_rects[pidx].h;
 
-			if(parent->flags & MKGUI_PANEL_BORDER) {
-				px += MKGUI_BOX_PAD;
-				py += MKGUI_BOX_PAD;
-				pw -= MKGUI_BOX_PAD * 2;
-				ph -= MKGUI_BOX_PAD * 2;
+			if(!(parent->flags & MKGUI_NO_PAD)) {
+				uint32_t nested = 0;
+				int32_t gpidx = -1;
+				for(uint32_t g = 0; g < ed.widget_count; ++g) {
+					if(ed.widgets[g].id == parent->parent_id) {
+						gpidx = (int32_t)g;
+						break;
+					}
+				}
+				if(gpidx >= 0) {
+					uint32_t gpt = ed.widgets[gpidx].type;
+					if(gpt == MKGUI_VBOX || gpt == MKGUI_HBOX || gpt == MKGUI_FORM || gpt == MKGUI_GROUP || gpt == MKGUI_TABS) {
+						nested = 1;
+					}
+				}
+				if(!nested || (parent->flags & MKGUI_PANEL_BORDER)) {
+					px += MKGUI_BOX_PAD;
+					py += MKGUI_BOX_PAD;
+					pw -= MKGUI_BOX_PAD * 2;
+					ph -= MKGUI_BOX_PAD * 2;
+				}
 			}
 
 			uint32_t child_count = 0;
@@ -1548,10 +1564,18 @@ static void ed_render_canvas(struct mkgui_ctx *ctx, uint32_t id, uint32_t *pixel
 				}
 				int32_t flex_h = flex_count > 0 ? remaining / (int32_t)flex_count : 0;
 
+				int32_t vflex_rem = (flex_count > 0) ? (remaining - flex_h * (int32_t)flex_count) : 0;
+				uint32_t vflex_idx = 0;
 				int32_t lay_y = py;
 				for(uint32_t j = 0; j < ed.widget_count; ++j) {
 					if(ed.widgets[j].parent_id == parent->id && j != (uint32_t)pidx && !(ed.widgets[j].flags & MKGUI_HIDDEN)) {
-						int32_t child_h = ed.widgets[j].h > 0 ? ed.widgets[j].h : flex_h;
+						int32_t child_h;
+						if(ed.widgets[j].h > 0) {
+							child_h = ed.widgets[j].h;
+						} else {
+							child_h = flex_h + ((int32_t)vflex_idx < vflex_rem ? 1 : 0);
+							++vflex_idx;
+						}
 						if(j == i) {
 							ed_rects[i].x = px;
 							ed_rects[i].y = lay_y;
@@ -1582,10 +1606,18 @@ static void ed_render_canvas(struct mkgui_ctx *ctx, uint32_t id, uint32_t *pixel
 				}
 				int32_t flex_w = flex_count > 0 ? remaining / (int32_t)flex_count : 0;
 
+				int32_t hflex_rem = (flex_count > 0) ? (remaining - flex_w * (int32_t)flex_count) : 0;
+				uint32_t hflex_idx = 0;
 				int32_t lay_x = px;
 				for(uint32_t j = 0; j < ed.widget_count; ++j) {
 					if(ed.widgets[j].parent_id == parent->id && j != (uint32_t)pidx && !(ed.widgets[j].flags & MKGUI_HIDDEN)) {
-						int32_t child_w = ed.widgets[j].w > 0 ? ed.widgets[j].w : flex_w;
+						int32_t child_w;
+						if(ed.widgets[j].w > 0) {
+							child_w = ed.widgets[j].w;
+						} else {
+							child_w = flex_w + ((int32_t)hflex_idx < hflex_rem ? 1 : 0);
+							++hflex_idx;
+						}
 						if(j == i) {
 							ed_rects[i].x = lay_x;
 							ed_rects[i].y = py;

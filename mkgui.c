@@ -355,7 +355,6 @@ struct mkgui_split_data {
 	float ratio;
 };
 
-#define MKGUI_MAX_TREE_NODES 4096
 #define MKGUI_MAX_STATUSBAR_SECTIONS 8
 #define MKGUI_MAX_TEXTAREA_LINES 4096
 #define MKGUI_MAX_TEXTAREA_LINE  1024
@@ -427,7 +426,6 @@ struct mkgui_textarea_data {
 	int32_t scroll_x;
 };
 
-#define MKGUI_MAX_ITEMVIEW_ITEMS 4096
 
 typedef void (*mkgui_itemview_label_cb)(uint32_t item, char *buf, uint32_t buf_size, void *userdata);
 typedef void (*mkgui_itemview_icon_cb)(uint32_t item, char *buf, uint32_t buf_size, void *userdata);
@@ -619,7 +617,10 @@ struct mkgui_ctx {
 	int32_t mouse_x, mouse_y;
 	uint32_t mouse_btn;
 	uint32_t dirty;
-	int32_t popup_hover_item;
+
+	uint32_t dblclick_id;
+	int32_t dblclick_row;
+	uint32_t dblclick_time;
 
 	struct { int32_t x, y, w, h; } dirty_rects[32];
 	uint32_t dirty_count;
@@ -628,6 +629,8 @@ struct mkgui_ctx {
 	uint32_t tooltip_id;
 	uint32_t tooltip_timer;
 	int32_t tooltip_x, tooltip_y;
+
+	char tooltip_texts[MKGUI_MAX_WIDGETS][128];
 
 	struct mkgui_theme theme;
 
@@ -1697,11 +1700,19 @@ static void layout_widgets(struct mkgui_ctx *ctx) {
 					}
 					int32_t flex_h = needs_scroll ? 0 : (flex_count > 0 ? remaining / (int32_t)flex_count : 0);
 
+					int32_t vflex_rem = (!needs_scroll && flex_count > 0) ? (remaining - flex_h * (int32_t)flex_count) : 0;
 					int32_t scroll_off = (bs && needs_scroll) ? bs->scroll_y : 0;
+					uint32_t vflex_idx = 0;
 					int32_t cy = py - scroll_off;
 					for(int32_t j = layout_first_child[pidx]; j >= 0; j = layout_next_sibling[j]) {
 						if(!(ctx->widgets[j].flags & MKGUI_HIDDEN)) {
-							int32_t ch = ctx->widgets[j].h > 0 ? ctx->widgets[j].h : flex_h;
+							int32_t ch;
+							if(ctx->widgets[j].h > 0) {
+								ch = ctx->widgets[j].h;
+							} else {
+								ch = flex_h + ((int32_t)vflex_idx < vflex_rem ? 1 : 0);
+								++vflex_idx;
+							}
 							if(j == (int32_t)i) {
 								ctx->rects[i].x = px;
 								ctx->rects[i].y = cy;
@@ -1732,10 +1743,18 @@ static void layout_widgets(struct mkgui_ctx *ctx) {
 					}
 					int32_t flex_w = flex_count > 0 ? remaining / (int32_t)flex_count : 0;
 
+					int32_t flex_rem = (flex_count > 0) ? (remaining - flex_w * (int32_t)flex_count) : 0;
+					uint32_t flex_idx = 0;
 					int32_t cx = px;
 					for(int32_t j = layout_first_child[pidx]; j >= 0; j = layout_next_sibling[j]) {
 						if(!(ctx->widgets[j].flags & MKGUI_HIDDEN)) {
-							int32_t cw = ctx->widgets[j].w > 0 ? ctx->widgets[j].w : flex_w;
+							int32_t cw;
+							if(ctx->widgets[j].w > 0) {
+								cw = ctx->widgets[j].w;
+							} else {
+								cw = flex_w + ((int32_t)flex_idx < flex_rem ? 1 : 0);
+								++flex_idx;
+							}
 							if(j == (int32_t)i) {
 								ctx->rects[i].x = cx;
 								ctx->rects[i].y = py;
@@ -2426,6 +2445,15 @@ static void init_aux_data(struct mkgui_ctx *ctx) {
 
 			default: {
 			} break;
+		}
+	}
+	for(uint32_t i = 0; i < ctx->widget_count; ++i) {
+		struct mkgui_widget *w = &ctx->widgets[i];
+		if(w->type == MKGUI_BUTTON && w->label[0] != '\0') {
+			struct mkgui_widget *parent = find_widget(ctx, w->parent_id);
+			if(parent && parent->type == MKGUI_TOOLBAR) {
+				snprintf(ctx->tooltip_texts[i], sizeof(ctx->tooltip_texts[i]), "%s", w->label);
+			}
 		}
 	}
 }
@@ -3379,12 +3407,26 @@ static uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 									if(row >= 0) {
 										struct mkgui_listview_data *lv = find_listv_data(ctx, hw->id);
 										if(lv) {
+											uint32_t now = mkgui_time_ms();
+											uint32_t is_dblclick = (ctx->dblclick_id == hw->id && ctx->dblclick_row == row && (now - ctx->dblclick_time) < 400);
+											ctx->dblclick_id = hw->id;
+											ctx->dblclick_row = row;
+											ctx->dblclick_time = now;
 											lv->selected_row = row;
+											int32_t col = listview_col_hit(ctx, (uint32_t)hi, ctx->mouse_x);
+											if(is_dblclick) {
+												ev->type = MKGUI_EVENT_LISTVIEW_DBLCLICK;
+												ev->id = hw->id;
+												ev->value = row;
+												ev->col = col;
+												ctx->dblclick_id = 0;
+												dirty_all(ctx);
+												return 1;
+											}
 											lv->drag_source = row;
 											lv->drag_target = -1;
 											lv->drag_start_y = ctx->mouse_y;
 											lv->drag_active = 0;
-											int32_t col = listview_col_hit(ctx, (uint32_t)hi, ctx->mouse_x);
 											ev->type = MKGUI_EVENT_LISTVIEW_SELECT;
 											ev->id = hw->id;
 											ev->value = row;
@@ -3412,8 +3454,18 @@ static uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 							if(iv) {
 								int32_t item = itemview_hit_item(ctx, (uint32_t)hi, iv, ctx->mouse_x, ctx->mouse_y);
 								if(item >= 0) {
+									uint32_t now = mkgui_time_ms();
+									uint32_t is_dblclick = (ctx->dblclick_id == hw->id && ctx->dblclick_row == item && (now - ctx->dblclick_time) < 400);
+									ctx->dblclick_id = hw->id;
+									ctx->dblclick_row = item;
+									ctx->dblclick_time = now;
 									iv->selected = item;
-									ev->type = MKGUI_EVENT_ITEMVIEW_SELECT;
+									if(is_dblclick) {
+										ev->type = MKGUI_EVENT_ITEMVIEW_DBLCLICK;
+										ctx->dblclick_id = 0;
+									} else {
+										ev->type = MKGUI_EVENT_ITEMVIEW_SELECT;
+									}
 									ev->id = hw->id;
 									ev->value = item;
 									dirty_all(ctx);

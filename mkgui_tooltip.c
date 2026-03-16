@@ -10,17 +10,17 @@ static void render_tooltip(struct mkgui_ctx *ctx) {
 		return;
 	}
 
-	struct mkgui_widget *w = find_widget(ctx, ctx->tooltip_id);
-	if(!w || w->label[0] == '\0') {
+	int32_t idx = find_widget_idx(ctx, ctx->tooltip_id);
+	if(idx < 0) {
 		return;
 	}
 
-	struct mkgui_widget *parent = find_widget(ctx, w->parent_id);
-	if(!parent || parent->type != MKGUI_TOOLBAR) {
+	const char *text = ctx->tooltip_texts[idx];
+	if(text[0] == '\0') {
 		return;
 	}
 
-	int32_t tw = text_width(ctx, w->label) + MKGUI_TOOLTIP_PAD * 2;
+	int32_t tw = text_width(ctx, text) + MKGUI_TOOLTIP_PAD * 2;
 	int32_t th = ctx->font_height + MKGUI_TOOLTIP_PAD * 2;
 	int32_t tx = ctx->tooltip_x + 12;
 	int32_t ty = ctx->tooltip_y + 16;
@@ -33,7 +33,7 @@ static void render_tooltip(struct mkgui_ctx *ctx) {
 	}
 
 	draw_rounded_rect(ctx->pixels, ctx->win_w, ctx->win_h, tx, ty, tw, th, ctx->theme.widget_bg, ctx->theme.widget_border, ctx->theme.corner_radius);
-	push_text_clip(tx + MKGUI_TOOLTIP_PAD, ty + MKGUI_TOOLTIP_PAD, w->label, ctx->theme.text, tx, ty, tx + tw, ty + th);
+	push_text_clip(tx + MKGUI_TOOLTIP_PAD, ty + MKGUI_TOOLTIP_PAD, text, ctx->theme.text, tx, ty, tx + tw, ty + th);
 }
 
 // [=]===^=[ tooltip_update ]=====================================[=]
@@ -51,5 +51,18 @@ static void tooltip_update(struct mkgui_ctx *ctx, uint32_t hover_id, int32_t mx,
 				dirty_all(ctx);
 			}
 		}
+	}
+}
+
+// [=]===^=[ mkgui_set_tooltip ]==================================[=]
+static void mkgui_set_tooltip(struct mkgui_ctx *ctx, uint32_t id, const char *text) {
+	int32_t idx = find_widget_idx(ctx, id);
+	if(idx < 0) {
+		return;
+	}
+	if(text) {
+		snprintf(ctx->tooltip_texts[idx], sizeof(ctx->tooltip_texts[idx]), "%s", text);
+	} else {
+		ctx->tooltip_texts[idx][0] = '\0';
 	}
 }

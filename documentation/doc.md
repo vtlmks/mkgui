@@ -211,14 +211,14 @@ struct mkgui_event {
 | `MKGUI_EVENT_INPUT_CHANGED` | Input text changed | -- | -- |
 | `MKGUI_EVENT_TEXTAREA_CHANGED` | Textarea changed | -- | -- |
 | `MKGUI_EVENT_LISTVIEW_SELECT` | Row clicked | row index | column index |
-| `MKGUI_EVENT_LISTVIEW_DBLCLICK` | Row double-clicked | row index | -- |
+| `MKGUI_EVENT_LISTVIEW_DBLCLICK` | Row double-clicked | row index | column index |
 | `MKGUI_EVENT_LISTVIEW_SORT` | Column header clicked | sort direction | column index |
 | `MKGUI_EVENT_LISTVIEW_COL_REORDER` | Column dragged to new position | -- | -- |
 | `MKGUI_EVENT_LISTVIEW_REORDER` | Row dragged to new position | source row | target row |
 | `MKGUI_EVENT_TREEVIEW_SELECT` | Tree node selected | node id | -- |
 | `MKGUI_EVENT_TREEVIEW_EXPAND` | Tree node expanded | node id | -- |
 | `MKGUI_EVENT_TREEVIEW_COLLAPSE` | Tree node collapsed | node id | -- |
-| `MKGUI_EVENT_SPLITTER_MOVED` | Splitter dragged | -- | -- |
+| `MKGUI_EVENT_SPLIT_MOVED` | Splitter dragged | -- | -- |
 | `MKGUI_EVENT_KEY` | Key pressed | keysym, keymod | -- |
 | `MKGUI_EVENT_ITEMVIEW_SELECT` | Item selected | item index | -- |
 | `MKGUI_EVENT_ITEMVIEW_DBLCLICK` | Item double-clicked | item index | -- |
@@ -845,6 +845,23 @@ MKGUI_FONT=/path/to/font.ttf ./myapp
 ```
 
 The default font search order prefers proportional sans-serif fonts: Noto Sans, IBM Plex Sans, DejaVu Sans.
+
+## Tooltips
+
+```c
+void mkgui_set_tooltip(struct mkgui_ctx *ctx, uint32_t id, const char *text);
+```
+
+Sets a tooltip on any widget. The tooltip appears after a short hover delay, positioned near the cursor. Pass `NULL` to clear.
+
+```c
+mkgui_set_tooltip(ctx, ID_BTN_SAVE, "Save the current document");
+mkgui_set_tooltip(ctx, ID_CANVAS, "Click to draw, right-click to erase");
+```
+
+Toolbar buttons automatically get their `label` set as tooltip text (since toolbars only show icons). For other widgets, tooltips must be set explicitly -- no tooltip is shown by default.
+
+Maximum tooltip text length is 127 characters.
 
 ## Simple dialogs
 
