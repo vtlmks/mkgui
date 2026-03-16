@@ -64,6 +64,7 @@
 #define MKGUI_KEY_PAGE_UP    0xFF55
 #define MKGUI_KEY_PAGE_DOWN  0xFF56
 #define MKGUI_KEY_END        0xFF57
+#define MKGUI_KEY_F1         0xFFBE
 
 // ---------------------------------------------------------------------------
 // Platform-neutral modifier masks
@@ -458,6 +459,8 @@ struct mkgui_box_scroll {
 	uint32_t widget_id;
 	int32_t scroll_y;
 	int32_t content_h;
+	int32_t scroll_x;
+	int32_t content_w;
 };
 
 struct mkgui_image_data {
@@ -1751,6 +1754,8 @@ static void layout_node(struct mkgui_ctx *ctx, int32_t idx) {
 			}
 
 		} else if(w->type == MKGUI_HBOX) {
+			uint32_t scrollable = (w->flags & MKGUI_SCROLL) ? 1 : 0;
+			struct mkgui_box_scroll *bs = scrollable ? find_box_scroll(ctx, w->id) : NULL;
 			int32_t fixed_total = 0;
 			uint32_t flex_count = 0;
 			for(int32_t j = layout_first_child[idx]; j >= 0; j = layout_next_sibling[j]) {
@@ -1763,14 +1768,22 @@ static void layout_node(struct mkgui_ctx *ctx, int32_t idx) {
 				}
 			}
 			int32_t gap_total = child_count > 1 ? (int32_t)(child_count - 1) * MKGUI_BOX_GAP : 0;
+			uint32_t needs_scroll = scrollable && (fixed_total + gap_total > pw);
+			if(needs_scroll) {
+				ph -= MKGUI_SCROLLBAR_W;
+			}
+			if(bs) {
+				bs->content_w = fixed_total + gap_total;
+			}
 			int32_t remaining = pw - fixed_total - gap_total;
 			if(remaining < 0) {
 				remaining = 0;
 			}
-			int32_t flex_w = flex_count > 0 ? remaining / (int32_t)flex_count : 0;
-			int32_t flex_rem = (flex_count > 0) ? (remaining - flex_w * (int32_t)flex_count) : 0;
+			int32_t flex_w = needs_scroll ? 0 : (flex_count > 0 ? remaining / (int32_t)flex_count : 0);
+			int32_t flex_rem = (!needs_scroll && flex_count > 0) ? (remaining - flex_w * (int32_t)flex_count) : 0;
+			int32_t scroll_off = (bs && needs_scroll) ? bs->scroll_x : 0;
 			uint32_t flex_idx = 0;
-			int32_t cx = px;
+			int32_t cx = px - scroll_off;
 			for(int32_t j = layout_first_child[idx]; j >= 0; j = layout_next_sibling[j]) {
 				if(!(ctx->widgets[j].flags & MKGUI_HIDDEN)) {
 					int32_t cw;
@@ -2154,38 +2167,42 @@ static void render_widget(struct mkgui_ctx *ctx, uint32_t idx) {
 			}
 			if(ctx->widgets[idx].flags & MKGUI_SCROLL) {
 				struct mkgui_box_scroll *bs = find_box_scroll(ctx, ctx->widgets[idx].id);
-				if(bs && bs->content_h > ctx->rects[idx].h) {
-					int32_t rx = ctx->rects[idx].x;
-					int32_t ry = ctx->rects[idx].y;
-					int32_t rw = ctx->rects[idx].w;
-					int32_t rh = ctx->rects[idx].h;
+				int32_t rx = ctx->rects[idx].x;
+				int32_t ry = ctx->rects[idx].y;
+				int32_t rw = ctx->rects[idx].w;
+				int32_t rh = ctx->rects[idx].h;
+				int32_t r = ctx->theme.corner_radius;
+				if(bs && bs->content_h > rh) {
 					int32_t sx = rx + rw - MKGUI_SCROLLBAR_W;
 					draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, sx, ry, MKGUI_SCROLLBAR_W, rh, ctx->theme.scrollbar_bg);
 					int32_t track = rh;
 					int32_t total = bs->content_h;
-					if(total < 1) {
-						total = 1;
-					}
+					if(total < 1) { total = 1; }
 					int32_t thumb = track * rh / total;
-					if(thumb < 20) {
-						thumb = 20;
-					}
-					if(thumb > track) {
-						thumb = track;
-					}
+					if(thumb < 20) { thumb = 20; }
+					if(thumb > track) { thumb = track; }
 					int32_t max_scroll = bs->content_h - rh;
-					if(max_scroll < 1) {
-						max_scroll = 1;
-					}
+					if(max_scroll < 1) { max_scroll = 1; }
 					int32_t pos = (int32_t)((int64_t)bs->scroll_y * (track - thumb) / max_scroll);
-					if(pos < 0) {
-						pos = 0;
-					}
-					if(pos > track - thumb) {
-						pos = track - thumb;
-					}
-					int32_t r = ctx->theme.corner_radius;
+					if(pos < 0) { pos = 0; }
+					if(pos > track - thumb) { pos = track - thumb; }
 					draw_rounded_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, sx + 2, ry + pos, MKGUI_SCROLLBAR_W - 4, thumb, ctx->theme.scrollbar_thumb, r);
+				}
+				if(bs && bs->content_w > rw) {
+					int32_t sy = ry + rh - MKGUI_SCROLLBAR_W;
+					draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, rx, sy, rw, MKGUI_SCROLLBAR_W, ctx->theme.scrollbar_bg);
+					int32_t track = rw;
+					int32_t total = bs->content_w;
+					if(total < 1) { total = 1; }
+					int32_t thumb = track * rw / total;
+					if(thumb < 20) { thumb = 20; }
+					if(thumb > track) { thumb = track; }
+					int32_t max_scroll = bs->content_w - rw;
+					if(max_scroll < 1) { max_scroll = 1; }
+					int32_t pos = (int32_t)((int64_t)bs->scroll_x * (track - thumb) / max_scroll);
+					if(pos < 0) { pos = 0; }
+					if(pos > track - thumb) { pos = track - thumb; }
+					draw_rounded_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, rx + pos, sy + 2, thumb, MKGUI_SCROLLBAR_W - 4, ctx->theme.scrollbar_thumb, r);
 				}
 			}
 		} break;
@@ -2783,22 +2800,41 @@ static uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 					} else if(dsi >= 0 && (ctx->widgets[dsi].type == MKGUI_VBOX || ctx->widgets[dsi].type == MKGUI_HBOX)) {
 						struct mkgui_box_scroll *bs = find_box_scroll(ctx, ctx->drag_scrollbar_id);
 						if(bs) {
-							int32_t sh = ctx->rects[dsi].h;
-							int32_t sy = ctx->rects[dsi].y;
-							int32_t track = sh;
-							int32_t total = bs->content_h;
-							if(total < 1) { total = 1; }
-							int32_t thumb = track * sh / total;
-							if(thumb < 20) { thumb = 20; }
-							if(thumb > track) { thumb = track; }
-							int32_t max_scroll = bs->content_h - sh;
-							if(max_scroll < 1) { max_scroll = 1; }
-							int32_t new_pos = ctx->mouse_y - sy - ctx->drag_scrollbar_offset;
-							int32_t scrollable_range = track - thumb;
-							if(scrollable_range < 1) { scrollable_range = 1; }
-							bs->scroll_y = (int32_t)((int64_t)new_pos * max_scroll / scrollable_range);
-							if(bs->scroll_y < 0) { bs->scroll_y = 0; }
-							if(bs->scroll_y > max_scroll) { bs->scroll_y = max_scroll; }
+							if(ctx->widgets[dsi].type == MKGUI_HBOX && bs->content_w > ctx->rects[dsi].w) {
+								int32_t sw = ctx->rects[dsi].w;
+								int32_t sx = ctx->rects[dsi].x;
+								int32_t track = sw;
+								int32_t total = bs->content_w;
+								if(total < 1) { total = 1; }
+								int32_t thumb = track * sw / total;
+								if(thumb < 20) { thumb = 20; }
+								if(thumb > track) { thumb = track; }
+								int32_t max_scroll = bs->content_w - sw;
+								if(max_scroll < 1) { max_scroll = 1; }
+								int32_t new_pos = ctx->mouse_x - sx - ctx->drag_scrollbar_offset;
+								int32_t scrollable_range = track - thumb;
+								if(scrollable_range < 1) { scrollable_range = 1; }
+								bs->scroll_x = (int32_t)((int64_t)new_pos * max_scroll / scrollable_range);
+								if(bs->scroll_x < 0) { bs->scroll_x = 0; }
+								if(bs->scroll_x > max_scroll) { bs->scroll_x = max_scroll; }
+							} else {
+								int32_t sh = ctx->rects[dsi].h;
+								int32_t sy = ctx->rects[dsi].y;
+								int32_t track = sh;
+								int32_t total = bs->content_h;
+								if(total < 1) { total = 1; }
+								int32_t thumb = track * sh / total;
+								if(thumb < 20) { thumb = 20; }
+								if(thumb > track) { thumb = track; }
+								int32_t max_scroll = bs->content_h - sh;
+								if(max_scroll < 1) { max_scroll = 1; }
+								int32_t new_pos = ctx->mouse_y - sy - ctx->drag_scrollbar_offset;
+								int32_t scrollable_range = track - thumb;
+								if(scrollable_range < 1) { scrollable_range = 1; }
+								bs->scroll_y = (int32_t)((int64_t)new_pos * max_scroll / scrollable_range);
+								if(bs->scroll_y < 0) { bs->scroll_y = 0; }
+								if(bs->scroll_y > max_scroll) { bs->scroll_y = max_scroll; }
+							}
 							dirty_all(ctx);
 						}
 					} else {
@@ -3199,17 +3235,20 @@ static uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 							if((ctx->widgets[si].type == MKGUI_VBOX || ctx->widgets[si].type == MKGUI_HBOX) && (ctx->widgets[si].flags & MKGUI_SCROLL)) {
 								struct mkgui_box_scroll *bs = find_box_scroll(ctx, sid);
 								if(bs) {
-									int32_t view_h = ctx->rects[si].h;
-									int32_t max_scroll = bs->content_h - view_h;
-									if(max_scroll < 0) {
-										max_scroll = 0;
-									}
-									bs->scroll_y += delta;
-									if(bs->scroll_y < 0) {
-										bs->scroll_y = 0;
-									}
-									if(bs->scroll_y > max_scroll) {
-										bs->scroll_y = max_scroll;
+									if(ctx->widgets[si].type == MKGUI_HBOX && bs->content_w > ctx->rects[si].w) {
+										int32_t view_w = ctx->rects[si].w;
+										int32_t max_scroll = bs->content_w - view_w;
+										if(max_scroll < 0) { max_scroll = 0; }
+										bs->scroll_x += delta;
+										if(bs->scroll_x < 0) { bs->scroll_x = 0; }
+										if(bs->scroll_x > max_scroll) { bs->scroll_x = max_scroll; }
+									} else {
+										int32_t view_h = ctx->rects[si].h;
+										int32_t max_scroll = bs->content_h - view_h;
+										if(max_scroll < 0) { max_scroll = 0; }
+										bs->scroll_y += delta;
+										if(bs->scroll_y < 0) { bs->scroll_y = 0; }
+										if(bs->scroll_y > max_scroll) { bs->scroll_y = max_scroll; }
 									}
 									dirty_all(ctx);
 								}
@@ -3225,7 +3264,31 @@ static uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 					struct mkgui_widget *bw = &ctx->widgets[bi];
 					if((bw->type == MKGUI_VBOX || bw->type == MKGUI_HBOX) && (bw->flags & MKGUI_SCROLL)) {
 						struct mkgui_box_scroll *bs = find_box_scroll(ctx, bw->id);
-						if(!bs || bs->content_h <= ctx->rects[bi].h) {
+						if(!bs) {
+							continue;
+						}
+						if(bw->type == MKGUI_HBOX && bs->content_w > ctx->rects[bi].w) {
+							int32_t sy = ctx->rects[bi].y + ctx->rects[bi].h - MKGUI_SCROLLBAR_W;
+							int32_t sx = ctx->rects[bi].x;
+							int32_t sw = ctx->rects[bi].w;
+							if(ctx->mouse_x >= sx && ctx->mouse_x < sx + sw && ctx->mouse_y >= sy && ctx->mouse_y < sy + MKGUI_SCROLLBAR_W) {
+								int32_t track = sw;
+								int32_t total = bs->content_w;
+								if(total < 1) { total = 1; }
+								int32_t thumb = track * sw / total;
+								if(thumb < 20) { thumb = 20; }
+								if(thumb > track) { thumb = track; }
+								int32_t max_scroll = bs->content_w - sw;
+								if(max_scroll < 1) { max_scroll = 1; }
+								int32_t pos = (int32_t)((int64_t)bs->scroll_x * (track - thumb) / max_scroll);
+								if(ctx->mouse_x >= sx + pos && ctx->mouse_x < sx + pos + thumb) {
+									ctx->drag_scrollbar_id = bw->id;
+									ctx->drag_scrollbar_offset = ctx->mouse_x - (sx + pos);
+								}
+								break;
+							}
+						}
+						if(bs->content_h <= ctx->rects[bi].h) {
 							continue;
 						}
 						int32_t sx = ctx->rects[bi].x + ctx->rects[bi].w - MKGUI_SCROLLBAR_W;
@@ -4014,10 +4077,11 @@ static uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 		glview_sync_all(ctx);
 		double t1 = mkgui_time_us();
 		render_widgets(ctx);
+		flush_text(ctx);
 		if(ctx->render_cb) {
 			ctx->render_cb(ctx, ctx->render_cb_data);
+			flush_text(ctx);
 		}
-		flush_text(ctx);
 		render_tooltip(ctx);
 		flush_text(ctx);
 		double t2 = mkgui_time_us();

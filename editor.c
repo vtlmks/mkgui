@@ -70,6 +70,9 @@ enum {
 	ED_PROP_FL_CHECKED, ED_PROP_FL_SEPARATOR,
 	ED_PROP_FL_MENUCHECK, ED_PROP_FL_MENURADIO,
 	ED_PROP_FL_REGTOP, ED_PROP_FL_REGBOT, ED_PROP_FL_REGLEFT, ED_PROP_FL_REGRIGHT,
+	ED_PROP_FL_SCROLL,
+	ED_PROP_FL_BORDER, ED_PROP_FL_SUNKEN, ED_PROP_FL_NOPAD,
+	ED_PROP_FL_PASSWORD, ED_PROP_FL_READONLY,
 	ED_PROP_ICON_BROWSE,
 	ED_PROP_ADD_TAB, ED_PROP_REM_TAB,
 	ED_PROP_ADD_ITEM, ED_PROP_REM_ITEM,
@@ -224,6 +227,177 @@ struct ed_state {
 static struct ed_state ed;
 
 // ---------------------------------------------------------------------------
+// Help popup
+// ---------------------------------------------------------------------------
+
+struct ed_help_entry {
+	uint32_t type;
+	const char *text;
+};
+
+static struct ed_help_entry ed_help[] = {
+	{ MKGUI_BUTTON,    "Push button. Emits a click event when pressed. Set label for text, icon for an icon." },
+	{ MKGUI_CANVAS,    "Custom drawing area. Set a callback to draw into the widget's pixel buffer. Clipping is automatic." },
+	{ MKGUI_CHECKBOX,  "Toggle checkbox with a label. Checked state is a flag on the widget. Emits a change event on click." },
+	{ MKGUI_DROPDOWN,  "Drop-down selector. Set up items with mkgui_dropdown_setup(). Opens a popup list on click." },
+	{ MKGUI_GLVIEW,    "OpenGL viewport. Creates a native child window for GL rendering. You create and manage the GL context." },
+	{ MKGUI_IMAGE,     "Displays ARGB pixel data. Centered and scaled down to fit. Use PANEL_BORDER for a frame, IMAGE_STRETCH to fill." },
+	{ MKGUI_INPUT,     "Single-line text input. Supports clipboard, cursor movement, and selection. PASSWORD flag hides text." },
+	{ MKGUI_ITEMVIEW,  "Multi-mode item view: icons, thumbnails, compact list, or detail. Uses callbacks for labels and icons." },
+	{ MKGUI_LABEL,     "Static text display. Not interactive. Use mkgui_label_set() to change text at runtime." },
+	{ MKGUI_LISTVIEW,  "Scrollable multi-column list. Fully virtual (callback provides data). Supports sorting, column reorder, row drag." },
+	{ MKGUI_PROGRESS,  "Progress bar with animated shimmer. Set value/max with mkgui_progress_set(). No user interaction." },
+	{ MKGUI_RADIO,     "Radio button. Mutually exclusive within the same parent container. Clicking one unchecks siblings." },
+	{ MKGUI_SCROLLBAR, "Standalone scrollbar. Vertical by default, SCROLLBAR_HORIZ for horizontal. Emits scroll events." },
+	{ MKGUI_SLIDER,    "Horizontal slider with draggable thumb. Set range with mkgui_slider_setup(). Does not render its own label." },
+	{ MKGUI_SPINBOX,   "Numeric input with +/- buttons. Click text to type, use arrows or mouse wheel to step. Enter confirms." },
+	{ MKGUI_SPINNER,   "Animated spinning arc. Place it as a loading indicator. Animates automatically when visible, zero CPU when hidden." },
+	{ MKGUI_STATUSBAR, "Status bar with multiple sections. Set section widths (positive=fixed, negative=flex) and text per section." },
+	{ MKGUI_TEXTAREA,  "Multi-line text editor. Supports clipboard, selection, and scrolling. READONLY flag disables editing." },
+	{ MKGUI_TREEVIEW,  "Hierarchical tree with expand/collapse. Supports drag-and-drop reordering of nodes." },
+	{ MKGUI_FORM,      "Two-column form layout. Children are paired: label on the left, control on the right. Label column auto-sizes." },
+	{ MKGUI_GROUP,     "Bordered container with a title label. Children are inset inside the frame. Useful for grouping related controls." },
+	{ MKGUI_HBOX,      "Horizontal box layout. Stacks children left-to-right with 6px gap. Children with w=0 flex to fill remaining space. SCROLL flag enables horizontal scrolling." },
+	{ MKGUI_VBOX,      "Vertical box layout. Stacks children top-to-bottom with 6px gap. Children with h=0 flex to fill remaining space. SCROLL flag enables scrolling." },
+	{ MKGUI_HSPLIT,    "Horizontal splitter. Divides area into top and bottom regions with a draggable divider. Children use REGION_TOP/BOTTOM flags." },
+	{ MKGUI_VSPLIT,    "Vertical splitter. Divides area into left and right regions with a draggable divider. Children use REGION_LEFT/RIGHT flags." },
+	{ MKGUI_MENU,      "Menu bar. Add MENUITEM children for top-level entries. Submenus are menuitems parented to other menuitems." },
+	{ MKGUI_PANEL,     "Plain container. No border by default. Use PANEL_BORDER for a visible border, PANEL_SUNKEN for a recessed look." },
+	{ MKGUI_TABS,      "Tab container. Children must be TAB widgets. Only the active tab's contents are visible and consume CPU." },
+	{ MKGUI_TOOLBAR,   "Toolbar bar. Children are buttons rendered as icon-only toolbar buttons. Labels become tooltips on hover." },
+};
+#define ED_HELP_COUNT (sizeof(ed_help) / sizeof(ed_help[0]))
+
+static const char *ed_help_text;
+static uint32_t ed_help_widget_id;
+
+// [=]===^=[ ed_find_help ]========================================[=]
+static const char *ed_find_help(uint32_t type) {
+	for(uint32_t i = 0; i < ED_HELP_COUNT; ++i) {
+		if(ed_help[i].type == type) {
+			return ed_help[i].text;
+		}
+	}
+	return NULL;
+}
+
+// [=]===^=[ ed_render_help_popup ]================================[=]
+static void ed_render_help_popup(struct mkgui_ctx *ctx, void *userdata) {
+	(void)userdata;
+	if(!ed_help_text || !ed_help_widget_id) {
+		return;
+	}
+
+	int32_t widx = find_widget_idx(ctx, ed_help_widget_id);
+	if(widx < 0) {
+		return;
+	}
+
+	int32_t bx = ctx->rects[widx].x;
+	int32_t by = ctx->rects[widx].y + ctx->rects[widx].h + 4;
+	int32_t max_w = 300;
+	int32_t pad = 8;
+	int32_t line_h = ctx->font_height + 2;
+
+	const char *src = ed_help_text;
+	int32_t lines = 0;
+	int32_t actual_w = 0;
+	while(*src) {
+		int32_t line_w = 0;
+		const char *line_start = src;
+		const char *last_break = NULL;
+		while(*src && *src != '\n') {
+			char tmp[2] = { *src, 0 };
+			int32_t cw = text_width(ctx, tmp);
+			if(line_w + cw > max_w - pad * 2) {
+				if(last_break) {
+					src = last_break + 1;
+				}
+				break;
+			}
+			if(*src == ' ') {
+				last_break = src;
+			}
+			line_w += cw;
+			++src;
+		}
+		if(*src == '\n') {
+			++src;
+		}
+		if(src == line_start && *src) {
+			++src;
+		}
+		if(line_w > actual_w) {
+			actual_w = line_w;
+		}
+		++lines;
+	}
+
+	int32_t pw = actual_w + pad * 2;
+	int32_t ph = lines * line_h + pad * 2;
+
+	if(bx + pw > ctx->win_w) {
+		bx = ctx->win_w - pw;
+	}
+	if(by + ph > ctx->win_h) {
+		by = ctx->rects[widx].y - ph - 4;
+	}
+	if(bx < 0) {
+		bx = 0;
+	}
+	if(by < 0) {
+		by = 0;
+	}
+
+	draw_rounded_rect(ctx->pixels, ctx->win_w, ctx->win_h, bx, by, pw, ph, ctx->theme.menu_bg, ctx->theme.splitter, ctx->theme.corner_radius);
+
+	src = ed_help_text;
+	int32_t ty = by + pad;
+	while(*src) {
+		int32_t line_w = 0;
+		const char *line_start = src;
+		const char *last_break = NULL;
+		const char *line_end = src;
+		while(*src && *src != '\n') {
+			char tmp[2] = { *src, 0 };
+			int32_t cw = text_width(ctx, tmp);
+			if(line_w + cw > max_w - pad * 2) {
+				if(last_break) {
+					line_end = last_break;
+					src = last_break + 1;
+				} else {
+					line_end = src;
+				}
+				break;
+			}
+			if(*src == ' ') {
+				last_break = src;
+			}
+			line_w += cw;
+			++src;
+			line_end = src;
+		}
+		if(*src == '\n') {
+			++src;
+		}
+		if(src == line_start && *src) {
+			++src;
+			line_end = src;
+		}
+
+		char line_buf[256];
+		uint32_t len = (uint32_t)(line_end - line_start);
+		if(len >= sizeof(line_buf)) {
+			len = sizeof(line_buf) - 1;
+		}
+		memcpy(line_buf, line_start, len);
+		line_buf[len] = '\0';
+		push_text_clip(bx + pad, ty, line_buf, ctx->theme.text, bx, by, bx + pw, by + ph);
+		ty += line_h;
+	}
+}
+
+// ---------------------------------------------------------------------------
 // Property descriptor system
 // ---------------------------------------------------------------------------
 
@@ -247,6 +421,9 @@ enum {
 	ED_VIS_IN_SPLIT  = (1 << 2),
 	ED_VIS_TABS      = (1 << 3),
 	ED_VIS_MENU      = (1 << 4),
+	ED_VIS_BOX       = (1 << 5),
+	ED_VIS_BORDERABLE = (1 << 6),
+	ED_VIS_INPUT     = (1 << 7),
 };
 
 enum {
@@ -296,6 +473,12 @@ static struct ed_prop_desc ed_props[] = {
 	{ ED_PK_FLAG,          "RgnBot",          offsetof(struct ed_widget, flags),         MKGUI_REGION_BOTTOM,0,      0,    ED_VIS_IN_SPLIT,  ED_ACT_NONE,         ED_PROP_FL_REGBOT,    0,                   0,                 0 },
 	{ ED_PK_FLAG,          "RgnLeft",         offsetof(struct ed_widget, flags),         MKGUI_REGION_LEFT,  0,      0,    ED_VIS_IN_SPLIT,  ED_ACT_NONE,         ED_PROP_FL_REGLEFT,   0,                   0,                 0 },
 	{ ED_PK_FLAG,          "RgnRight",        offsetof(struct ed_widget, flags),         MKGUI_REGION_RIGHT, 0,      0,    ED_VIS_IN_SPLIT,  ED_ACT_NONE,         ED_PROP_FL_REGRIGHT,  0,                   0,                 0 },
+	{ ED_PK_FLAG,          "Scroll",          offsetof(struct ed_widget, flags),         MKGUI_SCROLL,       0,      0,    ED_VIS_BOX,       ED_ACT_NONE,         ED_PROP_FL_SCROLL,    0,                   0,                 0 },
+	{ ED_PK_FLAG,          "Border",          offsetof(struct ed_widget, flags),         MKGUI_PANEL_BORDER, 0,      0,    ED_VIS_BORDERABLE,ED_ACT_NONE,         ED_PROP_FL_BORDER,    0,                   0,                 0 },
+	{ ED_PK_FLAG,          "Sunken",          offsetof(struct ed_widget, flags),         MKGUI_PANEL_SUNKEN, 0,      0,    ED_VIS_BORDERABLE,ED_ACT_NONE,         ED_PROP_FL_SUNKEN,    0,                   0,                 0 },
+	{ ED_PK_FLAG,          "No Pad",          offsetof(struct ed_widget, flags),         MKGUI_NO_PAD,       0,      0,    ED_VIS_BOX,       ED_ACT_NONE,         ED_PROP_FL_NOPAD,     0,                   0,                 0 },
+	{ ED_PK_FLAG,          "Password",        offsetof(struct ed_widget, flags),         MKGUI_PASSWORD,     0,      0,    ED_VIS_INPUT,     ED_ACT_NONE,         ED_PROP_FL_PASSWORD,  0,                   0,                 0 },
+	{ ED_PK_FLAG,          "Readonly",        offsetof(struct ed_widget, flags),         MKGUI_READONLY,     0,      0,    ED_VIS_INPUT,     ED_ACT_NONE,         ED_PROP_FL_READONLY,  0,                   0,                 0 },
 	{ ED_PK_ACTION,        "Add Tab",         0,                                        0,                  0,      0,    ED_VIS_TABS,      ED_ACT_ADD_TAB,      ED_PROP_ADD_TAB,      0,                   0,                 0 },
 	{ ED_PK_ACTION,        "Remove Tab",      0,                                        0,                  0,      0,    ED_VIS_TABS,      ED_ACT_REM_TAB,      ED_PROP_REM_TAB,      0,                   0,                 0 },
 	{ ED_PK_ACTION,        "Add Item",        0,                                        0,                  0,      0,    ED_VIS_MENU,      ED_ACT_ADD_ITEM,     ED_PROP_ADD_ITEM,     0,                   0,                 0 },
@@ -315,6 +498,15 @@ static uint32_t ed_compute_vis_mask(struct ed_widget *w) {
 	}
 	if(w->type == MKGUI_TABS) {
 		mask |= ED_VIS_TABS;
+	}
+	if(w->type == MKGUI_VBOX || w->type == MKGUI_HBOX) {
+		mask |= ED_VIS_BOX;
+	}
+	if(w->type == MKGUI_VBOX || w->type == MKGUI_HBOX || w->type == MKGUI_FORM || w->type == MKGUI_PANEL || w->type == MKGUI_IMAGE || w->type == MKGUI_GLVIEW || w->type == MKGUI_CANVAS) {
+		mask |= ED_VIS_BORDERABLE;
+	}
+	if(w->type == MKGUI_INPUT || w->type == MKGUI_TEXTAREA) {
+		mask |= ED_VIS_INPUT;
 	}
 	if(w->type == MKGUI_MENU || w->type == MKGUI_MENUITEM) {
 		mask |= ED_VIS_MENU;
@@ -2439,6 +2631,12 @@ int main(void) {
 		{ MKGUI_CHECKBOX, ED_PROP_FL_BOTTOM,  "Bottom",         "", ED_PROP_FL_COL3, 0, 0, 0, 20, 0 },
 		{ MKGUI_CHECKBOX, ED_PROP_FL_REGRIGHT,"RgnRight",       "", ED_PROP_FL_COL3, 0, 0, 0, 20, 0 },
 		{ MKGUI_CHECKBOX, ED_PROP_FL_MENURADIO,"MRad",          "", ED_PROP_FL_COL3, 0, 0, 0, 20, 0 },
+		{ MKGUI_CHECKBOX, ED_PROP_FL_SCROLL,  "Scroll",         "", ED_PROP_FL_COL0, 0, 0, 0, 20, 0 },
+		{ MKGUI_CHECKBOX, ED_PROP_FL_BORDER,  "Border",         "", ED_PROP_FL_COL1, 0, 0, 0, 20, 0 },
+		{ MKGUI_CHECKBOX, ED_PROP_FL_SUNKEN,  "Sunken",         "", ED_PROP_FL_COL2, 0, 0, 0, 20, 0 },
+		{ MKGUI_CHECKBOX, ED_PROP_FL_NOPAD,   "No Pad",         "", ED_PROP_FL_COL3, 0, 0, 0, 20, 0 },
+		{ MKGUI_CHECKBOX, ED_PROP_FL_PASSWORD, "Password",      "", ED_PROP_FL_COL0, 0, 0, 0, 20, 0 },
+		{ MKGUI_CHECKBOX, ED_PROP_FL_READONLY, "Readonly",      "", ED_PROP_FL_COL1, 0, 0, 0, 20, 0 },
 
 		/* Add/Remove buttons */
 		{ MKGUI_HBOX,     ED_PROP_BTN_HBOX,  "",                "", ED_PROP_VBOX, 0, 0, 0, 22, MKGUI_HIDDEN },
@@ -2513,6 +2711,7 @@ int main(void) {
 	}
 
 	mkgui_canvas_set_callback(ctx, ED_CANVAS_LBL, ed_render_canvas, NULL);
+	ctx->render_cb = ed_render_help_popup;
 
 	int32_t sb_widths[] = { -1, 120 };
 	mkgui_statusbar_setup(ctx, ED_STATUSBAR, 2, sb_widths);
@@ -2801,7 +3000,40 @@ int main(void) {
 				} break;
 
 				case MKGUI_EVENT_KEY: {
+					if(ev.keysym == MKGUI_KEY_F1) {
+						uint32_t hover = ctx->hover_id;
+						uint32_t help_type = 0;
+						for(uint32_t pi = 0; pi < widget_pal_count; ++pi) {
+							if(hover == ED_PAL_FIRST + pi) {
+								help_type = ed_widgets[pi].type;
+								break;
+							}
+						}
+						for(uint32_t pi = 0; pi < ctn_pal_count; ++pi) {
+							if(hover == ED_CTN_FIRST + pi) {
+								help_type = ed_containers[pi].type;
+								break;
+							}
+						}
+						if(help_type) {
+							ed_help_text = ed_find_help(help_type);
+							ed_help_widget_id = hover;
+							dirty_all(ctx);
+						} else {
+							if(ed_help_text) {
+								ed_help_text = NULL;
+								ed_help_widget_id = 0;
+								dirty_all(ctx);
+							}
+						}
+					}
+
 					if(ev.keysym == MKGUI_KEY_ESCAPE) {
+						if(ed_help_text) {
+							ed_help_text = NULL;
+							ed_help_widget_id = 0;
+							dirty_all(ctx);
+						}
 						ed.placement_type = 0;
 						mkgui_statusbar_set(ctx, ED_STATUSBAR, 0, "Ready");
 						dirty_all(ctx);
@@ -2921,6 +3153,18 @@ int main(void) {
 							}
 							memmove(&ed.widgets[new_idx], &ed.widgets[new_idx + 1], (ed.widget_count - (uint32_t)new_idx - 1) * sizeof(struct ed_widget));
 							--ed.widget_count;
+
+							if(pidx >= 0 && ed.widgets[pidx].type == MKGUI_FORM && tmp.type != MKGUI_LABEL && ed.widget_count + 1 < ED_MAX_WIDGETS) {
+								uint32_t lbl_pos = ed_insert_child_after(new_parent);
+								struct ed_widget *lbl = &ed.widgets[lbl_pos];
+								memset(lbl, 0, sizeof(*lbl));
+								lbl->type = MKGUI_LABEL;
+								lbl->id = ed.next_id++;
+								lbl->parent_id = new_parent;
+								snprintf(lbl->label, sizeof(lbl->label), "Label:");
+								snprintf(lbl->id_name, sizeof(lbl->id_name), "ID_LABEL_%u", lbl->id);
+							}
+
 							uint32_t pos = ed_insert_child_after(new_parent);
 							ed.widgets[pos] = tmp;
 							new_idx = (int32_t)pos;
@@ -3154,6 +3398,12 @@ int main(void) {
 					ed_push_undo();
 				}
 				ed.drag_active = 0;
+			}
+
+			if(ed_help_text && ed_help_widget_id && ctx->hover_id != ed_help_widget_id) {
+				ed_help_text = NULL;
+				ed_help_widget_id = 0;
+				dirty_all(ctx);
 			}
 
 			prev_press = ctx->press_id;

@@ -341,6 +341,8 @@ void mkgui_slider_setup(struct mkgui_ctx *ctx, uint32_t id, int32_t min_val, int
 int32_t mkgui_slider_get(struct mkgui_ctx *ctx, uint32_t id);
 ```
 
+The slider renders a horizontal track with a draggable thumb. It does not display any text -- add your own label and/or value display if needed (e.g. using a FORM row or an HBOX with a label widget).
+
 ### Spinbox
 
 ```c
@@ -722,7 +724,7 @@ Stacks children vertically with 6px gap. Each child gets the full container widt
 
 ### HBox
 
-Stacks children horizontally with 6px gap. Each child gets the full container height. Children with `w > 0` get a fixed width. Children with `w = 0` flex to share remaining horizontal space equally.
+Stacks children horizontally with 6px gap. Each child gets the full container height. Children with `w > 0` get a fixed width. Children with `w = 0` flex to share remaining horizontal space equally. Use `MKGUI_SCROLL` to enable horizontal scrolling when content overflows.
 
 ```c
 { MKGUI_HBOX,   ID_HBOX, "", "", ID_TAB1, 10, 10, 600, 300, 0 },
@@ -744,6 +746,8 @@ Two-column form layout for label+control pairs. Children are paired in order: 1s
 { MKGUI_LABEL,    ID_LBL3,  "Category:","", ID_FORM, 0, 0, 0, 0, 0 },
 { MKGUI_DROPDOWN, ID_DRP1,  "",          "", ID_FORM, 0, 0, 0, 0, 0 },
 ```
+
+The widget editor automatically inserts a label when dropping a non-label widget into a FORM, ensuring the pairing is always correct. Dropping a label by itself places it in the label column.
 
 Containers can be nested. For example, an HBOX containing a VBOX and a FORM side by side, where the VBOX has a fixed width and the FORM flexes to fill remaining space.
 
