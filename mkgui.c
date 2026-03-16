@@ -30,7 +30,7 @@
 #define MKGUI_TAB_HEIGHT     26
 #define MKGUI_MENU_HEIGHT    22
 #define MKGUI_SCROLLBAR_W    14
-#define MKGUI_SPLIT_THICK 5
+#define MKGUI_SPLIT_THICK    5
 #define MKGUI_BOX_GAP        6
 #define MKGUI_BOX_PAD        6
 #define MKGUI_MARGIN         3
@@ -52,22 +52,22 @@
 // Platform-neutral key constants (values match X11 keysyms for convenience)
 // ---------------------------------------------------------------------------
 
-#define MKGUI_KEY_BACKSPACE  0xFF08
-#define MKGUI_KEY_TAB        0xFF09
-#define MKGUI_KEY_ISO_LEFT_TAB 0xFE20
-#define MKGUI_KEY_RETURN     0xFF0D
-#define MKGUI_KEY_ESCAPE     0xFF1B
+#define MKGUI_KEY_BACKSPACE  0xff08
+#define MKGUI_KEY_TAB        0xff09
+#define MKGUI_KEY_ISO_LEFT_TAB 0xfe20
+#define MKGUI_KEY_RETURN     0xff0d
+#define MKGUI_KEY_ESCAPE     0xff1b
 #define MKGUI_KEY_SPACE      0x0020
-#define MKGUI_KEY_DELETE     0xFFFF
-#define MKGUI_KEY_HOME       0xFF50
-#define MKGUI_KEY_LEFT       0xFF51
-#define MKGUI_KEY_UP         0xFF52
-#define MKGUI_KEY_RIGHT      0xFF53
-#define MKGUI_KEY_DOWN       0xFF54
-#define MKGUI_KEY_PAGE_UP    0xFF55
-#define MKGUI_KEY_PAGE_DOWN  0xFF56
-#define MKGUI_KEY_END        0xFF57
-#define MKGUI_KEY_F1         0xFFBE
+#define MKGUI_KEY_DELETE     0xffff
+#define MKGUI_KEY_HOME       0xff50
+#define MKGUI_KEY_LEFT       0xff51
+#define MKGUI_KEY_UP         0xff52
+#define MKGUI_KEY_RIGHT      0xff53
+#define MKGUI_KEY_DOWN       0xff54
+#define MKGUI_KEY_PAGE_UP    0xff55
+#define MKGUI_KEY_PAGE_DOWN  0xff56
+#define MKGUI_KEY_END        0xff57
+#define MKGUI_KEY_F1         0xffbe
 
 // ---------------------------------------------------------------------------
 // Platform-neutral modifier masks
