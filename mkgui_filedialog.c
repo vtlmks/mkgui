@@ -24,7 +24,7 @@
 #define FD_DBLCLICK_MS      400
 #define FD_TOOLBAR_H        28
 #define FD_BOTTOM_H         72
-#define FD_TYPEAHEAD_TIMEOUT_MS 1500
+#define FD_FILTER_MAX 64
 
 // ---------------------------------------------------------------------------
 // Widget IDs
@@ -48,6 +48,7 @@ enum {
 	FD_ID_BTN_NEWFOLDER,
 	FD_ID_BTN_CONFIRM,
 	FD_ID_BTN_CANCEL,
+	FD_ID_SEARCH_LABEL,
 };
 
 // ---------------------------------------------------------------------------
@@ -108,9 +109,10 @@ struct fd_state {
 	uint32_t filter_count;
 	uint32_t active_filter;
 
-	char typeahead[64];
-	uint32_t typeahead_len;
-	uint32_t typeahead_time;
+	char filter[FD_FILTER_MAX];
+	uint32_t filter_len;
+	uint32_t filtered[FD_MAX_FILES];
+	uint32_t filtered_count;
 };
 
 static struct fd_state fd;
@@ -585,6 +587,85 @@ static uint32_t fd_history_can_fwd(void) {
 }
 
 // ---------------------------------------------------------------------------
+// Filter-as-you-type
+// ---------------------------------------------------------------------------
+
+// [=]===^=[ fd_strcasestr ]=======================================[=]
+static uint32_t fd_strcasestr(const char *haystack, const char *needle, uint32_t needle_len) {
+	if(needle_len == 0) {
+		return 1;
+	}
+	uint32_t hlen = (uint32_t)strlen(haystack);
+	if(needle_len > hlen) {
+		return 0;
+	}
+	for(uint32_t i = 0; i <= hlen - needle_len; ++i) {
+		uint32_t match = 1;
+		for(uint32_t j = 0; j < needle_len; ++j) {
+			int32_t ca = haystack[i + j];
+			int32_t cb = needle[j];
+			if(ca >= 'A' && ca <= 'Z') { ca += 32; }
+			if(cb >= 'A' && cb <= 'Z') { cb += 32; }
+			if(ca != cb) {
+				match = 0;
+				break;
+			}
+		}
+		if(match) {
+			return 1;
+		}
+	}
+	return 0;
+}
+
+// [=]===^=[ fd_apply_filter ]=====================================[=]
+static void fd_apply_filter(struct mkgui_ctx *dlg) {
+	fd.filtered_count = 0;
+	for(uint32_t i = 0; i < fd.entry_count; ++i) {
+		if(fd.entries[i].is_dir) {
+			fd.filtered[fd.filtered_count++] = i;
+			continue;
+		}
+		if(fd.filter_len == 0 || fd_strcasestr(fd.entries[i].name, fd.filter, fd.filter_len)) {
+			fd.filtered[fd.filtered_count++] = i;
+		}
+	}
+	struct mkgui_listview_data *lv = find_listv_data(dlg, FD_ID_FILES);
+	if(lv) {
+		lv->row_count = fd.filtered_count;
+		lv->selected_row = -1;
+		lv->scroll_y = 0;
+		memset(lv->multi_sel, 0, sizeof(lv->multi_sel));
+		lv->multi_sel_count = 0;
+	}
+	if(fd.filter_len > 0) {
+		char label[80];
+		snprintf(label, sizeof(label), "Filter: %s", fd.filter);
+		mkgui_label_set(dlg, FD_ID_SEARCH_LABEL, label);
+		int32_t widx = find_widget_idx(dlg, FD_ID_SEARCH_LABEL);
+		if(widx >= 0) {
+			dlg->widgets[widx].flags &= ~MKGUI_HIDDEN;
+		}
+	} else {
+		int32_t widx = find_widget_idx(dlg, FD_ID_SEARCH_LABEL);
+		if(widx >= 0) {
+			dlg->widgets[widx].flags |= MKGUI_HIDDEN;
+		}
+	}
+	dirty_all(dlg);
+}
+
+// [=]===^=[ fd_clear_filter ]=====================================[=]
+static void fd_clear_filter(struct mkgui_ctx *dlg) {
+	if(fd.filter_len == 0) {
+		return;
+	}
+	fd.filter_len = 0;
+	fd.filter[0] = '\0';
+	fd_apply_filter(dlg);
+}
+
+// ---------------------------------------------------------------------------
 // Navigation
 // ---------------------------------------------------------------------------
 
@@ -617,17 +698,9 @@ static void fd_navigate(struct mkgui_ctx *dlg, const char *newpath) {
 
 	mkgui_pathbar_set(dlg, FD_ID_PATHBAR, fd.path);
 
-	struct mkgui_listview_data *lv = find_listv_data(dlg, FD_ID_FILES);
-	if(lv) {
-		lv->row_count = fd.entry_count;
-		lv->selected_row = -1;
-		lv->scroll_y = 0;
-		memset(lv->multi_sel, 0, sizeof(lv->multi_sel));
-		lv->multi_sel_count = 0;
-	}
-
-	fd.typeahead_len = 0;
-	dirty_all(dlg);
+	fd.filter_len = 0;
+	fd.filter[0] = '\0';
+	fd_apply_filter(dlg);
 }
 
 // [=]===^=[ fd_navigate_entry ]==================================[=]
@@ -710,14 +783,9 @@ static void fd_navigate_back(struct mkgui_ctx *dlg) {
 	snprintf(fd.path, sizeof(fd.path), "%s", target);
 	fd_scan_dir();
 	mkgui_pathbar_set(dlg, FD_ID_PATHBAR, fd.path);
-	struct mkgui_listview_data *lv = find_listv_data(dlg, FD_ID_FILES);
-	if(lv) {
-		lv->row_count = fd.entry_count;
-		lv->selected_row = -1;
-		lv->scroll_y = 0;
-	}
-	fd.typeahead_len = 0;
-	dirty_all(dlg);
+	fd.filter_len = 0;
+	fd.filter[0] = '\0';
+	fd_apply_filter(dlg);
 }
 
 // [=]===^=[ fd_navigate_fwd ]=====================================[=]
@@ -730,14 +798,9 @@ static void fd_navigate_fwd(struct mkgui_ctx *dlg) {
 	snprintf(fd.path, sizeof(fd.path), "%s", target);
 	fd_scan_dir();
 	mkgui_pathbar_set(dlg, FD_ID_PATHBAR, fd.path);
-	struct mkgui_listview_data *lv = find_listv_data(dlg, FD_ID_FILES);
-	if(lv) {
-		lv->row_count = fd.entry_count;
-		lv->selected_row = -1;
-		lv->scroll_y = 0;
-	}
-	fd.typeahead_len = 0;
-	dirty_all(dlg);
+	fd.filter_len = 0;
+	fd.filter[0] = '\0';
+	fd_apply_filter(dlg);
 }
 
 // ---------------------------------------------------------------------------
@@ -774,6 +837,14 @@ static void fd_append_filter_ext(char *name, uint32_t name_size) {
 	}
 }
 
+// [=]===^=[ fd_filtered_entry ]===================================[=]
+static struct fd_entry *fd_filtered_entry(uint32_t row) {
+	if(row >= fd.filtered_count) {
+		return NULL;
+	}
+	return &fd.entries[fd.filtered[row]];
+}
+
 // ---------------------------------------------------------------------------
 // Results
 // ---------------------------------------------------------------------------
@@ -805,19 +876,20 @@ static void fd_build_results(struct mkgui_ctx *dlg) {
 		if(lv->multi_sel_count > 0) {
 			for(uint32_t i = 0; i < lv->multi_sel_count && fd_result_count < FD_MAX_RESULTS; ++i) {
 				int32_t row = lv->multi_sel[i];
-				if(row >= 0 && row < (int32_t)fd.entry_count && !fd.entries[row].is_dir) {
+				struct fd_entry *e = fd_filtered_entry((uint32_t)row);
+				if(e && !e->is_dir) {
 					if(strcmp(fd.path, "/") == 0) {
-						snprintf(fd_results[fd_result_count], FD_PATH_SIZE, "/%s", fd.entries[row].name);
+						snprintf(fd_results[fd_result_count], FD_PATH_SIZE, "/%s", e->name);
 					} else {
-						snprintf(fd_results[fd_result_count], FD_PATH_SIZE, "%s/%s", fd.path, fd.entries[row].name);
+						snprintf(fd_results[fd_result_count], FD_PATH_SIZE, "%s/%s", fd.path, e->name);
 					}
 					++fd_result_count;
 				}
 			}
 
-		} else if(lv->selected_row >= 0 && lv->selected_row < (int32_t)fd.entry_count) {
-			struct fd_entry *e = &fd.entries[lv->selected_row];
-			if(!e->is_dir) {
+		} else {
+			struct fd_entry *e = fd_filtered_entry((uint32_t)lv->selected_row);
+			if(e && !e->is_dir) {
 				if(strcmp(fd.path, "/") == 0) {
 					snprintf(fd_results[0], FD_PATH_SIZE, "/%s", e->name);
 				} else {
@@ -852,72 +924,6 @@ static uint32_t fd_confirm(struct mkgui_ctx *dlg) {
 
 	fd.confirmed = 1;
 	return 1;
-}
-
-// ---------------------------------------------------------------------------
-// Type-ahead search
-// ---------------------------------------------------------------------------
-
-// [=]===^=[ fd_typeahead_jump ]===================================[=]
-static void fd_typeahead_jump(struct mkgui_ctx *dlg) {
-	if(fd.typeahead_len == 0) {
-		return;
-	}
-	for(uint32_t i = 0; i < fd.entry_count; ++i) {
-		if(strcmp(fd.entries[i].name, "..") == 0) {
-			continue;
-		}
-		if(fd_strcasecmp(fd.entries[i].name, fd.typeahead) <= 0) {
-			uint32_t nlen = (uint32_t)strlen(fd.entries[i].name);
-			uint32_t match = 1;
-			for(uint32_t j = 0; j < fd.typeahead_len && j < nlen; ++j) {
-				int32_t ca = fd.typeahead[j];
-				int32_t cb = fd.entries[i].name[j];
-				if(ca >= 'A' && ca <= 'Z') { ca += 32; }
-				if(cb >= 'A' && cb <= 'Z') { cb += 32; }
-				if(ca != cb) {
-					match = 0;
-					break;
-				}
-			}
-			if(!match) {
-				continue;
-			}
-		} else {
-			uint32_t nlen = (uint32_t)strlen(fd.entries[i].name);
-			uint32_t match = 1;
-			for(uint32_t j = 0; j < fd.typeahead_len && j < nlen; ++j) {
-				int32_t ca = fd.typeahead[j];
-				int32_t cb = fd.entries[i].name[j];
-				if(ca >= 'A' && ca <= 'Z') { ca += 32; }
-				if(cb >= 'A' && cb <= 'Z') { cb += 32; }
-				if(ca != cb) {
-					match = 0;
-					break;
-				}
-			}
-			if(!match) {
-				continue;
-			}
-		}
-
-		struct mkgui_listview_data *lv = find_listv_data(dlg, FD_ID_FILES);
-		if(lv) {
-			lv->selected_row = (int32_t)i;
-			int32_t widx = find_widget_idx(dlg, FD_ID_FILES);
-			if(widx >= 0) {
-				int32_t view_h = dlg->rects[widx].h - MKGUI_ROW_HEIGHT - 2;
-				int32_t row_y = (int32_t)i * MKGUI_ROW_HEIGHT;
-				if(row_y < lv->scroll_y) {
-					lv->scroll_y = row_y;
-				} else if(row_y + MKGUI_ROW_HEIGHT > lv->scroll_y + view_h) {
-					lv->scroll_y = row_y + MKGUI_ROW_HEIGHT - view_h;
-				}
-			}
-			dirty_all(dlg);
-		}
-		return;
-	}
 }
 
 // ---------------------------------------------------------------------------
@@ -956,11 +962,11 @@ static void fd_bookmark_row_cb(uint32_t row, uint32_t col, char *buf, uint32_t b
 // [=]===^=[ fd_file_row_cb ]=====================================[=]
 static void fd_file_row_cb(uint32_t row, uint32_t col, char *buf, uint32_t buf_size, void *userdata) {
 	(void)userdata;
-	if(row >= fd.entry_count) {
+	struct fd_entry *e = fd_filtered_entry(row);
+	if(!e) {
 		buf[0] = '\0';
 		return;
 	}
-	struct fd_entry *e = &fd.entries[row];
 
 	switch(col) {
 		case 0: {
@@ -1001,17 +1007,18 @@ static void fd_update_name_from_selection(struct mkgui_ctx *dlg) {
 		uint32_t pos = 0;
 		for(uint32_t i = 0; i < lv->multi_sel_count; ++i) {
 			int32_t row = lv->multi_sel[i];
-			if(row >= 0 && row < (int32_t)fd.entry_count && !fd.entries[row].is_dir) {
-				uint32_t has_space = (strchr(fd.entries[row].name, ' ') != NULL);
+			struct fd_entry *e = fd_filtered_entry((uint32_t)row);
+			if(e && !e->is_dir) {
+				uint32_t has_space = (strchr(e->name, ' ') != NULL);
 				if(pos > 0 && pos < sizeof(combined) - 1) {
 					combined[pos++] = ' ';
 				}
 				if(has_space && pos < sizeof(combined) - 2) {
 					combined[pos++] = '"';
 				}
-				uint32_t nlen = (uint32_t)strlen(fd.entries[row].name);
+				uint32_t nlen = (uint32_t)strlen(e->name);
 				for(uint32_t j = 0; j < nlen && pos < sizeof(combined) - 2; ++j) {
-					combined[pos++] = fd.entries[row].name[j];
+					combined[pos++] = e->name[j];
 				}
 				if(has_space && pos < sizeof(combined) - 1) {
 					combined[pos++] = '"';
@@ -1021,9 +1028,9 @@ static void fd_update_name_from_selection(struct mkgui_ctx *dlg) {
 		combined[pos] = '\0';
 		mkgui_input_set(dlg, FD_ID_NAME_INPUT, combined);
 
-	} else if(lv->selected_row >= 0 && lv->selected_row < (int32_t)fd.entry_count) {
-		struct fd_entry *e = &fd.entries[lv->selected_row];
-		if(!e->is_dir) {
+	} else {
+		struct fd_entry *e = fd_filtered_entry((uint32_t)lv->selected_row);
+		if(e && !e->is_dir) {
 			mkgui_input_set(dlg, FD_ID_NAME_INPUT, e->name);
 		}
 	}
@@ -1049,13 +1056,7 @@ static void fd_new_folder(struct mkgui_ctx *dlg) {
 #endif
 
 	fd_scan_dir();
-	struct mkgui_listview_data *lv = find_listv_data(dlg, FD_ID_FILES);
-	if(lv) {
-		lv->row_count = fd.entry_count;
-		lv->selected_row = -1;
-		lv->scroll_y = 0;
-	}
-	dirty_all(dlg);
+	fd_apply_filter(dlg);
 }
 
 // ---------------------------------------------------------------------------
@@ -1114,6 +1115,7 @@ static uint32_t fd_run_dialog(struct mkgui_ctx *ctx, uint32_t mode, const struct
 		{ MKGUI_CHECKBOX, FD_ID_CHK_HIDDEN,    "Show hidden", "",               FD_ID_WINDOW,   8,  10, 110, 24, MKGUI_ANCHOR_BOTTOM, 0 },
 		{ MKGUI_BUTTON,   FD_ID_BTN_CONFIRM,   "",            "",               FD_ID_WINDOW, 100,   8,  80, 28, MKGUI_ANCHOR_BOTTOM | MKGUI_ANCHOR_RIGHT, 0 },
 		{ MKGUI_BUTTON,   FD_ID_BTN_CANCEL,    "Cancel",      "",               FD_ID_WINDOW,  12,   8,  80, 28, MKGUI_ANCHOR_BOTTOM | MKGUI_ANCHOR_RIGHT, 0 },
+		{ MKGUI_LABEL,    FD_ID_SEARCH_LABEL,  "",            "magnify",        FD_ID_WINDOW, 130,  10, 200, 20, MKGUI_ANCHOR_BOTTOM | MKGUI_HIDDEN, 0 },
 	};
 
 	strncpy(widgets[0].label, title, MKGUI_MAX_TEXT - 1);
@@ -1142,6 +1144,7 @@ static uint32_t fd_run_dialog(struct mkgui_ctx *ctx, uint32_t mode, const struct
 		{ "Modified", 150, MKGUI_CELL_DATE },
 	};
 	mkgui_listview_setup(dlg, FD_ID_FILES, fd.entry_count, 3, file_cols, fd_file_row_cb, NULL);
+	fd_apply_filter(dlg);
 
 	struct mkgui_split_data *sd = find_split_data(dlg, FD_ID_SPLIT);
 	if(sd) {
@@ -1198,13 +1201,7 @@ static uint32_t fd_run_dialog(struct mkgui_ctx *ctx, uint32_t mode, const struct
 					if(ev.id == FD_ID_CHK_HIDDEN) {
 						fd.show_hidden = mkgui_checkbox_get(dlg, FD_ID_CHK_HIDDEN);
 						fd_scan_dir();
-						struct mkgui_listview_data *lv = find_listv_data(dlg, FD_ID_FILES);
-						if(lv) {
-							lv->row_count = fd.entry_count;
-							lv->selected_row = -1;
-							lv->scroll_y = 0;
-						}
-						dirty_all(dlg);
+						fd_apply_filter(dlg);
 					}
 				} break;
 
@@ -1212,13 +1209,7 @@ static uint32_t fd_run_dialog(struct mkgui_ctx *ctx, uint32_t mode, const struct
 					if(ev.id == FD_ID_FILTER_DROP) {
 						fd.active_filter = (uint32_t)ev.value;
 						fd_scan_dir();
-						struct mkgui_listview_data *lv = find_listv_data(dlg, FD_ID_FILES);
-						if(lv) {
-							lv->row_count = fd.entry_count;
-							lv->selected_row = -1;
-							lv->scroll_y = 0;
-						}
-						dirty_all(dlg);
+						fd_apply_filter(dlg);
 					}
 				} break;
 
@@ -1244,21 +1235,14 @@ static uint32_t fd_run_dialog(struct mkgui_ctx *ctx, uint32_t mode, const struct
 						fd.sort_col = ev.col;
 						fd.sort_dir = ev.value;
 						fd_scan_dir();
-						struct mkgui_listview_data *lv = find_listv_data(dlg, FD_ID_FILES);
-						if(lv) {
-							lv->row_count = fd.entry_count;
-							lv->selected_row = -1;
-							lv->scroll_y = 0;
-						}
-						dirty_all(dlg);
+						fd_apply_filter(dlg);
 					}
 				} break;
 
 				case MKGUI_EVENT_KEY: {
 					if(ev.keysym == MKGUI_KEY_ESCAPE) {
-						if(fd.typeahead_len > 0) {
-							fd.typeahead_len = 0;
-							fd.typeahead[0] = '\0';
+						if(fd.filter_len > 0) {
+							fd_clear_filter(dlg);
 						} else {
 							running = 0;
 						}
@@ -1270,10 +1254,12 @@ static uint32_t fd_run_dialog(struct mkgui_ctx *ctx, uint32_t mode, const struct
 							}
 						} else if(dlg->focus_id == FD_ID_FILES) {
 							struct mkgui_listview_data *lv = find_listv_data(dlg, FD_ID_FILES);
-							if(lv && lv->selected_row >= 0 && lv->selected_row < (int32_t)fd.entry_count) {
-								if(fd.entries[lv->selected_row].is_dir) {
-									fd_navigate_entry(dlg, lv->selected_row);
-								} else {
+							if(lv && lv->selected_row >= 0) {
+								struct fd_entry *e = fd_filtered_entry((uint32_t)lv->selected_row);
+								if(e && e->is_dir) {
+									uint32_t real_idx = fd.filtered[(uint32_t)lv->selected_row];
+									fd_navigate_entry(dlg, (int32_t)real_idx);
+								} else if(e) {
 									if(fd_confirm(dlg)) {
 										running = 0;
 									}
@@ -1285,12 +1271,14 @@ static uint32_t fd_run_dialog(struct mkgui_ctx *ctx, uint32_t mode, const struct
 							}
 						}
 
+					} else if(ev.keysym == MKGUI_KEY_DELETE && dlg->focus_id == FD_ID_FILES) {
+						fd_clear_filter(dlg);
+
 					} else if(ev.keysym == MKGUI_KEY_BACKSPACE && dlg->focus_id == FD_ID_FILES) {
-						if(fd.typeahead_len > 0) {
-							--fd.typeahead_len;
-							fd.typeahead[fd.typeahead_len] = '\0';
-							fd.typeahead_time = mkgui_time_ms();
-							fd_typeahead_jump(dlg);
+						if(fd.filter_len > 0) {
+							--fd.filter_len;
+							fd.filter[fd.filter_len] = '\0';
+							fd_apply_filter(dlg);
 						} else {
 							fd_navigate_up(dlg);
 						}
@@ -1304,15 +1292,10 @@ static uint32_t fd_run_dialog(struct mkgui_ctx *ctx, uint32_t mode, const struct
 						}
 
 					} else if(dlg->focus_id == FD_ID_FILES && ev.keysym >= 32 && ev.keysym < 127 && !(ev.keymod & MKGUI_MOD_CONTROL)) {
-						uint32_t now = mkgui_time_ms();
-						if(now - fd.typeahead_time > FD_TYPEAHEAD_TIMEOUT_MS) {
-							fd.typeahead_len = 0;
-						}
-						if(fd.typeahead_len < sizeof(fd.typeahead) - 1) {
-							fd.typeahead[fd.typeahead_len++] = (char)ev.keysym;
-							fd.typeahead[fd.typeahead_len] = '\0';
-							fd.typeahead_time = now;
-							fd_typeahead_jump(dlg);
+						if(fd.filter_len < FD_FILTER_MAX - 1) {
+							fd.filter[fd.filter_len++] = (char)ev.keysym;
+							fd.filter[fd.filter_len] = '\0';
+							fd_apply_filter(dlg);
 						}
 					}
 				} break;
@@ -1324,28 +1307,33 @@ static uint32_t fd_run_dialog(struct mkgui_ctx *ctx, uint32_t mode, const struct
 						}
 
 					} else if(ev.id == FD_ID_FILES) {
-						if(ev.value >= 0 && ev.value < (int32_t)fd.entry_count) {
+						struct fd_entry *e = fd_filtered_entry((uint32_t)ev.value);
+						if(e) {
 							if(fd.mode == 0) {
 								fd_update_name_from_selection(dlg);
-							} else if(!fd.entries[ev.value].is_dir) {
-								mkgui_input_set(dlg, FD_ID_NAME_INPUT, fd.entries[ev.value].name);
+							} else if(!e->is_dir) {
+								mkgui_input_set(dlg, FD_ID_NAME_INPUT, e->name);
 							}
 						}
 					}
 				} break;
 
 				case MKGUI_EVENT_LISTVIEW_DBLCLICK: {
-					if(ev.id == FD_ID_FILES && ev.value >= 0 && ev.value < (int32_t)fd.entry_count) {
-						if(fd.entries[ev.value].is_dir) {
-							fd_navigate_entry(dlg, ev.value);
-						} else {
-							if(fd.mode == 0) {
-								fd_update_name_from_selection(dlg);
+					if(ev.id == FD_ID_FILES) {
+						struct fd_entry *e = fd_filtered_entry((uint32_t)ev.value);
+						if(e) {
+							if(e->is_dir) {
+								uint32_t real_idx = fd.filtered[(uint32_t)ev.value];
+								fd_navigate_entry(dlg, (int32_t)real_idx);
 							} else {
-								mkgui_input_set(dlg, FD_ID_NAME_INPUT, fd.entries[ev.value].name);
-							}
-							if(fd_confirm(dlg)) {
-								running = 0;
+								if(fd.mode == 0) {
+									fd_update_name_from_selection(dlg);
+								} else {
+									mkgui_input_set(dlg, FD_ID_NAME_INPUT, e->name);
+								}
+								if(fd_confirm(dlg)) {
+									running = 0;
+								}
 							}
 						}
 					}

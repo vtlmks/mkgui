@@ -123,6 +123,7 @@ static struct ed_palette_entry ed_widgets[] = {
 	{ "ItemView",   MKGUI_ITEMVIEW },
 	{ "Label",      MKGUI_LABEL },
 	{ "Listview",   MKGUI_LISTVIEW },
+	{ "Pathbar",    MKGUI_PATHBAR },
 	{ "Progress",   MKGUI_PROGRESS },
 	{ "Radio",      MKGUI_RADIO },
 	{ "Scrollbar",  MKGUI_SCROLLBAR },
@@ -182,6 +183,7 @@ static struct ed_type_event_map ed_type_events[] = {
 	{ MKGUI_TOGGLE,    { MKGUI_EVENT_TOGGLE_CHANGED }, 1 },
 	{ MKGUI_COMBOBOX,  { MKGUI_EVENT_COMBOBOX_CHANGED, MKGUI_EVENT_COMBOBOX_SUBMIT }, 2 },
 	{ MKGUI_DATEPICKER,{ MKGUI_EVENT_DATEPICKER_CHANGED }, 1 },
+	{ MKGUI_PATHBAR,   { MKGUI_EVENT_PATHBAR_NAV, MKGUI_EVENT_PATHBAR_SUBMIT }, 2 },
 	{ MKGUI_ITEMVIEW,  { MKGUI_EVENT_ITEMVIEW_SELECT, MKGUI_EVENT_ITEMVIEW_DBLCLICK }, 2 },
 	{ MKGUI_MENUITEM,  { MKGUI_EVENT_MENU }, 1 },
 	{ MKGUI_HSPLIT,    { MKGUI_EVENT_SPLIT_MOVED }, 1 },
@@ -231,6 +233,8 @@ static const char *ed_event_name(uint32_t event_type) {
 		case MKGUI_EVENT_COMBOBOX_CHANGED:   { return "COMBOBOX_CHANGED"; }
 		case MKGUI_EVENT_COMBOBOX_SUBMIT:    { return "COMBOBOX_SUBMIT"; }
 		case MKGUI_EVENT_DATEPICKER_CHANGED: { return "DATEPICKER_CHANGED"; }
+		case MKGUI_EVENT_PATHBAR_NAV:        { return "PATHBAR_NAV"; }
+		case MKGUI_EVENT_PATHBAR_SUBMIT:     { return "PATHBAR_SUBMIT"; }
 		default:                             { return "UNKNOWN"; }
 	}
 }
@@ -267,6 +271,8 @@ static uint32_t ed_event_from_name(const char *name) {
 		{ "COMBOBOX_CHANGED",   MKGUI_EVENT_COMBOBOX_CHANGED },
 		{ "COMBOBOX_SUBMIT",    MKGUI_EVENT_COMBOBOX_SUBMIT },
 		{ "DATEPICKER_CHANGED", MKGUI_EVENT_DATEPICKER_CHANGED },
+		{ "PATHBAR_NAV",        MKGUI_EVENT_PATHBAR_NAV },
+		{ "PATHBAR_SUBMIT",     MKGUI_EVENT_PATHBAR_SUBMIT },
 	};
 	for(uint32_t i = 0; i < sizeof(map) / sizeof(map[0]); ++i) {
 		if(strcmp(map[i].name, name) == 0) {
@@ -1187,6 +1193,7 @@ static void ed_gen_id_name(struct ed_widget *w) {
 		case MKGUI_TOGGLE:     { prefix = "ID_TOGGLE"; } break;
 		case MKGUI_COMBOBOX:   { prefix = "ID_COMBOBOX"; } break;
 		case MKGUI_DATEPICKER: { prefix = "ID_DATEPICKER"; } break;
+		case MKGUI_PATHBAR:    { prefix = "ID_PATHBAR"; } break;
 		case MKGUI_VBOX:       { prefix = "ID_VBOX"; } break;
 		case MKGUI_HBOX:       { prefix = "ID_HBOX"; } break;
 		case MKGUI_FORM:       { prefix = "ID_FORM"; } break;
@@ -1251,6 +1258,11 @@ static int32_t ed_add_widget(uint32_t type, int32_t x, int32_t y) {
 
 		case MKGUI_DATEPICKER: {
 			w->w = 150;
+			w->h = 24;
+		} break;
+
+		case MKGUI_PATHBAR: {
+			w->w = 300;
 			w->h = 24;
 		} break;
 
@@ -3597,6 +3609,7 @@ static const char *ed_type_name_upper(uint32_t type) {
 		case MKGUI_TOGGLE:     { return "MKGUI_TOGGLE"; }
 		case MKGUI_COMBOBOX:   { return "MKGUI_COMBOBOX"; }
 		case MKGUI_DATEPICKER: { return "MKGUI_DATEPICKER"; }
+		case MKGUI_PATHBAR:    { return "MKGUI_PATHBAR"; }
 		case MKGUI_VBOX:       { return "MKGUI_VBOX"; }
 		case MKGUI_HBOX:       { return "MKGUI_HBOX"; }
 		case MKGUI_FORM:       { return "MKGUI_FORM"; }
