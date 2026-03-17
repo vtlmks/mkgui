@@ -89,8 +89,19 @@ static void render_spinbox(struct mkgui_ctx *ctx, uint32_t idx) {
 		}
 		int32_t ty = ry + (rh - ctx->font_height) / 2;
 		int32_t text_right = rx + rw - MKGUI_SPINBOX_BTN_W;
-		push_text_clip(rx + 4, ty, display, tc, rx + 1, ry + 1, text_right, ry + rh - 1);
-		if(sd->editing && focused) {
+		if(sd->editing && focused && sd->select_all && sd->edit_len > 0) {
+			int32_t sel_w = text_width(ctx, display);
+			if(rx + 4 + sel_w > text_right) {
+				sel_w = text_right - rx - 4;
+			}
+			if(sel_w > 0) {
+				draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, rx + 4, ry + 2, sel_w, rh - 4, ctx->theme.selection);
+				push_text_clip(rx + 4, ty, display, ctx->theme.sel_text, rx + 1, ry + 1, text_right, ry + rh - 1);
+			}
+		} else {
+			push_text_clip(rx + 4, ty, display, tc, rx + 1, ry + 1, text_right, ry + rh - 1);
+		}
+		if(sd->editing && focused && !sd->select_all) {
 			int32_t cur_x = rx + 4 + text_width(ctx, display);
 			if(cur_x < text_right) {
 				draw_vline(ctx->pixels, ctx->win_w, ctx->win_h, cur_x, ry + 3, rh - 6, tc);
@@ -157,9 +168,10 @@ static uint32_t handle_spinbox_key(struct mkgui_ctx *ctx, struct mkgui_event *ev
 		return 1;
 	}
 
-	if(ks == MKGUI_KEY_RETURN) {
+	if(ks == MKGUI_KEY_RETURN || ks == MKGUI_KEY_TAB) {
 		if(sd->editing) {
 			spinbox_commit_edit(sd);
+			sd->select_all = 0;
 			ev->type = MKGUI_EVENT_SPINBOX_CHANGED;
 			ev->id = ctx->focus_id;
 			ev->value = sd->value;
@@ -167,6 +179,14 @@ static uint32_t handle_spinbox_key(struct mkgui_ctx *ctx, struct mkgui_event *ev
 		ctx->focus_id = 0;
 		dirty_all(ctx);
 		return 1;
+	}
+
+	if(ks == MKGUI_KEY_LEFT || ks == MKGUI_KEY_RIGHT) {
+		if(sd->select_all) {
+			sd->select_all = 0;
+			dirty_all(ctx);
+			return 1;
+		}
 	}
 
 	if(!sd->editing) {
@@ -185,8 +205,13 @@ static uint32_t handle_spinbox_key(struct mkgui_ctx *ctx, struct mkgui_event *ev
 	}
 
 	if(ks == MKGUI_KEY_BACKSPACE) {
-		if(sd->editing && sd->edit_len > 0) {
-			--sd->edit_len;
+		if(sd->editing) {
+			if(sd->select_all) {
+				sd->edit_len = 0;
+				sd->select_all = 0;
+			} else if(sd->edit_len > 0) {
+				--sd->edit_len;
+			}
 			dirty_all(ctx);
 			return 1;
 		}
@@ -204,6 +229,11 @@ static uint32_t handle_spinbox_key(struct mkgui_ctx *ctx, struct mkgui_event *ev
 			if(!sd->editing) {
 				sd->editing = 1;
 				sd->edit_len = 0;
+				sd->select_all = 0;
+			}
+			if(sd->select_all) {
+				sd->edit_len = 0;
+				sd->select_all = 0;
 			}
 			if(is_minus) {
 				if(sd->edit_len == 0) {

@@ -8,7 +8,7 @@
 // Editor constants
 // ---------------------------------------------------------------------------
 
-#define ED_MAX_WIDGETS    512
+#define ED_MAX_WIDGETS    1024
 #define ED_MAX_UNDO       64
 #define ED_GRID_DEFAULT   8
 #define ED_CANVAS_DEF_W   640
@@ -33,7 +33,7 @@
 enum {
 	ED_WINDOW = 0,
 	ED_MENU, ED_FILE_MENU, ED_EDIT_MENU,
-	ED_MI_NEW, ED_MI_OPEN, ED_MI_SAVE, ED_MI_SAVEAS, ED_MI_GENERATE, ED_MI_EXIT,
+	ED_MI_NEW, ED_MI_OPEN, ED_MI_SAVE, ED_MI_SAVEAS, ED_MI_RECENT, ED_MI_GENERATE, ED_MI_EXIT,
 	ED_MI_UNDO, ED_MI_REDO, ED_MI_COPY, ED_MI_PASTE, ED_MI_DELETE,
 	ED_TOOLBAR = 20,
 	ED_TB_NEW, ED_TB_OPEN, ED_TB_SAVE, ED_TB_GEN, ED_TB_TEST,
@@ -89,6 +89,11 @@ enum {
 	ED_PROP_FL_COL3,
 	ED_PROP_BTN_HBOX,
 	ED_STATUSBAR = 170,
+	ED_EVT_GROUP = 180, ED_EVT_VBOX, ED_EVT_LIST,
+	ED_DATA_GROUP = 190, ED_DATA_VBOX, ED_DATA_LIST, ED_DATA_ITEM_INP,
+	ED_DATA_BTN_HBOX, ED_DATA_ADD_BTN, ED_DATA_REM_BTN, ED_DATA_UP_BTN, ED_DATA_DOWN_BTN,
+	ED_RECENT_FIRST = 250,
+	ED_RECENT_LAST = 259,
 };
 
 // ---------------------------------------------------------------------------
@@ -115,6 +120,7 @@ static struct ed_palette_entry ed_widgets[] = {
 	{ "Radio",      MKGUI_RADIO },
 	{ "Scrollbar",  MKGUI_SCROLLBAR },
 	{ "Slider",     MKGUI_SLIDER },
+	{ "Spacer",     MKGUI_SPACER },
 	{ "Spinbox",    MKGUI_SPINBOX },
 	{ "Spinner",    MKGUI_SPINNER },
 	{ "Statusbar",  MKGUI_STATUSBAR },
@@ -137,6 +143,116 @@ static struct ed_palette_entry ed_containers[] = {
 
 #define ED_WIDGET_COUNT    (sizeof(ed_widgets) / sizeof(ed_widgets[0]))
 #define ED_CONTAINER_COUNT (sizeof(ed_containers) / sizeof(ed_containers[0]))
+
+// ---------------------------------------------------------------------------
+// Event-to-widget mapping
+// ---------------------------------------------------------------------------
+
+#define ED_MAX_TYPE_EVENTS 8
+
+struct ed_type_event_map {
+	uint32_t widget_type;
+	uint32_t events[ED_MAX_TYPE_EVENTS];
+	uint32_t event_count;
+};
+
+static struct ed_type_event_map ed_type_events[] = {
+	{ MKGUI_WINDOW,    { MKGUI_EVENT_CLOSE, MKGUI_EVENT_RESIZE }, 2 },
+	{ MKGUI_BUTTON,    { MKGUI_EVENT_CLICK }, 1 },
+	{ MKGUI_INPUT,     { MKGUI_EVENT_INPUT_CHANGED, MKGUI_EVENT_INPUT_SUBMIT }, 2 },
+	{ MKGUI_CHECKBOX,  { MKGUI_EVENT_CHECKBOX_CHANGED }, 1 },
+	{ MKGUI_DROPDOWN,  { MKGUI_EVENT_DROPDOWN_CHANGED }, 1 },
+	{ MKGUI_SLIDER,    { MKGUI_EVENT_SLIDER_CHANGED }, 1 },
+	{ MKGUI_LISTVIEW,  { MKGUI_EVENT_LISTVIEW_SELECT, MKGUI_EVENT_LISTVIEW_DBLCLICK, MKGUI_EVENT_LISTVIEW_SORT }, 3 },
+	{ MKGUI_TREEVIEW,  { MKGUI_EVENT_TREEVIEW_SELECT, MKGUI_EVENT_TREEVIEW_EXPAND, MKGUI_EVENT_TREEVIEW_COLLAPSE }, 3 },
+	{ MKGUI_TABS,      { MKGUI_EVENT_TAB_CHANGED, MKGUI_EVENT_TAB_CLOSE }, 2 },
+	{ MKGUI_RADIO,     { MKGUI_EVENT_RADIO_CHANGED }, 1 },
+	{ MKGUI_TEXTAREA,  { MKGUI_EVENT_TEXTAREA_CHANGED }, 1 },
+	{ MKGUI_SPINBOX,   { MKGUI_EVENT_SPINBOX_CHANGED }, 1 },
+	{ MKGUI_SCROLLBAR, { MKGUI_EVENT_SCROLL }, 1 },
+	{ MKGUI_ITEMVIEW,  { MKGUI_EVENT_ITEMVIEW_SELECT, MKGUI_EVENT_ITEMVIEW_DBLCLICK }, 2 },
+	{ MKGUI_MENUITEM,  { MKGUI_EVENT_MENU }, 1 },
+	{ MKGUI_HSPLIT,    { MKGUI_EVENT_SPLIT_MOVED }, 1 },
+	{ MKGUI_VSPLIT,    { MKGUI_EVENT_SPLIT_MOVED }, 1 },
+};
+#define ED_TYPE_EVENT_COUNT (sizeof(ed_type_events) / sizeof(ed_type_events[0]))
+
+// [=]===^=[ ed_find_type_events ]=================================[=]
+static struct ed_type_event_map *ed_find_type_events(uint32_t widget_type) {
+	for(uint32_t i = 0; i < ED_TYPE_EVENT_COUNT; ++i) {
+		if(ed_type_events[i].widget_type == widget_type) {
+			return &ed_type_events[i];
+		}
+	}
+	return NULL;
+}
+
+// [=]===^=[ ed_event_name ]=======================================[=]
+static const char *ed_event_name(uint32_t event_type) {
+	switch(event_type) {
+		case MKGUI_EVENT_CLICK:              { return "CLICK"; }
+		case MKGUI_EVENT_MENU:               { return "MENU"; }
+		case MKGUI_EVENT_TAB_CHANGED:        { return "TAB_CHANGED"; }
+		case MKGUI_EVENT_TAB_CLOSE:          { return "TAB_CLOSE"; }
+		case MKGUI_EVENT_LISTVIEW_SORT:      { return "LISTVIEW_SORT"; }
+		case MKGUI_EVENT_LISTVIEW_SELECT:    { return "LISTVIEW_SELECT"; }
+		case MKGUI_EVENT_LISTVIEW_DBLCLICK:  { return "LISTVIEW_DBLCLICK"; }
+		case MKGUI_EVENT_INPUT_CHANGED:      { return "INPUT_CHANGED"; }
+		case MKGUI_EVENT_INPUT_SUBMIT:       { return "INPUT_SUBMIT"; }
+		case MKGUI_EVENT_CHECKBOX_CHANGED:   { return "CHECKBOX_CHANGED"; }
+		case MKGUI_EVENT_DROPDOWN_CHANGED:   { return "DROPDOWN_CHANGED"; }
+		case MKGUI_EVENT_SLIDER_CHANGED:     { return "SLIDER_CHANGED"; }
+		case MKGUI_EVENT_SPLIT_MOVED:        { return "SPLIT_MOVED"; }
+		case MKGUI_EVENT_TREEVIEW_SELECT:    { return "TREEVIEW_SELECT"; }
+		case MKGUI_EVENT_TREEVIEW_EXPAND:    { return "TREEVIEW_EXPAND"; }
+		case MKGUI_EVENT_TREEVIEW_COLLAPSE:  { return "TREEVIEW_COLLAPSE"; }
+		case MKGUI_EVENT_SPINBOX_CHANGED:    { return "SPINBOX_CHANGED"; }
+		case MKGUI_EVENT_RADIO_CHANGED:      { return "RADIO_CHANGED"; }
+		case MKGUI_EVENT_TEXTAREA_CHANGED:   { return "TEXTAREA_CHANGED"; }
+		case MKGUI_EVENT_CLOSE:              { return "CLOSE"; }
+		case MKGUI_EVENT_RESIZE:             { return "RESIZE"; }
+		case MKGUI_EVENT_ITEMVIEW_SELECT:    { return "ITEMVIEW_SELECT"; }
+		case MKGUI_EVENT_ITEMVIEW_DBLCLICK:  { return "ITEMVIEW_DBLCLICK"; }
+		case MKGUI_EVENT_SCROLL:             { return "SCROLL"; }
+		default:                             { return "UNKNOWN"; }
+	}
+}
+
+// [=]===^=[ ed_event_from_name ]==================================[=]
+static uint32_t ed_event_from_name(const char *name) {
+	struct { const char *name; uint32_t type; } map[] = {
+		{ "CLICK",              MKGUI_EVENT_CLICK },
+		{ "MENU",               MKGUI_EVENT_MENU },
+		{ "TAB_CHANGED",        MKGUI_EVENT_TAB_CHANGED },
+		{ "TAB_CLOSE",          MKGUI_EVENT_TAB_CLOSE },
+		{ "LISTVIEW_SORT",      MKGUI_EVENT_LISTVIEW_SORT },
+		{ "LISTVIEW_SELECT",    MKGUI_EVENT_LISTVIEW_SELECT },
+		{ "LISTVIEW_DBLCLICK",  MKGUI_EVENT_LISTVIEW_DBLCLICK },
+		{ "INPUT_CHANGED",      MKGUI_EVENT_INPUT_CHANGED },
+		{ "INPUT_SUBMIT",       MKGUI_EVENT_INPUT_SUBMIT },
+		{ "CHECKBOX_CHANGED",   MKGUI_EVENT_CHECKBOX_CHANGED },
+		{ "DROPDOWN_CHANGED",   MKGUI_EVENT_DROPDOWN_CHANGED },
+		{ "SLIDER_CHANGED",     MKGUI_EVENT_SLIDER_CHANGED },
+		{ "SPLIT_MOVED",        MKGUI_EVENT_SPLIT_MOVED },
+		{ "TREEVIEW_SELECT",    MKGUI_EVENT_TREEVIEW_SELECT },
+		{ "TREEVIEW_EXPAND",    MKGUI_EVENT_TREEVIEW_EXPAND },
+		{ "TREEVIEW_COLLAPSE",  MKGUI_EVENT_TREEVIEW_COLLAPSE },
+		{ "SPINBOX_CHANGED",    MKGUI_EVENT_SPINBOX_CHANGED },
+		{ "RADIO_CHANGED",      MKGUI_EVENT_RADIO_CHANGED },
+		{ "TEXTAREA_CHANGED",   MKGUI_EVENT_TEXTAREA_CHANGED },
+		{ "CLOSE",              MKGUI_EVENT_CLOSE },
+		{ "RESIZE",             MKGUI_EVENT_RESIZE },
+		{ "ITEMVIEW_SELECT",    MKGUI_EVENT_ITEMVIEW_SELECT },
+		{ "ITEMVIEW_DBLCLICK",  MKGUI_EVENT_ITEMVIEW_DBLCLICK },
+		{ "SCROLL",             MKGUI_EVENT_SCROLL },
+	};
+	for(uint32_t i = 0; i < sizeof(map) / sizeof(map[0]); ++i) {
+		if(strcmp(map[i].name, name) == 0) {
+			return map[i].type;
+		}
+	}
+	return MKGUI_EVENT_NONE;
+}
 
 // ---------------------------------------------------------------------------
 // Type name lookup
@@ -173,6 +289,7 @@ struct ed_widget {
 	int32_t x, y, w, h;
 	uint32_t flags;
 	uint32_t tab_order;
+	uint64_t event_mask;
 };
 
 // ---------------------------------------------------------------------------
@@ -182,6 +299,19 @@ struct ed_widget {
 struct ed_snapshot {
 	struct ed_widget widgets[ED_MAX_WIDGETS];
 	uint32_t widget_count;
+};
+
+// ---------------------------------------------------------------------------
+// Widget data (dropdown items, etc.)
+// ---------------------------------------------------------------------------
+
+#define ED_MAX_DATA_WIDGETS 64
+#define ED_MAX_DATA_ITEMS   64
+
+struct ed_widget_data {
+	uint32_t widget_id;
+	char items[ED_MAX_DATA_ITEMS][MKGUI_MAX_TEXT];
+	uint32_t item_count;
 };
 
 // ---------------------------------------------------------------------------
@@ -222,9 +352,195 @@ struct ed_state {
 
 	struct ed_tab_state tab_states[32];
 	uint32_t tab_state_count;
+
+	struct ed_widget_data widget_data[ED_MAX_DATA_WIDGETS];
+	uint32_t widget_data_count;
 };
 
 static struct ed_state ed;
+
+// ---------------------------------------------------------------------------
+// Editor config (recent files, settings)
+// ---------------------------------------------------------------------------
+
+#define ED_MAX_RECENT     10
+#define ED_CONFIG_PATH_LEN 512
+
+struct ed_config {
+	char recent[ED_MAX_RECENT][ED_CONFIG_PATH_LEN];
+	uint32_t recent_count;
+	char last_dir[ED_CONFIG_PATH_LEN];
+	int32_t window_w, window_h;
+};
+
+static struct ed_config ed_cfg;
+
+// [=]===^=[ ed_config_dir ]=======================================[=]
+static void ed_config_dir(char *buf, uint32_t buf_size) {
+	const char *xdg = getenv("XDG_CONFIG_HOME");
+	if(xdg && xdg[0]) {
+		snprintf(buf, buf_size, "%s/mkgui-editor", xdg);
+	} else {
+		const char *home = getenv("HOME");
+		if(!home) {
+			home = "/tmp";
+		}
+		snprintf(buf, buf_size, "%s/.config/mkgui-editor", home);
+	}
+}
+
+// [=]===^=[ ed_config_path ]======================================[=]
+static void ed_config_path(char *buf, uint32_t buf_size) {
+	char dir[ED_CONFIG_PATH_LEN];
+	ed_config_dir(dir, sizeof(dir));
+	snprintf(buf, buf_size, "%s/config", dir);
+}
+
+// [=]===^=[ ed_config_ensure_dir ]================================[=]
+static void ed_config_ensure_dir(void) {
+	char dir[ED_CONFIG_PATH_LEN];
+	ed_config_dir(dir, sizeof(dir));
+
+	char parent[ED_CONFIG_PATH_LEN];
+	const char *xdg = getenv("XDG_CONFIG_HOME");
+	if(xdg && xdg[0]) {
+		snprintf(parent, sizeof(parent), "%s", xdg);
+	} else {
+		const char *home = getenv("HOME");
+		if(!home) {
+			home = "/tmp";
+		}
+		snprintf(parent, sizeof(parent), "%s/.config", home);
+	}
+	mkdir(parent, 0755);
+	mkdir(dir, 0755);
+}
+
+// [=]===^=[ ed_config_load ]======================================[=]
+static void ed_config_load(void) {
+	memset(&ed_cfg, 0, sizeof(ed_cfg));
+
+	char path[ED_CONFIG_PATH_LEN];
+	ed_config_path(path, sizeof(path));
+
+	FILE *f = fopen(path, "r");
+	if(!f) {
+		return;
+	}
+
+	char line[1024];
+	while(fgets(line, (int32_t)sizeof(line), f)) {
+		size_t len = strlen(line);
+		while(len > 0 && (line[len - 1] == '\n' || line[len - 1] == '\r')) {
+			line[--len] = '\0';
+		}
+		if(len == 0) {
+			continue;
+		}
+
+		if(strncmp(line, "file ", 5) == 0 && ed_cfg.recent_count < ED_MAX_RECENT) {
+			snprintf(ed_cfg.recent[ed_cfg.recent_count], ED_CONFIG_PATH_LEN, "%s", line + 5);
+			++ed_cfg.recent_count;
+
+		} else if(strncmp(line, "last_dir ", 9) == 0) {
+			snprintf(ed_cfg.last_dir, ED_CONFIG_PATH_LEN, "%s", line + 9);
+
+		} else if(strncmp(line, "window_size ", 12) == 0) {
+			sscanf(line + 12, "%d %d", &ed_cfg.window_w, &ed_cfg.window_h);
+		}
+	}
+
+	fclose(f);
+}
+
+// [=]===^=[ ed_config_save ]======================================[=]
+static void ed_config_save(void) {
+	ed_config_ensure_dir();
+
+	char path[ED_CONFIG_PATH_LEN];
+	ed_config_path(path, sizeof(path));
+
+	FILE *f = fopen(path, "w");
+	if(!f) {
+		return;
+	}
+
+	fprintf(f, "[recent]\n");
+	for(uint32_t i = 0; i < ed_cfg.recent_count; ++i) {
+		fprintf(f, "file %s\n", ed_cfg.recent[i]);
+	}
+	fprintf(f, "\n[settings]\n");
+	if(ed_cfg.last_dir[0]) {
+		fprintf(f, "last_dir %s\n", ed_cfg.last_dir);
+	}
+	if(ed_cfg.window_w > 0 && ed_cfg.window_h > 0) {
+		fprintf(f, "window_size %d %d\n", ed_cfg.window_w, ed_cfg.window_h);
+	}
+
+	fclose(f);
+}
+
+// [=]===^=[ ed_config_add_recent ]================================[=]
+static void ed_config_add_recent(const char *filepath) {
+	for(uint32_t i = 0; i < ed_cfg.recent_count; ++i) {
+		if(strcmp(ed_cfg.recent[i], filepath) == 0) {
+			for(uint32_t j = i; j > 0; --j) {
+				memcpy(ed_cfg.recent[j], ed_cfg.recent[j - 1], ED_CONFIG_PATH_LEN);
+			}
+			snprintf(ed_cfg.recent[0], ED_CONFIG_PATH_LEN, "%s", filepath);
+			ed_config_save();
+			return;
+		}
+	}
+
+	uint32_t count = ed_cfg.recent_count;
+	if(count >= ED_MAX_RECENT) {
+		count = ED_MAX_RECENT - 1;
+	}
+	for(uint32_t j = count; j > 0; --j) {
+		memcpy(ed_cfg.recent[j], ed_cfg.recent[j - 1], ED_CONFIG_PATH_LEN);
+	}
+	snprintf(ed_cfg.recent[0], ED_CONFIG_PATH_LEN, "%s", filepath);
+	if(ed_cfg.recent_count < ED_MAX_RECENT) {
+		++ed_cfg.recent_count;
+	}
+
+	const char *slash = strrchr(filepath, '/');
+	if(slash) {
+		size_t dir_len = (size_t)(slash - filepath);
+		if(dir_len >= ED_CONFIG_PATH_LEN) {
+			dir_len = ED_CONFIG_PATH_LEN - 1;
+		}
+		memcpy(ed_cfg.last_dir, filepath, dir_len);
+		ed_cfg.last_dir[dir_len] = '\0';
+	}
+
+	ed_config_save();
+}
+
+// [=]===^=[ ed_sync_recent_menu ]=================================[=]
+static void ed_sync_recent_menu(struct mkgui_ctx *ctx) {
+	for(uint32_t i = 0; i < ED_MAX_RECENT; ++i) {
+		uint32_t id = ED_RECENT_FIRST + i;
+		struct mkgui_widget *w = find_widget(ctx, id);
+		if(!w) {
+			continue;
+		}
+		if(i < ed_cfg.recent_count) {
+			w->flags &= ~MKGUI_HIDDEN;
+			const char *path = ed_cfg.recent[i];
+			const char *fname = strrchr(path, '/');
+			if(fname) {
+				++fname;
+			} else {
+				fname = path;
+			}
+			snprintf(w->label, MKGUI_MAX_TEXT, "%s", fname);
+		} else {
+			w->flags |= MKGUI_HIDDEN;
+		}
+	}
+}
 
 // ---------------------------------------------------------------------------
 // Help popup
@@ -249,6 +565,7 @@ static struct ed_help_entry ed_help[] = {
 	{ MKGUI_PROGRESS,  "Progress bar with animated shimmer. Set value/max with mkgui_progress_set(). No user interaction." },
 	{ MKGUI_RADIO,     "Radio button. Mutually exclusive within the same parent container. Clicking one unchecks siblings." },
 	{ MKGUI_SCROLLBAR, "Standalone scrollbar. Vertical by default, SCROLLBAR_HORIZ for horizontal. Emits scroll events." },
+	{ MKGUI_SPACER,    "Invisible spacer. Use w=0 or h=0 for flex fill inside HBox/VBox. Pushes siblings to the opposite edge." },
 	{ MKGUI_SLIDER,    "Horizontal slider with draggable thumb. Set range with mkgui_slider_setup(). Does not render its own label." },
 	{ MKGUI_SPINBOX,   "Numeric input with +/- buttons. Click text to type, use arrows or mouse wheel to step. Enter confirms." },
 	{ MKGUI_SPINNER,   "Animated spinning arc. Place it as a loading indicator. Animates automatically when visible, zero CPU when hidden." },
@@ -679,6 +996,48 @@ static uint32_t ed_is_tab_child_visible(uint32_t idx) {
 }
 
 // ---------------------------------------------------------------------------
+// Widget data helpers
+// ---------------------------------------------------------------------------
+
+// [=]===^=[ ed_find_widget_data ]=================================[=]
+static struct ed_widget_data *ed_find_widget_data(uint32_t widget_id) {
+	for(uint32_t i = 0; i < ed.widget_data_count; ++i) {
+		if(ed.widget_data[i].widget_id == widget_id) {
+			return &ed.widget_data[i];
+		}
+	}
+	return NULL;
+}
+
+// [=]===^=[ ed_get_or_create_widget_data ]========================[=]
+static struct ed_widget_data *ed_get_or_create_widget_data(uint32_t widget_id) {
+	struct ed_widget_data *d = ed_find_widget_data(widget_id);
+	if(d) {
+		return d;
+	}
+	if(ed.widget_data_count >= ED_MAX_DATA_WIDGETS) {
+		return NULL;
+	}
+	d = &ed.widget_data[ed.widget_data_count++];
+	memset(d, 0, sizeof(*d));
+	d->widget_id = widget_id;
+	return d;
+}
+
+// [=]===^=[ ed_remove_widget_data ]===============================[=]
+static void ed_remove_widget_data(uint32_t widget_id) {
+	for(uint32_t i = 0; i < ed.widget_data_count; ++i) {
+		if(ed.widget_data[i].widget_id == widget_id) {
+			if(i + 1 < ed.widget_data_count) {
+				memmove(&ed.widget_data[i], &ed.widget_data[i + 1], (ed.widget_data_count - i - 1) * sizeof(struct ed_widget_data));
+			}
+			--ed.widget_data_count;
+			return;
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
 // Undo / redo
 // ---------------------------------------------------------------------------
 
@@ -764,6 +1123,7 @@ static void ed_gen_id_name(struct ed_widget *w) {
 		case MKGUI_IMAGE:      { prefix = "ID_IMAGE"; } break;
 		case MKGUI_GLVIEW:     { prefix = "ID_GLVIEW"; } break;
 		case MKGUI_CANVAS:     { prefix = "ID_CANVAS"; } break;
+		case MKGUI_SPACER:     { prefix = "ID_SPACER"; } break;
 		case MKGUI_VBOX:       { prefix = "ID_VBOX"; } break;
 		case MKGUI_HBOX:       { prefix = "ID_HBOX"; } break;
 		case MKGUI_FORM:       { prefix = "ID_FORM"; } break;
@@ -936,6 +1296,11 @@ static int32_t ed_add_widget(uint32_t type, int32_t x, int32_t y) {
 			w->h = 150;
 		} break;
 
+		case MKGUI_SPACER: {
+			w->w = 0;
+			w->h = 0;
+		} break;
+
 		case MKGUI_HBOX: {
 			w->x = 0;
 			w->y = 0;
@@ -1036,12 +1401,14 @@ static void ed_delete_widget_tree(uint32_t id) {
 	for(uint32_t i = ed.widget_count; i > 0; --i) {
 		uint32_t idx = i - 1;
 		if(ed_is_descendant(idx, id)) {
+			ed_remove_widget_data(ed.widgets[idx].id);
 			memmove(&ed.widgets[idx], &ed.widgets[idx + 1], (ed.widget_count - idx - 1) * sizeof(struct ed_widget));
 			--ed.widget_count;
 		}
 	}
 	for(uint32_t i = 0; i < ed.widget_count; ++i) {
 		if(ed.widgets[i].id == id) {
+			ed_remove_widget_data(ed.widgets[i].id);
 			memmove(&ed.widgets[i], &ed.widgets[i + 1], (ed.widget_count - i - 1) * sizeof(struct ed_widget));
 			--ed.widget_count;
 			break;
@@ -1160,26 +1527,16 @@ static void ed_convert_to_layout(uint32_t idx, int32_t *lx, int32_t *ly, int32_t
 		return;
 	}
 
-	if((flags & MKGUI_ANCHOR_LEFT) && (flags & MKGUI_ANCHOR_RIGHT)) {
-		if(w > 0) {
-			w = pw - rel_x - w;
-			if(w < 0) {
-				w = 0;
-			}
+	if(flags & MKGUI_ANCHOR_RIGHT) {
+		if(!(flags & MKGUI_ANCHOR_LEFT)) {
+			rel_x = pw - rel_x - w;
 		}
-	} else if(flags & MKGUI_ANCHOR_RIGHT) {
-		rel_x = pw - rel_x - w;
 	}
 
-	if((flags & MKGUI_ANCHOR_TOP) && (flags & MKGUI_ANCHOR_BOTTOM)) {
-		if(h > 0) {
-			h = ph - rel_y - h;
-			if(h < 0) {
-				h = 0;
-			}
+	if(flags & MKGUI_ANCHOR_BOTTOM) {
+		if(!(flags & MKGUI_ANCHOR_TOP)) {
+			rel_y = ph - rel_y - h;
 		}
-	} else if(flags & MKGUI_ANCHOR_BOTTOM) {
-		rel_y = ph - rel_y - h;
 	}
 
 	*lx = rel_x;
@@ -2084,7 +2441,7 @@ static void ed_render_canvas(struct mkgui_ctx *ctx, uint32_t id, uint32_t *pixel
 		uint32_t t = ed.widgets[i].type;
 		uint32_t fl = ed.widgets[i].flags;
 		uint32_t needs_outline = 0;
-		if(t == MKGUI_VBOX || t == MKGUI_HBOX || t == MKGUI_FORM) {
+		if(t == MKGUI_VBOX || t == MKGUI_HBOX || t == MKGUI_FORM || t == MKGUI_SPACER) {
 			if(!(fl & MKGUI_PANEL_BORDER)) {
 				needs_outline = 1;
 			}
@@ -2329,6 +2686,121 @@ static void ed_apply_parent_dropdown(struct mkgui_ctx *ctx) {
 	}
 }
 
+// ---------------------------------------------------------------------------
+// Events panel sync
+// ---------------------------------------------------------------------------
+
+static uint32_t ed_cur_events[40];
+static uint32_t ed_cur_event_count;
+
+// [=]===^=[ ed_event_row_cb ]=====================================[=]
+static void ed_event_row_cb(uint32_t row, uint32_t col, char *buf, uint32_t buf_size, void *userdata) {
+	(void)col;
+	(void)userdata;
+	if(row < ed_cur_event_count) {
+		snprintf(buf, buf_size, "%s", ed_event_name(ed_cur_events[row]));
+	} else {
+		buf[0] = '\0';
+	}
+}
+
+// [=]===^=[ ed_sync_events ]======================================[=]
+static void ed_sync_events(struct mkgui_ctx *ctx) {
+	ed_cur_event_count = 0;
+
+	if(ed.selected < 0 || (uint32_t)ed.selected >= ed.widget_count) {
+		ed_set_widget_vis(ctx, ED_EVT_GROUP, 0);
+		mkgui_listview_set_rows(ctx, ED_EVT_LIST, 0);
+		return;
+	}
+
+	struct ed_widget *w = &ed.widgets[ed.selected];
+	struct ed_type_event_map *map = ed_find_type_events(w->type);
+	if(!map || map->event_count == 0) {
+		ed_set_widget_vis(ctx, ED_EVT_GROUP, 0);
+		mkgui_listview_set_rows(ctx, ED_EVT_LIST, 0);
+		return;
+	}
+
+	ed_set_widget_vis(ctx, ED_EVT_GROUP, 1);
+	for(uint32_t i = 0; i < map->event_count && i < 40; ++i) {
+		ed_cur_events[ed_cur_event_count++] = map->events[i];
+	}
+	mkgui_listview_set_rows(ctx, ED_EVT_LIST, ed_cur_event_count);
+
+	struct mkgui_listview_data *lv = find_listv_data(ctx, ED_EVT_LIST);
+	if(lv) {
+		lv->multi_sel_count = 0;
+		lv->selected_row = -1;
+		for(uint32_t i = 0; i < ed_cur_event_count; ++i) {
+			if(w->event_mask & (1ULL << ed_cur_events[i])) {
+				if(lv->multi_sel_count < MKGUI_MAX_MULTI_SEL) {
+					lv->multi_sel[lv->multi_sel_count++] = (int32_t)i;
+				}
+			}
+		}
+	}
+
+	struct mkgui_widget *grp = find_widget(ctx, ED_EVT_GROUP);
+	if(grp) {
+		int32_t rows = (int32_t)ed_cur_event_count;
+		if(rows > 8) {
+			rows = 8;
+		}
+		grp->h = 36 + rows * MKGUI_ROW_HEIGHT + 20;
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Data panel sync
+// ---------------------------------------------------------------------------
+
+static uint32_t ed_data_widget_id;
+
+// [=]===^=[ ed_data_row_cb ]======================================[=]
+static void ed_data_row_cb(uint32_t row, uint32_t col, char *buf, uint32_t buf_size, void *userdata) {
+	(void)col;
+	(void)userdata;
+	struct ed_widget_data *d = ed_find_widget_data(ed_data_widget_id);
+	if(d && row < d->item_count) {
+		snprintf(buf, buf_size, "%s", d->items[row]);
+	} else {
+		buf[0] = '\0';
+	}
+}
+
+// [=]===^=[ ed_sync_data ]========================================[=]
+static void ed_sync_data(struct mkgui_ctx *ctx) {
+	if(ed.selected < 0 || (uint32_t)ed.selected >= ed.widget_count) {
+		ed_set_widget_vis(ctx, ED_DATA_GROUP, 0);
+		mkgui_listview_set_rows(ctx, ED_DATA_LIST, 0);
+		return;
+	}
+
+	struct ed_widget *w = &ed.widgets[ed.selected];
+	if(w->type != MKGUI_DROPDOWN) {
+		ed_set_widget_vis(ctx, ED_DATA_GROUP, 0);
+		mkgui_listview_set_rows(ctx, ED_DATA_LIST, 0);
+		return;
+	}
+
+	ed_set_widget_vis(ctx, ED_DATA_GROUP, 1);
+	ed_data_widget_id = w->id;
+	struct ed_widget_data *d = ed_get_or_create_widget_data(w->id);
+	if(d) {
+		mkgui_listview_set_rows(ctx, ED_DATA_LIST, d->item_count);
+	} else {
+		mkgui_listview_set_rows(ctx, ED_DATA_LIST, 0);
+	}
+
+	int32_t sel = mkgui_listview_get_selected(ctx, ED_DATA_LIST);
+	if(d && sel >= 0 && (uint32_t)sel < d->item_count) {
+		mkgui_input_set(ctx, ED_DATA_ITEM_INP, d->items[sel]);
+	} else {
+		mkgui_input_set(ctx, ED_DATA_ITEM_INP, "");
+	}
+}
+
 // [=]===^=[ ed_update_prop_group_h ]=============================[=]
 static void ed_update_prop_group_h(struct mkgui_ctx *ctx) {
 	int32_t h = ED_PROP_GROUP_H;
@@ -2380,6 +2852,8 @@ static void ed_sync_props(struct mkgui_ctx *ctx) {
 	ed_sync_parent_dropdown(ctx);
 	ed_sync_menu_tree(ctx);
 	ed_update_prop_group_h(ctx);
+	ed_sync_events(ctx);
+	ed_sync_data(ctx);
 	dirty_all(ctx);
 }
 
@@ -2546,50 +3020,461 @@ static void ed_remove_menu_item(struct mkgui_ctx *ctx) {
 }
 
 // ---------------------------------------------------------------------------
-// Code generation
+// Project save / load
 // ---------------------------------------------------------------------------
 
-// [=]===^=[ ed_generate_code ]===================================[=]
-static void ed_generate_code(void) {
-	FILE *fh = fopen("gui_ids.h", "w");
-	FILE *fc = fopen("gui_layout.c", "w");
-	if(!fh || !fc) {
-		if(fh) {
-			fclose(fh);
+// [=]===^=[ ed_save_project ]=====================================[=]
+static void ed_save_project(struct mkgui_ctx *ctx, uint32_t save_as) {
+	if(save_as || ed.project_path[0] == '\0') {
+		if(!mkgui_save_dialog(ctx, "untitled.mkgui")) {
+			return;
 		}
-		if(fc) {
-			fclose(fc);
-		}
+		const char *path = mkgui_dialog_path(ctx, 0);
+		snprintf(ed.project_path, sizeof(ed.project_path), "%s", path);
+	}
+
+	FILE *f = fopen(ed.project_path, "w");
+	if(!f) {
 		return;
 	}
 
-	fprintf(fh, "// Generated by mkgui-editor -- do not edit by hand\n");
-	fprintf(fh, "#ifndef GUI_IDS_H\n");
-	fprintf(fh, "#define GUI_IDS_H\n\n");
-	fprintf(fh, "enum {\n");
-	for(uint32_t i = 0; i < ed.widget_count; ++i) {
-		fprintf(fh, "\t%s = %u,\n", ed.widgets[i].id_name, ed.widgets[i].id);
-	}
-	fprintf(fh, "};\n\n");
-	fprintf(fh, "#endif\n");
-	fclose(fh);
+	fprintf(f, "[mkgui 1]\n");
+	fprintf(f, "canvas %d %d\n", ed.canvas_w, ed.canvas_h);
+	fprintf(f, "grid %d\n", ed.grid_size);
+	fprintf(f, "next_id %u\n", ed.next_id);
+	fprintf(f, "\n");
 
-	fprintf(fc, "// Generated by mkgui-editor -- do not edit by hand\n\n");
-	fprintf(fc, "#include \"gui_ids.h\"\n\n");
-	fprintf(fc, "static struct mkgui_widget gui_widgets[] = {\n");
+	for(uint32_t i = 0; i < ed.widget_count; ++i) {
+		struct ed_widget *w = &ed.widgets[i];
+		fprintf(f, "[widget %u]\n", i);
+		fprintf(f, "type %u\n", w->type);
+		fprintf(f, "id %u\n", w->id);
+		fprintf(f, "id_name %s\n", w->id_name);
+		fprintf(f, "label %s\n", w->label);
+		fprintf(f, "icon %s\n", w->icon);
+		fprintf(f, "parent %u\n", w->parent_id);
+		fprintf(f, "pos %d %d\n", w->x, w->y);
+		fprintf(f, "size %d %d\n", w->w, w->h);
+		fprintf(f, "flags 0x%08x\n", w->flags);
+		fprintf(f, "tab_order %u\n", w->tab_order);
+		fprintf(f, "event_mask 0x%016llx\n", (unsigned long long)w->event_mask);
+
+		struct ed_widget_data *d = ed_find_widget_data(w->id);
+		if(d) {
+			for(uint32_t j = 0; j < d->item_count; ++j) {
+				fprintf(f, "item %s\n", d->items[j]);
+			}
+		}
+
+		fprintf(f, "\n");
+	}
+
+	for(uint32_t i = 0; i < ed.tab_state_count; ++i) {
+		fprintf(f, "[tab_state]\n");
+		fprintf(f, "tabs %u %u\n", ed.tab_states[i].tabs_id, ed.tab_states[i].active_id);
+		fprintf(f, "\n");
+	}
+
+	fclose(f);
+
+	char buf[256];
+	const char *fname = strrchr(ed.project_path, '/');
+	if(!fname) {
+		fname = ed.project_path;
+	} else {
+		++fname;
+	}
+	snprintf(buf, sizeof(buf), "Saved: %s", fname);
+	mkgui_statusbar_set(ctx, ED_STATUSBAR, 0, buf);
+
+	ed_config_add_recent(ed.project_path);
+	ed_sync_recent_menu(ctx);
+}
+
+// [=]===^=[ ed_load_file ]========================================[=]
+static void ed_load_file(struct mkgui_ctx *ctx, const char *path) {
+	FILE *f = fopen(path, "r");
+	if(!f) {
+		return;
+	}
+
+	snprintf(ed.project_path, sizeof(ed.project_path), "%s", path);
+
+	memset(ed.widgets, 0, sizeof(ed.widgets));
+	ed.widget_count = 0;
+	ed.selected = -1;
+	ed.placement_type = 0;
+	ed.next_id = 1;
+	ed.canvas_w = ED_CANVAS_DEF_W;
+	ed.canvas_h = ED_CANVAS_DEF_H;
+	ed.grid_size = ED_GRID_DEFAULT;
+	ed.drag_active = 0;
+	ed.tab_state_count = 0;
+	ed.widget_data_count = 0;
+
+	char line[1024];
+	int32_t cur_widget = -1;
+	uint32_t cur_data_id = 0;
+
+	while(fgets(line, (int32_t)sizeof(line), f)) {
+		size_t len = strlen(line);
+		while(len > 0 && (line[len - 1] == '\n' || line[len - 1] == '\r')) {
+			line[--len] = '\0';
+		}
+		if(len == 0) {
+			continue;
+		}
+
+		if(line[0] == '[') {
+			uint32_t idx;
+			if(sscanf(line, "[mkgui %*d]") == 0 && strncmp(line, "[mkgui ", 7) == 0) {
+				cur_widget = -1;
+				cur_data_id = 0;
+
+			} else if(sscanf(line, "[widget %u]", &idx) == 1) {
+				if(ed.widget_count < ED_MAX_WIDGETS) {
+					cur_widget = (int32_t)ed.widget_count;
+					memset(&ed.widgets[cur_widget], 0, sizeof(struct ed_widget));
+					++ed.widget_count;
+					cur_data_id = 0;
+				}
+
+			} else if(strncmp(line, "[tab_state]", 11) == 0) {
+				cur_widget = -1;
+				cur_data_id = 0;
+				if(ed.tab_state_count < 32) {
+					char next_line[1024];
+					if(fgets(next_line, (int32_t)sizeof(next_line), f)) {
+						uint32_t tid, aid;
+						if(sscanf(next_line, "tabs %u %u", &tid, &aid) == 2) {
+							ed.tab_states[ed.tab_state_count].tabs_id = tid;
+							ed.tab_states[ed.tab_state_count].active_id = aid;
+							++ed.tab_state_count;
+						}
+					}
+				}
+			}
+			continue;
+		}
+
+		if(strncmp(line, "canvas ", 7) == 0) {
+			sscanf(line + 7, "%d %d", &ed.canvas_w, &ed.canvas_h);
+
+		} else if(strncmp(line, "grid ", 5) == 0) {
+			sscanf(line + 5, "%d", &ed.grid_size);
+
+		} else if(strncmp(line, "next_id ", 8) == 0) {
+			sscanf(line + 8, "%u", &ed.next_id);
+
+		} else if(cur_widget >= 0 && (uint32_t)cur_widget < ed.widget_count) {
+			struct ed_widget *w = &ed.widgets[cur_widget];
+
+			if(strncmp(line, "type ", 5) == 0) {
+				sscanf(line + 5, "%u", &w->type);
+
+			} else if(strncmp(line, "id_name ", 8) == 0) {
+				snprintf(w->id_name, sizeof(w->id_name), "%s", line + 8);
+
+			} else if(strncmp(line, "id ", 3) == 0) {
+				sscanf(line + 3, "%u", &w->id);
+
+			} else if(strncmp(line, "label ", 6) == 0) {
+				snprintf(w->label, sizeof(w->label), "%s", line + 6);
+
+			} else if(strncmp(line, "label", 5) == 0 && line[5] == '\0') {
+				w->label[0] = '\0';
+
+			} else if(strncmp(line, "icon ", 5) == 0) {
+				snprintf(w->icon, sizeof(w->icon), "%s", line + 5);
+
+			} else if(strncmp(line, "icon", 4) == 0 && line[4] == '\0') {
+				w->icon[0] = '\0';
+
+			} else if(strncmp(line, "parent ", 7) == 0) {
+				sscanf(line + 7, "%u", &w->parent_id);
+
+			} else if(strncmp(line, "pos ", 4) == 0) {
+				sscanf(line + 4, "%d %d", &w->x, &w->y);
+
+			} else if(strncmp(line, "size ", 5) == 0) {
+				sscanf(line + 5, "%d %d", &w->w, &w->h);
+
+			} else if(strncmp(line, "flags ", 6) == 0) {
+				uint32_t fl;
+				sscanf(line + 6, "%x", &fl);
+				w->flags = fl;
+
+			} else if(strncmp(line, "tab_order ", 10) == 0) {
+				sscanf(line + 10, "%u", &w->tab_order);
+
+			} else if(strncmp(line, "event_mask ", 11) == 0) {
+				unsigned long long em;
+				sscanf(line + 11, "%llx", &em);
+				w->event_mask = (uint64_t)em;
+
+			} else if(strncmp(line, "item ", 5) == 0) {
+				if(!cur_data_id) {
+					cur_data_id = w->id;
+				}
+				struct ed_widget_data *d = ed_get_or_create_widget_data(cur_data_id);
+				if(d && d->item_count < ED_MAX_DATA_ITEMS) {
+					snprintf(d->items[d->item_count], MKGUI_MAX_TEXT, "%s", line + 5);
+					++d->item_count;
+				}
+			}
+		}
+	}
+
+	fclose(f);
+
+	ed.undo_pos = 0;
+	ed.undo_count = 0;
+
+	ed_sync_tree(ctx);
+	ed_sync_props(ctx);
+
+	ed_config_add_recent(path);
+	ed_sync_recent_menu(ctx);
+
+	char buf[256];
+	const char *fname = strrchr(path, '/');
+	if(!fname) {
+		fname = path;
+	} else {
+		++fname;
+	}
+	snprintf(buf, sizeof(buf), "Loaded: %s", fname);
+	mkgui_statusbar_set(ctx, ED_STATUSBAR, 0, buf);
+}
+
+// [=]===^=[ ed_load_project ]=====================================[=]
+static void ed_load_project(struct mkgui_ctx *ctx) {
+	if(!mkgui_open_dialog(ctx)) {
+		return;
+	}
+	ed_load_file(ctx, mkgui_dialog_path(ctx, 0));
+}
+
+// [=]===^=[ ed_load_recent ]======================================[=]
+static void ed_load_recent(struct mkgui_ctx *ctx, uint32_t index) {
+	if(index >= ed_cfg.recent_count) {
+		return;
+	}
+	ed_load_file(ctx, ed_cfg.recent[index]);
+}
+
+// ---------------------------------------------------------------------------
+// Code generation
+// ---------------------------------------------------------------------------
+
+// [=]===^=[ ed_type_name_upper ]==================================[=]
+static const char *ed_type_name_upper(uint32_t type) {
+	switch(type) {
+		case MKGUI_WINDOW:     { return "MKGUI_WINDOW"; }
+		case MKGUI_BUTTON:     { return "MKGUI_BUTTON"; }
+		case MKGUI_LABEL:      { return "MKGUI_LABEL"; }
+		case MKGUI_INPUT:      { return "MKGUI_INPUT"; }
+		case MKGUI_CHECKBOX:   { return "MKGUI_CHECKBOX"; }
+		case MKGUI_DROPDOWN:   { return "MKGUI_DROPDOWN"; }
+		case MKGUI_SLIDER:     { return "MKGUI_SLIDER"; }
+		case MKGUI_LISTVIEW:   { return "MKGUI_LISTVIEW"; }
+		case MKGUI_MENU:       { return "MKGUI_MENU"; }
+		case MKGUI_MENUITEM:   { return "MKGUI_MENUITEM"; }
+		case MKGUI_TABS:       { return "MKGUI_TABS"; }
+		case MKGUI_TAB:        { return "MKGUI_TAB"; }
+		case MKGUI_HSPLIT:     { return "MKGUI_HSPLIT"; }
+		case MKGUI_VSPLIT:     { return "MKGUI_VSPLIT"; }
+		case MKGUI_TREEVIEW:   { return "MKGUI_TREEVIEW"; }
+		case MKGUI_STATUSBAR:  { return "MKGUI_STATUSBAR"; }
+		case MKGUI_TOOLBAR:    { return "MKGUI_TOOLBAR"; }
+		case MKGUI_SPINBOX:    { return "MKGUI_SPINBOX"; }
+		case MKGUI_RADIO:      { return "MKGUI_RADIO"; }
+		case MKGUI_PROGRESS:   { return "MKGUI_PROGRESS"; }
+		case MKGUI_TEXTAREA:   { return "MKGUI_TEXTAREA"; }
+		case MKGUI_GROUP:      { return "MKGUI_GROUP"; }
+		case MKGUI_SPINNER:    { return "MKGUI_SPINNER"; }
+		case MKGUI_ITEMVIEW:   { return "MKGUI_ITEMVIEW"; }
+		case MKGUI_PANEL:      { return "MKGUI_PANEL"; }
+		case MKGUI_SCROLLBAR:  { return "MKGUI_SCROLLBAR"; }
+		case MKGUI_IMAGE:      { return "MKGUI_IMAGE"; }
+		case MKGUI_GLVIEW:     { return "MKGUI_GLVIEW"; }
+		case MKGUI_CANVAS:     { return "MKGUI_CANVAS"; }
+		case MKGUI_SPACER:     { return "MKGUI_SPACER"; }
+		case MKGUI_VBOX:       { return "MKGUI_VBOX"; }
+		case MKGUI_HBOX:       { return "MKGUI_HBOX"; }
+		case MKGUI_FORM:       { return "MKGUI_FORM"; }
+		default:               { return "0"; }
+	}
+}
+
+// [=]===^=[ ed_generate_code ]===================================[=]
+static void ed_generate_code(struct mkgui_ctx *ctx) {
+	if(!mkgui_save_dialog(ctx, "gui_app.c")) {
+		return;
+	}
+	const char *out_path = mkgui_dialog_path(ctx, 0);
+	FILE *f = fopen(out_path, "w");
+	if(!f) {
+		return;
+	}
+
+	fprintf(f, "// Copyright (c) 2026\n");
+	fprintf(f, "// SPDX-License-Identifier: MIT\n\n");
+	fprintf(f, "#include \"mkgui.c\"\n\n");
+
+	fprintf(f, "enum {\n");
+	for(uint32_t i = 0; i < ed.widget_count; ++i) {
+		fprintf(f, "\t%s = %u,\n", ed.widgets[i].id_name, ed.widgets[i].id);
+	}
+	fprintf(f, "};\n\n");
+
+	for(uint32_t i = 0; i < ed.widget_count; ++i) {
+		if(ed.widgets[i].type == MKGUI_LISTVIEW) {
+			fprintf(f, "// [=]===^=[ %s_row_cb ]===\n", ed.widgets[i].id_name);
+			fprintf(f, "static void %s_row_cb(uint32_t row, uint32_t col, char *buf, uint32_t buf_size, void *userdata) {\n", ed.widgets[i].id_name);
+			fprintf(f, "\t(void)row; (void)col; (void)userdata;\n");
+			fprintf(f, "\tbuf[0] = '\\0';\n");
+			fprintf(f, "}\n\n");
+		}
+	}
+
+	fprintf(f, "// [=]===^=[ main ]===\n");
+	fprintf(f, "int main(void) {\n");
+	fprintf(f, "\tstruct mkgui_widget widgets[] = {\n");
 	for(uint32_t i = 0; i < ed.widget_count; ++i) {
 		struct ed_widget *w = &ed.widgets[i];
 		int32_t lx, ly, lw, lh;
 		ed_convert_to_layout(i, &lx, &ly, &lw, &lh);
-		fprintf(fc, "\t{ %u, %s, \"%s\", \"%s\", %u, %d, %d, %d, %d, 0x%X },\n",
-			w->type, w->id_name, w->label, w->icon, w->parent_id,
-			lx, ly, lw, lh, w->flags);
+		const char *parent_name = "0";
+		if(w->parent_id != 0) {
+			int32_t pidx = ed_find_widget(w->parent_id);
+			if(pidx >= 0) {
+				parent_name = ed.widgets[pidx].id_name;
+			}
+		}
+		fprintf(f, "\t\t{ %s, %s, \"%s\", \"%s\", %s, %d, %d, %d, %d, 0x%x },\n",
+			ed_type_name_upper(w->type), w->id_name, w->label, w->icon,
+			parent_name, lx, ly, lw, lh, w->flags);
 	}
-	fprintf(fc, "};\n\n");
-	fprintf(fc, "static uint32_t gui_widget_count = sizeof(gui_widgets) / sizeof(gui_widgets[0]);\n");
-	fclose(fc);
+	fprintf(f, "\t};\n\n");
 
-	printf("Generated gui_ids.h and gui_layout.c (%u widgets)\n", ed.widget_count);
+	fprintf(f, "\tuint32_t widget_count = sizeof(widgets) / sizeof(widgets[0]);\n");
+	fprintf(f, "\tstruct mkgui_ctx *ctx = mkgui_create(widgets, widget_count);\n");
+	fprintf(f, "\tif(!ctx) {\n\t\treturn 1;\n\t}\n\n");
+
+	for(uint32_t i = 0; i < ed.widget_count; ++i) {
+		struct ed_widget *w = &ed.widgets[i];
+		if(w->type == MKGUI_DROPDOWN) {
+			struct ed_widget_data *d = ed_find_widget_data(w->id);
+			if(d && d->item_count > 0) {
+				fprintf(f, "\t{\n");
+				fprintf(f, "\t\tconst char *%s_items[] = {", w->id_name);
+				for(uint32_t j = 0; j < d->item_count; ++j) {
+					fprintf(f, "%s\"%s\"", j ? ", " : " ", d->items[j]);
+				}
+				fprintf(f, " };\n");
+				fprintf(f, "\t\tmkgui_dropdown_setup(ctx, %s, %s_items, %u);\n", w->id_name, w->id_name, d->item_count);
+				fprintf(f, "\t}\n");
+			}
+
+		} else if(w->type == MKGUI_SLIDER) {
+			fprintf(f, "\tmkgui_slider_setup(ctx, %s, 0, 100, 50);\n", w->id_name);
+
+		} else if(w->type == MKGUI_SPINBOX) {
+			fprintf(f, "\tmkgui_spinbox_setup(ctx, %s, 0, 100, 0, 1);\n", w->id_name);
+
+		} else if(w->type == MKGUI_LISTVIEW) {
+			fprintf(f, "\t{\n");
+			fprintf(f, "\t\tstruct mkgui_column %s_cols[] = {\n", w->id_name);
+			fprintf(f, "\t\t\t{ \"Column\", 200, MKGUI_CELL_TEXT },\n");
+			fprintf(f, "\t\t};\n");
+			fprintf(f, "\t\tmkgui_listview_setup(ctx, %s, 0, 1, %s_cols, %s_row_cb, NULL);\n", w->id_name, w->id_name, w->id_name);
+			fprintf(f, "\t}\n");
+		}
+	}
+
+	fprintf(f, "\n\tstruct mkgui_event ev;\n");
+	fprintf(f, "\tuint32_t running = 1;\n");
+	fprintf(f, "\twhile(running) {\n");
+	fprintf(f, "\t\twhile(mkgui_poll(ctx, &ev)) {\n");
+	fprintf(f, "\t\t\tswitch(ev.type) {\n");
+
+	uint32_t events_used[64];
+	uint32_t events_used_count = 0;
+
+	for(uint32_t i = 0; i < ed.widget_count; ++i) {
+		if(ed.widgets[i].event_mask == 0) {
+			continue;
+		}
+		for(uint32_t bit = 1; bit < 40; ++bit) {
+			if(!(ed.widgets[i].event_mask & (1ULL << bit))) {
+				continue;
+			}
+			uint32_t found = 0;
+			for(uint32_t j = 0; j < events_used_count; ++j) {
+				if(events_used[j] == bit) {
+					found = 1;
+					break;
+				}
+			}
+			if(!found && events_used_count < 64) {
+				events_used[events_used_count++] = bit;
+			}
+		}
+	}
+
+	for(uint32_t ei = 0; ei < events_used_count; ++ei) {
+		uint32_t evt = events_used[ei];
+		fprintf(f, "\t\t\t\tcase MKGUI_EVENT_%s: {\n", ed_event_name(evt));
+
+		if(evt == MKGUI_EVENT_CLOSE) {
+			fprintf(f, "\t\t\t\t\trunning = 0;\n");
+		} else {
+			for(uint32_t i = 0; i < ed.widget_count; ++i) {
+				if(ed.widgets[i].event_mask & (1ULL << evt)) {
+					fprintf(f, "\t\t\t\t\tif(ev.id == %s) {\n", ed.widgets[i].id_name);
+					fprintf(f, "\t\t\t\t\t\t// TODO: handle %s for %s\n", ed_event_name(evt), ed.widgets[i].id_name);
+					fprintf(f, "\t\t\t\t\t}\n");
+				}
+			}
+		}
+
+		fprintf(f, "\t\t\t\t} break;\n\n");
+	}
+
+	uint32_t has_close = 0;
+	for(uint32_t j = 0; j < events_used_count; ++j) {
+		if(events_used[j] == MKGUI_EVENT_CLOSE) {
+			has_close = 1;
+			break;
+		}
+	}
+	if(!has_close) {
+		fprintf(f, "\t\t\t\tcase MKGUI_EVENT_CLOSE: {\n");
+		fprintf(f, "\t\t\t\t\trunning = 0;\n");
+		fprintf(f, "\t\t\t\t} break;\n\n");
+	}
+
+	fprintf(f, "\t\t\t\tdefault: break;\n");
+	fprintf(f, "\t\t\t}\n");
+	fprintf(f, "\t\t}\n");
+	fprintf(f, "\t\tmkgui_wait(ctx);\n");
+	fprintf(f, "\t}\n\n");
+	fprintf(f, "\tmkgui_destroy(ctx);\n");
+	fprintf(f, "\treturn 0;\n");
+	fprintf(f, "}\n");
+
+	fclose(f);
+
+	char buf[256];
+	const char *fname = strrchr(out_path, '/');
+	if(!fname) {
+		fname = out_path;
+	} else {
+		++fname;
+	}
+	snprintf(buf, sizeof(buf), "Generated: %s", fname);
+	mkgui_statusbar_set(ctx, ED_STATUSBAR, 0, buf);
 }
 
 // ---------------------------------------------------------------------------
@@ -2641,6 +3526,20 @@ static void ed_test_gui(struct mkgui_ctx *editor_ctx) {
 		return;
 	}
 
+	for(uint32_t i = 0; i < ed.widget_count; ++i) {
+		struct ed_widget *ew = &ed.widgets[i];
+		if(ew->type == MKGUI_DROPDOWN) {
+			struct ed_widget_data *d = ed_find_widget_data(ew->id);
+			if(d && d->item_count > 0) {
+				const char *items[ED_MAX_DATA_ITEMS];
+				for(uint32_t j = 0; j < d->item_count; ++j) {
+					items[j] = d->items[j];
+				}
+				mkgui_dropdown_setup(test, ew->id, items, d->item_count);
+			}
+		}
+	}
+
 	struct mkgui_event ev;
 	uint32_t running = 1;
 	while(running) {
@@ -2668,6 +3567,8 @@ int main(void) {
 	ed.selected = -1;
 	ed.next_id = 1;
 
+	ed_config_load();
+
 	ed_add_widget(MKGUI_WINDOW, 0, 0);
 	ed.undo_pos = 0;
 	ed.undo_count = 0;
@@ -2675,8 +3576,11 @@ int main(void) {
 	uint32_t widget_pal_count = ED_WIDGET_COUNT;
 	uint32_t ctn_pal_count = ED_CONTAINER_COUNT;
 
+	int32_t win_w = (ed_cfg.window_w > 0) ? ed_cfg.window_w : 1280;
+	int32_t win_h = (ed_cfg.window_h > 0) ? ed_cfg.window_h : 800;
+
 	struct mkgui_widget widgets[] = {
-		{ MKGUI_WINDOW,   ED_WINDOW,      "mkgui editor",    "", 0,          0, 0, 1280, 800, 0 },
+		{ MKGUI_WINDOW,   ED_WINDOW,      "mkgui editor",    "", 0,          0, 0, win_w, win_h, 0 },
 
 		{ MKGUI_MENU,     ED_MENU,        "",                 "", ED_WINDOW,  0, 0, 0, 0, 0 },
 		{ MKGUI_MENUITEM, ED_FILE_MENU,   "File",             "", ED_MENU,    0, 0, 0, 0, 0 },
@@ -2684,6 +3588,18 @@ int main(void) {
 		{ MKGUI_MENUITEM, ED_MI_NEW,      "New",              "document-new",  ED_FILE_MENU, 0, 0, 0, 0, 0 },
 		{ MKGUI_MENUITEM, ED_MI_OPEN,     "Open",             "document-open", ED_FILE_MENU, 0, 0, 0, 0, 0 },
 		{ MKGUI_MENUITEM, ED_MI_SAVE,     "Save",             "document-save", ED_FILE_MENU, 0, 0, 0, 0, 0 },
+		{ MKGUI_MENUITEM, ED_MI_SAVEAS,   "Save As...",       "", ED_FILE_MENU, 0, 0, 0, 0, MKGUI_SEPARATOR },
+		{ MKGUI_MENUITEM, ED_MI_RECENT,   "Recent Files",     "", ED_FILE_MENU, 0, 0, 0, 0, 0 },
+		{ MKGUI_MENUITEM, ED_RECENT_FIRST + 0, "", "", ED_MI_RECENT, 0, 0, 0, 0, MKGUI_HIDDEN },
+		{ MKGUI_MENUITEM, ED_RECENT_FIRST + 1, "", "", ED_MI_RECENT, 0, 0, 0, 0, MKGUI_HIDDEN },
+		{ MKGUI_MENUITEM, ED_RECENT_FIRST + 2, "", "", ED_MI_RECENT, 0, 0, 0, 0, MKGUI_HIDDEN },
+		{ MKGUI_MENUITEM, ED_RECENT_FIRST + 3, "", "", ED_MI_RECENT, 0, 0, 0, 0, MKGUI_HIDDEN },
+		{ MKGUI_MENUITEM, ED_RECENT_FIRST + 4, "", "", ED_MI_RECENT, 0, 0, 0, 0, MKGUI_HIDDEN },
+		{ MKGUI_MENUITEM, ED_RECENT_FIRST + 5, "", "", ED_MI_RECENT, 0, 0, 0, 0, MKGUI_HIDDEN },
+		{ MKGUI_MENUITEM, ED_RECENT_FIRST + 6, "", "", ED_MI_RECENT, 0, 0, 0, 0, MKGUI_HIDDEN },
+		{ MKGUI_MENUITEM, ED_RECENT_FIRST + 7, "", "", ED_MI_RECENT, 0, 0, 0, 0, MKGUI_HIDDEN },
+		{ MKGUI_MENUITEM, ED_RECENT_FIRST + 8, "", "", ED_MI_RECENT, 0, 0, 0, 0, MKGUI_HIDDEN },
+		{ MKGUI_MENUITEM, ED_RECENT_FIRST + 9, "", "", ED_MI_RECENT, 0, 0, 0, 0, MKGUI_HIDDEN },
 		{ MKGUI_MENUITEM, ED_MI_GENERATE, "Generate Code",    "", ED_FILE_MENU, 0, 0, 0, 0, MKGUI_SEPARATOR },
 		{ MKGUI_MENUITEM, ED_MI_EXIT,     "Exit",             "application-exit", ED_FILE_MENU, 0, 0, 0, 0, MKGUI_SEPARATOR },
 		{ MKGUI_MENUITEM, ED_MI_UNDO,     "Undo",             "edit-undo", ED_EDIT_MENU, 0, 0, 0, 0, 0 },
@@ -2790,6 +3706,22 @@ int main(void) {
 		/* Menu tree */
 		{ MKGUI_TREEVIEW, ED_MENU_TREE,      "",                "", ED_PROP_VBOX, 0, 0, 0, 200, MKGUI_HIDDEN },
 
+		/* Events section */
+		{ MKGUI_GROUP,    ED_EVT_GROUP,      "Events",          "", ED_RIGHT_PANEL, 0, 0, 0, 200, MKGUI_HIDDEN },
+		{ MKGUI_VBOX,     ED_EVT_VBOX,       "",                "", ED_EVT_GROUP,   0, 0, 0, 0, MKGUI_ANCHOR_LEFT | MKGUI_ANCHOR_TOP | MKGUI_ANCHOR_RIGHT | MKGUI_ANCHOR_BOTTOM },
+		{ MKGUI_LISTVIEW, ED_EVT_LIST,       "",                "", ED_EVT_VBOX,    0, 0, 0, 0, MKGUI_MULTI_SELECT },
+
+		/* Data section */
+		{ MKGUI_GROUP,    ED_DATA_GROUP,     "Data",            "", ED_RIGHT_PANEL, 0, 0, 0, 250, MKGUI_HIDDEN },
+		{ MKGUI_VBOX,     ED_DATA_VBOX,      "",                "", ED_DATA_GROUP,  0, 0, 0, 0, MKGUI_ANCHOR_LEFT | MKGUI_ANCHOR_TOP | MKGUI_ANCHOR_RIGHT | MKGUI_ANCHOR_BOTTOM },
+		{ MKGUI_LISTVIEW, ED_DATA_LIST,      "",                "", ED_DATA_VBOX,   0, 0, 0, 0, 0 },
+		{ MKGUI_INPUT,    ED_DATA_ITEM_INP,  "",                "", ED_DATA_VBOX,   0, 0, 0, 24, 0 },
+		{ MKGUI_HBOX,     ED_DATA_BTN_HBOX,  "",                "", ED_DATA_VBOX,   0, 0, 0, 22, 0 },
+		{ MKGUI_BUTTON,   ED_DATA_ADD_BTN,   "Add",             "", ED_DATA_BTN_HBOX, 0, 0, 0, 0, 0 },
+		{ MKGUI_BUTTON,   ED_DATA_REM_BTN,   "Remove",          "", ED_DATA_BTN_HBOX, 0, 0, 0, 0, 0 },
+		{ MKGUI_BUTTON,   ED_DATA_UP_BTN,    "Up",              "", ED_DATA_BTN_HBOX, 0, 0, 0, 0, 0 },
+		{ MKGUI_BUTTON,   ED_DATA_DOWN_BTN,  "Down",            "", ED_DATA_BTN_HBOX, 0, 0, 0, 0, 0 },
+
 		{ MKGUI_STATUSBAR, ED_STATUSBAR,   "",                 "", ED_WINDOW,  0, 0, 0, 0, 0 },
 	};
 
@@ -2870,8 +3802,22 @@ int main(void) {
 		}
 	}
 
+	{
+		struct mkgui_column evt_cols[] = {
+			{ "Event", 200, MKGUI_CELL_TEXT },
+		};
+		mkgui_listview_setup(ctx, ED_EVT_LIST, 0, 1, evt_cols, ed_event_row_cb, NULL);
+	}
+	{
+		struct mkgui_column data_cols[] = {
+			{ "Item", 200, MKGUI_CELL_TEXT },
+		};
+		mkgui_listview_setup(ctx, ED_DATA_LIST, 0, 1, data_cols, ed_data_row_cb, NULL);
+	}
+
 	ed_sync_tree(ctx);
 	ed_sync_props(ctx);
+	ed_sync_recent_menu(ctx);
 
 	struct mkgui_event ev;
 	uint32_t running = 1;
@@ -2881,6 +3827,9 @@ int main(void) {
 		while(mkgui_poll(ctx, &ev)) {
 			switch(ev.type) {
 				case MKGUI_EVENT_CLOSE: {
+					ed_cfg.window_w = ctx->win_w;
+					ed_cfg.window_h = ctx->win_h;
+					ed_config_save();
 					running = 0;
 				} break;
 
@@ -2899,9 +3848,17 @@ int main(void) {
 						ed_sync_props(ctx);
 						mkgui_statusbar_set(ctx, ED_STATUSBAR, 0, "New project");
 
+					} else if(ev.id == ED_TB_SAVE || ev.id == ED_MI_SAVE) {
+						ed_save_project(ctx, 0);
+
+					} else if(ev.id == ED_MI_SAVEAS) {
+						ed_save_project(ctx, 1);
+
+					} else if(ev.id == ED_TB_OPEN || ev.id == ED_MI_OPEN) {
+						ed_load_project(ctx);
+
 					} else if(ev.id == ED_TB_GEN || ev.id == ED_MI_GENERATE) {
-						ed_generate_code();
-						mkgui_statusbar_set(ctx, ED_STATUSBAR, 0, "Code generated");
+						ed_generate_code(ctx);
 
 					} else if(ev.id == ED_TB_TEST) {
 						ed_test_gui(ctx);
@@ -2965,6 +3922,64 @@ int main(void) {
 							}
 						}
 						if(!handled) {
+						if(ev.id == ED_DATA_ADD_BTN) {
+							struct ed_widget_data *d = ed_find_widget_data(ed_data_widget_id);
+							if(d && d->item_count < ED_MAX_DATA_ITEMS) {
+								snprintf(d->items[d->item_count], MKGUI_MAX_TEXT, "Item %u", d->item_count + 1);
+								++d->item_count;
+								mkgui_listview_set_rows(ctx, ED_DATA_LIST, d->item_count);
+								dirty_all(ctx);
+							}
+							handled = 1;
+
+						} else if(ev.id == ED_DATA_REM_BTN) {
+							struct ed_widget_data *d = ed_find_widget_data(ed_data_widget_id);
+							int32_t dsel = mkgui_listview_get_selected(ctx, ED_DATA_LIST);
+							if(d && dsel >= 0 && (uint32_t)dsel < d->item_count) {
+								for(uint32_t si = (uint32_t)dsel; si + 1 < d->item_count; ++si) {
+									memcpy(d->items[si], d->items[si + 1], MKGUI_MAX_TEXT);
+								}
+								--d->item_count;
+								mkgui_listview_set_rows(ctx, ED_DATA_LIST, d->item_count);
+								mkgui_input_set(ctx, ED_DATA_ITEM_INP, "");
+								dirty_all(ctx);
+							}
+							handled = 1;
+
+						} else if(ev.id == ED_DATA_UP_BTN) {
+							struct ed_widget_data *d = ed_find_widget_data(ed_data_widget_id);
+							int32_t dsel = mkgui_listview_get_selected(ctx, ED_DATA_LIST);
+							if(d && dsel > 0 && (uint32_t)dsel < d->item_count) {
+								char tmp[MKGUI_MAX_TEXT];
+								memcpy(tmp, d->items[dsel], MKGUI_MAX_TEXT);
+								memcpy(d->items[dsel], d->items[dsel - 1], MKGUI_MAX_TEXT);
+								memcpy(d->items[dsel - 1], tmp, MKGUI_MAX_TEXT);
+								struct mkgui_listview_data *lv = find_listv_data(ctx, ED_DATA_LIST);
+								if(lv) {
+									lv->selected_row = dsel - 1;
+								}
+								dirty_all(ctx);
+							}
+							handled = 1;
+
+						} else if(ev.id == ED_DATA_DOWN_BTN) {
+							struct ed_widget_data *d = ed_find_widget_data(ed_data_widget_id);
+							int32_t dsel = mkgui_listview_get_selected(ctx, ED_DATA_LIST);
+							if(d && dsel >= 0 && (uint32_t)dsel + 1 < d->item_count) {
+								char tmp[MKGUI_MAX_TEXT];
+								memcpy(tmp, d->items[dsel], MKGUI_MAX_TEXT);
+								memcpy(d->items[dsel], d->items[dsel + 1], MKGUI_MAX_TEXT);
+								memcpy(d->items[dsel + 1], tmp, MKGUI_MAX_TEXT);
+								struct mkgui_listview_data *lv = find_listv_data(ctx, ED_DATA_LIST);
+								if(lv) {
+									lv->selected_row = dsel + 1;
+								}
+								dirty_all(ctx);
+							}
+							handled = 1;
+						}
+						}
+						if(!handled) {
 						for(uint32_t pi = 0; pi < widget_pal_count; ++pi) {
 							if(ev.id == ED_PAL_FIRST + pi) {
 								ed.placement_type = ed_widgets[pi].type;
@@ -2991,10 +4006,18 @@ int main(void) {
 
 				case MKGUI_EVENT_MENU: {
 					if(ev.id == ED_MI_EXIT) {
+						ed_cfg.window_w = ctx->win_w;
+						ed_cfg.window_h = ctx->win_h;
+						ed_config_save();
 						running = 0;
+					} else if(ev.id == ED_MI_SAVE) {
+						ed_save_project(ctx, 0);
+					} else if(ev.id == ED_MI_SAVEAS) {
+						ed_save_project(ctx, 1);
+					} else if(ev.id == ED_MI_OPEN) {
+						ed_load_project(ctx);
 					} else if(ev.id == ED_MI_GENERATE) {
-						ed_generate_code();
-						mkgui_statusbar_set(ctx, ED_STATUSBAR, 0, "Code generated");
+						ed_generate_code(ctx);
 					} else if(ev.id == ED_MI_UNDO) {
 						ed_undo();
 						ed_sync_tree(ctx);
@@ -3019,6 +4042,9 @@ int main(void) {
 						ed.undo_count = 0;
 						ed_sync_tree(ctx);
 						ed_sync_props(ctx);
+
+					} else if(ev.id >= ED_RECENT_FIRST && ev.id <= ED_RECENT_LAST) {
+						ed_load_recent(ctx, ev.id - ED_RECENT_FIRST);
 					}
 				} break;
 
@@ -3129,15 +4155,27 @@ int main(void) {
 				case MKGUI_EVENT_SPINBOX_CHANGED:
 				case MKGUI_EVENT_INPUT_CHANGED:
 				case MKGUI_EVENT_INPUT_SUBMIT: {
-					for(uint32_t pi = 0; pi < ED_PROP_COUNT; ++pi) {
-						struct ed_prop_desc *p = &ed_props[pi];
-						if(p->widget_id == ev.id || p->widget_id2 == ev.id) {
-							ed_read_props(ctx);
-							if(p->offset == offsetof(struct ed_widget, id_name) || p->offset == offsetof(struct ed_widget, label)) {
-								ed_sync_tree(ctx);
-								ed_sync_menu_tree(ctx);
+					if(ev.id == ED_DATA_ITEM_INP) {
+						struct ed_widget_data *d = ed_find_widget_data(ed_data_widget_id);
+						int32_t dsel = mkgui_listview_get_selected(ctx, ED_DATA_LIST);
+						if(d && dsel >= 0 && (uint32_t)dsel < d->item_count) {
+							const char *val = mkgui_input_get(ctx, ED_DATA_ITEM_INP);
+							if(val) {
+								snprintf(d->items[dsel], MKGUI_MAX_TEXT, "%s", val);
+								dirty_all(ctx);
 							}
-							break;
+						}
+					} else {
+						for(uint32_t pi = 0; pi < ED_PROP_COUNT; ++pi) {
+							struct ed_prop_desc *p = &ed_props[pi];
+							if(p->widget_id == ev.id || p->widget_id2 == ev.id) {
+								ed_read_props(ctx);
+								if(p->offset == offsetof(struct ed_widget, id_name) || p->offset == offsetof(struct ed_widget, label)) {
+									ed_sync_tree(ctx);
+									ed_sync_menu_tree(ctx);
+								}
+								break;
+							}
 						}
 					}
 				} break;
@@ -3154,6 +4192,28 @@ int main(void) {
 				case MKGUI_EVENT_DROPDOWN_CHANGED: {
 					if(ev.id == ED_PROP_PARENT_DRP) {
 						ed_apply_parent_dropdown(ctx);
+					}
+				} break;
+
+				case MKGUI_EVENT_LISTVIEW_SELECT: {
+					if(ev.id == ED_EVT_LIST && ed.selected >= 0 && (uint32_t)ed.selected < ed.widget_count) {
+						const int32_t *sel;
+						uint32_t sel_count = mkgui_listview_get_multi_sel(ctx, ED_EVT_LIST, &sel);
+						uint64_t mask = 0;
+						for(uint32_t si = 0; si < sel_count; ++si) {
+							if(sel[si] >= 0 && (uint32_t)sel[si] < ed_cur_event_count) {
+								mask |= (1ULL << ed_cur_events[sel[si]]);
+							}
+						}
+						ed.widgets[ed.selected].event_mask = mask;
+
+					} else if(ev.id == ED_DATA_LIST) {
+						struct ed_widget_data *d = ed_find_widget_data(ed_data_widget_id);
+						if(d && ev.value >= 0 && (uint32_t)ev.value < d->item_count) {
+							mkgui_input_set(ctx, ED_DATA_ITEM_INP, d->items[ev.value]);
+						} else {
+							mkgui_input_set(ctx, ED_DATA_ITEM_INP, "");
+						}
 					}
 				} break;
 
@@ -3234,6 +4294,10 @@ int main(void) {
 						ed_redo();
 						ed_sync_tree(ctx);
 						ed_sync_props(ctx);
+					}
+
+					if((ev.keymod & MKGUI_MOD_CONTROL) && ev.keysym == 's') {
+						ed_save_project(ctx, 0);
 					}
 				} break;
 
@@ -3559,14 +4623,10 @@ int main(void) {
 								continue;
 							}
 							uint32_t af = aw->flags;
-							if((af & MKGUI_ANCHOR_LEFT) && (af & MKGUI_ANCHOR_RIGHT)) {
-								aw->w += dx;
-							} else if(af & MKGUI_ANCHOR_RIGHT) {
+							if(!(af & MKGUI_ANCHOR_LEFT) && (af & MKGUI_ANCHOR_RIGHT)) {
 								aw->x += dx;
 							}
-							if((af & MKGUI_ANCHOR_TOP) && (af & MKGUI_ANCHOR_BOTTOM)) {
-								aw->h += dy;
-							} else if(af & MKGUI_ANCHOR_BOTTOM) {
+							if(!(af & MKGUI_ANCHOR_TOP) && (af & MKGUI_ANCHOR_BOTTOM)) {
 								aw->y += dy;
 							}
 						}

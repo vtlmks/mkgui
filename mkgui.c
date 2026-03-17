@@ -186,6 +186,7 @@ enum {
 	MKGUI_VBOX,
 	MKGUI_HBOX,
 	MKGUI_FORM,
+	MKGUI_SPACER,
 };
 
 // ---------------------------------------------------------------------------
@@ -426,6 +427,7 @@ struct mkgui_spinbox_data {
 	int32_t step;
 	int32_t hover_btn;
 	uint32_t editing;
+	uint32_t select_all;
 	char edit_buf[32];
 	uint32_t edit_len;
 	int32_t repeat_dir;
@@ -1742,6 +1744,7 @@ static void layout_node(struct mkgui_ctx *ctx, uint32_t idx) {
 		ph -= gtop + gpad;
 	}
 
+	uint32_t box_has_pad = 0;
 	if(w->type == MKGUI_VBOX || w->type == MKGUI_HBOX || w->type == MKGUI_FORM) {
 		if(!(w->flags & MKGUI_NO_PAD)) {
 			uint32_t gpidx = layout_parent[idx];
@@ -1757,6 +1760,7 @@ static void layout_node(struct mkgui_ctx *ctx, uint32_t idx) {
 				py += MKGUI_BOX_PAD;
 				pw -= MKGUI_BOX_PAD * 2;
 				ph -= MKGUI_BOX_PAD * 2;
+				box_has_pad = 1;
 			}
 		}
 
@@ -1788,6 +1792,9 @@ static void layout_node(struct mkgui_ctx *ctx, uint32_t idx) {
 			}
 			if(bs) {
 				bs->content_h = fixed_total + gap_total;
+				if(box_has_pad) {
+					bs->content_h += MKGUI_BOX_PAD * 2;
+				}
 			}
 			int32_t remaining = ph - fixed_total - gap_total;
 			if(remaining < 0) {
@@ -3782,6 +3789,7 @@ static uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 
 							} else {
 								sd->editing = 1;
+								sd->select_all = 1;
 								snprintf(sd->edit_buf, sizeof(sd->edit_buf), "%d", sd->value);
 								sd->edit_len = (uint32_t)strlen(sd->edit_buf);
 								dirty_all(ctx);
