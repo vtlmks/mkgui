@@ -39,6 +39,9 @@ static void render_tooltip(struct mkgui_ctx *ctx) {
 // [=]===^=[ tooltip_update ]=====================================[=]
 static void tooltip_update(struct mkgui_ctx *ctx, uint32_t hover_id, int32_t mx, int32_t my) {
 	if(hover_id != ctx->tooltip_id) {
+		if(ctx->tooltip_timer >= MKGUI_TOOLTIP_DELAY) {
+			dirty_all(ctx);
+		}
 		ctx->tooltip_id = hover_id;
 		ctx->tooltip_timer = 0;
 		ctx->tooltip_x = mx;

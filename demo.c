@@ -12,37 +12,66 @@
 
 enum {
 	ID_WINDOW = 0,
+
 	ID_MENU, ID_FILE_MENU, ID_EDIT_MENU, ID_VIEW_MENU, ID_HELP_MENU,
 	ID_FILE_NEW, ID_OPEN, ID_SAVE, ID_FILE_SEP1, ID_EXIT,
 	ID_EDIT_CUT, ID_COPY, ID_PASTE,
 	ID_VIEW_GRID, ID_VIEW_STATUS, ID_VIEW_SEP1,
 	ID_VIEW_SMALL, ID_VIEW_MEDIUM, ID_VIEW_LARGE,
 	ID_HELP_ABOUT,
+
 	ID_TOOLBAR, ID_TB_NEW, ID_TB_OPEN, ID_TB_SAVE,
+
 	ID_TABS,
-	ID_TAB1, ID_TAB3, ID_TAB4, ID_TAB5, ID_TAB7, ID_TAB6,
+	ID_TAB_CONTROLS, ID_TAB_TREE, ID_TAB_DATA, ID_TAB_LAYOUT, ID_TAB_MEDIA,
+
 	ID_STATUSBAR,
-	ID_TAB1_VBOX, ID_GRP_INPUT, ID_TAB1_FORM,
-	ID_LABEL1, ID_INPUT1,
+
+	/* Controls tab */
+	ID_CTL_HBOX,
+	ID_CTL_LVBOX,
+	ID_GRP_SETTINGS, ID_CTL_FORM,
+	ID_LBL_NAME, ID_INPUT1,
 	ID_LBL_ENABLE, ID_CHECK1,
 	ID_LBL_MODE, ID_DROPDOWN1,
+	ID_LBL_SEARCH, ID_COMBOBOX1,
 	ID_LBL_VOLUME, ID_SLIDER1,
-	ID_GRP_RADIO, ID_TAB1_RADIO_HBOX, ID_RADIO1, ID_RADIO2, ID_RADIO3,
-	ID_TAB1_PROG_HBOX, ID_PROG_LBL, ID_PROGRESS1, ID_SPINNER1,
-	ID_TAB1_COUNT_HBOX, ID_LBL_COUNT, ID_SPINBOX1,
-	ID_TAB1_BTN_HBOX, ID_BUTTON1, ID_THEME_CHECK,
-	ID_TAB3_SPLIT, ID_TAB3_LVBOX, ID_TREE_LBL, ID_TREEVIEW1,
-	ID_TAB3_RVBOX, ID_TEXT_LBL, ID_TEXTAREA1,
-	ID_TAB4_VBOX, ID_LABEL2, ID_LISTVIEW1,
-	ID_TAB5_VBOX, ID_TAB5_BTN_HBOX,
+	ID_GRP_RADIO, ID_RADIO_HBOX, ID_RADIO1, ID_RADIO2, ID_RADIO3,
+	ID_PROG_HBOX, ID_PROG_LBL, ID_PROGRESS1, ID_SPINNER1,
+	ID_COUNT_HBOX, ID_LBL_COUNT, ID_SPINBOX1,
+	ID_BTN_HBOX, ID_BUTTON1, ID_SPACER1, ID_THEME_CHECK,
+	ID_CTL_RVBOX,
+	ID_GRP_EXTRA, ID_EXTRA_FORM,
+	ID_LBL_POWER, ID_TOGGLE1,
+	ID_LBL_DATE, ID_DATEPICKER1,
+	ID_LBL_IP, ID_IPINPUT1,
+
+	/* Tree / Text tab */
+	ID_TREE_SPLIT, ID_TREE_LVBOX, ID_TREE_LBL, ID_TREEVIEW1,
+	ID_TREE_RVBOX, ID_TEXT_LBL, ID_TEXTAREA1,
+
+	/* Data Views tab */
+	ID_DATA_SPLIT,
+	ID_DATA_LVBOX, ID_LV_LBL, ID_LISTVIEW1,
+	ID_DATA_RVBOX, ID_IV_HBOX,
 	ID_IV_ICON, ID_IV_THUMB, ID_IV_COMPACT, ID_IV_DETAIL, ID_ITEMVIEW1,
-	ID_HBOX1, ID_VBOX1, ID_VBOX_BTN1, ID_VBOX_BTN2, ID_VBOX_BTN3, ID_VBOX_INPUT,
-	ID_FORM1, ID_FORM_LBL1, ID_FORM_INP1, ID_FORM_LBL2, ID_FORM_INP2,
+
+	/* Layout tab */
+	ID_LAY_HBOX,
+	ID_LAY_VBOX, ID_VBOX_BTN1, ID_VBOX_BTN2, ID_VBOX_INPUT, ID_VBOX_SPACER, ID_VBOX_BTN3,
+	ID_LAY_FORM, ID_FORM_LBL1, ID_FORM_INP1, ID_FORM_LBL2, ID_FORM_INP2,
 	ID_FORM_LBL3, ID_FORM_DRP1, ID_FORM_LBL4, ID_FORM_CHK1,
-	ID_TAB6_HBOX, ID_TAB6_LVBOX,
+
+	/* Media tab */
+	ID_MEDIA_HBOX,
+	ID_MEDIA_LVBOX,
 	ID_PANEL1, ID_PANEL_LBL, ID_PANEL_BTN,
+	ID_PATH_LBL, ID_PATHBAR1,
 	ID_SB_LBL, ID_SCROLLBAR1,
-	ID_TAB6_RVBOX, ID_IMG_LBL, ID_IMAGE1, ID_GL_LBL, ID_GLVIEW1,
+	ID_MEDIA_RVBOX,
+	ID_CANVAS_LBL, ID_CANVAS1,
+	ID_IMG_LBL, ID_IMAGE1,
+	ID_GL_LBL, ID_GLVIEW1,
 };
 
 // [=]===^=[ demo_row_cb ]=======================================[=]
@@ -177,126 +206,170 @@ static void demo_itemview_icon(uint32_t item, char *buf, uint32_t buf_size, void
 	snprintf(buf, buf_size, "%s", icon);
 }
 
+// [=]===^=[ demo_canvas_cb ]=====================================[=]
+static void demo_canvas_cb(struct mkgui_ctx *ctx, uint32_t id, uint32_t *pixels, int32_t x, int32_t y, int32_t w, int32_t h, void *userdata) {
+	(void)ctx; (void)id; (void)userdata;
+	for(int32_t iy = 0; iy < h; ++iy) {
+		for(int32_t ix = 0; ix < w; ++ix) {
+			int32_t px = x + ix;
+			int32_t py = y + iy;
+			uint32_t r = (uint32_t)(ix * 255 / (w > 1 ? w - 1 : 1));
+			uint32_t g = (uint32_t)(iy * 255 / (h > 1 ? h - 1 : 1));
+			uint32_t b = (uint32_t)((ix + iy) * 128 / (w + h > 2 ? w + h - 2 : 1));
+			pixels[py * ctx->win_w + px] = 0xff000000 | (r << 16) | (g << 8) | b;
+		}
+	}
+}
+
+#define ANCHOR_ALL (MKGUI_ANCHOR_LEFT | MKGUI_ANCHOR_TOP | MKGUI_ANCHOR_RIGHT | MKGUI_ANCHOR_BOTTOM)
+
 // [=]===^=[ main ]==============================================[=]
 int main(void) {
 	struct mkgui_widget widgets[] = {
 		{ MKGUI_WINDOW,   ID_WINDOW,    "mkgui demo",       "",  0,           0,  0, 1000, 700, 0, 0 },
 
+		/* Menu bar */
 		{ MKGUI_MENU,     ID_MENU,      "",                  "", ID_WINDOW,   0, 0, 0, 0, 0, 0 },
-		{ MKGUI_MENUITEM, ID_FILE_MENU, "File",              "", ID_MENU,     0,  0,  0,  0, 0, 0 },
-		{ MKGUI_MENUITEM, ID_EDIT_MENU, "Edit",              "", ID_MENU,     0,  0,  0,  0, 0, 0 },
-		{ MKGUI_MENUITEM, ID_VIEW_MENU, "View",              "", ID_MENU,     0,  0,  0,  0, 0, 0 },
-		{ MKGUI_MENUITEM, ID_HELP_MENU, "Help",              "", ID_MENU,     0,  0,  0,  0, 0, 0 },
-		{ MKGUI_MENUITEM, ID_FILE_NEW,  "New",               "file-plus",    ID_FILE_MENU,0,  0,  0,  0, 0, 0 },
-		{ MKGUI_MENUITEM, ID_OPEN,      "Open",              "folder-open",  ID_FILE_MENU,0,  0,  0,  0, 0, 0 },
-		{ MKGUI_MENUITEM, ID_SAVE,      "Save",              "content-save", ID_FILE_MENU,0,  0,  0,  0, 0, 0 },
-		{ MKGUI_MENUITEM, ID_FILE_SEP1, "",                  "",             ID_FILE_MENU,0,  0,  0,  0, MKGUI_SEPARATOR, 0 },
-		{ MKGUI_MENUITEM, ID_EXIT,      "Exit",              "exit-to-app",  ID_FILE_MENU,0,  0,  0,  0, 0, 0 },
-		{ MKGUI_MENUITEM, ID_EDIT_CUT,  "Cut",               "content-cut",  ID_EDIT_MENU,0,  0,  0,  0, 0, 0 },
-		{ MKGUI_MENUITEM, ID_COPY,      "Copy",              "content-copy", ID_EDIT_MENU,0,  0,  0,  0, 0, 0 },
-		{ MKGUI_MENUITEM, ID_PASTE,     "Paste",             "content-paste",ID_EDIT_MENU,0,  0,  0,  0, 0, 0 },
-		{ MKGUI_MENUITEM, ID_VIEW_GRID, "Show Grid",         "grid",         ID_VIEW_MENU,0,  0,  0,  0, MKGUI_MENU_CHECK | MKGUI_CHECKED, 0 },
-		{ MKGUI_MENUITEM, ID_VIEW_STATUS,"Show Statusbar",   "dock-bottom",  ID_VIEW_MENU,0,  0,  0,  0, MKGUI_MENU_CHECK | MKGUI_CHECKED, 0 },
-		{ MKGUI_MENUITEM, ID_VIEW_SEP1, "",                  "",             ID_VIEW_MENU,0,  0,  0,  0, MKGUI_SEPARATOR, 0 },
-		{ MKGUI_MENUITEM, ID_VIEW_SMALL,"Small",             "",             ID_VIEW_MENU,0,  0,  0,  0, MKGUI_MENU_RADIO, 0 },
-		{ MKGUI_MENUITEM, ID_VIEW_MEDIUM,"Medium",           "",             ID_VIEW_MENU,0,  0,  0,  0, MKGUI_MENU_RADIO | MKGUI_CHECKED, 0 },
-		{ MKGUI_MENUITEM, ID_VIEW_LARGE,"Large",             "",             ID_VIEW_MENU,0,  0,  0,  0, MKGUI_MENU_RADIO, 0 },
-		{ MKGUI_MENUITEM, ID_HELP_ABOUT,"About",             "information",  ID_HELP_MENU,0,  0,  0,  0, 0, 0 },
+		{ MKGUI_MENUITEM, ID_FILE_MENU, "File",              "", ID_MENU,     0, 0, 0, 0, 0, 0 },
+		{ MKGUI_MENUITEM, ID_EDIT_MENU, "Edit",              "", ID_MENU,     0, 0, 0, 0, 0, 0 },
+		{ MKGUI_MENUITEM, ID_VIEW_MENU, "View",              "", ID_MENU,     0, 0, 0, 0, 0, 0 },
+		{ MKGUI_MENUITEM, ID_HELP_MENU, "Help",              "", ID_MENU,     0, 0, 0, 0, 0, 0 },
+		{ MKGUI_MENUITEM, ID_FILE_NEW,  "New",               "file-plus",    ID_FILE_MENU, 0, 0, 0, 0, 0, 0 },
+		{ MKGUI_MENUITEM, ID_OPEN,      "Open",              "folder-open",  ID_FILE_MENU, 0, 0, 0, 0, 0, 0 },
+		{ MKGUI_MENUITEM, ID_SAVE,      "Save",              "content-save", ID_FILE_MENU, 0, 0, 0, 0, 0, 0 },
+		{ MKGUI_MENUITEM, ID_FILE_SEP1, "",                  "",             ID_FILE_MENU, 0, 0, 0, 0, MKGUI_SEPARATOR, 0 },
+		{ MKGUI_MENUITEM, ID_EXIT,      "Exit",              "exit-to-app",  ID_FILE_MENU, 0, 0, 0, 0, 0, 0 },
+		{ MKGUI_MENUITEM, ID_EDIT_CUT,  "Cut",               "content-cut",  ID_EDIT_MENU, 0, 0, 0, 0, 0, 0 },
+		{ MKGUI_MENUITEM, ID_COPY,      "Copy",              "content-copy", ID_EDIT_MENU, 0, 0, 0, 0, 0, 0 },
+		{ MKGUI_MENUITEM, ID_PASTE,     "Paste",             "content-paste",ID_EDIT_MENU, 0, 0, 0, 0, 0, 0 },
+		{ MKGUI_MENUITEM, ID_VIEW_GRID, "Show Grid",         "grid",         ID_VIEW_MENU, 0, 0, 0, 0, MKGUI_MENU_CHECK | MKGUI_CHECKED, 0 },
+		{ MKGUI_MENUITEM, ID_VIEW_STATUS,"Show Statusbar",   "dock-bottom",  ID_VIEW_MENU, 0, 0, 0, 0, MKGUI_MENU_CHECK | MKGUI_CHECKED, 0 },
+		{ MKGUI_MENUITEM, ID_VIEW_SEP1, "",                  "",             ID_VIEW_MENU, 0, 0, 0, 0, MKGUI_SEPARATOR, 0 },
+		{ MKGUI_MENUITEM, ID_VIEW_SMALL,"Small",             "",             ID_VIEW_MENU, 0, 0, 0, 0, MKGUI_MENU_RADIO, 0 },
+		{ MKGUI_MENUITEM, ID_VIEW_MEDIUM,"Medium",           "",             ID_VIEW_MENU, 0, 0, 0, 0, MKGUI_MENU_RADIO | MKGUI_CHECKED, 0 },
+		{ MKGUI_MENUITEM, ID_VIEW_LARGE,"Large",             "",             ID_VIEW_MENU, 0, 0, 0, 0, MKGUI_MENU_RADIO, 0 },
+		{ MKGUI_MENUITEM, ID_HELP_ABOUT,"About",             "information",  ID_HELP_MENU, 0, 0, 0, 0, 0, 0 },
 
+		/* Toolbar */
 		{ MKGUI_TOOLBAR,  ID_TOOLBAR,   "",                  "", ID_WINDOW,   0, 0, 0, 0, 0, 0 },
-		{ MKGUI_BUTTON,   ID_TB_NEW,    "New",               "file-plus",  ID_TOOLBAR,  0,  0,  0,  0, 0, 0 },
-		{ MKGUI_BUTTON,   ID_TB_OPEN,   "Open",              "folder-open", ID_TOOLBAR,  0,  0,  0,  0, MKGUI_TOOLBAR_SEP, 0 },
-		{ MKGUI_BUTTON,   ID_TB_SAVE,   "Save",              "content-save", ID_TOOLBAR,  0,  0,  0,  0, 0, 0 },
+		{ MKGUI_BUTTON,   ID_TB_NEW,    "New",               "file-plus",    ID_TOOLBAR, 0, 0, 0, 0, 0, 0 },
+		{ MKGUI_BUTTON,   ID_TB_OPEN,   "Open",              "folder-open",  ID_TOOLBAR, 0, 0, 0, 0, MKGUI_TOOLBAR_SEP, 0 },
+		{ MKGUI_BUTTON,   ID_TB_SAVE,   "Save",              "content-save", ID_TOOLBAR, 0, 0, 0, 0, 0, 0 },
 
-		{ MKGUI_TABS,     ID_TABS,      "",                  "", ID_WINDOW,   0, 0, 0, 0, MKGUI_ANCHOR_LEFT | MKGUI_ANCHOR_TOP | MKGUI_ANCHOR_RIGHT | MKGUI_ANCHOR_BOTTOM, 0 },
-		{ MKGUI_TAB,      ID_TAB1,      "General",           "cog",       ID_TABS, 0, 0, 0, 0, 0, 0 },
-		{ MKGUI_TAB,      ID_TAB3,      "Tree / Text",       "folder",    ID_TABS, 0, 0, 0, 0, 0, 0 },
-		{ MKGUI_TAB,      ID_TAB4,      "Listview",          "view-list", ID_TABS, 0, 0, 0, 0, 0, 0 },
-		{ MKGUI_TAB,      ID_TAB5,      "Item View",         "",          ID_TABS, 0, 0, 0, 0, 0, 0 },
-		{ MKGUI_TAB,      ID_TAB7,      "Layout",            "",          ID_TABS, 0, 0, 0, 0, 0, 0 },
-		{ MKGUI_TAB,      ID_TAB6,      "Extras",            "",          ID_TABS, 0, 0, 0, 0, 0, 0 },
+		/* Tabs */
+		{ MKGUI_TABS,     ID_TABS,      "",                  "", ID_WINDOW,   0, 0, 0, 0, ANCHOR_ALL, 0 },
+		{ MKGUI_TAB,      ID_TAB_CONTROLS, "Controls",       "cog",       ID_TABS, 0, 0, 0, 0, 0, 0 },
+		{ MKGUI_TAB,      ID_TAB_TREE,     "Tree / Text",    "folder",    ID_TABS, 0, 0, 0, 0, 0, 0 },
+		{ MKGUI_TAB,      ID_TAB_DATA,     "Data Views",     "view-list", ID_TABS, 0, 0, 0, 0, 0, 0 },
+		{ MKGUI_TAB,      ID_TAB_LAYOUT,   "Layout",         "view-dashboard", ID_TABS, 0, 0, 0, 0, 0, 0 },
+		{ MKGUI_TAB,      ID_TAB_MEDIA,    "Media",          "image",     ID_TABS, 0, 0, 0, 0, 0, 0 },
 
-		/* Tab 1: General */
-		{ MKGUI_VBOX,     ID_TAB1_VBOX, "",                  "", ID_TAB1, 0, 0, 0, 0, MKGUI_ANCHOR_LEFT | MKGUI_ANCHOR_TOP | MKGUI_ANCHOR_RIGHT | MKGUI_ANCHOR_BOTTOM, 0 },
-		{ MKGUI_GROUP,    ID_GRP_INPUT, "Settings",          "", ID_TAB1_VBOX, 0, 0, 0, 150, MKGUI_FIXED, 0 },
-		{ MKGUI_FORM,     ID_TAB1_FORM, "",                  "", ID_GRP_INPUT, 0, 0, 0, 0, MKGUI_ANCHOR_LEFT | MKGUI_ANCHOR_TOP | MKGUI_ANCHOR_RIGHT | MKGUI_ANCHOR_BOTTOM, 0 },
-		{ MKGUI_LABEL,    ID_LABEL1,    "Name:",             "", ID_TAB1_FORM, 0, 0, 0, 0, 0, 0 },
-		{ MKGUI_INPUT,    ID_INPUT1,    "",                  "", ID_TAB1_FORM, 0, 0, 0, 0, 0, 0 },
-		{ MKGUI_LABEL,    ID_LBL_ENABLE,"Enable:",           "", ID_TAB1_FORM, 0, 0, 0, 0, 0, 0 },
-		{ MKGUI_CHECKBOX, ID_CHECK1,    "Enable feature",    "", ID_TAB1_FORM, 0, 0, 0, 0, 0, 0 },
-		{ MKGUI_LABEL,    ID_LBL_MODE,  "Mode:",             "", ID_TAB1_FORM, 0, 0, 0, 0, 0, 0 },
-		{ MKGUI_DROPDOWN, ID_DROPDOWN1, "",                  "", ID_TAB1_FORM, 0, 0, 0, 0, 0, 0 },
-		{ MKGUI_LABEL,    ID_LBL_VOLUME,"Volume:",           "", ID_TAB1_FORM, 0, 0, 0, 0, 0, 0 },
-		{ MKGUI_SLIDER,   ID_SLIDER1,   "",                  "", ID_TAB1_FORM, 0, 0, 0, 0, 0, 0 },
-		{ MKGUI_GROUP,    ID_GRP_RADIO, "Priority",          "", ID_TAB1_VBOX, 0, 0, 0, 56, MKGUI_FIXED, 0 },
-		{ MKGUI_HBOX,     ID_TAB1_RADIO_HBOX, "",            "", ID_GRP_RADIO, 0, 0, 0, 0, MKGUI_ANCHOR_LEFT | MKGUI_ANCHOR_TOP | MKGUI_ANCHOR_RIGHT | MKGUI_ANCHOR_BOTTOM, 0 },
-		{ MKGUI_RADIO,    ID_RADIO1,    "Low",               "", ID_TAB1_RADIO_HBOX, 0, 0, 0, 0, MKGUI_CHECKED, 1 },
-		{ MKGUI_RADIO,    ID_RADIO2,    "Medium",            "", ID_TAB1_RADIO_HBOX, 0, 0, 0, 0, 0, 1 },
-		{ MKGUI_RADIO,    ID_RADIO3,    "High",              "", ID_TAB1_RADIO_HBOX, 0, 0, 0, 0, 0, 1 },
-		{ MKGUI_HBOX,     ID_TAB1_PROG_HBOX, "",             "", ID_TAB1_VBOX, 0, 0, 0, 28, MKGUI_FIXED, 0 },
-		{ MKGUI_LABEL,    ID_PROG_LBL,  "Progress:",         "", ID_TAB1_PROG_HBOX, 0, 0, 80, 0, MKGUI_FIXED, 0 },
-		{ MKGUI_PROGRESS, ID_PROGRESS1, "",                  "", ID_TAB1_PROG_HBOX, 0, 0, 0, 0, 0, 1 },
-		{ MKGUI_SPINNER,  ID_SPINNER1,  "",                  "", ID_TAB1_PROG_HBOX, 0, 0, 28, 0, MKGUI_FIXED, 0 },
-		{ MKGUI_HBOX,     ID_TAB1_COUNT_HBOX, "",            "", ID_TAB1_VBOX, 0, 0, 0, 24, MKGUI_FIXED, 0 },
-		{ MKGUI_LABEL,    ID_LBL_COUNT, "Count:",            "", ID_TAB1_COUNT_HBOX, 0, 0, 80, 0, MKGUI_FIXED, 0 },
-		{ MKGUI_SPINBOX,  ID_SPINBOX1,  "",                  "", ID_TAB1_COUNT_HBOX, 0, 0, 120, 0, MKGUI_FIXED, 0 },
-		{ MKGUI_HBOX,     ID_TAB1_BTN_HBOX, "",              "", ID_TAB1_VBOX, 0, 0, 0, 28, MKGUI_FIXED, 0 },
-		{ MKGUI_BUTTON,   ID_BUTTON1,   "Apply",             "", ID_TAB1_BTN_HBOX, 0, 0, 100, 0, MKGUI_FIXED, 0 },
-		{ MKGUI_CHECKBOX, ID_THEME_CHECK,"Light theme",      "brightness-6", ID_TAB1_BTN_HBOX, 0, 0, 200, 0, MKGUI_FIXED, 0 },
+		/* ---- Controls tab ---- */
+		{ MKGUI_HBOX,     ID_CTL_HBOX,  "",                  "", ID_TAB_CONTROLS, 0, 0, 0, 0, ANCHOR_ALL, 0 },
 
-		/* Tab 3: Tree / Text */
-		{ MKGUI_VSPLIT,   ID_TAB3_SPLIT,"",                 "", ID_TAB3, 0, 0, 0, 0, MKGUI_ANCHOR_LEFT | MKGUI_ANCHOR_TOP | MKGUI_ANCHOR_RIGHT | MKGUI_ANCHOR_BOTTOM, 0 },
-		{ MKGUI_VBOX,     ID_TAB3_LVBOX,"",                  "", ID_TAB3_SPLIT, 0, 0, 0, 0, MKGUI_REGION_LEFT, 0 },
-		{ MKGUI_LABEL,    ID_TREE_LBL,  "Project tree:",     "", ID_TAB3_LVBOX, 0, 0, 0, 20, MKGUI_FIXED, 0 },
-		{ MKGUI_TREEVIEW, ID_TREEVIEW1, "",                  "", ID_TAB3_LVBOX, 0, 0, 0, 0, 0, 1 },
-		{ MKGUI_VBOX,     ID_TAB3_RVBOX,"",                  "", ID_TAB3_SPLIT, 0, 0, 0, 0, MKGUI_REGION_RIGHT, 0 },
-		{ MKGUI_LABEL,    ID_TEXT_LBL,  "Notes:",            "", ID_TAB3_RVBOX, 0, 0, 0, 20, MKGUI_FIXED, 0 },
-		{ MKGUI_TEXTAREA, ID_TEXTAREA1, "",                  "", ID_TAB3_RVBOX, 0, 0, 0, 0, 0, 1 },
+		/* Controls: left column */
+		{ MKGUI_VBOX,     ID_CTL_LVBOX, "",                  "", ID_CTL_HBOX, 0, 0, 0, 0, 0, 1 },
+		{ MKGUI_GROUP,    ID_GRP_SETTINGS, "Settings",       "", ID_CTL_LVBOX, 0, 0, 0, 175, MKGUI_FIXED, 0 },
+		{ MKGUI_FORM,     ID_CTL_FORM,  "",                  "", ID_GRP_SETTINGS, 0, 0, 0, 0, ANCHOR_ALL, 0 },
+		{ MKGUI_LABEL,    ID_LBL_NAME,  "Name:",             "", ID_CTL_FORM, 0, 0, 0, 0, 0, 0 },
+		{ MKGUI_INPUT,    ID_INPUT1,    "",                  "", ID_CTL_FORM, 0, 0, 0, 0, 0, 0 },
+		{ MKGUI_LABEL,    ID_LBL_ENABLE,"Enable:",           "", ID_CTL_FORM, 0, 0, 0, 0, 0, 0 },
+		{ MKGUI_CHECKBOX, ID_CHECK1,    "Enable feature",    "", ID_CTL_FORM, 0, 0, 0, 0, 0, 0 },
+		{ MKGUI_LABEL,    ID_LBL_MODE,  "Mode:",             "", ID_CTL_FORM, 0, 0, 0, 0, 0, 0 },
+		{ MKGUI_DROPDOWN, ID_DROPDOWN1, "",                  "", ID_CTL_FORM, 0, 0, 0, 0, 0, 0 },
+		{ MKGUI_LABEL,    ID_LBL_SEARCH,"Search:",           "", ID_CTL_FORM, 0, 0, 0, 0, 0, 0 },
+		{ MKGUI_COMBOBOX, ID_COMBOBOX1, "",                  "", ID_CTL_FORM, 0, 0, 0, 0, 0, 0 },
+		{ MKGUI_LABEL,    ID_LBL_VOLUME,"Volume:",           "", ID_CTL_FORM, 0, 0, 0, 0, 0, 0 },
+		{ MKGUI_SLIDER,   ID_SLIDER1,   "",                  "", ID_CTL_FORM, 0, 0, 0, 0, 0, 0 },
 
-		/* Tab 4: Listview */
-		{ MKGUI_VBOX,     ID_TAB4_VBOX, "",                  "", ID_TAB4, 0, 0, 0, 0, MKGUI_ANCHOR_LEFT | MKGUI_ANCHOR_TOP | MKGUI_ANCHOR_RIGHT | MKGUI_ANCHOR_BOTTOM, 0 },
-		{ MKGUI_LABEL,    ID_LABEL2,    "Data list (1M rows):", "", ID_TAB4_VBOX, 0, 0, 0, 20, MKGUI_FIXED, 0 },
-		{ MKGUI_LISTVIEW, ID_LISTVIEW1, "",                  "", ID_TAB4_VBOX, 0, 0, 0, 0, 0, 1 },
+		{ MKGUI_GROUP,    ID_GRP_RADIO, "Priority",          "", ID_CTL_LVBOX, 0, 0, 0, 56, MKGUI_FIXED, 0 },
+		{ MKGUI_HBOX,     ID_RADIO_HBOX,"",                  "", ID_GRP_RADIO, 0, 0, 0, 0, ANCHOR_ALL, 0 },
+		{ MKGUI_RADIO,    ID_RADIO1,    "Low",               "", ID_RADIO_HBOX, 0, 0, 0, 0, MKGUI_CHECKED, 1 },
+		{ MKGUI_RADIO,    ID_RADIO2,    "Medium",            "", ID_RADIO_HBOX, 0, 0, 0, 0, 0, 1 },
+		{ MKGUI_RADIO,    ID_RADIO3,    "High",              "", ID_RADIO_HBOX, 0, 0, 0, 0, 0, 1 },
 
-		/* Tab 5: Item View */
-		{ MKGUI_VBOX,     ID_TAB5_VBOX, "",                  "", ID_TAB5, 0, 0, 0, 0, MKGUI_ANCHOR_LEFT | MKGUI_ANCHOR_TOP | MKGUI_ANCHOR_RIGHT | MKGUI_ANCHOR_BOTTOM, 0 },
-		{ MKGUI_HBOX,     ID_TAB5_BTN_HBOX, "",              "", ID_TAB5_VBOX, 0, 0, 0, 24, MKGUI_FIXED, 0 },
-		{ MKGUI_BUTTON,   ID_IV_ICON,   "Icons",             "", ID_TAB5_BTN_HBOX, 0, 0, 0, 0, 0, 1 },
-		{ MKGUI_BUTTON,   ID_IV_THUMB,  "Thumbnails",        "", ID_TAB5_BTN_HBOX, 0, 0, 0, 0, 0, 1 },
-		{ MKGUI_BUTTON,   ID_IV_COMPACT,"Compact",           "", ID_TAB5_BTN_HBOX, 0, 0, 0, 0, 0, 1 },
-		{ MKGUI_BUTTON,   ID_IV_DETAIL, "Detail",            "", ID_TAB5_BTN_HBOX, 0, 0, 0, 0, 0, 1 },
-		{ MKGUI_ITEMVIEW, ID_ITEMVIEW1, "",                  "", ID_TAB5_VBOX, 0, 0, 0, 0, 0, 1 },
+		{ MKGUI_HBOX,     ID_PROG_HBOX, "",                  "", ID_CTL_LVBOX, 0, 0, 0, 28, MKGUI_FIXED, 0 },
+		{ MKGUI_LABEL,    ID_PROG_LBL,  "Progress:",         "", ID_PROG_HBOX, 0, 0, 80, 0, MKGUI_FIXED, 0 },
+		{ MKGUI_PROGRESS, ID_PROGRESS1, "",                  "", ID_PROG_HBOX, 0, 0, 0, 0, 0, 1 },
+		{ MKGUI_SPINNER,  ID_SPINNER1,  "",                  "", ID_PROG_HBOX, 0, 0, 28, 0, MKGUI_FIXED, 0 },
 
-		/* Tab 7: Layout */
-		{ MKGUI_HBOX,     ID_HBOX1,     "",                  "", ID_TAB7, 0, 0, 0, 0, MKGUI_ANCHOR_LEFT | MKGUI_ANCHOR_TOP | MKGUI_ANCHOR_RIGHT | MKGUI_ANCHOR_BOTTOM, 0 },
-		{ MKGUI_VBOX,     ID_VBOX1,     "",                  "", ID_HBOX1, 0, 0, 200, 0, MKGUI_PANEL_BORDER | MKGUI_FIXED, 0 },
-		{ MKGUI_BUTTON,   ID_VBOX_BTN1, "First",             "file-plus",    ID_VBOX1, 0, 0, 0, 28, MKGUI_FIXED, 0 },
-		{ MKGUI_BUTTON,   ID_VBOX_BTN2, "Second",            "content-save", ID_VBOX1, 0, 0, 0, 28, MKGUI_FIXED, 0 },
-		{ MKGUI_INPUT,    ID_VBOX_INPUT,"",                  "", ID_VBOX1, 0, 0, 0, 24, MKGUI_FIXED, 0 },
-		{ MKGUI_BUTTON,   ID_VBOX_BTN3, "Flex (fills rest)", "", ID_VBOX1, 0, 0, 0, 0, 0, 1 },
-		{ MKGUI_FORM,     ID_FORM1,     "",                  "", ID_HBOX1, 0, 0, 0, 0, MKGUI_PANEL_BORDER, 1 },
-		{ MKGUI_LABEL,    ID_FORM_LBL1, "Name:",             "", ID_FORM1, 0, 0, 0, 0, 0, 0 },
-		{ MKGUI_INPUT,    ID_FORM_INP1, "",                  "", ID_FORM1, 0, 0, 0, 0, 0, 0 },
-		{ MKGUI_LABEL,    ID_FORM_LBL2, "Email address:",    "", ID_FORM1, 0, 0, 0, 0, 0, 0 },
-		{ MKGUI_INPUT,    ID_FORM_INP2, "",                  "", ID_FORM1, 0, 0, 0, 0, 0, 0 },
-		{ MKGUI_LABEL,    ID_FORM_LBL3, "Category:",         "", ID_FORM1, 0, 0, 0, 0, 0, 0 },
-		{ MKGUI_DROPDOWN, ID_FORM_DRP1, "",                  "", ID_FORM1, 0, 0, 0, 0, 0, 0 },
-		{ MKGUI_LABEL,    ID_FORM_LBL4, "Subscribe:",        "", ID_FORM1, 0, 0, 0, 0, 0, 0 },
-		{ MKGUI_CHECKBOX, ID_FORM_CHK1, "Yes",               "", ID_FORM1, 0, 0, 0, 0, 0, 0 },
+		{ MKGUI_HBOX,     ID_COUNT_HBOX,"",                  "", ID_CTL_LVBOX, 0, 0, 0, 24, MKGUI_FIXED, 0 },
+		{ MKGUI_LABEL,    ID_LBL_COUNT, "Count:",            "", ID_COUNT_HBOX, 0, 0, 80, 0, MKGUI_FIXED, 0 },
+		{ MKGUI_SPINBOX,  ID_SPINBOX1,  "",                  "", ID_COUNT_HBOX, 0, 0, 120, 0, MKGUI_FIXED, 0 },
 
-		/* Tab 6: Extras */
-		{ MKGUI_HBOX,     ID_TAB6_HBOX, "",                  "", ID_TAB6, 0, 0, 0, 0, MKGUI_ANCHOR_LEFT | MKGUI_ANCHOR_TOP | MKGUI_ANCHOR_RIGHT | MKGUI_ANCHOR_BOTTOM, 0 },
-		{ MKGUI_VBOX,     ID_TAB6_LVBOX,"",                  "", ID_TAB6_HBOX, 0, 0, 320, 0, MKGUI_FIXED, 0 },
-		{ MKGUI_PANEL,    ID_PANEL1,    "",                  "", ID_TAB6_LVBOX, 0, 0, 0, 120, MKGUI_PANEL_BORDER | MKGUI_PANEL_SUNKEN | MKGUI_FIXED, 0 },
+		{ MKGUI_HBOX,     ID_BTN_HBOX,  "",                  "", ID_CTL_LVBOX, 0, 0, 0, 28, MKGUI_FIXED, 0 },
+		{ MKGUI_BUTTON,   ID_BUTTON1,   "Apply",             "", ID_BTN_HBOX, 0, 0, 100, 0, MKGUI_FIXED, 0 },
+		{ MKGUI_SPACER,   ID_SPACER1,   "",                  "", ID_BTN_HBOX, 0, 0, 0, 0, 0, 1 },
+		{ MKGUI_CHECKBOX, ID_THEME_CHECK,"Light theme",      "brightness-6", ID_BTN_HBOX, 0, 0, 140, 0, MKGUI_FIXED, 0 },
+
+		/* Controls: right column */
+		{ MKGUI_VBOX,     ID_CTL_RVBOX, "",                  "", ID_CTL_HBOX, 0, 0, 280, 0, MKGUI_FIXED, 0 },
+		{ MKGUI_GROUP,    ID_GRP_EXTRA, "Extra Controls",    "", ID_CTL_RVBOX, 0, 0, 0, 0, 0, 1 },
+		{ MKGUI_FORM,     ID_EXTRA_FORM,"",                  "", ID_GRP_EXTRA, 0, 0, 0, 0, ANCHOR_ALL, 0 },
+		{ MKGUI_LABEL,    ID_LBL_POWER, "Power:",            "", ID_EXTRA_FORM, 0, 0, 0, 0, 0, 0 },
+		{ MKGUI_TOGGLE,   ID_TOGGLE1,   "",                  "", ID_EXTRA_FORM, 0, 0, 0, 0, 0, 0 },
+		{ MKGUI_LABEL,    ID_LBL_DATE,  "Date:",             "", ID_EXTRA_FORM, 0, 0, 0, 0, 0, 0 },
+		{ MKGUI_DATEPICKER, ID_DATEPICKER1, "",              "", ID_EXTRA_FORM, 0, 0, 0, 0, 0, 0 },
+		{ MKGUI_LABEL,    ID_LBL_IP,    "IP Address:",       "", ID_EXTRA_FORM, 0, 0, 0, 0, 0, 0 },
+		{ MKGUI_IPINPUT,  ID_IPINPUT1,  "",                  "", ID_EXTRA_FORM, 0, 0, 0, 0, 0, 0 },
+
+		/* ---- Tree / Text tab ---- */
+		{ MKGUI_VSPLIT,   ID_TREE_SPLIT,"",                  "", ID_TAB_TREE, 0, 0, 0, 0, ANCHOR_ALL, 0 },
+		{ MKGUI_VBOX,     ID_TREE_LVBOX,"",                  "", ID_TREE_SPLIT, 0, 0, 0, 0, MKGUI_REGION_LEFT, 0 },
+		{ MKGUI_LABEL,    ID_TREE_LBL,  "Project tree:",     "", ID_TREE_LVBOX, 0, 0, 0, 20, MKGUI_FIXED, 0 },
+		{ MKGUI_TREEVIEW, ID_TREEVIEW1, "",                  "", ID_TREE_LVBOX, 0, 0, 0, 0, 0, 1 },
+		{ MKGUI_VBOX,     ID_TREE_RVBOX,"",                  "", ID_TREE_SPLIT, 0, 0, 0, 0, MKGUI_REGION_RIGHT, 0 },
+		{ MKGUI_LABEL,    ID_TEXT_LBL,  "Notes:",            "", ID_TREE_RVBOX, 0, 0, 0, 20, MKGUI_FIXED, 0 },
+		{ MKGUI_TEXTAREA, ID_TEXTAREA1, "",                  "", ID_TREE_RVBOX, 0, 0, 0, 0, 0, 1 },
+
+		/* ---- Data Views tab ---- */
+		{ MKGUI_VSPLIT,   ID_DATA_SPLIT,"",                  "", ID_TAB_DATA, 0, 0, 0, 0, ANCHOR_ALL, 0 },
+		{ MKGUI_VBOX,     ID_DATA_LVBOX,"",                  "", ID_DATA_SPLIT, 0, 0, 0, 0, MKGUI_REGION_LEFT, 0 },
+		{ MKGUI_LABEL,    ID_LV_LBL,   "Listview (1M rows):", "", ID_DATA_LVBOX, 0, 0, 0, 20, MKGUI_FIXED, 0 },
+		{ MKGUI_LISTVIEW, ID_LISTVIEW1, "",                  "", ID_DATA_LVBOX, 0, 0, 0, 0, 0, 1 },
+		{ MKGUI_VBOX,     ID_DATA_RVBOX,"",                  "", ID_DATA_SPLIT, 0, 0, 0, 0, MKGUI_REGION_RIGHT, 0 },
+		{ MKGUI_HBOX,     ID_IV_HBOX,   "",                  "", ID_DATA_RVBOX, 0, 0, 0, 24, MKGUI_FIXED, 0 },
+		{ MKGUI_BUTTON,   ID_IV_ICON,   "Icons",             "", ID_IV_HBOX, 0, 0, 0, 0, 0, 1 },
+		{ MKGUI_BUTTON,   ID_IV_THUMB,  "Thumbs",            "", ID_IV_HBOX, 0, 0, 0, 0, 0, 1 },
+		{ MKGUI_BUTTON,   ID_IV_COMPACT,"Compact",           "", ID_IV_HBOX, 0, 0, 0, 0, 0, 1 },
+		{ MKGUI_BUTTON,   ID_IV_DETAIL, "Detail",            "", ID_IV_HBOX, 0, 0, 0, 0, 0, 1 },
+		{ MKGUI_ITEMVIEW, ID_ITEMVIEW1, "",                  "", ID_DATA_RVBOX, 0, 0, 0, 0, 0, 1 },
+
+		/* ---- Layout tab ---- */
+		{ MKGUI_HBOX,     ID_LAY_HBOX,  "",                  "", ID_TAB_LAYOUT, 0, 0, 0, 0, ANCHOR_ALL, 0 },
+		{ MKGUI_VBOX,     ID_LAY_VBOX,  "",                  "", ID_LAY_HBOX, 0, 0, 200, 0, MKGUI_PANEL_BORDER | MKGUI_FIXED, 0 },
+		{ MKGUI_BUTTON,   ID_VBOX_BTN1, "First",             "file-plus",    ID_LAY_VBOX, 0, 0, 0, 28, MKGUI_FIXED, 0 },
+		{ MKGUI_BUTTON,   ID_VBOX_BTN2, "Second",            "content-save", ID_LAY_VBOX, 0, 0, 0, 28, MKGUI_FIXED, 0 },
+		{ MKGUI_INPUT,    ID_VBOX_INPUT,"",                  "", ID_LAY_VBOX, 0, 0, 0, 24, MKGUI_FIXED, 0 },
+		{ MKGUI_SPACER,   ID_VBOX_SPACER,"",                 "", ID_LAY_VBOX, 0, 0, 0, 0, 0, 1 },
+		{ MKGUI_BUTTON,   ID_VBOX_BTN3, "Bottom (after spacer)", "", ID_LAY_VBOX, 0, 0, 0, 28, MKGUI_FIXED, 0 },
+		{ MKGUI_FORM,     ID_LAY_FORM,  "",                  "", ID_LAY_HBOX, 0, 0, 0, 0, MKGUI_PANEL_BORDER, 1 },
+		{ MKGUI_LABEL,    ID_FORM_LBL1, "Name:",             "", ID_LAY_FORM, 0, 0, 0, 0, 0, 0 },
+		{ MKGUI_INPUT,    ID_FORM_INP1, "",                  "", ID_LAY_FORM, 0, 0, 0, 0, 0, 0 },
+		{ MKGUI_LABEL,    ID_FORM_LBL2, "Email address:",    "", ID_LAY_FORM, 0, 0, 0, 0, 0, 0 },
+		{ MKGUI_INPUT,    ID_FORM_INP2, "",                  "", ID_LAY_FORM, 0, 0, 0, 0, 0, 0 },
+		{ MKGUI_LABEL,    ID_FORM_LBL3, "Category:",         "", ID_LAY_FORM, 0, 0, 0, 0, 0, 0 },
+		{ MKGUI_DROPDOWN, ID_FORM_DRP1, "",                  "", ID_LAY_FORM, 0, 0, 0, 0, 0, 0 },
+		{ MKGUI_LABEL,    ID_FORM_LBL4, "Subscribe:",        "", ID_LAY_FORM, 0, 0, 0, 0, 0, 0 },
+		{ MKGUI_CHECKBOX, ID_FORM_CHK1, "Yes",               "", ID_LAY_FORM, 0, 0, 0, 0, 0, 0 },
+
+		/* ---- Media tab ---- */
+		{ MKGUI_HBOX,     ID_MEDIA_HBOX,"",                  "", ID_TAB_MEDIA, 0, 0, 0, 0, ANCHOR_ALL, 0 },
+		{ MKGUI_VBOX,     ID_MEDIA_LVBOX,"",                 "", ID_MEDIA_HBOX, 0, 0, 320, 0, MKGUI_FIXED, 0 },
+		{ MKGUI_PANEL,    ID_PANEL1,    "",                  "", ID_MEDIA_LVBOX, 0, 0, 0, 80, MKGUI_PANEL_BORDER | MKGUI_PANEL_SUNKEN | MKGUI_FIXED, 0 },
 		{ MKGUI_LABEL,    ID_PANEL_LBL, "Panel container:",  "", ID_PANEL1, 8, 4, 200, 20, 0, 0 },
 		{ MKGUI_BUTTON,   ID_PANEL_BTN, "Inside Panel",      "", ID_PANEL1, 8, 30, 120, 28, 0, 0 },
-		{ MKGUI_LABEL,    ID_SB_LBL,    "Scrollbar:",        "", ID_TAB6_LVBOX, 0, 0, 0, 20, MKGUI_FIXED, 0 },
-		{ MKGUI_SCROLLBAR,ID_SCROLLBAR1,"",                  "", ID_TAB6_LVBOX, 0, 0, MKGUI_SCROLLBAR_W, 0, 0, 1 },
-		{ MKGUI_VBOX,     ID_TAB6_RVBOX,"",                  "", ID_TAB6_HBOX, 0, 0, 0, 0, 0, 1 },
-		{ MKGUI_LABEL,    ID_IMG_LBL,   "Image:",            "", ID_TAB6_RVBOX, 0, 0, 0, 20, MKGUI_FIXED, 0 },
-		{ MKGUI_IMAGE,    ID_IMAGE1,    "",                  "", ID_TAB6_RVBOX, 0, 0, 0, 200, MKGUI_PANEL_BORDER | MKGUI_FIXED, 0 },
-		{ MKGUI_LABEL,    ID_GL_LBL,    "OpenGL:",           "", ID_TAB6_RVBOX, 0, 0, 0, 20, MKGUI_FIXED, 0 },
-		{ MKGUI_GLVIEW,   ID_GLVIEW1,   "",                  "", ID_TAB6_RVBOX, 0, 0, 0, 0, MKGUI_PANEL_BORDER, 1 },
+		{ MKGUI_LABEL,    ID_PATH_LBL,  "Pathbar:",          "", ID_MEDIA_LVBOX, 0, 0, 0, 20, MKGUI_FIXED, 0 },
+		{ MKGUI_PATHBAR,  ID_PATHBAR1,  "",                  "", ID_MEDIA_LVBOX, 0, 0, 0, 24, MKGUI_FIXED, 0 },
+		{ MKGUI_LABEL,    ID_SB_LBL,    "Scrollbar:",        "", ID_MEDIA_LVBOX, 0, 0, 0, 20, MKGUI_FIXED, 0 },
+		{ MKGUI_SCROLLBAR,ID_SCROLLBAR1,"",                  "", ID_MEDIA_LVBOX, 0, 0, MKGUI_SCROLLBAR_W, 0, 0, 1 },
+		{ MKGUI_VBOX,     ID_MEDIA_RVBOX,"",                 "", ID_MEDIA_HBOX, 0, 0, 0, 0, 0, 1 },
+		{ MKGUI_LABEL,    ID_CANVAS_LBL,"Canvas:",           "", ID_MEDIA_RVBOX, 0, 0, 0, 20, MKGUI_FIXED, 0 },
+		{ MKGUI_CANVAS,   ID_CANVAS1,   "",                  "", ID_MEDIA_RVBOX, 0, 0, 0, 120, MKGUI_PANEL_BORDER | MKGUI_FIXED, 0 },
+		{ MKGUI_LABEL,    ID_IMG_LBL,   "Image:",            "", ID_MEDIA_RVBOX, 0, 0, 0, 20, MKGUI_FIXED, 0 },
+		{ MKGUI_IMAGE,    ID_IMAGE1,    "",                  "", ID_MEDIA_RVBOX, 0, 0, 0, 120, MKGUI_PANEL_BORDER | MKGUI_FIXED, 0 },
+		{ MKGUI_LABEL,    ID_GL_LBL,    "OpenGL:",           "", ID_MEDIA_RVBOX, 0, 0, 0, 20, MKGUI_FIXED, 0 },
+		{ MKGUI_GLVIEW,   ID_GLVIEW1,   "",                  "", ID_MEDIA_RVBOX, 0, 0, 0, 0, MKGUI_PANEL_BORDER, 1 },
 
 		{ MKGUI_STATUSBAR, ID_STATUSBAR, "Ready",            "", ID_WINDOW, 0, 0, 0, 0, 0, 0 },
 	};
@@ -307,19 +380,30 @@ int main(void) {
 		return 1;
 	}
 
+	/* Controls tab setup */
 	const char *modes[] = { "Auto", "Manual", "Custom", "Debug" };
 	mkgui_dropdown_setup(ctx, ID_DROPDOWN1, modes, 4);
+
+	const char *search_items[] = { "Apple", "Banana", "Cherry", "Date", "Elderberry", "Fig", "Grape", "Honeydew" };
+	mkgui_combobox_setup(ctx, ID_COMBOBOX1, search_items, 8);
+
 	mkgui_slider_setup(ctx, ID_SLIDER1, 0, 100, 50);
 	mkgui_spinbox_setup(ctx, ID_SPINBOX1, 0, 999, 42, 1);
 	mkgui_progress_setup(ctx, ID_PROGRESS1, 100);
 	mkgui_progress_set(ctx, ID_PROGRESS1, 65);
 
+	mkgui_toggle_set(ctx, ID_TOGGLE1, 1);
+	mkgui_datepicker_set(ctx, ID_DATEPICKER1, 2026, 3, 17);
+	mkgui_ipinput_set(ctx, ID_IPINPUT1, "192.168.1.100");
+
+	/* Statusbar setup */
 	int32_t sb_widths[] = { -1, 150, 100 };
 	mkgui_statusbar_setup(ctx, ID_STATUSBAR, 3, sb_widths);
 	mkgui_statusbar_set(ctx, ID_STATUSBAR, 0, "Ready");
 	mkgui_statusbar_set(ctx, ID_STATUSBAR, 1, "Ln 1, Col 1");
 	mkgui_statusbar_set(ctx, ID_STATUSBAR, 2, "UTF-8");
 
+	/* Data Views tab setup */
 	struct mkgui_column cols[] = {
 		{ "Name",     200, MKGUI_CELL_ICON_TEXT },
 		{ "Size",     100, MKGUI_CELL_SIZE },
@@ -328,6 +412,14 @@ int main(void) {
 	};
 	mkgui_listview_setup(ctx, ID_LISTVIEW1, 1000000, 4, cols, demo_row_cb, NULL);
 
+	mkgui_itemview_setup(ctx, ID_ITEMVIEW1, 200, MKGUI_VIEW_ICON, demo_itemview_label, demo_itemview_icon, NULL);
+
+	struct mkgui_split_data *ds = find_split_data(ctx, ID_DATA_SPLIT);
+	if(ds) {
+		ds->ratio = 0.50f;
+	}
+
+	/* Tree / Text tab setup */
 	mkgui_treeview_setup(ctx, ID_TREEVIEW1);
 	mkgui_treeview_add(ctx, ID_TREEVIEW1, 1, 0, "src");
 	mkgui_treeview_add(ctx, ID_TREEVIEW1, 2, 1, "main.c");
@@ -341,10 +433,6 @@ int main(void) {
 	mkgui_treeview_add(ctx, ID_TREEVIEW1, 10, 0, "Makefile");
 	mkgui_treeview_add(ctx, ID_TREEVIEW1, 11, 0, "README.md");
 
-	mkgui_textarea_set(ctx, ID_TEXTAREA1, "Type your notes here.\nLine 2.\nLine 3.");
-
-	mkgui_itemview_setup(ctx, ID_ITEMVIEW1, 200, MKGUI_VIEW_ICON, demo_itemview_label, demo_itemview_icon, NULL);
-
 	mkgui_set_treenode_icon(ctx, ID_TREEVIEW1, 1, "folder");
 	mkgui_set_treenode_icon(ctx, ID_TREEVIEW1, 4, "folder");
 	mkgui_set_treenode_icon(ctx, ID_TREEVIEW1, 7, "folder");
@@ -357,10 +445,16 @@ int main(void) {
 	mkgui_set_treenode_icon(ctx, ID_TREEVIEW1, 10, "file-cog");
 	mkgui_set_treenode_icon(ctx, ID_TREEVIEW1, 11, "file-document");
 
+	mkgui_textarea_set(ctx, ID_TEXTAREA1, "Type your notes here.\nLine 2.\nLine 3.");
+
+	/* Layout tab setup */
 	const char *form_cats[] = { "General", "Support", "Sales", "Billing" };
 	mkgui_dropdown_setup(ctx, ID_FORM_DRP1, form_cats, 4);
 
+	/* Media tab setup */
+	mkgui_pathbar_set(ctx, ID_PATHBAR1, "/home/user/projects/mkgui");
 	mkgui_scrollbar_setup(ctx, ID_SCROLLBAR1, 1000, 100);
+	mkgui_canvas_set_callback(ctx, ID_CANVAS1, demo_canvas_cb, NULL);
 
 	{
 		uint32_t test_img[64 * 64];
@@ -428,16 +522,9 @@ int main(void) {
 				case MKGUI_EVENT_CLICK: {
 					if(ev.id == ID_BUTTON1) {
 						mkgui_statusbar_set(ctx, ID_STATUSBAR, 0, "Applied!");
-						printf("Button clicked! Input: %s\n", mkgui_input_get(ctx, ID_INPUT1));
 
-					} else if(ev.id == ID_TB_NEW) {
-						mkgui_statusbar_set(ctx, ID_STATUSBAR, 0, "New");
-
-					} else if(ev.id == ID_TB_OPEN) {
-						mkgui_statusbar_set(ctx, ID_STATUSBAR, 0, "Open");
-
-					} else if(ev.id == ID_TB_SAVE) {
-						mkgui_statusbar_set(ctx, ID_STATUSBAR, 0, "Save");
+					} else if(ev.id == ID_TB_NEW || ev.id == ID_TB_OPEN || ev.id == ID_TB_SAVE) {
+						goto handle_file_action;
 
 					} else if(ev.id == ID_IV_ICON) {
 						mkgui_itemview_set_view(ctx, ID_ITEMVIEW1, MKGUI_VIEW_ICON);
@@ -454,12 +541,13 @@ int main(void) {
 				} break;
 
 				case MKGUI_EVENT_MENU: {
+					handle_file_action:
 					if(ev.id == ID_EXIT) {
 						if(mkgui_confirm_dialog(ctx, "Quit", "Are you sure you want to exit?")) {
 							running = 0;
 						}
 
-					} else if(ev.id == ID_FILE_NEW) {
+					} else if(ev.id == ID_FILE_NEW || ev.id == ID_TB_NEW) {
 						char name[256];
 						if(mkgui_input_dialog(ctx, "New File", "File name:", "untitled.txt", name, sizeof(name))) {
 							char buf[256];
@@ -467,7 +555,7 @@ int main(void) {
 							mkgui_statusbar_set(ctx, ID_STATUSBAR, 0, buf);
 						}
 
-					} else if(ev.id == ID_OPEN) {
+					} else if(ev.id == ID_OPEN || ev.id == ID_TB_OPEN) {
 						struct mkgui_file_dialog_opts open_opts = {0};
 						uint32_t count = mkgui_open_dialog(ctx, &open_opts);
 						if(count > 0) {
@@ -476,7 +564,7 @@ int main(void) {
 							mkgui_statusbar_set(ctx, ID_STATUSBAR, 0, buf);
 						}
 
-					} else if(ev.id == ID_SAVE) {
+					} else if(ev.id == ID_SAVE || ev.id == ID_TB_SAVE) {
 						struct mkgui_file_dialog_opts save_opts = {0};
 						save_opts.default_name = "untitled.txt";
 						if(mkgui_save_dialog(ctx, &save_opts)) {
@@ -486,23 +574,14 @@ int main(void) {
 						}
 
 					} else if(ev.id == ID_HELP_ABOUT) {
-						mkgui_message_box(ctx, "About", "mkgui demo v1.0");
+						mkgui_message_box(ctx, "About", "mkgui demo v1.0\nDemonstrates all widget types.");
 					}
-				} break;
-
-				case MKGUI_EVENT_TAB_CHANGED: {
-					printf("Tab changed to %d\n", ev.value);
 				} break;
 
 				case MKGUI_EVENT_CHECKBOX_CHANGED: {
 					if(ev.id == ID_THEME_CHECK) {
 						mkgui_set_theme(ctx, ev.value ? light_theme() : default_theme());
 					}
-					printf("Checkbox %u = %d\n", ev.id, ev.value);
-				} break;
-
-				case MKGUI_EVENT_DROPDOWN_CHANGED: {
-					printf("Dropdown %u = %d\n", ev.id, ev.value);
 				} break;
 
 				case MKGUI_EVENT_SLIDER_CHANGED: {
@@ -511,12 +590,38 @@ int main(void) {
 					mkgui_statusbar_set(ctx, ID_STATUSBAR, 0, buf);
 				} break;
 
-				case MKGUI_EVENT_SPINBOX_CHANGED: {
-					printf("Spinbox %u = %d\n", ev.id, ev.value);
+				case MKGUI_EVENT_TOGGLE_CHANGED: {
+					char buf[64];
+					snprintf(buf, sizeof(buf), "Power: %s", ev.value ? "ON" : "OFF");
+					mkgui_statusbar_set(ctx, ID_STATUSBAR, 0, buf);
+					uint32_t ids[] = { ID_DATEPICKER1, ID_IPINPUT1 };
+					for(uint32_t i = 0; i < 2; ++i) {
+						int32_t wi = find_widget_idx(ctx, ids[i]);
+						if(wi >= 0) {
+							if(ev.value) {
+								ctx->widgets[wi].flags &= ~MKGUI_HIDDEN;
+							} else {
+								ctx->widgets[wi].flags |= MKGUI_HIDDEN;
+							}
+						}
+					}
+					dirty_all(ctx);
 				} break;
 
-				case MKGUI_EVENT_RADIO_CHANGED: {
-					printf("Radio %u selected\n", ev.id);
+				case MKGUI_EVENT_DATEPICKER_CHANGED: {
+					char buf[64];
+					snprintf(buf, sizeof(buf), "Date changed: %d", ev.value);
+					mkgui_statusbar_set(ctx, ID_STATUSBAR, 0, buf);
+				} break;
+
+				case MKGUI_EVENT_IPINPUT_CHANGED: {
+					mkgui_statusbar_set(ctx, ID_STATUSBAR, 0, "IP address changed");
+				} break;
+
+				case MKGUI_EVENT_COMBOBOX_CHANGED: {
+					char buf[64];
+					snprintf(buf, sizeof(buf), "Combobox selection: %d", ev.value);
+					mkgui_statusbar_set(ctx, ID_STATUSBAR, 0, buf);
 				} break;
 
 				case MKGUI_EVENT_ITEMVIEW_SELECT: {
@@ -531,25 +636,15 @@ int main(void) {
 					mkgui_statusbar_set(ctx, ID_STATUSBAR, 0, buf);
 				} break;
 
-				case MKGUI_EVENT_LISTVIEW_SORT: {
-					printf("Sort column %d dir %d\n", ev.col, ev.value);
-				} break;
-
-				case MKGUI_EVENT_TREEVIEW_SELECT: {
-					printf("Tree node selected: %d\n", ev.value);
-				} break;
-
-				case MKGUI_EVENT_TREEVIEW_EXPAND: {
-					printf("Tree node expanded: %d\n", ev.value);
-				} break;
-
-				case MKGUI_EVENT_TREEVIEW_COLLAPSE: {
-					printf("Tree node collapsed: %d\n", ev.value);
-				} break;
-
 				case MKGUI_EVENT_SCROLL: {
 					char buf[64];
-					snprintf(buf, sizeof(buf), "Scroll %u = %d", ev.id, ev.value);
+					snprintf(buf, sizeof(buf), "Scroll: %d", ev.value);
+					mkgui_statusbar_set(ctx, ID_STATUSBAR, 0, buf);
+				} break;
+
+				case MKGUI_EVENT_PATHBAR_NAV: {
+					char buf[128];
+					snprintf(buf, sizeof(buf), "Pathbar navigate: segment %d", ev.value);
 					mkgui_statusbar_set(ctx, ID_STATUSBAR, 0, buf);
 				} break;
 
@@ -596,7 +691,7 @@ int main(void) {
 #else
 				glXSwapBuffers(mkgui_glview_get_x11_display(ctx), mkgui_glview_get_x11_window(ctx, ID_GLVIEW1));
 #endif
-				}
+			}
 		}
 
 		mkgui_wait(ctx);
