@@ -13,40 +13,69 @@
 // Constants
 // ---------------------------------------------------------------------------
 
-#define FD_MAX_FILES      4096
-#define FD_PATH_SIZE      4096
-#define FD_MAX_BOOKMARKS  32
-#define FD_MAX_RESULTS    64
-#define FD_INIT_W         720
-#define FD_INIT_H         500
-#define FD_DBLCLICK_MS    400
-#define FD_BOTTOM_H       72
+#define FD_MAX_FILES        4096
+#define FD_PATH_SIZE        4096
+#define FD_MAX_BOOKMARKS    32
+#define FD_MAX_RESULTS      64
+#define FD_MAX_FILTERS      32
+#define FD_HISTORY_SIZE     32
+#define FD_INIT_W           780
+#define FD_INIT_H           520
+#define FD_DBLCLICK_MS      400
+#define FD_TOOLBAR_H        28
+#define FD_BOTTOM_H         72
+#define FD_TYPEAHEAD_TIMEOUT_MS 1500
 
 // ---------------------------------------------------------------------------
 // Widget IDs
 // ---------------------------------------------------------------------------
 
 enum {
-	FD_ID_WINDOW      = 1,
-	FD_ID_PATH_LABEL  = 2,
-	FD_ID_PATH_INPUT  = 3,
-	FD_ID_SPLIT    = 4,
-	FD_ID_BOOKMARKS   = 5,
-	FD_ID_FILES       = 6,
-	FD_ID_NAME_LABEL  = 7,
-	FD_ID_NAME_INPUT  = 8,
-	FD_ID_BTN_CONFIRM = 9,
-	FD_ID_BTN_CANCEL  = 10,
+	FD_ID_WINDOW = 1,
+	FD_ID_TOOLBAR,
+	FD_ID_BTN_BACK,
+	FD_ID_BTN_FWD,
+	FD_ID_BTN_UP,
+	FD_ID_PATHBAR,
+	FD_ID_SPLIT,
+	FD_ID_BOOKMARKS,
+	FD_ID_FILES,
+	FD_ID_NAME_LABEL,
+	FD_ID_NAME_INPUT,
+	FD_ID_FILTER_LABEL,
+	FD_ID_FILTER_DROP,
+	FD_ID_CHK_HIDDEN,
+	FD_ID_BTN_NEWFOLDER,
+	FD_ID_BTN_CONFIRM,
+	FD_ID_BTN_CANCEL,
 };
 
 // ---------------------------------------------------------------------------
-// Types
+// Public API types
+// ---------------------------------------------------------------------------
+
+struct mkgui_file_filter {
+	const char *label;
+	const char *pattern;
+};
+
+struct mkgui_file_dialog_opts {
+	const char *start_path;
+	const struct mkgui_file_filter *filters;
+	uint32_t filter_count;
+	const char *default_name;
+	uint32_t multi_select;
+};
+
+// ---------------------------------------------------------------------------
+// Internal types
 // ---------------------------------------------------------------------------
 
 struct fd_entry {
 	char name[256];
 	uint32_t is_dir;
 	int64_t size;
+	int64_t mtime;
 };
 
 struct fd_bookmark {
@@ -66,8 +95,22 @@ struct fd_state {
 
 	uint32_t confirmed;
 
-	uint32_t last_click_time;
-	int32_t last_click_row;
+	uint32_t show_hidden;
+
+	char history[FD_HISTORY_SIZE][FD_PATH_SIZE];
+	uint32_t history_pos;
+	uint32_t history_count;
+
+	int32_t sort_col;
+	int32_t sort_dir;
+
+	const struct mkgui_file_filter *filters;
+	uint32_t filter_count;
+	uint32_t active_filter;
+
+	char typeahead[64];
+	uint32_t typeahead_len;
+	uint32_t typeahead_time;
 };
 
 static struct fd_state fd;
@@ -77,11 +120,6 @@ static uint32_t fd_result_count;
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-// [=]===^=[ fd_get_time_ms ]=====================================[=]
-static uint32_t fd_get_time_ms(void) {
-	return mkgui_time_ms();
-}
 
 // [=]===^=[ fd_strcasecmp ]======================================[=]
 static int32_t fd_strcasecmp(const char *a, const char *b) {
@@ -142,123 +180,6 @@ static const char *fd_icon_for_name(const char *name, uint32_t is_dir) {
 	return "file-document-outline";
 }
 
-// ---------------------------------------------------------------------------
-// Directory scanning
-// ---------------------------------------------------------------------------
-
-// [=]===^=[ fd_compare_entries ]=================================[=]
-static int fd_compare_entries(const void *a, const void *b) {
-	const struct fd_entry *ea = (const struct fd_entry *)a;
-	const struct fd_entry *eb = (const struct fd_entry *)b;
-	if(strcmp(ea->name, "..") == 0) {
-		return -1;
-	}
-	if(strcmp(eb->name, "..") == 0) {
-		return 1;
-	}
-	if(ea->is_dir && !eb->is_dir) {
-		return -1;
-	}
-	if(!ea->is_dir && eb->is_dir) {
-		return 1;
-	}
-	return fd_strcasecmp(ea->name, eb->name);
-}
-
-// [=]===^=[ fd_scan_dir ]========================================[=]
-static void fd_scan_dir(void) {
-	fd.entry_count = 0;
-
-#ifdef _WIN32
-	uint32_t plen = (uint32_t)strlen(fd.path);
-	if(plen == 0) {
-		return;
-	}
-
-	if(!(plen == 3 && fd.path[1] == ':' && fd.path[2] == '\\')) {
-		struct fd_entry *e = &fd.entries[fd.entry_count++];
-		snprintf(e->name, sizeof(e->name), "..");
-		e->is_dir = 1;
-		e->size = 0;
-	}
-
-	char pattern[FD_PATH_SIZE];
-	snprintf(pattern, sizeof(pattern), "%s\\*", fd.path);
-	WIN32_FIND_DATAA wfd;
-	HANDLE hf = FindFirstFileA(pattern, &wfd);
-	if(hf == INVALID_HANDLE_VALUE) {
-		return;
-	}
-	do {
-		if(fd.entry_count >= FD_MAX_FILES) {
-			break;
-		}
-		if(wfd.cFileName[0] == '.') {
-			continue;
-		}
-		struct fd_entry *e = &fd.entries[fd.entry_count];
-		snprintf(e->name, sizeof(e->name), "%s", wfd.cFileName);
-		e->is_dir = (wfd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) ? 1 : 0;
-		e->size = ((int64_t)wfd.nFileSizeHigh << 32) | wfd.nFileSizeLow;
-		++fd.entry_count;
-	} while(FindNextFileA(hf, &wfd));
-	FindClose(hf);
-#else
-	DIR *dir = opendir(fd.path);
-	if(!dir) {
-		return;
-	}
-
-	if(strcmp(fd.path, "/") != 0) {
-		struct fd_entry *e = &fd.entries[fd.entry_count++];
-		snprintf(e->name, sizeof(e->name), "..");
-		e->is_dir = 1;
-		e->size = 0;
-	}
-
-	struct dirent *de;
-	while((de = readdir(dir)) != NULL && fd.entry_count < FD_MAX_FILES) {
-		if(de->d_name[0] == '.') {
-			continue;
-		}
-		struct fd_entry *e = &fd.entries[fd.entry_count];
-		snprintf(e->name, sizeof(e->name), "%s", de->d_name);
-
-		char fullpath[FD_PATH_SIZE];
-		snprintf(fullpath, sizeof(fullpath), "%s/%s", fd.path, de->d_name);
-
-		struct stat st;
-		if(stat(fullpath, &st) == 0) {
-			e->is_dir = S_ISDIR(st.st_mode) ? 1 : 0;
-			e->size = st.st_size;
-		} else {
-			e->is_dir = 0;
-			e->size = 0;
-		}
-		++fd.entry_count;
-	}
-	closedir(dir);
-#endif
-
-	if(fd.entry_count > 1) {
-		qsort(fd.entries, fd.entry_count, sizeof(fd.entries[0]), fd_compare_entries);
-	}
-}
-
-// ---------------------------------------------------------------------------
-// Bookmarks
-// ---------------------------------------------------------------------------
-
-// [=]===^=[ fd_add_bookmark ]====================================[=]
-static void fd_add_bookmark(const char *label, const char *path) {
-	if(fd.bookmark_count >= FD_MAX_BOOKMARKS) {
-		return;
-	}
-	struct fd_bookmark *b = &fd.bookmarks[fd.bookmark_count++];
-	snprintf(b->label, sizeof(b->label), "%s", label);
-	snprintf(b->path, sizeof(b->path), "%s", path);
-}
-
 // [=]===^=[ fd_path_exists ]======================================[=]
 static uint32_t fd_path_exists(const char *path) {
 #ifdef _WIN32
@@ -285,6 +206,235 @@ static const char *fd_get_home(void) {
 #endif
 }
 
+// ---------------------------------------------------------------------------
+// Filter matching
+// ---------------------------------------------------------------------------
+
+// [=]===^=[ fd_match_pattern ]====================================[=]
+static uint32_t fd_match_pattern(const char *name, const char *pattern) {
+	if(!pattern || pattern[0] == '\0' || strcmp(pattern, "*") == 0 || strcmp(pattern, "*.*") == 0) {
+		return 1;
+	}
+
+	char pat_buf[1024];
+	snprintf(pat_buf, sizeof(pat_buf), "%s", pattern);
+
+	char *tok = pat_buf;
+	while(*tok) {
+		while(*tok == ' ' || *tok == ';') {
+			++tok;
+		}
+		if(*tok == '\0') {
+			break;
+		}
+
+		char *end = tok;
+		while(*end && *end != ';' && *end != ' ') {
+			++end;
+		}
+		char saved = *end;
+		*end = '\0';
+
+		char *pat = tok;
+		if(pat[0] == '*' && pat[1] == '.') {
+			const char *ext = pat + 1;
+			const char *dot = strrchr(name, '.');
+			if(dot && fd_strcasecmp(dot, ext) == 0) {
+				return 1;
+			}
+		} else if(strcmp(pat, "*") == 0) {
+			return 1;
+		}
+
+		*end = saved;
+		tok = end;
+	}
+	return 0;
+}
+
+// ---------------------------------------------------------------------------
+// Directory scanning
+// ---------------------------------------------------------------------------
+
+// [=]===^=[ fd_compare_entries ]=================================[=]
+static int fd_compare_entries(const void *a, const void *b) {
+	const struct fd_entry *ea = (const struct fd_entry *)a;
+	const struct fd_entry *eb = (const struct fd_entry *)b;
+	if(strcmp(ea->name, "..") == 0) {
+		return -1;
+	}
+	if(strcmp(eb->name, "..") == 0) {
+		return 1;
+	}
+	if(ea->is_dir && !eb->is_dir) {
+		return -1;
+	}
+	if(!ea->is_dir && eb->is_dir) {
+		return 1;
+	}
+
+	int32_t result = 0;
+	switch(fd.sort_col) {
+		case 0: {
+			result = fd_strcasecmp(ea->name, eb->name);
+		} break;
+
+		case 1: {
+			if(ea->size < eb->size) {
+				result = -1;
+			} else if(ea->size > eb->size) {
+				result = 1;
+			} else {
+				result = fd_strcasecmp(ea->name, eb->name);
+			}
+		} break;
+
+		case 2: {
+			if(ea->mtime < eb->mtime) {
+				result = -1;
+			} else if(ea->mtime > eb->mtime) {
+				result = 1;
+			} else {
+				result = fd_strcasecmp(ea->name, eb->name);
+			}
+		} break;
+
+		default: {
+			result = fd_strcasecmp(ea->name, eb->name);
+		} break;
+	}
+
+	return result * fd.sort_dir;
+}
+
+// [=]===^=[ fd_scan_dir ]========================================[=]
+static void fd_scan_dir(void) {
+	fd.entry_count = 0;
+
+	const char *filter_pat = NULL;
+	if(fd.filters && fd.active_filter < fd.filter_count) {
+		filter_pat = fd.filters[fd.active_filter].pattern;
+	}
+
+#ifdef _WIN32
+	uint32_t plen = (uint32_t)strlen(fd.path);
+	if(plen == 0) {
+		return;
+	}
+
+	if(!(plen == 3 && fd.path[1] == ':' && fd.path[2] == '\\')) {
+		struct fd_entry *e = &fd.entries[fd.entry_count++];
+		snprintf(e->name, sizeof(e->name), "..");
+		e->is_dir = 1;
+		e->size = 0;
+		e->mtime = 0;
+	}
+
+	char pattern[FD_PATH_SIZE];
+	snprintf(pattern, sizeof(pattern), "%s\\*", fd.path);
+	WIN32_FIND_DATAA wfd;
+	HANDLE hf = FindFirstFileA(pattern, &wfd);
+	if(hf == INVALID_HANDLE_VALUE) {
+		return;
+	}
+	do {
+		if(fd.entry_count >= FD_MAX_FILES) {
+			break;
+		}
+		if(wfd.cFileName[0] == '.') {
+			if(!fd.show_hidden) {
+				continue;
+			}
+			if(strcmp(wfd.cFileName, ".") == 0 || strcmp(wfd.cFileName, "..") == 0) {
+				continue;
+			}
+		}
+		uint32_t is_dir = (wfd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) ? 1 : 0;
+		if(!is_dir && filter_pat && !fd_match_pattern(wfd.cFileName, filter_pat)) {
+			continue;
+		}
+		struct fd_entry *e = &fd.entries[fd.entry_count];
+		snprintf(e->name, sizeof(e->name), "%s", wfd.cFileName);
+		e->is_dir = is_dir;
+		e->size = ((int64_t)wfd.nFileSizeHigh << 32) | wfd.nFileSizeLow;
+		ULARGE_INTEGER ftime;
+		ftime.LowPart = wfd.ftLastWriteTime.dwLowDateTime;
+		ftime.HighPart = wfd.ftLastWriteTime.dwHighDateTime;
+		e->mtime = (int64_t)((ftime.QuadPart - 116444736000000000ULL) / 10000000ULL);
+		++fd.entry_count;
+	} while(FindNextFileA(hf, &wfd));
+	FindClose(hf);
+#else
+	DIR *dir = opendir(fd.path);
+	if(!dir) {
+		return;
+	}
+
+	if(strcmp(fd.path, "/") != 0) {
+		struct fd_entry *e = &fd.entries[fd.entry_count++];
+		snprintf(e->name, sizeof(e->name), "..");
+		e->is_dir = 1;
+		e->size = 0;
+		e->mtime = 0;
+	}
+
+	struct dirent *de;
+	while((de = readdir(dir)) != NULL && fd.entry_count < FD_MAX_FILES) {
+		if(de->d_name[0] == '.') {
+			if(!fd.show_hidden) {
+				continue;
+			}
+			if(strcmp(de->d_name, ".") == 0 || strcmp(de->d_name, "..") == 0) {
+				continue;
+			}
+		}
+
+		char fullpath[FD_PATH_SIZE];
+		snprintf(fullpath, sizeof(fullpath), "%s/%s", fd.path, de->d_name);
+
+		struct stat st;
+		uint32_t is_dir = 0;
+		int64_t fsize = 0;
+		int64_t fmtime = 0;
+		if(stat(fullpath, &st) == 0) {
+			is_dir = S_ISDIR(st.st_mode) ? 1 : 0;
+			fsize = st.st_size;
+			fmtime = (int64_t)st.st_mtime;
+		}
+
+		if(!is_dir && filter_pat && !fd_match_pattern(de->d_name, filter_pat)) {
+			continue;
+		}
+
+		struct fd_entry *e = &fd.entries[fd.entry_count];
+		snprintf(e->name, sizeof(e->name), "%s", de->d_name);
+		e->is_dir = is_dir;
+		e->size = fsize;
+		e->mtime = fmtime;
+		++fd.entry_count;
+	}
+	closedir(dir);
+#endif
+
+	if(fd.entry_count > 1) {
+		qsort(fd.entries, fd.entry_count, sizeof(fd.entries[0]), fd_compare_entries);
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Bookmarks
+// ---------------------------------------------------------------------------
+
+// [=]===^=[ fd_add_bookmark ]====================================[=]
+static void fd_add_bookmark(const char *label, const char *path) {
+	if(fd.bookmark_count >= FD_MAX_BOOKMARKS) {
+		return;
+	}
+	struct fd_bookmark *b = &fd.bookmarks[fd.bookmark_count++];
+	snprintf(b->label, sizeof(b->label), "%s", label);
+	snprintf(b->path, sizeof(b->path), "%s", path);
+}
+
 // [=]===^=[ fd_load_bookmarks ]==================================[=]
 static void fd_load_bookmarks(void) {
 	fd.bookmark_count = 0;
@@ -309,47 +459,129 @@ static void fd_load_bookmarks(void) {
 		fd_add_bookmark("Downloads", buf);
 	}
 
-#ifdef _WIN32
-	FILE *f = NULL;
-#else
+#ifndef _WIN32
 	snprintf(buf, sizeof(buf), "%s/.config/gtk-3.0/bookmarks", home);
 	FILE *f = fopen(buf, "r");
+	if(f) {
+		char line[4096];
+		while(fgets(line, sizeof(line), f) != NULL && fd.bookmark_count < FD_MAX_BOOKMARKS) {
+			char *nl = strchr(line, '\n');
+			if(nl) {
+				*nl = '\0';
+			}
+			if(strncmp(line, "file://", 7) != 0) {
+				continue;
+			}
+
+			char *raw_path = line + 7;
+			char *space = strchr(raw_path, ' ');
+			char *label = NULL;
+			if(space) {
+				*space = '\0';
+				label = space + 1;
+			}
+
+			char decoded[1024];
+			fd_url_decode(decoded, raw_path, sizeof(decoded));
+
+			if(!label || !*label) {
+				label = strrchr(decoded, '/');
+				label = label ? label + 1 : decoded;
+			}
+
+			if(fd_path_exists(decoded)) {
+				fd_add_bookmark(label, decoded);
+			}
+		}
+		fclose(f);
+	}
+
+	FILE *mounts = fopen("/proc/mounts", "r");
+	if(mounts) {
+		char mline[4096];
+		while(fgets(mline, sizeof(mline), mounts) != NULL && fd.bookmark_count < FD_MAX_BOOKMARKS) {
+			char *nl = strchr(mline, '\n');
+			if(nl) {
+				*nl = '\0';
+			}
+
+			char dev[512], mp[512], fs[128];
+			if(sscanf(mline, "%511s %511s %127s", dev, mp, fs) < 3) {
+				continue;
+			}
+
+			if(strcmp(fs, "proc") == 0 || strcmp(fs, "sysfs") == 0 || strcmp(fs, "tmpfs") == 0 ||
+			   strcmp(fs, "devtmpfs") == 0 || strcmp(fs, "devpts") == 0 || strcmp(fs, "cgroup") == 0 ||
+			   strcmp(fs, "cgroup2") == 0 || strcmp(fs, "securityfs") == 0 || strcmp(fs, "debugfs") == 0 ||
+			   strcmp(fs, "configfs") == 0 || strcmp(fs, "fusectl") == 0 || strcmp(fs, "hugetlbfs") == 0 ||
+			   strcmp(fs, "mqueue") == 0 || strcmp(fs, "pstore") == 0 || strcmp(fs, "binfmt_misc") == 0 ||
+			   strcmp(fs, "autofs") == 0 || strcmp(fs, "efivarfs") == 0 || strcmp(fs, "tracefs") == 0 ||
+			   strcmp(fs, "bpf") == 0 || strcmp(fs, "nsfs") == 0 || strcmp(fs, "overlay") == 0 ||
+			   strcmp(fs, "squashfs") == 0 || strcmp(fs, "fuse.portal") == 0) {
+				continue;
+			}
+
+			uint32_t is_media = (strncmp(mp, "/media/", 7) == 0);
+			uint32_t is_mnt = (strncmp(mp, "/mnt/", 5) == 0);
+			if(!is_media && !is_mnt) {
+				continue;
+			}
+
+			uint32_t already = 0;
+			for(uint32_t bi = 0; bi < fd.bookmark_count; ++bi) {
+				if(strcmp(fd.bookmarks[bi].path, mp) == 0) {
+					already = 1;
+					break;
+				}
+			}
+			if(already) {
+				continue;
+			}
+
+			const char *label = strrchr(mp, '/');
+			label = label ? label + 1 : mp;
+			fd_add_bookmark(label, mp);
+		}
+		fclose(mounts);
+	}
 #endif
-	if(!f) {
+}
+
+// ---------------------------------------------------------------------------
+// Navigation history
+// ---------------------------------------------------------------------------
+
+// [=]===^=[ fd_history_push ]=====================================[=]
+static void fd_history_push(const char *path) {
+	if(fd.history_count > 0 && fd.history_pos > 0 && strcmp(fd.history[fd.history_pos - 1], path) == 0) {
 		return;
 	}
 
-	char line[4096];
-	while(fgets(line, sizeof(line), f) != NULL && fd.bookmark_count < FD_MAX_BOOKMARKS) {
-		char *nl = strchr(line, '\n');
-		if(nl) {
-			*nl = '\0';
-		}
-		if(strncmp(line, "file://", 7) != 0) {
-			continue;
-		}
+	if(fd.history_pos < fd.history_count) {
+		fd.history_count = fd.history_pos;
+	}
 
-		char *raw_path = line + 7;
-		char *space = strchr(raw_path, ' ');
-		char *label = NULL;
-		if(space) {
-			*space = '\0';
-			label = space + 1;
-		}
-
-		char decoded[1024];
-		fd_url_decode(decoded, raw_path, sizeof(decoded));
-
-		if(!label || !*label) {
-			label = strrchr(decoded, '/');
-			label = label ? label + 1 : decoded;
-		}
-
-		if(fd_path_exists(decoded)) {
-			fd_add_bookmark(label, decoded);
+	if(fd.history_count >= FD_HISTORY_SIZE) {
+		memmove(&fd.history[0], &fd.history[1], (FD_HISTORY_SIZE - 1) * FD_PATH_SIZE);
+		--fd.history_count;
+		if(fd.history_pos > 0) {
+			--fd.history_pos;
 		}
 	}
-	fclose(f);
+
+	snprintf(fd.history[fd.history_count], FD_PATH_SIZE, "%s", path);
+	++fd.history_count;
+	fd.history_pos = fd.history_count;
+}
+
+// [=]===^=[ fd_history_can_back ]=================================[=]
+static uint32_t fd_history_can_back(void) {
+	return fd.history_pos > 1;
+}
+
+// [=]===^=[ fd_history_can_fwd ]=================================[=]
+static uint32_t fd_history_can_fwd(void) {
+	return fd.history_pos < fd.history_count;
 }
 
 // ---------------------------------------------------------------------------
@@ -380,16 +612,21 @@ static void fd_navigate(struct mkgui_ctx *dlg, const char *newpath) {
 #endif
 
 	snprintf(fd.path, sizeof(fd.path), "%s", resolved);
+	fd_history_push(fd.path);
 	fd_scan_dir();
 
-	mkgui_input_set(dlg, FD_ID_PATH_INPUT, fd.path);
+	mkgui_pathbar_set(dlg, FD_ID_PATHBAR, fd.path);
 
 	struct mkgui_listview_data *lv = find_listv_data(dlg, FD_ID_FILES);
 	if(lv) {
 		lv->row_count = fd.entry_count;
 		lv->selected_row = -1;
 		lv->scroll_y = 0;
+		memset(lv->multi_sel, 0, sizeof(lv->multi_sel));
+		lv->multi_sel_count = 0;
 	}
+
+	fd.typeahead_len = 0;
 	dirty_all(dlg);
 }
 
@@ -406,19 +643,135 @@ static void fd_navigate_entry(struct mkgui_ctx *dlg, int32_t idx) {
 	char newpath[FD_PATH_SIZE];
 	if(strcmp(e->name, "..") == 0) {
 		char *last = strrchr(fd.path, '/');
+#ifdef _WIN32
+		char *last_bs = strrchr(fd.path, '\\');
+		if(last_bs && (!last || last_bs > last)) {
+			last = last_bs;
+		}
+#endif
 		if(last && last != fd.path) {
 			snprintf(newpath, sizeof(newpath), "%.*s", (int)(last - fd.path), fd.path);
 		} else {
 			snprintf(newpath, sizeof(newpath), "/");
 		}
 	} else {
+#ifdef _WIN32
+		snprintf(newpath, sizeof(newpath), "%s\\%s", fd.path, e->name);
+#else
 		if(strcmp(fd.path, "/") == 0) {
 			snprintf(newpath, sizeof(newpath), "/%s", e->name);
 		} else {
 			snprintf(newpath, sizeof(newpath), "%s/%s", fd.path, e->name);
 		}
+#endif
 	}
 	fd_navigate(dlg, newpath);
+}
+
+// [=]===^=[ fd_navigate_up ]=====================================[=]
+static void fd_navigate_up(struct mkgui_ctx *dlg) {
+	char *last = strrchr(fd.path, '/');
+#ifdef _WIN32
+	char *last_bs = strrchr(fd.path, '\\');
+	if(last_bs && (!last || last_bs > last)) {
+		last = last_bs;
+	}
+	if(!last) {
+		return;
+	}
+	if(last == fd.path + 2 && fd.path[1] == ':') {
+		char newpath[4] = { fd.path[0], ':', '\\', '\0' };
+		fd_navigate(dlg, newpath);
+		return;
+	}
+#else
+	if(!last) {
+		return;
+	}
+	if(last == fd.path) {
+		if(strcmp(fd.path, "/") != 0) {
+			fd_navigate(dlg, "/");
+		}
+		return;
+	}
+#endif
+	char newpath[FD_PATH_SIZE];
+	snprintf(newpath, sizeof(newpath), "%.*s", (int)(last - fd.path), fd.path);
+	fd_navigate(dlg, newpath);
+}
+
+// [=]===^=[ fd_navigate_back ]====================================[=]
+static void fd_navigate_back(struct mkgui_ctx *dlg) {
+	if(!fd_history_can_back()) {
+		return;
+	}
+	--fd.history_pos;
+	const char *target = fd.history[fd.history_pos - 1];
+	snprintf(fd.path, sizeof(fd.path), "%s", target);
+	fd_scan_dir();
+	mkgui_pathbar_set(dlg, FD_ID_PATHBAR, fd.path);
+	struct mkgui_listview_data *lv = find_listv_data(dlg, FD_ID_FILES);
+	if(lv) {
+		lv->row_count = fd.entry_count;
+		lv->selected_row = -1;
+		lv->scroll_y = 0;
+	}
+	fd.typeahead_len = 0;
+	dirty_all(dlg);
+}
+
+// [=]===^=[ fd_navigate_fwd ]=====================================[=]
+static void fd_navigate_fwd(struct mkgui_ctx *dlg) {
+	if(!fd_history_can_fwd()) {
+		return;
+	}
+	const char *target = fd.history[fd.history_pos];
+	++fd.history_pos;
+	snprintf(fd.path, sizeof(fd.path), "%s", target);
+	fd_scan_dir();
+	mkgui_pathbar_set(dlg, FD_ID_PATHBAR, fd.path);
+	struct mkgui_listview_data *lv = find_listv_data(dlg, FD_ID_FILES);
+	if(lv) {
+		lv->row_count = fd.entry_count;
+		lv->selected_row = -1;
+		lv->scroll_y = 0;
+	}
+	fd.typeahead_len = 0;
+	dirty_all(dlg);
+}
+
+// ---------------------------------------------------------------------------
+// Filter extension
+// ---------------------------------------------------------------------------
+
+// [=]===^=[ fd_append_filter_ext ]================================[=]
+static void fd_append_filter_ext(char *name, uint32_t name_size) {
+	if(!fd.filters || fd.active_filter >= fd.filter_count) {
+		return;
+	}
+	if(strchr(name, '.')) {
+		return;
+	}
+	const char *pat = fd.filters[fd.active_filter].pattern;
+	if(!pat) {
+		return;
+	}
+
+	while(*pat == ' ' || *pat == ';') {
+		++pat;
+	}
+	if(pat[0] == '*' && pat[1] == '.') {
+		uint32_t nlen = (uint32_t)strlen(name);
+		const char *ext = pat + 1;
+		uint32_t elen = 0;
+		while(ext[elen] && ext[elen] != ';' && ext[elen] != ' ') {
+			++elen;
+		}
+		if(nlen + elen < name_size - 1) {
+			memcpy(&name[nlen], ext, elen);
+			name[nlen + elen] = '\0';
+		}
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -432,16 +785,37 @@ static void fd_build_results(struct mkgui_ctx *dlg) {
 	if(fd.mode == 1) {
 		const char *name = mkgui_input_get(dlg, FD_ID_NAME_INPUT);
 		if(name && name[0] != '\0') {
+			char fname[512];
+			snprintf(fname, sizeof(fname), "%s", name);
+			fd_append_filter_ext(fname, sizeof(fname));
 			if(strcmp(fd.path, "/") == 0) {
-				snprintf(fd_results[0], FD_PATH_SIZE, "/%s", name);
+				snprintf(fd_results[0], FD_PATH_SIZE, "/%s", fname);
 			} else {
-				snprintf(fd_results[0], FD_PATH_SIZE, "%s/%s", fd.path, name);
+				snprintf(fd_results[0], FD_PATH_SIZE, "%s/%s", fd.path, fname);
 			}
 			fd_result_count = 1;
 		}
+
 	} else {
 		struct mkgui_listview_data *lv = find_listv_data(dlg, FD_ID_FILES);
-		if(lv && lv->selected_row >= 0 && lv->selected_row < (int32_t)fd.entry_count) {
+		if(!lv) {
+			return;
+		}
+
+		if(lv->multi_sel_count > 0) {
+			for(uint32_t i = 0; i < lv->multi_sel_count && fd_result_count < FD_MAX_RESULTS; ++i) {
+				int32_t row = lv->multi_sel[i];
+				if(row >= 0 && row < (int32_t)fd.entry_count && !fd.entries[row].is_dir) {
+					if(strcmp(fd.path, "/") == 0) {
+						snprintf(fd_results[fd_result_count], FD_PATH_SIZE, "/%s", fd.entries[row].name);
+					} else {
+						snprintf(fd_results[fd_result_count], FD_PATH_SIZE, "%s/%s", fd.path, fd.entries[row].name);
+					}
+					++fd_result_count;
+				}
+			}
+
+		} else if(lv->selected_row >= 0 && lv->selected_row < (int32_t)fd.entry_count) {
 			struct fd_entry *e = &fd.entries[lv->selected_row];
 			if(!e->is_dir) {
 				if(strcmp(fd.path, "/") == 0) {
@@ -456,10 +830,93 @@ static void fd_build_results(struct mkgui_ctx *dlg) {
 }
 
 // [=]===^=[ fd_confirm ]=========================================[=]
-static void fd_confirm(struct mkgui_ctx *dlg) {
+static uint32_t fd_confirm(struct mkgui_ctx *dlg) {
 	fd_build_results(dlg);
-	if(fd_result_count > 0) {
-		fd.confirmed = 1;
+	if(fd_result_count == 0) {
+		return 0;
+	}
+
+	if(fd.mode == 1 && fd_path_exists(fd_results[0])) {
+		const char *fname = strrchr(fd_results[0], '/');
+		if(!fname) {
+			fname = fd_results[0];
+		} else {
+			++fname;
+		}
+		char msg[512];
+		snprintf(msg, sizeof(msg), "Overwrite existing file %s?", fname);
+		if(!mkgui_confirm_dialog(dlg, "Confirm Save", msg)) {
+			return 0;
+		}
+	}
+
+	fd.confirmed = 1;
+	return 1;
+}
+
+// ---------------------------------------------------------------------------
+// Type-ahead search
+// ---------------------------------------------------------------------------
+
+// [=]===^=[ fd_typeahead_jump ]===================================[=]
+static void fd_typeahead_jump(struct mkgui_ctx *dlg) {
+	if(fd.typeahead_len == 0) {
+		return;
+	}
+	for(uint32_t i = 0; i < fd.entry_count; ++i) {
+		if(strcmp(fd.entries[i].name, "..") == 0) {
+			continue;
+		}
+		if(fd_strcasecmp(fd.entries[i].name, fd.typeahead) <= 0) {
+			uint32_t nlen = (uint32_t)strlen(fd.entries[i].name);
+			uint32_t match = 1;
+			for(uint32_t j = 0; j < fd.typeahead_len && j < nlen; ++j) {
+				int32_t ca = fd.typeahead[j];
+				int32_t cb = fd.entries[i].name[j];
+				if(ca >= 'A' && ca <= 'Z') { ca += 32; }
+				if(cb >= 'A' && cb <= 'Z') { cb += 32; }
+				if(ca != cb) {
+					match = 0;
+					break;
+				}
+			}
+			if(!match) {
+				continue;
+			}
+		} else {
+			uint32_t nlen = (uint32_t)strlen(fd.entries[i].name);
+			uint32_t match = 1;
+			for(uint32_t j = 0; j < fd.typeahead_len && j < nlen; ++j) {
+				int32_t ca = fd.typeahead[j];
+				int32_t cb = fd.entries[i].name[j];
+				if(ca >= 'A' && ca <= 'Z') { ca += 32; }
+				if(cb >= 'A' && cb <= 'Z') { cb += 32; }
+				if(ca != cb) {
+					match = 0;
+					break;
+				}
+			}
+			if(!match) {
+				continue;
+			}
+		}
+
+		struct mkgui_listview_data *lv = find_listv_data(dlg, FD_ID_FILES);
+		if(lv) {
+			lv->selected_row = (int32_t)i;
+			int32_t widx = find_widget_idx(dlg, FD_ID_FILES);
+			if(widx >= 0) {
+				int32_t view_h = dlg->rects[widx].h - MKGUI_ROW_HEIGHT - 2;
+				int32_t row_y = (int32_t)i * MKGUI_ROW_HEIGHT;
+				if(row_y < lv->scroll_y) {
+					lv->scroll_y = row_y;
+				} else if(row_y + MKGUI_ROW_HEIGHT > lv->scroll_y + view_h) {
+					lv->scroll_y = row_y + MKGUI_ROW_HEIGHT - view_h;
+				}
+			}
+			dirty_all(dlg);
+		}
+		return;
 	}
 }
 
@@ -481,6 +938,14 @@ static void fd_bookmark_row_cb(uint32_t row, uint32_t col, char *buf, uint32_t b
 			icon = "download";
 		} else if(strcmp(fd.bookmarks[row].label, "Documents") == 0) {
 			icon = "file-document-multiple";
+		} else {
+			uint32_t is_mount = 0;
+			if(strncmp(fd.bookmarks[row].path, "/media/", 7) == 0 || strncmp(fd.bookmarks[row].path, "/mnt/", 5) == 0) {
+				is_mount = 1;
+			}
+			if(is_mount) {
+				icon = "harddisk";
+			}
 		}
 		snprintf(buf, buf_size, "%s\t%s", icon, fd.bookmarks[row].label);
 	} else {
@@ -510,10 +975,87 @@ static void fd_file_row_cb(uint32_t row, uint32_t col, char *buf, uint32_t buf_s
 			}
 		} break;
 
+		case 2: {
+			if(e->mtime > 0) {
+				snprintf(buf, buf_size, "%lld", (long long)e->mtime);
+			} else {
+				buf[0] = '\0';
+			}
+		} break;
+
 		default: {
 			buf[0] = '\0';
 		} break;
 	}
+}
+
+// [=]===^=[ fd_update_name_from_selection ]=======================[=]
+static void fd_update_name_from_selection(struct mkgui_ctx *dlg) {
+	struct mkgui_listview_data *lv = find_listv_data(dlg, FD_ID_FILES);
+	if(!lv) {
+		return;
+	}
+
+	if(lv->multi_sel_count > 0) {
+		char combined[2048] = {0};
+		uint32_t pos = 0;
+		for(uint32_t i = 0; i < lv->multi_sel_count; ++i) {
+			int32_t row = lv->multi_sel[i];
+			if(row >= 0 && row < (int32_t)fd.entry_count && !fd.entries[row].is_dir) {
+				uint32_t has_space = (strchr(fd.entries[row].name, ' ') != NULL);
+				if(pos > 0 && pos < sizeof(combined) - 1) {
+					combined[pos++] = ' ';
+				}
+				if(has_space && pos < sizeof(combined) - 2) {
+					combined[pos++] = '"';
+				}
+				uint32_t nlen = (uint32_t)strlen(fd.entries[row].name);
+				for(uint32_t j = 0; j < nlen && pos < sizeof(combined) - 2; ++j) {
+					combined[pos++] = fd.entries[row].name[j];
+				}
+				if(has_space && pos < sizeof(combined) - 1) {
+					combined[pos++] = '"';
+				}
+			}
+		}
+		combined[pos] = '\0';
+		mkgui_input_set(dlg, FD_ID_NAME_INPUT, combined);
+
+	} else if(lv->selected_row >= 0 && lv->selected_row < (int32_t)fd.entry_count) {
+		struct fd_entry *e = &fd.entries[lv->selected_row];
+		if(!e->is_dir) {
+			mkgui_input_set(dlg, FD_ID_NAME_INPUT, e->name);
+		}
+	}
+}
+
+// [=]===^=[ fd_new_folder ]=======================================[=]
+static void fd_new_folder(struct mkgui_ctx *dlg) {
+	char name[256] = {0};
+	if(!mkgui_input_dialog(dlg, "New Folder", "Name:", "", name, sizeof(name))) {
+		return;
+	}
+	if(name[0] == '\0') {
+		return;
+	}
+
+	char fullpath[FD_PATH_SIZE];
+	snprintf(fullpath, sizeof(fullpath), "%s/%s", fd.path, name);
+
+#ifdef _WIN32
+	CreateDirectoryA(fullpath, NULL);
+#else
+	mkdir(fullpath, 0755);
+#endif
+
+	fd_scan_dir();
+	struct mkgui_listview_data *lv = find_listv_data(dlg, FD_ID_FILES);
+	if(lv) {
+		lv->row_count = fd.entry_count;
+		lv->selected_row = -1;
+		lv->scroll_y = 0;
+	}
+	dirty_all(dlg);
 }
 
 // ---------------------------------------------------------------------------
@@ -521,37 +1063,61 @@ static void fd_file_row_cb(uint32_t row, uint32_t col, char *buf, uint32_t buf_s
 // ---------------------------------------------------------------------------
 
 // [=]===^=[ fd_run_dialog ]=======================================[=]
-static uint32_t fd_run_dialog(struct mkgui_ctx *ctx, uint32_t mode, const char *default_name) {
+static uint32_t fd_run_dialog(struct mkgui_ctx *ctx, uint32_t mode, const struct mkgui_file_dialog_opts *opts) {
 	memset(&fd, 0, sizeof(fd));
 	fd.mode = mode;
-	fd.last_click_row = -1;
+	fd.sort_col = 0;
+	fd.sort_dir = 1;
 
-	snprintf(fd.path, sizeof(fd.path), "%s", fd_get_home());
+	if(opts && opts->start_path && opts->start_path[0] != '\0') {
+		snprintf(fd.path, sizeof(fd.path), "%s", opts->start_path);
+	} else {
+		snprintf(fd.path, sizeof(fd.path), "%s", fd_get_home());
+	}
+
+	if(opts && opts->filters && opts->filter_count > 0) {
+		fd.filters = opts->filters;
+		fd.filter_count = opts->filter_count;
+	}
 
 	fd_load_bookmarks();
+	fd_history_push(fd.path);
 	fd_scan_dir();
 
 	popup_destroy_all(ctx);
 
-	uint32_t name_flags = (mode == 0) ? MKGUI_HIDDEN : 0;
+	uint32_t multi = (mode == 0 && opts && opts->multi_select) ? MKGUI_MULTI_SELECT : 0;
 	const char *confirm_label = (mode == 0) ? "Open" : "Save";
 	const char *title = (mode == 0) ? "Open File" : "Save File";
 
+	uint32_t has_filters = (fd.filter_count > 0) ? 0 : MKGUI_HIDDEN;
+
 	struct mkgui_widget widgets[] = {
-		{ MKGUI_WINDOW,     FD_ID_WINDOW,      "",         "",             0,              0,  0, FD_INIT_W, FD_INIT_H, 0 },
-		{ MKGUI_LABEL,      FD_ID_PATH_LABEL,  "Path:",    "",             FD_ID_WINDOW,   8,  6,  40, 24, 0 },
-		{ MKGUI_INPUT,      FD_ID_PATH_INPUT,   "",         "",             FD_ID_WINDOW,  50,  4,  20, 24, MKGUI_ANCHOR_LEFT | MKGUI_ANCHOR_TOP | MKGUI_ANCHOR_RIGHT },
-		{ MKGUI_VSPLIT, FD_ID_SPLIT,     "",         "",             FD_ID_WINDOW,   0, 32,   0, FD_BOTTOM_H, MKGUI_ANCHOR_LEFT | MKGUI_ANCHOR_TOP | MKGUI_ANCHOR_RIGHT | MKGUI_ANCHOR_BOTTOM },
-		{ MKGUI_LISTVIEW,   FD_ID_BOOKMARKS,    "",         "",             FD_ID_SPLIT, 0,  0,   0,  0, MKGUI_REGION_LEFT },
-		{ MKGUI_LISTVIEW,   FD_ID_FILES,        "",         "",             FD_ID_SPLIT, 0,  0,   0,  0, MKGUI_REGION_RIGHT },
-		{ MKGUI_LABEL,      FD_ID_NAME_LABEL,  "File name:", "",           FD_ID_WINDOW,   8,  40, 70, 24, MKGUI_ANCHOR_BOTTOM | name_flags },
-		{ MKGUI_INPUT,      FD_ID_NAME_INPUT,   "",         "",             FD_ID_WINDOW,  80,  40, 110, 24, MKGUI_ANCHOR_LEFT | MKGUI_ANCHOR_BOTTOM | MKGUI_ANCHOR_RIGHT | name_flags },
-		{ MKGUI_BUTTON,     FD_ID_BTN_CONFIRM,  "",         "",             FD_ID_WINDOW, 100,   8, 80, 28, MKGUI_ANCHOR_BOTTOM | MKGUI_ANCHOR_RIGHT },
-		{ MKGUI_BUTTON,     FD_ID_BTN_CANCEL,  "Cancel",   "",             FD_ID_WINDOW,  12,   8, 80, 28, MKGUI_ANCHOR_BOTTOM | MKGUI_ANCHOR_RIGHT },
+		{ MKGUI_WINDOW,   FD_ID_WINDOW,       "",          "",                  0,              0,   0, FD_INIT_W, FD_INIT_H, 0 },
+
+		{ MKGUI_TOOLBAR,  FD_ID_TOOLBAR,       "",          "",                  FD_ID_WINDOW,   0,   0,   0,  FD_TOOLBAR_H, MKGUI_ANCHOR_LEFT | MKGUI_ANCHOR_TOP | MKGUI_ANCHOR_RIGHT },
+		{ MKGUI_BUTTON,   FD_ID_BTN_BACK,      "",          "arrow-left",        FD_ID_TOOLBAR,  0,   0,   0,   0, 0 },
+		{ MKGUI_BUTTON,   FD_ID_BTN_FWD,       "",          "arrow-right",       FD_ID_TOOLBAR,  0,   0,   0,   0, 0 },
+		{ MKGUI_BUTTON,   FD_ID_BTN_UP,        "",          "arrow-up",          FD_ID_TOOLBAR,  0,   0,   0,   0, 0 },
+		{ MKGUI_BUTTON,   FD_ID_BTN_NEWFOLDER, "",          "folder-plus",       FD_ID_TOOLBAR,  0,   0,   0,   0, MKGUI_TOOLBAR_SEP },
+
+		{ MKGUI_PATHBAR,  FD_ID_PATHBAR,       "",          "",                  FD_ID_WINDOW, 126,  2, 80, 24, MKGUI_ANCHOR_LEFT | MKGUI_ANCHOR_TOP | MKGUI_ANCHOR_RIGHT },
+		{ MKGUI_VSPLIT,   FD_ID_SPLIT,         "",          "",                  FD_ID_WINDOW,   0, 30,   0, FD_BOTTOM_H, MKGUI_ANCHOR_LEFT | MKGUI_ANCHOR_TOP | MKGUI_ANCHOR_RIGHT | MKGUI_ANCHOR_BOTTOM },
+		{ MKGUI_LISTVIEW, FD_ID_BOOKMARKS,     "",          "",                  FD_ID_SPLIT,    0,   0,   0,   0, MKGUI_REGION_LEFT },
+		{ MKGUI_LISTVIEW, FD_ID_FILES,         "",          "",                  FD_ID_SPLIT,    0,   0,   0,   0, MKGUI_REGION_RIGHT | multi },
+
+		{ MKGUI_LABEL,    FD_ID_NAME_LABEL,    "File name:", "",                 FD_ID_WINDOW,   8,  40, 70,  24, MKGUI_ANCHOR_BOTTOM },
+		{ MKGUI_INPUT,    FD_ID_NAME_INPUT,     "",          "",                  FD_ID_WINDOW,  80,  40, has_filters ? 8 : 240, 24, MKGUI_ANCHOR_LEFT | MKGUI_ANCHOR_BOTTOM | MKGUI_ANCHOR_RIGHT },
+		{ MKGUI_LABEL,    FD_ID_FILTER_LABEL,  "Filter:",   "",                  FD_ID_WINDOW, 184,  40, 45,  24, MKGUI_ANCHOR_BOTTOM | MKGUI_ANCHOR_RIGHT | has_filters },
+		{ MKGUI_DROPDOWN, FD_ID_FILTER_DROP,    "",          "",                  FD_ID_WINDOW,   8,  40, 170, 24, MKGUI_ANCHOR_BOTTOM | MKGUI_ANCHOR_RIGHT | has_filters },
+
+		{ MKGUI_CHECKBOX, FD_ID_CHK_HIDDEN,    "Show hidden", "",               FD_ID_WINDOW,   8,  10, 110, 24, MKGUI_ANCHOR_BOTTOM },
+		{ MKGUI_BUTTON,   FD_ID_BTN_CONFIRM,   "",            "",               FD_ID_WINDOW, 100,   8,  80, 28, MKGUI_ANCHOR_BOTTOM | MKGUI_ANCHOR_RIGHT },
+		{ MKGUI_BUTTON,   FD_ID_BTN_CANCEL,    "Cancel",      "",               FD_ID_WINDOW,  12,   8,  80, 28, MKGUI_ANCHOR_BOTTOM | MKGUI_ANCHOR_RIGHT },
 	};
 
 	strncpy(widgets[0].label, title, MKGUI_MAX_TEXT - 1);
-	strncpy(widgets[8].label, confirm_label, MKGUI_MAX_TEXT - 1);
+	strncpy(widgets[15].label, confirm_label, MKGUI_MAX_TEXT - 1);
 
 	uint32_t wcount = sizeof(widgets) / sizeof(widgets[0]);
 	struct mkgui_ctx *dlg = mkgui_create_child(ctx, widgets, wcount, title, FD_INIT_W, FD_INIT_H);
@@ -559,9 +1125,10 @@ static uint32_t fd_run_dialog(struct mkgui_ctx *ctx, uint32_t mode, const char *
 		return 0;
 	}
 
-	mkgui_input_set(dlg, FD_ID_PATH_INPUT, fd.path);
-	if(mode == 1 && default_name) {
-		mkgui_input_set(dlg, FD_ID_NAME_INPUT, default_name);
+	mkgui_pathbar_set(dlg, FD_ID_PATHBAR, fd.path);
+
+	if(mode == 1 && opts && opts->default_name) {
+		mkgui_input_set(dlg, FD_ID_NAME_INPUT, opts->default_name);
 	}
 
 	struct mkgui_column bm_cols[] = {
@@ -570,15 +1137,30 @@ static uint32_t fd_run_dialog(struct mkgui_ctx *ctx, uint32_t mode, const char *
 	mkgui_listview_setup(dlg, FD_ID_BOOKMARKS, fd.bookmark_count, 1, bm_cols, fd_bookmark_row_cb, NULL);
 
 	struct mkgui_column file_cols[] = {
-		{ "Name", 350, MKGUI_CELL_ICON_TEXT },
-		{ "Size", 100, MKGUI_CELL_SIZE },
+		{ "Name",     300, MKGUI_CELL_ICON_TEXT },
+		{ "Size",     100, MKGUI_CELL_SIZE },
+		{ "Modified", 150, MKGUI_CELL_DATE },
 	};
-	mkgui_listview_setup(dlg, FD_ID_FILES, fd.entry_count, 2, file_cols, fd_file_row_cb, NULL);
+	mkgui_listview_setup(dlg, FD_ID_FILES, fd.entry_count, 3, file_cols, fd_file_row_cb, NULL);
 
 	struct mkgui_split_data *sd = find_split_data(dlg, FD_ID_SPLIT);
 	if(sd) {
 		sd->ratio = 0.22f;
 	}
+
+	if(fd.filter_count > 0) {
+		const char *filter_labels[FD_MAX_FILTERS];
+		uint32_t fc = fd.filter_count < FD_MAX_FILTERS ? fd.filter_count : FD_MAX_FILTERS;
+		for(uint32_t i = 0; i < fc; ++i) {
+			filter_labels[i] = fd.filters[i].label;
+		}
+		mkgui_dropdown_setup(dlg, FD_ID_FILTER_DROP, filter_labels, fc);
+	}
+
+	mkgui_set_tooltip(dlg, FD_ID_BTN_BACK, "Back");
+	mkgui_set_tooltip(dlg, FD_ID_BTN_FWD, "Forward");
+	mkgui_set_tooltip(dlg, FD_ID_BTN_UP, "Parent directory");
+	mkgui_set_tooltip(dlg, FD_ID_BTN_NEWFOLDER, "New folder");
 
 	uint32_t running = 1;
 	struct mkgui_event ev;
@@ -594,25 +1176,143 @@ static uint32_t fd_run_dialog(struct mkgui_ctx *ctx, uint32_t mode, const char *
 						running = 0;
 
 					} else if(ev.id == FD_ID_BTN_CONFIRM) {
-						fd_confirm(dlg);
-						if(fd.confirmed) {
+						if(fd_confirm(dlg)) {
 							running = 0;
 						}
+
+					} else if(ev.id == FD_ID_BTN_BACK) {
+						fd_navigate_back(dlg);
+
+					} else if(ev.id == FD_ID_BTN_FWD) {
+						fd_navigate_fwd(dlg);
+
+					} else if(ev.id == FD_ID_BTN_UP) {
+						fd_navigate_up(dlg);
+
+					} else if(ev.id == FD_ID_BTN_NEWFOLDER) {
+						fd_new_folder(dlg);
+					}
+				} break;
+
+				case MKGUI_EVENT_CHECKBOX_CHANGED: {
+					if(ev.id == FD_ID_CHK_HIDDEN) {
+						fd.show_hidden = mkgui_checkbox_get(dlg, FD_ID_CHK_HIDDEN);
+						fd_scan_dir();
+						struct mkgui_listview_data *lv = find_listv_data(dlg, FD_ID_FILES);
+						if(lv) {
+							lv->row_count = fd.entry_count;
+							lv->selected_row = -1;
+							lv->scroll_y = 0;
+						}
+						dirty_all(dlg);
+					}
+				} break;
+
+				case MKGUI_EVENT_DROPDOWN_CHANGED: {
+					if(ev.id == FD_ID_FILTER_DROP) {
+						fd.active_filter = (uint32_t)ev.value;
+						fd_scan_dir();
+						struct mkgui_listview_data *lv = find_listv_data(dlg, FD_ID_FILES);
+						if(lv) {
+							lv->row_count = fd.entry_count;
+							lv->selected_row = -1;
+							lv->scroll_y = 0;
+						}
+						dirty_all(dlg);
+					}
+				} break;
+
+				case MKGUI_EVENT_PATHBAR_NAV: {
+					if(ev.id == FD_ID_PATHBAR) {
+						char seg_path[FD_PATH_SIZE];
+						mkgui_pathbar_get_segment_path(dlg, FD_ID_PATHBAR, (uint32_t)ev.value, seg_path, sizeof(seg_path));
+						if(seg_path[0] != '\0') {
+							fd_navigate(dlg, seg_path);
+						}
+					}
+				} break;
+
+				case MKGUI_EVENT_PATHBAR_SUBMIT: {
+					if(ev.id == FD_ID_PATHBAR) {
+						const char *new_path = mkgui_pathbar_get(dlg, FD_ID_PATHBAR);
+						fd_navigate(dlg, new_path);
+					}
+				} break;
+
+				case MKGUI_EVENT_LISTVIEW_SORT: {
+					if(ev.id == FD_ID_FILES) {
+						fd.sort_col = ev.col;
+						fd.sort_dir = ev.value;
+						fd_scan_dir();
+						struct mkgui_listview_data *lv = find_listv_data(dlg, FD_ID_FILES);
+						if(lv) {
+							lv->row_count = fd.entry_count;
+							lv->selected_row = -1;
+							lv->scroll_y = 0;
+						}
+						dirty_all(dlg);
 					}
 				} break;
 
 				case MKGUI_EVENT_KEY: {
 					if(ev.keysym == MKGUI_KEY_ESCAPE) {
-						running = 0;
+						if(fd.typeahead_len > 0) {
+							fd.typeahead_len = 0;
+							fd.typeahead[0] = '\0';
+						} else {
+							running = 0;
+						}
 
 					} else if(ev.keysym == MKGUI_KEY_RETURN) {
-						if(dlg->focus_id == FD_ID_PATH_INPUT) {
-							fd_navigate(dlg, mkgui_input_get(dlg, FD_ID_PATH_INPUT));
-						} else {
-							fd_confirm(dlg);
-							if(fd.confirmed) {
+						if(dlg->focus_id == FD_ID_NAME_INPUT) {
+							if(fd_confirm(dlg)) {
 								running = 0;
 							}
+						} else if(dlg->focus_id == FD_ID_FILES) {
+							struct mkgui_listview_data *lv = find_listv_data(dlg, FD_ID_FILES);
+							if(lv && lv->selected_row >= 0 && lv->selected_row < (int32_t)fd.entry_count) {
+								if(fd.entries[lv->selected_row].is_dir) {
+									fd_navigate_entry(dlg, lv->selected_row);
+								} else {
+									if(fd_confirm(dlg)) {
+										running = 0;
+									}
+								}
+							}
+						} else {
+							if(fd_confirm(dlg)) {
+								running = 0;
+							}
+						}
+
+					} else if(ev.keysym == MKGUI_KEY_BACKSPACE && dlg->focus_id == FD_ID_FILES) {
+						if(fd.typeahead_len > 0) {
+							--fd.typeahead_len;
+							fd.typeahead[fd.typeahead_len] = '\0';
+							fd.typeahead_time = mkgui_time_ms();
+							fd_typeahead_jump(dlg);
+						} else {
+							fd_navigate_up(dlg);
+						}
+
+					} else if(ev.keysym == 'l' && (ev.keymod & MKGUI_MOD_CONTROL)) {
+						struct mkgui_pathbar_data *pb = find_pathbar_data(dlg, FD_ID_PATHBAR);
+						if(pb && !pb->editing) {
+							dlg->focus_id = FD_ID_PATHBAR;
+							pathbar_enter_edit(pb);
+							dirty_all(dlg);
+						}
+
+					} else if(dlg->focus_id == FD_ID_FILES && ev.keysym >= 32 && ev.keysym < 127 && !(ev.keymod & MKGUI_MOD_CONTROL)) {
+						uint32_t now = mkgui_time_ms();
+						if(now - fd.typeahead_time > FD_TYPEAHEAD_TIMEOUT_MS) {
+							fd.typeahead_len = 0;
+						}
+						if(fd.typeahead_len < sizeof(fd.typeahead) - 1) {
+							fd.typeahead[fd.typeahead_len++] = (char)ev.keysym;
+							fd.typeahead[fd.typeahead_len] = '\0';
+							fd.typeahead_time = now;
+							fd_typeahead_jump(dlg);
 						}
 					}
 				} break;
@@ -624,22 +1324,37 @@ static uint32_t fd_run_dialog(struct mkgui_ctx *ctx, uint32_t mode, const char *
 						}
 
 					} else if(ev.id == FD_ID_FILES) {
-						uint32_t now = fd_get_time_ms();
-						uint32_t is_dblclick = (ev.value == fd.last_click_row && (now - fd.last_click_time) < FD_DBLCLICK_MS);
-						fd.last_click_row = ev.value;
-						fd.last_click_time = now;
-
-						if(is_dblclick && ev.value >= 0 && ev.value < (int32_t)fd.entry_count) {
-							if(fd.entries[ev.value].is_dir) {
-								fd_navigate_entry(dlg, ev.value);
-							} else {
-								fd_confirm(dlg);
-								if(fd.confirmed) {
-									running = 0;
-								}
+						if(ev.value >= 0 && ev.value < (int32_t)fd.entry_count) {
+							if(fd.mode == 0) {
+								fd_update_name_from_selection(dlg);
+							} else if(!fd.entries[ev.value].is_dir) {
+								mkgui_input_set(dlg, FD_ID_NAME_INPUT, fd.entries[ev.value].name);
 							}
-						} else if(fd.mode == 1 && ev.value >= 0 && ev.value < (int32_t)fd.entry_count && !fd.entries[ev.value].is_dir) {
-							mkgui_input_set(dlg, FD_ID_NAME_INPUT, fd.entries[ev.value].name);
+						}
+					}
+				} break;
+
+				case MKGUI_EVENT_LISTVIEW_DBLCLICK: {
+					if(ev.id == FD_ID_FILES && ev.value >= 0 && ev.value < (int32_t)fd.entry_count) {
+						if(fd.entries[ev.value].is_dir) {
+							fd_navigate_entry(dlg, ev.value);
+						} else {
+							if(fd.mode == 0) {
+								fd_update_name_from_selection(dlg);
+							} else {
+								mkgui_input_set(dlg, FD_ID_NAME_INPUT, fd.entries[ev.value].name);
+							}
+							if(fd_confirm(dlg)) {
+								running = 0;
+							}
+						}
+					}
+				} break;
+
+				case MKGUI_EVENT_INPUT_SUBMIT: {
+					if(ev.id == FD_ID_NAME_INPUT) {
+						if(fd_confirm(dlg)) {
+							running = 0;
 						}
 					}
 				} break;
@@ -661,13 +1376,13 @@ static uint32_t fd_run_dialog(struct mkgui_ctx *ctx, uint32_t mode, const char *
 // ---------------------------------------------------------------------------
 
 // [=]===^=[ mkgui_open_dialog ]==================================[=]
-static uint32_t mkgui_open_dialog(struct mkgui_ctx *ctx) {
-	return fd_run_dialog(ctx, 0, NULL);
+static uint32_t mkgui_open_dialog(struct mkgui_ctx *ctx, const struct mkgui_file_dialog_opts *opts) {
+	return fd_run_dialog(ctx, 0, opts);
 }
 
 // [=]===^=[ mkgui_save_dialog ]==================================[=]
-static uint32_t mkgui_save_dialog(struct mkgui_ctx *ctx, const char *default_name) {
-	return fd_run_dialog(ctx, 1, default_name);
+static uint32_t mkgui_save_dialog(struct mkgui_ctx *ctx, const struct mkgui_file_dialog_opts *opts) {
+	return fd_run_dialog(ctx, 1, opts);
 }
 
 // [=]===^=[ mkgui_dialog_path ]==================================[=]

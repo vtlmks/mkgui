@@ -468,7 +468,8 @@ int main(void) {
 						}
 
 					} else if(ev.id == ID_OPEN) {
-						uint32_t count = mkgui_open_dialog(ctx);
+						struct mkgui_file_dialog_opts open_opts = {0};
+						uint32_t count = mkgui_open_dialog(ctx, &open_opts);
 						if(count > 0) {
 							char buf[256];
 							snprintf(buf, sizeof(buf), "Opened %u file(s): %s", count, mkgui_dialog_path(ctx, 0));
@@ -476,7 +477,9 @@ int main(void) {
 						}
 
 					} else if(ev.id == ID_SAVE) {
-						if(mkgui_save_dialog(ctx, "untitled.txt")) {
+						struct mkgui_file_dialog_opts save_opts = {0};
+						save_opts.default_name = "untitled.txt";
+						if(mkgui_save_dialog(ctx, &save_opts)) {
 							char buf[256];
 							snprintf(buf, sizeof(buf), "Save to: %s", mkgui_dialog_path(ctx, 0));
 							mkgui_statusbar_set(ctx, ID_STATUSBAR, 0, buf);

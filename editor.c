@@ -412,8 +412,13 @@ static void ed_config_ensure_dir(void) {
 		}
 		snprintf(parent, sizeof(parent), "%s/.config", home);
 	}
+#ifdef _WIN32
+	CreateDirectoryA(parent, NULL);
+	CreateDirectoryA(dir, NULL);
+#else
 	mkdir(parent, 0755);
 	mkdir(dir, 0755);
+#endif
 }
 
 // [=]===^=[ ed_config_load ]======================================[=]
@@ -3026,7 +3031,15 @@ static void ed_remove_menu_item(struct mkgui_ctx *ctx) {
 // [=]===^=[ ed_save_project ]=====================================[=]
 static void ed_save_project(struct mkgui_ctx *ctx, uint32_t save_as) {
 	if(save_as || ed.project_path[0] == '\0') {
-		if(!mkgui_save_dialog(ctx, "untitled.mkgui")) {
+		struct mkgui_file_filter save_filters[] = {
+			{ "mkgui files", "*.mkgui" },
+			{ "All files", "*" },
+		};
+		struct mkgui_file_dialog_opts save_opts = {0};
+		save_opts.default_name = "untitled.mkgui";
+		save_opts.filters = save_filters;
+		save_opts.filter_count = 2;
+		if(!mkgui_save_dialog(ctx, &save_opts)) {
 			return;
 		}
 		const char *path = mkgui_dialog_path(ctx, 0);
@@ -3249,7 +3262,14 @@ static void ed_load_file(struct mkgui_ctx *ctx, const char *path) {
 
 // [=]===^=[ ed_load_project ]=====================================[=]
 static void ed_load_project(struct mkgui_ctx *ctx) {
-	if(!mkgui_open_dialog(ctx)) {
+	struct mkgui_file_filter open_filters[] = {
+		{ "mkgui files", "*.mkgui" },
+		{ "All files", "*" },
+	};
+	struct mkgui_file_dialog_opts open_opts = {0};
+	open_opts.filters = open_filters;
+	open_opts.filter_count = 2;
+	if(!mkgui_open_dialog(ctx, &open_opts)) {
 		return;
 	}
 	ed_load_file(ctx, mkgui_dialog_path(ctx, 0));
@@ -3309,7 +3329,15 @@ static const char *ed_type_name_upper(uint32_t type) {
 
 // [=]===^=[ ed_generate_code ]===================================[=]
 static void ed_generate_code(struct mkgui_ctx *ctx) {
-	if(!mkgui_save_dialog(ctx, "gui_app.c")) {
+	struct mkgui_file_filter gen_filters[] = {
+		{ "C source", "*.c" },
+		{ "All files", "*" },
+	};
+	struct mkgui_file_dialog_opts gen_opts = {0};
+	gen_opts.default_name = "gui_app.c";
+	gen_opts.filters = gen_filters;
+	gen_opts.filter_count = 2;
+	if(!mkgui_save_dialog(ctx, &gen_opts)) {
 		return;
 	}
 	const char *out_path = mkgui_dialog_path(ctx, 0);

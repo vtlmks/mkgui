@@ -939,31 +939,60 @@ if(mkgui_input_dialog(ctx, "New File", "File name:", "untitled.txt", name, sizeo
 
 mkgui includes built-in open and save file dialogs. Both are blocking (modal) -- they run a nested event loop and return when the user confirms or cancels.
 
+### Options struct
+
+```c
+struct mkgui_file_filter {
+    const char *label;        // "Images", "Source Files"
+    const char *pattern;      // "*.png;*.jpg;*.jpeg", "*.c;*.h"
+};
+
+struct mkgui_file_dialog_opts {
+    const char *start_path;                   // NULL = home directory
+    const struct mkgui_file_filter *filters;  // NULL = no filters
+    uint32_t filter_count;
+    const char *default_name;                 // save mode only, NULL = empty
+    uint32_t multi_select;                    // open mode only, 0 or 1
+};
+```
+
+Zero-init opts and only set the fields you need.
+
 ### Open dialog
 
 ```c
-uint32_t count = mkgui_open_dialog(ctx);
+struct mkgui_file_dialog_opts opts = {0};
+opts.multi_select = 1;
+uint32_t count = mkgui_open_dialog(ctx, &opts);
 for(uint32_t i = 0; i < count; ++i) {
     printf("Selected: %s\n", mkgui_dialog_path(ctx, i));
 }
 ```
 
-Returns the number of selected files (0 = cancelled). Supports multi-select with Ctrl+Click and Shift+Click.
+Returns the number of selected files (0 = cancelled). Set `opts.multi_select = 1` to enable Ctrl+Click and Shift+Click selection.
 
 ### Save dialog
 
 ```c
-if(mkgui_save_dialog(ctx, "untitled.txt")) {
+struct mkgui_file_dialog_opts opts = {0};
+opts.default_name = "untitled.txt";
+struct mkgui_file_filter filters[] = {
+    { "Text files", "*.txt" },
+    { "All files",  "*" },
+};
+opts.filters = filters;
+opts.filter_count = 2;
+if(mkgui_save_dialog(ctx, &opts)) {
     printf("Save to: %s\n", mkgui_dialog_path(ctx, 0));
 }
 ```
 
-Returns 1 if the user confirmed, 0 if cancelled. The second argument is the default filename (pre-selected in the input field).
+Returns 1 if the user confirmed, 0 if cancelled. If the user types a filename without an extension and a filter is active, the first extension from the active filter is appended automatically. If the target file already exists, an overwrite confirmation dialog is shown.
 
 ### Dialog window
 
 Dialogs open as separate, WM-decorated X11 windows (not overlays). They are:
-- **Resizable** -- drag the window border to see more sidebar entries or file list rows (minimum size 400x300, initial 720x500)
+- **Resizable** -- drag the window border to see more sidebar entries or file list rows (minimum size 400x300, initial 780x520)
 - **Movable** -- drag the title bar to reposition, e.g. to see the main window underneath when naming a file
 - **Modal** -- set as transient-for the main window; the main window does not accept input while the dialog is open
 - **Parent stays alive** -- the parent window continues to repaint and animate (spinners, progress bars, GL views) while the dialog is open
@@ -973,22 +1002,25 @@ The dialog window is centered on the parent window when opened.
 ### Dialog layout
 
 Both dialogs feature:
-- Path bar at top (editable, press Enter to navigate)
-- Left sidebar with shortcuts: Home, Desktop, Documents, Downloads, plus bookmarks from `~/.config/gtk-3.0/bookmarks`
-- File list on the right with Name and Size columns
+- Toolbar with back/forward/up navigation buttons
+- Breadcrumb path bar (MKGUI_PATHBAR) showing clickable directory segments; click to navigate, click background to type a path directly
+- Left sidebar with shortcuts: Home, Desktop, Documents, Downloads, GTK bookmarks, and mounted volumes from `/media/` and `/mnt/`
+- File list on the right with Name, Size, and Date Modified columns (sortable by clicking headers)
+- File type filter dropdown (when filters are provided)
+- Show hidden files checkbox
 - Scrollable file list with mouse wheel
 - Double-click directories to enter them, double-click files to select and confirm
-- Escape to cancel, Enter to confirm
-- Tab to cycle focus between path bar, filename input (save), and file list
-- Ctrl+A to select all files (open dialog)
+- Type-ahead search: typing while the file list is focused jumps to the first matching file (accumulating prefix, backspace to correct, escape to reset)
+- Keyboard: Escape to cancel, Enter to confirm, Ctrl+L to focus path bar, Backspace to go up a directory
+- Tab to cycle focus between path bar, filename input (save), filter dropdown, and file list
 
-The save dialog adds a "File name:" input row at the bottom. Clicking a file in the list fills the filename field automatically.
+The save dialog adds a "File name:" input row and a "New Folder" button at the bottom. Clicking a file in the list fills the filename field automatically.
 
 ### API reference
 
 ```c
-uint32_t mkgui_open_dialog(struct mkgui_ctx *ctx);
-uint32_t mkgui_save_dialog(struct mkgui_ctx *ctx, const char *default_name);
+uint32_t mkgui_open_dialog(struct mkgui_ctx *ctx, const struct mkgui_file_dialog_opts *opts);
+uint32_t mkgui_save_dialog(struct mkgui_ctx *ctx, const struct mkgui_file_dialog_opts *opts);
 const char *mkgui_dialog_path(struct mkgui_ctx *ctx, uint32_t index);
 ```
 

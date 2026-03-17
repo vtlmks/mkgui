@@ -187,6 +187,7 @@ enum {
 	MKGUI_HBOX,
 	MKGUI_FORM,
 	MKGUI_SPACER,
+	MKGUI_PATHBAR,
 };
 
 // ---------------------------------------------------------------------------
@@ -267,6 +268,8 @@ enum {
 	MKGUI_EVENT_DRAG_END,
 	MKGUI_EVENT_BUTTON_DBLCLICK,
 	MKGUI_EVENT_TAB_CLOSE,
+	MKGUI_EVENT_PATHBAR_NAV,
+	MKGUI_EVENT_PATHBAR_SUBMIT,
 };
 
 // ---------------------------------------------------------------------------
@@ -510,6 +513,27 @@ struct mkgui_canvas_data {
 	void *userdata;
 };
 
+#define MKGUI_PATHBAR_MAX_SEGS 64
+
+struct mkgui_pathbar_data {
+	uint32_t widget_id;
+	char path[4096];
+	uint32_t editing;
+	uint32_t segment_count;
+	struct mkgui_pathbar_seg {
+		uint32_t offset;
+		uint32_t len;
+		int32_t x;
+		int32_t w;
+	} segments[MKGUI_PATHBAR_MAX_SEGS];
+	int32_t hover_seg;
+
+	char edit_buf[4096];
+	uint32_t edit_cursor;
+	uint32_t edit_sel_start;
+	uint32_t edit_sel_end;
+};
+
 struct mkgui_glyph {
 	int32_t width;
 	int32_t height;
@@ -626,6 +650,8 @@ struct mkgui_ctx {
 	uint32_t glview_count;
 	struct mkgui_canvas_data canvases[16];
 	uint32_t canvas_count;
+	struct mkgui_pathbar_data pathbars[8];
+	uint32_t pathbar_count;
 
 	struct mkgui_popup popups[MKGUI_MAX_POPUPS];
 	uint32_t popup_count;
@@ -1344,6 +1370,16 @@ static struct mkgui_canvas_data *find_canvas_data(struct mkgui_ctx *ctx, uint32_
 	return NULL;
 }
 
+// [=]===^=[ find_pathbar_data ]=================================[=]
+static struct mkgui_pathbar_data *find_pathbar_data(struct mkgui_ctx *ctx, uint32_t widget_id) {
+	for(uint32_t i = 0; i < ctx->pathbar_count; ++i) {
+		if(ctx->pathbars[i].widget_id == widget_id) {
+			return &ctx->pathbars[i];
+		}
+	}
+	return NULL;
+}
+
 // ---------------------------------------------------------------------------
 // Widget visibility
 // ---------------------------------------------------------------------------
@@ -1401,7 +1437,8 @@ static uint32_t is_focusable(struct mkgui_widget *w) {
 		case MKGUI_RADIO:
 		case MKGUI_TEXTAREA:
 		case MKGUI_ITEMVIEW:
-		case MKGUI_TABS: {
+		case MKGUI_TABS:
+		case MKGUI_PATHBAR: {
 			return 1;
 		} break;
 
@@ -2162,6 +2199,7 @@ static void draw_icon_popup(struct mkgui_popup *p, struct mkgui_icon *icon, int3
 #include "mkgui_treeview.c"
 #include "mkgui_statusbar.c"
 #include "mkgui_toolbar.c"
+#include "mkgui_pathbar.c"
 #include "mkgui_spinbox.c"
 #include "mkgui_progress.c"
 #include "mkgui_textarea.c"
@@ -2281,6 +2319,10 @@ static void render_widget(struct mkgui_ctx *ctx, uint32_t idx) {
 
 		case MKGUI_CANVAS: {
 			render_canvas(ctx, idx);
+		} break;
+
+		case MKGUI_PATHBAR: {
+			render_pathbar(ctx, idx);
 		} break;
 
 		case MKGUI_VBOX:
@@ -2542,6 +2584,15 @@ static void init_aux_data(struct mkgui_ctx *ctx) {
 					struct mkgui_canvas_data *cd = &ctx->canvases[ctx->canvas_count++];
 					memset(cd, 0, sizeof(*cd));
 					cd->widget_id = w->id;
+				}
+			} break;
+
+			case MKGUI_PATHBAR: {
+				if(ctx->pathbar_count < 8) {
+					struct mkgui_pathbar_data *pb = &ctx->pathbars[ctx->pathbar_count++];
+					memset(pb, 0, sizeof(*pb));
+					pb->widget_id = w->id;
+					pb->hover_seg = -1;
 				}
 			} break;
 
@@ -3089,6 +3140,16 @@ static uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 						}
 					}
 				}
+				if(hi >= 0 && ctx->widgets[hi].type == MKGUI_PATHBAR) {
+					struct mkgui_pathbar_data *pb = find_pathbar_data(ctx, ctx->widgets[hi].id);
+					if(pb && !pb->editing) {
+						int32_t seg = pathbar_segment_hit(pb, ctx->rects[hi].x, ctx->mouse_x);
+						if(seg != pb->hover_seg) {
+							pb->hover_seg = seg;
+							dirty_widget(ctx, (uint32_t)hi);
+						}
+					}
+				}
 				for(uint32_t tvi = 0; tvi < ctx->treeview_count; ++tvi) {
 					struct mkgui_treeview_data *tv = &ctx->treeviews[tvi];
 					if(tv->drag_source >= 0 && ctx->press_id == tv->widget_id) {
@@ -3328,6 +3389,26 @@ static uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 							}
 						}
 
+					} else if(hi >= 0 && ctx->widgets[hi].type == MKGUI_DROPDOWN) {
+						struct mkgui_dropdown_data *dd = find_dropdown_data(ctx, ctx->widgets[hi].id);
+						if(dd && dd->item_count > 0) {
+							int32_t sel = dd->selected + (pev.button == 4 ? -1 : 1);
+							if(sel < 0) {
+								sel = 0;
+							}
+							if(sel >= (int32_t)dd->item_count) {
+								sel = (int32_t)dd->item_count - 1;
+							}
+							if(sel != dd->selected) {
+								dd->selected = sel;
+								dirty_all(ctx);
+								ev->type = MKGUI_EVENT_DROPDOWN_CHANGED;
+								ev->id = ctx->widgets[hi].id;
+								ev->value = sel;
+								return 1;
+							}
+						}
+
 					} else if(hi >= 0 && ctx->widgets[hi].type == MKGUI_SLIDER) {
 						struct mkgui_slider_data *sd = find_slider_data(ctx, ctx->widgets[hi].id);
 						if(sd) {
@@ -3510,10 +3591,12 @@ static uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 
 					if(is_focusable(hw)) {
 						spinbox_focus_lost(ctx);
+					pathbar_focus_lost(ctx);
 						ctx->focus_id = hw->id;
 
 					} else {
 						spinbox_focus_lost(ctx);
+					pathbar_focus_lost(ctx);
 						ctx->focus_id = 0;
 					}
 
@@ -3701,6 +3784,12 @@ static uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 						}
 					}
 
+					if(hw->type == MKGUI_PATHBAR) {
+						if(handle_pathbar_click(ctx, ev, (uint32_t)hi, ctx->mouse_x, ctx->mouse_y)) {
+							return 1;
+						}
+					}
+
 					if(hw->type == MKGUI_MENUITEM) {
 						struct mkgui_widget *parent = find_widget(ctx, hw->parent_id);
 						if(parent && parent->type == MKGUI_MENU) {
@@ -3799,6 +3888,7 @@ static uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 
 				} else {
 					spinbox_focus_lost(ctx);
+					pathbar_focus_lost(ctx);
 					ctx->focus_id = 0;
 				}
 			} break;
@@ -4017,6 +4107,7 @@ static uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 						}
 						if(widget_visible(ctx, idx) && is_focusable(&ctx->widgets[idx])) {
 							spinbox_focus_lost(ctx);
+					pathbar_focus_lost(ctx);
 							ctx->focus_id = ctx->widgets[idx].id;
 							dirty_all(ctx);
 							break;
@@ -4248,6 +4339,12 @@ static uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 								}
 							} break;
 
+							case MKGUI_PATHBAR: {
+								if(handle_pathbar_key(ctx, ev, ks, pev.keymod, pev.text, pev.text_len)) {
+									return 1;
+								}
+							} break;
+
 							default: {
 							} break;
 						}
@@ -4272,6 +4369,12 @@ static uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 					if(!has_child_popup) {
 						ctx->popups[popup_idx].hover_item = -1;
 						ctx->popups[popup_idx].dirty = 1;
+					}
+				}
+				for(uint32_t pbi = 0; pbi < ctx->pathbar_count; ++pbi) {
+					if(ctx->pathbars[pbi].hover_seg >= 0) {
+						ctx->pathbars[pbi].hover_seg = -1;
+						dirty_widget_id(ctx, ctx->pathbars[pbi].widget_id);
 					}
 				}
 			} break;
