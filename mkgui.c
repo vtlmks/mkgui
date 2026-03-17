@@ -220,6 +220,11 @@ enum {
 	MKGUI_NO_PAD        = (1 << 22),
 	MKGUI_TAB_CLOSABLE  = (1 << 23),
 	MKGUI_MULTI_SELECT  = (1 << 24),
+	MKGUI_ALIGN_START   = (1 << 25),
+	MKGUI_ALIGN_CENTER  = (2 << 25),
+	MKGUI_ALIGN_END     = (3 << 25),
+	MKGUI_ALIGN_MASK    = (3 << 25),
+	MKGUI_FIXED         = (1 << 27),
 };
 
 // ---------------------------------------------------------------------------
@@ -295,6 +300,7 @@ struct mkgui_widget {
 	uint32_t parent_id;
 	int32_t x, y, w, h;
 	uint32_t flags;
+	uint32_t weight;
 };
 
 struct mkgui_ctx;
@@ -1723,6 +1729,82 @@ static void layout_child_area(struct mkgui_ctx *ctx, uint32_t pidx, uint32_t cid
 	}
 }
 
+// [=]===^=[ measure_container ]===================================[=]
+static int32_t measure_container(struct mkgui_ctx *ctx, uint32_t idx, uint32_t axis) {
+	struct mkgui_widget *w = &ctx->widgets[idx];
+	uint32_t is_vbox = (w->type == MKGUI_VBOX);
+	uint32_t is_hbox = (w->type == MKGUI_HBOX);
+	uint32_t is_form = (w->type == MKGUI_FORM);
+	if(!is_vbox && !is_hbox && !is_form) {
+		return 0;
+	}
+
+	if(is_form) {
+		uint32_t pair_count = 0;
+		for(uint32_t j = layout_first_child[idx]; j < ctx->widget_count; j = layout_next_sibling[j]) {
+			if(!(ctx->widgets[j].flags & MKGUI_HIDDEN)) {
+				++pair_count;
+			}
+		}
+		uint32_t rows = (pair_count + 1) / 2;
+		int32_t h = (int32_t)rows * 24 + (rows > 1 ? (int32_t)(rows - 1) * MKGUI_BOX_GAP : 0);
+		return h;
+	}
+
+	int32_t main_total = 0;
+	int32_t cross_max = 0;
+	uint32_t visible = 0;
+	for(uint32_t j = layout_first_child[idx]; j < ctx->widget_count; j = layout_next_sibling[j]) {
+		if(ctx->widgets[j].flags & MKGUI_HIDDEN) {
+			continue;
+		}
+		++visible;
+		int32_t child_main;
+		int32_t child_cross;
+		if(is_vbox) {
+			child_main = ctx->widgets[j].h;
+			child_cross = ctx->widgets[j].w;
+		} else {
+			child_main = ctx->widgets[j].w;
+			child_cross = ctx->widgets[j].h;
+		}
+		uint32_t ct = ctx->widgets[j].type;
+		if(child_main == 0 && (ctx->widgets[j].flags & MKGUI_FIXED) && (ct == MKGUI_VBOX || ct == MKGUI_HBOX || ct == MKGUI_FORM)) {
+			child_main = measure_container(ctx, j, is_vbox ? 1 : 0);
+		}
+		main_total += child_main;
+		if(child_cross > cross_max) {
+			cross_max = child_cross;
+		}
+	}
+	int32_t gap_total = visible > 1 ? (int32_t)(visible - 1) * MKGUI_BOX_GAP : 0;
+	main_total += gap_total;
+
+	uint32_t has_pad = 0;
+	if(!(w->flags & MKGUI_NO_PAD)) {
+		uint32_t gpidx = layout_parent[idx];
+		uint32_t nested = 0;
+		if(gpidx < ctx->widget_count) {
+			uint32_t gpt = ctx->widgets[gpidx].type;
+			if(gpt == MKGUI_VBOX || gpt == MKGUI_HBOX || gpt == MKGUI_FORM || gpt == MKGUI_GROUP || gpt == MKGUI_TABS) {
+				nested = 1;
+			}
+		}
+		if(!nested || (w->flags & MKGUI_PANEL_BORDER)) {
+			has_pad = 1;
+		}
+	}
+	if(has_pad) {
+		main_total += MKGUI_BOX_PAD * 2;
+		cross_max += MKGUI_BOX_PAD * 2;
+	}
+
+	if(axis == 0) {
+		return is_vbox ? cross_max : main_total;
+	}
+	return is_vbox ? main_total : cross_max;
+}
+
 // [=]===^=[ layout_node ]========================================[=]
 static void layout_node(struct mkgui_ctx *ctx, uint32_t idx) {
 	struct mkgui_widget *w = &ctx->widgets[idx];
@@ -1812,99 +1894,169 @@ static void layout_node(struct mkgui_ctx *ctx, uint32_t idx) {
 			uint32_t scrollable = (w->flags & MKGUI_SCROLL) ? 1 : 0;
 			struct mkgui_box_scroll *bs = scrollable ? find_box_scroll(ctx, w->id) : NULL;
 			int32_t fixed_total = 0;
-			uint32_t flex_count = 0;
+			int32_t min_total = 0;
+			uint32_t weight_total = 0;
 			for(uint32_t j = layout_first_child[idx]; j < ctx->widget_count; j = layout_next_sibling[j]) {
-				if(!(ctx->widgets[j].flags & MKGUI_HIDDEN)) {
-					if(ctx->widgets[j].h > 0) {
-						fixed_total += ctx->widgets[j].h;
-					} else {
-						++flex_count;
+				if(ctx->widgets[j].flags & MKGUI_HIDDEN) {
+					continue;
+				}
+				if(ctx->widgets[j].flags & MKGUI_FIXED) {
+					int32_t fh = ctx->widgets[j].h;
+					uint32_t ct = ctx->widgets[j].type;
+					if(fh == 0 && (ct == MKGUI_VBOX || ct == MKGUI_HBOX || ct == MKGUI_FORM)) {
+						fh = measure_container(ctx, j, 1);
 					}
+					fixed_total += fh;
+				} else {
+					uint32_t ew = ctx->widgets[j].weight > 0 ? ctx->widgets[j].weight : 1;
+					min_total += ctx->widgets[j].h;
+					weight_total += ew;
 				}
 			}
 			int32_t gap_total = child_count > 1 ? (int32_t)(child_count - 1) * MKGUI_BOX_GAP : 0;
-			uint32_t needs_scroll = scrollable && (fixed_total + gap_total > ph);
+			int32_t content_h = fixed_total + min_total + gap_total;
+			uint32_t needs_scroll = scrollable && (content_h > ph);
 			if(needs_scroll) {
 				pw -= MKGUI_SCROLLBAR_W;
 			}
 			if(bs) {
-				bs->content_h = fixed_total + gap_total;
+				bs->content_h = content_h;
 				if(box_has_pad) {
 					bs->content_h += MKGUI_BOX_PAD * 2;
 				}
 			}
-			int32_t remaining = ph - fixed_total - gap_total;
+			int32_t remaining = ph - fixed_total - min_total - gap_total;
 			if(remaining < 0) {
 				remaining = 0;
 			}
-			int32_t flex_h = needs_scroll ? 0 : (flex_count > 0 ? remaining / (int32_t)flex_count : 0);
-			int32_t vflex_rem = (!needs_scroll && flex_count > 0) ? (remaining - flex_h * (int32_t)flex_count) : 0;
+			if(needs_scroll) {
+				remaining = 0;
+			}
 			int32_t scroll_off = (bs && needs_scroll) ? bs->scroll_y : 0;
-			uint32_t vflex_idx = 0;
+			uint32_t wdist = 0;
 			int32_t cy = py - scroll_off;
 			for(uint32_t j = layout_first_child[idx]; j < ctx->widget_count; j = layout_next_sibling[j]) {
-				if(!(ctx->widgets[j].flags & MKGUI_HIDDEN)) {
-					int32_t ch;
-					if(ctx->widgets[j].h > 0) {
-						ch = ctx->widgets[j].h;
-					} else {
-						ch = flex_h + ((int32_t)vflex_idx < vflex_rem ? 1 : 0);
-						++vflex_idx;
-					}
-					ctx->rects[j].x = px;
-					ctx->rects[j].y = cy;
-					ctx->rects[j].w = pw;
-					ctx->rects[j].h = ch;
-					cy += ch + MKGUI_BOX_GAP;
+				if(ctx->widgets[j].flags & MKGUI_HIDDEN) {
+					continue;
 				}
+				int32_t ch;
+				if(ctx->widgets[j].flags & MKGUI_FIXED) {
+					ch = ctx->widgets[j].h;
+					uint32_t ct = ctx->widgets[j].type;
+					if(ch == 0 && (ct == MKGUI_VBOX || ct == MKGUI_HBOX || ct == MKGUI_FORM)) {
+						ch = measure_container(ctx, j, 1);
+					}
+				} else {
+					uint32_t wt = ctx->widgets[j].weight > 0 ? ctx->widgets[j].weight : 1;
+					ch = ctx->widgets[j].h + (weight_total > 0 ? (int32_t)(remaining * wt / weight_total) : 0);
+					uint32_t extra = wdist + wt * (uint32_t)(remaining % (int32_t)weight_total);
+					if(extra >= weight_total && weight_total > 0) {
+						++ch;
+					}
+					wdist = extra % weight_total;
+				}
+				int32_t cx_child = px;
+				int32_t cw_child = pw;
+				uint32_t align = ctx->widgets[j].flags & MKGUI_ALIGN_MASK;
+				if(align && ctx->widgets[j].w > 0) {
+					if(align == MKGUI_ALIGN_START) {
+						cw_child = ctx->widgets[j].w;
+					} else if(align == MKGUI_ALIGN_CENTER) {
+						cw_child = ctx->widgets[j].w;
+						cx_child = px + (pw - cw_child) / 2;
+					} else if(align == MKGUI_ALIGN_END) {
+						cw_child = ctx->widgets[j].w;
+						cx_child = px + pw - cw_child;
+					}
+				}
+				ctx->rects[j].x = cx_child;
+				ctx->rects[j].y = cy;
+				ctx->rects[j].w = cw_child;
+				ctx->rects[j].h = ch;
+				cy += ch + MKGUI_BOX_GAP;
 			}
 
 		} else if(w->type == MKGUI_HBOX) {
 			uint32_t scrollable = (w->flags & MKGUI_SCROLL) ? 1 : 0;
 			struct mkgui_box_scroll *bs = scrollable ? find_box_scroll(ctx, w->id) : NULL;
 			int32_t fixed_total = 0;
-			uint32_t flex_count = 0;
+			int32_t min_total = 0;
+			uint32_t weight_total = 0;
 			for(uint32_t j = layout_first_child[idx]; j < ctx->widget_count; j = layout_next_sibling[j]) {
-				if(!(ctx->widgets[j].flags & MKGUI_HIDDEN)) {
-					if(ctx->widgets[j].w > 0) {
-						fixed_total += ctx->widgets[j].w;
-					} else {
-						++flex_count;
+				if(ctx->widgets[j].flags & MKGUI_HIDDEN) {
+					continue;
+				}
+				if(ctx->widgets[j].flags & MKGUI_FIXED) {
+					int32_t fw = ctx->widgets[j].w;
+					uint32_t ct = ctx->widgets[j].type;
+					if(fw == 0 && (ct == MKGUI_VBOX || ct == MKGUI_HBOX || ct == MKGUI_FORM)) {
+						fw = measure_container(ctx, j, 0);
 					}
+					fixed_total += fw;
+				} else {
+					uint32_t ew = ctx->widgets[j].weight > 0 ? ctx->widgets[j].weight : 1;
+					min_total += ctx->widgets[j].w;
+					weight_total += ew;
 				}
 			}
 			int32_t gap_total = child_count > 1 ? (int32_t)(child_count - 1) * MKGUI_BOX_GAP : 0;
-			uint32_t needs_scroll = scrollable && (fixed_total + gap_total > pw);
+			int32_t content_w = fixed_total + min_total + gap_total;
+			uint32_t needs_scroll = scrollable && (content_w > pw);
 			if(needs_scroll) {
 				ph -= MKGUI_SCROLLBAR_W;
 			}
 			if(bs) {
-				bs->content_w = fixed_total + gap_total;
+				bs->content_w = content_w;
 			}
-			int32_t remaining = pw - fixed_total - gap_total;
+			int32_t remaining = pw - fixed_total - min_total - gap_total;
 			if(remaining < 0) {
 				remaining = 0;
 			}
-			int32_t flex_w = needs_scroll ? 0 : (flex_count > 0 ? remaining / (int32_t)flex_count : 0);
-			int32_t flex_rem = (!needs_scroll && flex_count > 0) ? (remaining - flex_w * (int32_t)flex_count) : 0;
+			if(needs_scroll) {
+				remaining = 0;
+			}
 			int32_t scroll_off = (bs && needs_scroll) ? bs->scroll_x : 0;
-			uint32_t flex_idx = 0;
+			uint32_t wdist = 0;
 			int32_t cx = px - scroll_off;
 			for(uint32_t j = layout_first_child[idx]; j < ctx->widget_count; j = layout_next_sibling[j]) {
-				if(!(ctx->widgets[j].flags & MKGUI_HIDDEN)) {
-					int32_t cw;
-					if(ctx->widgets[j].w > 0) {
-						cw = ctx->widgets[j].w;
-					} else {
-						cw = flex_w + ((int32_t)flex_idx < flex_rem ? 1 : 0);
-						++flex_idx;
-					}
-					ctx->rects[j].x = cx;
-					ctx->rects[j].y = py;
-					ctx->rects[j].w = cw;
-					ctx->rects[j].h = ph;
-					cx += cw + MKGUI_BOX_GAP;
+				if(ctx->widgets[j].flags & MKGUI_HIDDEN) {
+					continue;
 				}
+				int32_t cw;
+				if(ctx->widgets[j].flags & MKGUI_FIXED) {
+					cw = ctx->widgets[j].w;
+					uint32_t ct = ctx->widgets[j].type;
+					if(cw == 0 && (ct == MKGUI_VBOX || ct == MKGUI_HBOX || ct == MKGUI_FORM)) {
+						cw = measure_container(ctx, j, 0);
+					}
+				} else {
+					uint32_t wt = ctx->widgets[j].weight > 0 ? ctx->widgets[j].weight : 1;
+					cw = ctx->widgets[j].w + (weight_total > 0 ? (int32_t)(remaining * wt / weight_total) : 0);
+					uint32_t extra = wdist + wt * (uint32_t)(remaining % (int32_t)weight_total);
+					if(extra >= weight_total && weight_total > 0) {
+						++cw;
+					}
+					wdist = extra % weight_total;
+				}
+				int32_t cy_child = py;
+				int32_t ch_child = ph;
+				uint32_t align = ctx->widgets[j].flags & MKGUI_ALIGN_MASK;
+				if(align && ctx->widgets[j].h > 0) {
+					if(align == MKGUI_ALIGN_START) {
+						ch_child = ctx->widgets[j].h;
+					} else if(align == MKGUI_ALIGN_CENTER) {
+						ch_child = ctx->widgets[j].h;
+						cy_child = py + (ph - ch_child) / 2;
+					} else if(align == MKGUI_ALIGN_END) {
+						ch_child = ctx->widgets[j].h;
+						cy_child = py + ph - ch_child;
+					}
+				}
+				ctx->rects[j].x = cx;
+				ctx->rects[j].y = cy_child;
+				ctx->rects[j].w = cw;
+				ctx->rects[j].h = ch_child;
+				cx += cw + MKGUI_BOX_GAP;
 			}
 
 		} else {
@@ -2205,6 +2357,7 @@ static void draw_icon_popup(struct mkgui_popup *p, struct mkgui_icon *icon, int3
 #include "mkgui_textarea.c"
 #include "mkgui_group.c"
 #include "mkgui_panel.c"
+#include "mkgui_spacer.c"
 #include "mkgui_spinner.c"
 #include "mkgui_itemview.c"
 #include "mkgui_scrollbar.c"
@@ -2679,6 +2832,15 @@ static void mkgui_set_theme(struct mkgui_ctx *ctx, struct mkgui_theme theme) {
 	icon_text_color = theme.text & 0x00ffffff;
 	icon_reload_all();
 	dirty_all(ctx);
+}
+
+// [=]===^=[ mkgui_set_weight ]===================================[=]
+static void mkgui_set_weight(struct mkgui_ctx *ctx, uint32_t id, uint32_t weight) {
+	struct mkgui_widget *w = find_widget(ctx, id);
+	if(w) {
+		w->weight = weight;
+		dirty_all(ctx);
+	}
 }
 
 // [=]===^=[ mkgui_destroy ]=====================================[=]

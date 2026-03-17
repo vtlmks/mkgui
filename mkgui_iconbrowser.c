@@ -98,13 +98,13 @@ static uint32_t mkgui_icon_browser(struct mkgui_ctx *ctx, char *out, uint32_t ou
 	uint32_t wcount = 3 + tab_count;
 	struct mkgui_widget widgets[3 + IB_CAT_COUNT];
 
-	widgets[0] = (struct mkgui_widget){ MKGUI_WINDOW, IB_ID_WINDOW, "Icon Browser", "", 0, 0, 0, IB_WIN_W, IB_WIN_H, 0 };
-	widgets[1] = (struct mkgui_widget){ MKGUI_TABS, IB_ID_TABS, "", "", IB_ID_WINDOW, 0, 0, 0, 0, MKGUI_ANCHOR_LEFT | MKGUI_ANCHOR_TOP | MKGUI_ANCHOR_RIGHT | MKGUI_ANCHOR_BOTTOM };
+	widgets[0] = (struct mkgui_widget){ MKGUI_WINDOW, IB_ID_WINDOW, "Icon Browser", "", 0, 0, 0, IB_WIN_W, IB_WIN_H, 0, 0 };
+	widgets[1] = (struct mkgui_widget){ MKGUI_TABS, IB_ID_TABS, "", "", IB_ID_WINDOW, 0, 0, 0, 0, MKGUI_ANCHOR_LEFT | MKGUI_ANCHOR_TOP | MKGUI_ANCHOR_RIGHT | MKGUI_ANCHOR_BOTTOM, 0 };
 	for(uint32_t i = 0; i < tab_count; ++i) {
-		widgets[2 + i] = (struct mkgui_widget){ MKGUI_TAB, IB_ID_TAB_BASE + i, "", "", IB_ID_TABS, 0, 0, 0, 0, 0 };
+		widgets[2 + i] = (struct mkgui_widget){ MKGUI_TAB, IB_ID_TAB_BASE + i, "", "", IB_ID_TABS, 0, 0, 0, 0, 0, 0 };
 		strncpy(widgets[2 + i].label, ib_categories[i], MKGUI_MAX_TEXT - 1);
 	}
-	widgets[2 + tab_count] = (struct mkgui_widget){ MKGUI_ITEMVIEW, IB_ID_ITEMVIEW, "", "", IB_ID_TAB_BASE, 0, 0, 0, 0, MKGUI_ANCHOR_LEFT | MKGUI_ANCHOR_TOP | MKGUI_ANCHOR_RIGHT | MKGUI_ANCHOR_BOTTOM };
+	widgets[2 + tab_count] = (struct mkgui_widget){ MKGUI_ITEMVIEW, IB_ID_ITEMVIEW, "", "", IB_ID_TAB_BASE, 0, 0, 0, 0, MKGUI_ANCHOR_LEFT | MKGUI_ANCHOR_TOP | MKGUI_ANCHOR_RIGHT | MKGUI_ANCHOR_BOTTOM, 0 };
 
 	struct mkgui_ctx *dlg = mkgui_create_child(ctx, widgets, wcount, "Icon Browser", IB_WIN_W, IB_WIN_H);
 	if(!dlg) {

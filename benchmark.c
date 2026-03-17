@@ -38,35 +38,35 @@ int32_t main(int32_t argc, char **argv) {
 	struct mkgui_widget widgets[MKGUI_MAX_WIDGETS];
 	memset(widgets, 0, sizeof(widgets));
 
-	widgets[BM_WINDOW] = (struct mkgui_widget){ MKGUI_WINDOW, BM_WINDOW, "mkgui benchmark", "", 0, 0, 0, 900, 700, 0 };
-	widgets[BM_STATUSBAR] = (struct mkgui_widget){ MKGUI_STATUSBAR, BM_STATUSBAR, "", "", BM_WINDOW, 0, 0, 0, 0, 0 };
-	widgets[BM_VBOX] = (struct mkgui_widget){ MKGUI_VBOX, BM_VBOX, "", "", BM_WINDOW, 0, 0, 0, 0, MKGUI_ANCHOR_LEFT | MKGUI_ANCHOR_TOP | MKGUI_ANCHOR_RIGHT | MKGUI_ANCHOR_BOTTOM | MKGUI_SCROLL };
+	widgets[BM_WINDOW] = (struct mkgui_widget){ MKGUI_WINDOW, BM_WINDOW, "mkgui benchmark", "", 0, 0, 0, 900, 700, 0, 0 };
+	widgets[BM_STATUSBAR] = (struct mkgui_widget){ MKGUI_STATUSBAR, BM_STATUSBAR, "", "", BM_WINDOW, 0, 0, 0, 0, 0, 0 };
+	widgets[BM_VBOX] = (struct mkgui_widget){ MKGUI_VBOX, BM_VBOX, "", "", BM_WINDOW, 0, 0, 0, 0, MKGUI_ANCHOR_LEFT | MKGUI_ANCHOR_TOP | MKGUI_ANCHOR_RIGHT | MKGUI_ANCHOR_BOTTOM | MKGUI_SCROLL, 0 };
 
 	uint32_t idx = BM_FIRST_ROW;
 	for(uint32_t r = 0; r < rows; ++r) {
 		uint32_t row_id = 1000 + r * 10;
 		char label_buf[64];
 
-		widgets[idx] = (struct mkgui_widget){ MKGUI_HBOX, row_id, "", "", BM_VBOX, 0, 0, 0, 24, 0 };
+		widgets[idx] = (struct mkgui_widget){ MKGUI_HBOX, row_id, "", "", BM_VBOX, 0, 0, 0, 24, MKGUI_FIXED, 0 };
 		++idx;
 
 		snprintf(label_buf, sizeof(label_buf), "Row %u", r);
-		widgets[idx] = (struct mkgui_widget){ MKGUI_LABEL, row_id + 1, "", "", row_id, 0, 0, 80, 0, 0 };
+		widgets[idx] = (struct mkgui_widget){ MKGUI_LABEL, row_id + 1, "", "", row_id, 0, 0, 80, 0, MKGUI_FIXED, 0 };
 		snprintf(widgets[idx].label, sizeof(widgets[idx].label), "%s", label_buf);
 		++idx;
 
-		widgets[idx] = (struct mkgui_widget){ MKGUI_BUTTON, row_id + 2, "Action", "", row_id, 0, 0, 80, 0, 0 };
+		widgets[idx] = (struct mkgui_widget){ MKGUI_BUTTON, row_id + 2, "Action", "", row_id, 0, 0, 80, 0, MKGUI_FIXED, 0 };
 		++idx;
 
-		widgets[idx] = (struct mkgui_widget){ MKGUI_CHECKBOX, row_id + 3, "Enable", "", row_id, 0, 0, 80, 0, 0 };
+		widgets[idx] = (struct mkgui_widget){ MKGUI_CHECKBOX, row_id + 3, "Enable", "", row_id, 0, 0, 80, 0, MKGUI_FIXED, 0 };
 		++idx;
 
 		snprintf(label_buf, sizeof(label_buf), "Status for item %u", r);
-		widgets[idx] = (struct mkgui_widget){ MKGUI_LABEL, row_id + 4, "", "", row_id, 0, 0, 0, 0, 0 };
+		widgets[idx] = (struct mkgui_widget){ MKGUI_LABEL, row_id + 4, "", "", row_id, 0, 0, 0, 0, 0, 1 };
 		snprintf(widgets[idx].label, sizeof(widgets[idx].label), "%s", label_buf);
 		++idx;
 
-		widgets[idx] = (struct mkgui_widget){ MKGUI_BUTTON, row_id + 5, "Delete", "delete", row_id, 0, 0, 80, 0, 0 };
+		widgets[idx] = (struct mkgui_widget){ MKGUI_BUTTON, row_id + 5, "Delete", "delete", row_id, 0, 0, 80, 0, MKGUI_FIXED, 0 };
 		++idx;
 	}
 

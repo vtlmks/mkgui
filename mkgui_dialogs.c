@@ -71,9 +71,9 @@ static void mkgui_message_box(struct mkgui_ctx *ctx, const char *title, const ch
 	int32_t dh = 110;
 
 	struct mkgui_widget widgets[] = {
-		{ MKGUI_WINDOW, MKGUI_DLG_WINDOW, "", "", 0, 0, 0, dw, dh, 0 },
-		{ MKGUI_LABEL, MKGUI_DLG_LABEL, "", "", MKGUI_DLG_WINDOW, 20, 16, dw - 40, 24, 0 },
-		{ MKGUI_BUTTON, MKGUI_DLG_BTN_OK, "OK", "", MKGUI_DLG_WINDOW, 40, 12, 80, 28, MKGUI_ANCHOR_BOTTOM | MKGUI_ANCHOR_RIGHT },
+		{ MKGUI_WINDOW, MKGUI_DLG_WINDOW, "", "", 0, 0, 0, dw, dh, 0, 0 },
+		{ MKGUI_LABEL, MKGUI_DLG_LABEL, "", "", MKGUI_DLG_WINDOW, 20, 16, dw - 40, 24, 0, 0 },
+		{ MKGUI_BUTTON, MKGUI_DLG_BTN_OK, "OK", "", MKGUI_DLG_WINDOW, 40, 12, 80, 28, MKGUI_ANCHOR_BOTTOM | MKGUI_ANCHOR_RIGHT, 0 },
 	};
 
 	strncpy(widgets[0].label, title, MKGUI_MAX_TEXT - 1);
@@ -91,10 +91,10 @@ static uint32_t mkgui_confirm_dialog(struct mkgui_ctx *ctx, const char *title, c
 	int32_t dh = 110;
 
 	struct mkgui_widget widgets[] = {
-		{ MKGUI_WINDOW, MKGUI_DLG_WINDOW, "", "", 0, 0, 0, dw, dh, 0 },
-		{ MKGUI_LABEL, MKGUI_DLG_LABEL, "", "", MKGUI_DLG_WINDOW, 20, 16, dw - 40, 24, 0 },
-		{ MKGUI_BUTTON, MKGUI_DLG_BTN_OK, "OK", "", MKGUI_DLG_WINDOW, 100, 12, 80, 28, MKGUI_ANCHOR_BOTTOM | MKGUI_ANCHOR_RIGHT },
-		{ MKGUI_BUTTON, MKGUI_DLG_BTN_CANCEL, "Cancel", "", MKGUI_DLG_WINDOW, 12, 12, 80, 28, MKGUI_ANCHOR_BOTTOM | MKGUI_ANCHOR_RIGHT },
+		{ MKGUI_WINDOW, MKGUI_DLG_WINDOW, "", "", 0, 0, 0, dw, dh, 0, 0 },
+		{ MKGUI_LABEL, MKGUI_DLG_LABEL, "", "", MKGUI_DLG_WINDOW, 20, 16, dw - 40, 24, 0, 0 },
+		{ MKGUI_BUTTON, MKGUI_DLG_BTN_OK, "OK", "", MKGUI_DLG_WINDOW, 100, 12, 80, 28, MKGUI_ANCHOR_BOTTOM | MKGUI_ANCHOR_RIGHT, 0 },
+		{ MKGUI_BUTTON, MKGUI_DLG_BTN_CANCEL, "Cancel", "", MKGUI_DLG_WINDOW, 12, 12, 80, 28, MKGUI_ANCHOR_BOTTOM | MKGUI_ANCHOR_RIGHT, 0 },
 	};
 
 	strncpy(widgets[0].label, title, MKGUI_MAX_TEXT - 1);
@@ -113,11 +113,11 @@ static uint32_t mkgui_input_dialog(struct mkgui_ctx *ctx, const char *title, con
 	int32_t lbl_w = tw + 10;
 
 	struct mkgui_widget widgets[] = {
-		{ MKGUI_WINDOW, MKGUI_DLG_WINDOW, "", "", 0, 0, 0, dw, dh, 0 },
-		{ MKGUI_LABEL, MKGUI_DLG_LABEL, "", "", MKGUI_DLG_WINDOW, 12, 18, lbl_w, 24, 0 },
-		{ MKGUI_INPUT, MKGUI_DLG_INPUT, "", "", MKGUI_DLG_WINDOW, 12 + lbl_w, 16, 20, 24, MKGUI_ANCHOR_LEFT | MKGUI_ANCHOR_RIGHT },
-		{ MKGUI_BUTTON, MKGUI_DLG_BTN_OK, "OK", "", MKGUI_DLG_WINDOW, 100, 12, 80, 28, MKGUI_ANCHOR_BOTTOM | MKGUI_ANCHOR_RIGHT },
-		{ MKGUI_BUTTON, MKGUI_DLG_BTN_CANCEL, "Cancel", "", MKGUI_DLG_WINDOW, 12, 12, 80, 28, MKGUI_ANCHOR_BOTTOM | MKGUI_ANCHOR_RIGHT },
+		{ MKGUI_WINDOW, MKGUI_DLG_WINDOW, "", "", 0, 0, 0, dw, dh, 0, 0 },
+		{ MKGUI_LABEL, MKGUI_DLG_LABEL, "", "", MKGUI_DLG_WINDOW, 12, 18, lbl_w, 24, 0, 0 },
+		{ MKGUI_INPUT, MKGUI_DLG_INPUT, "", "", MKGUI_DLG_WINDOW, 12 + lbl_w, 16, 20, 24, MKGUI_ANCHOR_LEFT | MKGUI_ANCHOR_RIGHT, 0 },
+		{ MKGUI_BUTTON, MKGUI_DLG_BTN_OK, "OK", "", MKGUI_DLG_WINDOW, 100, 12, 80, 28, MKGUI_ANCHOR_BOTTOM | MKGUI_ANCHOR_RIGHT, 0 },
+		{ MKGUI_BUTTON, MKGUI_DLG_BTN_CANCEL, "Cancel", "", MKGUI_DLG_WINDOW, 12, 12, 80, 28, MKGUI_ANCHOR_BOTTOM | MKGUI_ANCHOR_RIGHT, 0 },
 	};
 
 	strncpy(widgets[0].label, title, MKGUI_MAX_TEXT - 1);
