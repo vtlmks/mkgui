@@ -188,6 +188,10 @@ enum {
 	MKGUI_FORM,
 	MKGUI_SPACER,
 	MKGUI_PATHBAR,
+	MKGUI_IPINPUT,
+	MKGUI_TOGGLE,
+	MKGUI_COMBOBOX,
+	MKGUI_DATEPICKER,
 };
 
 // ---------------------------------------------------------------------------
@@ -275,6 +279,11 @@ enum {
 	MKGUI_EVENT_TAB_CLOSE,
 	MKGUI_EVENT_PATHBAR_NAV,
 	MKGUI_EVENT_PATHBAR_SUBMIT,
+	MKGUI_EVENT_IPINPUT_CHANGED,
+	MKGUI_EVENT_TOGGLE_CHANGED,
+	MKGUI_EVENT_COMBOBOX_CHANGED,
+	MKGUI_EVENT_COMBOBOX_SUBMIT,
+	MKGUI_EVENT_DATEPICKER_CHANGED,
 };
 
 // ---------------------------------------------------------------------------
@@ -361,6 +370,52 @@ struct mkgui_input_data {
 	uint32_t cursor;
 	uint32_t sel_start;
 	uint32_t sel_end;
+};
+
+struct mkgui_ipinput_data {
+	uint32_t widget_id;
+	uint8_t octets[4];
+	uint32_t active_field;
+	uint32_t sel_all;
+	uint32_t editing;
+	char edit_buf[4];
+	uint32_t edit_len;
+};
+
+struct mkgui_toggle_data {
+	uint32_t widget_id;
+	uint32_t state;
+};
+
+struct mkgui_combobox_data {
+	uint32_t widget_id;
+	char items[MKGUI_MAX_DROPDOWN][MKGUI_MAX_TEXT];
+	uint32_t item_count;
+	int32_t selected;
+	char text[MKGUI_MAX_TEXT];
+	char prev_text[MKGUI_MAX_TEXT];
+	uint32_t cursor;
+	uint32_t sel_all;
+	uint32_t popup_open;
+	int32_t highlight;
+	uint32_t filter_map[MKGUI_MAX_DROPDOWN];
+	uint32_t filter_count;
+	int32_t scroll_y;
+};
+
+struct mkgui_datepicker_data {
+	uint32_t widget_id;
+	int32_t year;
+	int32_t month;
+	int32_t day;
+	int32_t view_year;
+	int32_t view_month;
+	uint32_t popup_open;
+	int32_t cal_hover;
+	uint32_t editing;
+	char edit_buf[16];
+	uint32_t edit_cursor;
+	uint32_t month_select;
 };
 
 struct mkgui_dropdown_data {
@@ -658,6 +713,14 @@ struct mkgui_ctx {
 	uint32_t canvas_count;
 	struct mkgui_pathbar_data pathbars[8];
 	uint32_t pathbar_count;
+	struct mkgui_ipinput_data ipinputs[16];
+	uint32_t ipinput_count;
+	struct mkgui_toggle_data toggles[32];
+	uint32_t toggle_count;
+	struct mkgui_combobox_data comboboxes[16];
+	uint32_t combobox_count;
+	struct mkgui_datepicker_data datepickers[16];
+	uint32_t datepicker_count;
 
 	struct mkgui_popup popups[MKGUI_MAX_POPUPS];
 	uint32_t popup_count;
@@ -1276,6 +1339,46 @@ static struct mkgui_input_data *find_input_data(struct mkgui_ctx *ctx, uint32_t 
 	return NULL;
 }
 
+// [=]===^=[ find_ipinput_data ]=================================[=]
+static struct mkgui_ipinput_data *find_ipinput_data(struct mkgui_ctx *ctx, uint32_t widget_id) {
+	for(uint32_t i = 0; i < ctx->ipinput_count; ++i) {
+		if(ctx->ipinputs[i].widget_id == widget_id) {
+			return &ctx->ipinputs[i];
+		}
+	}
+	return NULL;
+}
+
+// [=]===^=[ find_toggle_data ]==================================[=]
+static struct mkgui_toggle_data *find_toggle_data(struct mkgui_ctx *ctx, uint32_t widget_id) {
+	for(uint32_t i = 0; i < ctx->toggle_count; ++i) {
+		if(ctx->toggles[i].widget_id == widget_id) {
+			return &ctx->toggles[i];
+		}
+	}
+	return NULL;
+}
+
+// [=]===^=[ find_combobox_data ]=================================[=]
+static struct mkgui_combobox_data *find_combobox_data(struct mkgui_ctx *ctx, uint32_t widget_id) {
+	for(uint32_t i = 0; i < ctx->combobox_count; ++i) {
+		if(ctx->comboboxes[i].widget_id == widget_id) {
+			return &ctx->comboboxes[i];
+		}
+	}
+	return NULL;
+}
+
+// [=]===^=[ find_datepicker_data ]===============================[=]
+static struct mkgui_datepicker_data *find_datepicker_data(struct mkgui_ctx *ctx, uint32_t widget_id) {
+	for(uint32_t i = 0; i < ctx->datepicker_count; ++i) {
+		if(ctx->datepickers[i].widget_id == widget_id) {
+			return &ctx->datepickers[i];
+		}
+	}
+	return NULL;
+}
+
 // [=]===^=[ find_dropdown_data ]================================[=]
 static struct mkgui_dropdown_data *find_dropdown_data(struct mkgui_ctx *ctx, uint32_t widget_id) {
 	for(uint32_t i = 0; i < ctx->dropdown_count; ++i) {
@@ -1444,7 +1547,11 @@ static uint32_t is_focusable(struct mkgui_widget *w) {
 		case MKGUI_TEXTAREA:
 		case MKGUI_ITEMVIEW:
 		case MKGUI_TABS:
-		case MKGUI_PATHBAR: {
+		case MKGUI_PATHBAR:
+		case MKGUI_IPINPUT:
+		case MKGUI_TOGGLE:
+		case MKGUI_COMBOBOX:
+		case MKGUI_DATEPICKER: {
 			return 1;
 		} break;
 
@@ -2358,6 +2465,10 @@ static void draw_icon_popup(struct mkgui_popup *p, struct mkgui_icon *icon, int3
 #include "mkgui_group.c"
 #include "mkgui_panel.c"
 #include "mkgui_spacer.c"
+#include "mkgui_ipinput.c"
+#include "mkgui_toggle.c"
+#include "mkgui_combobox.c"
+#include "mkgui_datepicker.c"
 #include "mkgui_spinner.c"
 #include "mkgui_itemview.c"
 #include "mkgui_scrollbar.c"
@@ -2476,6 +2587,22 @@ static void render_widget(struct mkgui_ctx *ctx, uint32_t idx) {
 
 		case MKGUI_PATHBAR: {
 			render_pathbar(ctx, idx);
+		} break;
+
+		case MKGUI_IPINPUT: {
+			render_ipinput(ctx, idx);
+		} break;
+
+		case MKGUI_TOGGLE: {
+			render_toggle(ctx, idx);
+		} break;
+
+		case MKGUI_COMBOBOX: {
+			render_combobox(ctx, idx);
+		} break;
+
+		case MKGUI_DATEPICKER: {
+			render_datepicker(ctx, idx);
 		} break;
 
 		case MKGUI_VBOX:
@@ -2619,6 +2746,42 @@ static void init_aux_data(struct mkgui_ctx *ctx) {
 					struct mkgui_input_data *inp = &ctx->inputs[ctx->input_count++];
 					memset(inp, 0, sizeof(*inp));
 					inp->widget_id = w->id;
+				}
+			} break;
+
+			case MKGUI_IPINPUT: {
+				if(ctx->ipinput_count < 16) {
+					struct mkgui_ipinput_data *ip = &ctx->ipinputs[ctx->ipinput_count++];
+					memset(ip, 0, sizeof(*ip));
+					ip->widget_id = w->id;
+				}
+			} break;
+
+			case MKGUI_TOGGLE: {
+				if(ctx->toggle_count < 32) {
+					struct mkgui_toggle_data *td = &ctx->toggles[ctx->toggle_count++];
+					memset(td, 0, sizeof(*td));
+					td->widget_id = w->id;
+				}
+			} break;
+
+			case MKGUI_COMBOBOX: {
+				if(ctx->combobox_count < 16) {
+					struct mkgui_combobox_data *cb = &ctx->comboboxes[ctx->combobox_count++];
+					memset(cb, 0, sizeof(*cb));
+					cb->widget_id = w->id;
+					cb->selected = -1;
+				}
+			} break;
+
+			case MKGUI_DATEPICKER: {
+				if(ctx->datepicker_count < 16) {
+					struct mkgui_datepicker_data *dp = &ctx->datepickers[ctx->datepicker_count++];
+					memset(dp, 0, sizeof(*dp));
+					dp->widget_id = w->id;
+					dp->year = 2026;
+					dp->month = 1;
+					dp->day = 1;
 				}
 			} break;
 
@@ -3074,12 +3237,27 @@ static uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 							popup_destroy_from(ctx, (uint32_t)popup_idx + 1);
 						}
 
+					} else if(mpw && mpw->type == MKGUI_DATEPICKER) {
+						struct mkgui_datepicker_data *mdp = find_datepicker_data(ctx, mpw->id);
+						if(mdp) {
+							int32_t new_hover = datepicker_cal_hit(mdp, pev.x, pev.y);
+							if(new_hover != mdp->cal_hover) {
+								mdp->cal_hover = new_hover;
+								mp->dirty = 1;
+							}
+						}
+
 					} else {
 						int32_t scroll_off = 0;
 						if(mpw && mpw->type == MKGUI_DROPDOWN) {
 							struct mkgui_dropdown_data *mdd = find_dropdown_data(ctx, mpw->id);
 							if(mdd) {
 								scroll_off = mdd->scroll_y;
+							}
+						} else if(mpw && mpw->type == MKGUI_COMBOBOX) {
+							struct mkgui_combobox_data *mcb = find_combobox_data(ctx, mpw->id);
+							if(mcb) {
+								scroll_off = mcb->scroll_y;
 							}
 						}
 						int32_t new_item = (pev.y - 1 + scroll_off) / MKGUI_ROW_HEIGHT;
@@ -3417,6 +3595,27 @@ static uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 					struct mkgui_popup *p = &ctx->popups[popup_idx];
 					struct mkgui_widget *pw = find_widget(ctx, p->widget_id);
 
+					if((pev.button == 4 || pev.button == 5) && pw && pw->type == MKGUI_DATEPICKER) {
+						struct mkgui_datepicker_data *dp = find_datepicker_data(ctx, pw->id);
+						if(dp) {
+							int32_t hit = datepicker_cal_hit(dp, pev.x, pev.y);
+							if(hit == -5 || hit == -6 || hit == -7) {
+								dp->view_year += (pev.button == 4) ? 1 : -1;
+							} else {
+								if(pev.button == 4) {
+									--dp->view_month;
+									if(dp->view_month < 1) { dp->view_month = 12; --dp->view_year; }
+								} else {
+									++dp->view_month;
+									if(dp->view_month > 12) { dp->view_month = 1; ++dp->view_year; }
+								}
+							}
+							p->dirty = 1;
+							dirty_all(ctx);
+						}
+						break;
+					}
+
 					if((pev.button == 4 || pev.button == 5) && pw && pw->type == MKGUI_DROPDOWN) {
 						struct mkgui_dropdown_data *dd = find_dropdown_data(ctx, pw->id);
 						if(dd) {
@@ -3445,6 +3644,86 @@ static uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 							popup_destroy(ctx, (uint32_t)popup_idx);
 							dirty_all(ctx);
 							return 1;
+						}
+
+					} else if(pw && pw->type == MKGUI_COMBOBOX) {
+						struct mkgui_combobox_data *cb = find_combobox_data(ctx, pw->id);
+						if(cb) {
+							int32_t item = (pev.y - 1 + cb->scroll_y) / MKGUI_ROW_HEIGHT;
+							if(item >= 0 && item < (int32_t)cb->filter_count) {
+								uint32_t real_idx = cb->filter_map[item];
+								cb->selected = (int32_t)real_idx;
+								{ size_t _l = strlen(cb->items[real_idx]); if(_l >= MKGUI_MAX_TEXT) { _l = MKGUI_MAX_TEXT - 1; } memcpy(cb->text, cb->items[real_idx], _l); cb->text[_l] = '\0'; }
+								cb->cursor = (uint32_t)strlen(cb->text);
+								cb->sel_all = 0;
+								combobox_close_popup(ctx, cb);
+								ev->type = MKGUI_EVENT_COMBOBOX_CHANGED;
+								ev->id = pw->id;
+								ev->value = cb->selected;
+								dirty_all(ctx);
+								return 1;
+							}
+						}
+
+					} else if(pw && pw->type == MKGUI_DATEPICKER) {
+						struct mkgui_datepicker_data *dp = find_datepicker_data(ctx, pw->id);
+						if(dp) {
+							int32_t hit = datepicker_cal_hit(dp, pev.x, pev.y);
+							if(hit == -2) {
+								--dp->view_month;
+								if(dp->view_month < 1) {
+									dp->view_month = 12;
+									--dp->view_year;
+								}
+								p->dirty = 1;
+								dirty_all(ctx);
+								break;
+							} else if(hit == -3) {
+								++dp->view_month;
+								if(dp->view_month > 12) {
+									dp->view_month = 1;
+									++dp->view_year;
+								}
+								p->dirty = 1;
+								dirty_all(ctx);
+								break;
+							} else if(hit == -4) {
+								dp->month_select = dp->month_select ? 0 : 1;
+								dp->cal_hover = -1;
+								p->dirty = 1;
+								dirty_all(ctx);
+								break;
+							} else if(hit == -5) {
+								++dp->view_year;
+								p->dirty = 1;
+								dirty_all(ctx);
+								break;
+							} else if(hit == -6) {
+								--dp->view_year;
+								p->dirty = 1;
+								dirty_all(ctx);
+								break;
+							} else if(hit >= 100 && hit < 112) {
+								dp->view_month = hit - 100 + 1;
+								dp->month_select = 0;
+								dp->cal_hover = -1;
+								p->dirty = 1;
+								dirty_all(ctx);
+								break;
+							} else if(hit == -7 || hit == -1) {
+								break;
+							} else if(hit > 0) {
+								dp->day = hit;
+								dp->month = dp->view_month;
+								dp->year = dp->view_year;
+								dp->popup_open = 0;
+								dp->editing = 0;
+								popup_destroy(ctx, (uint32_t)popup_idx);
+								ev->type = MKGUI_EVENT_DATEPICKER_CHANGED;
+								ev->id = pw->id;
+								dirty_all(ctx);
+								return 1;
+							}
 						}
 
 					} else if(pw && pw->type == MKGUI_MENUITEM) {
@@ -3784,6 +4063,23 @@ static uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 							ctx->drag_select_id = hw->id;
 							dirty_all(ctx);
 						}
+					}
+
+					if(hw->type == MKGUI_IPINPUT) {
+						handle_ipinput_click(ctx, hw->id, ctx->mouse_x);
+					}
+
+					if(hw->type == MKGUI_TOGGLE) {
+						handle_toggle_click(ctx, ev, hw->id);
+						return ev->type != MKGUI_EVENT_NONE;
+					}
+
+					if(hw->type == MKGUI_COMBOBOX) {
+						handle_combobox_click(ctx, ev, hw->id);
+					}
+
+					if(hw->type == MKGUI_DATEPICKER) {
+						handle_datepicker_click(ctx, hw->id);
 					}
 
 					if(hw->type == MKGUI_TEXTAREA) {
@@ -4507,6 +4803,30 @@ static uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 								}
 							} break;
 
+							case MKGUI_IPINPUT: {
+								if(handle_ipinput_key(ctx, ev, ks, pev.keymod, pev.text, pev.text_len)) {
+									return 1;
+								}
+							} break;
+
+							case MKGUI_TOGGLE: {
+								if(handle_toggle_key(ctx, ev, ks)) {
+									return 1;
+								}
+							} break;
+
+							case MKGUI_COMBOBOX: {
+								if(handle_combobox_key(ctx, ev, ks, pev.keymod, pev.text, pev.text_len)) {
+									return 1;
+								}
+							} break;
+
+							case MKGUI_DATEPICKER: {
+								if(handle_datepicker_key(ctx, ev, ks, pev.keymod, pev.text, pev.text_len)) {
+									return 1;
+								}
+							} break;
+
 							default: {
 							} break;
 						}
@@ -4601,6 +4921,23 @@ static uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 				struct mkgui_dropdown_data *dd = find_dropdown_data(ctx, pw->id);
 				if(dd) {
 					render_dropdown_popup(ctx, p, dd, p->hover_item);
+					flush_text_popup(ctx, p);
+					platform_popup_blit(ctx, p);
+				}
+
+			} else if(pw && pw->type == MKGUI_COMBOBOX) {
+				struct mkgui_combobox_data *cb = find_combobox_data(ctx, pw->id);
+				if(cb) {
+					render_combobox_popup(ctx, p, cb, p->hover_item);
+					flush_text_popup(ctx, p);
+					platform_popup_blit(ctx, p);
+				}
+
+			} else if(pw && pw->type == MKGUI_DATEPICKER) {
+				struct mkgui_datepicker_data *dp = find_datepicker_data(ctx, pw->id);
+				if(dp) {
+					int32_t hover_day = dp->cal_hover > 0 ? dp->cal_hover : -1;
+					render_datepicker_popup(ctx, p, dp, hover_day);
 					flush_text_popup(ctx, p);
 					platform_popup_blit(ctx, p);
 				}

@@ -117,6 +117,9 @@ static struct ed_palette_entry ed_widgets[] = {
 	{ "GLView",     MKGUI_GLVIEW },
 	{ "Image",      MKGUI_IMAGE },
 	{ "Input",      MKGUI_INPUT },
+	{ "Combobox",   MKGUI_COMBOBOX },
+	{ "DatePicker", MKGUI_DATEPICKER },
+	{ "IPInput",    MKGUI_IPINPUT },
 	{ "ItemView",   MKGUI_ITEMVIEW },
 	{ "Label",      MKGUI_LABEL },
 	{ "Listview",   MKGUI_LISTVIEW },
@@ -129,6 +132,7 @@ static struct ed_palette_entry ed_widgets[] = {
 	{ "Spinner",    MKGUI_SPINNER },
 	{ "Statusbar",  MKGUI_STATUSBAR },
 	{ "Textarea",   MKGUI_TEXTAREA },
+	{ "Toggle",     MKGUI_TOGGLE },
 	{ "Treeview",   MKGUI_TREEVIEW },
 };
 
@@ -174,6 +178,10 @@ static struct ed_type_event_map ed_type_events[] = {
 	{ MKGUI_TEXTAREA,  { MKGUI_EVENT_TEXTAREA_CHANGED }, 1 },
 	{ MKGUI_SPINBOX,   { MKGUI_EVENT_SPINBOX_CHANGED }, 1 },
 	{ MKGUI_SCROLLBAR, { MKGUI_EVENT_SCROLL }, 1 },
+	{ MKGUI_IPINPUT,   { MKGUI_EVENT_IPINPUT_CHANGED }, 1 },
+	{ MKGUI_TOGGLE,    { MKGUI_EVENT_TOGGLE_CHANGED }, 1 },
+	{ MKGUI_COMBOBOX,  { MKGUI_EVENT_COMBOBOX_CHANGED, MKGUI_EVENT_COMBOBOX_SUBMIT }, 2 },
+	{ MKGUI_DATEPICKER,{ MKGUI_EVENT_DATEPICKER_CHANGED }, 1 },
 	{ MKGUI_ITEMVIEW,  { MKGUI_EVENT_ITEMVIEW_SELECT, MKGUI_EVENT_ITEMVIEW_DBLCLICK }, 2 },
 	{ MKGUI_MENUITEM,  { MKGUI_EVENT_MENU }, 1 },
 	{ MKGUI_HSPLIT,    { MKGUI_EVENT_SPLIT_MOVED }, 1 },
@@ -218,6 +226,11 @@ static const char *ed_event_name(uint32_t event_type) {
 		case MKGUI_EVENT_ITEMVIEW_SELECT:    { return "ITEMVIEW_SELECT"; }
 		case MKGUI_EVENT_ITEMVIEW_DBLCLICK:  { return "ITEMVIEW_DBLCLICK"; }
 		case MKGUI_EVENT_SCROLL:             { return "SCROLL"; }
+		case MKGUI_EVENT_IPINPUT_CHANGED:    { return "IPINPUT_CHANGED"; }
+		case MKGUI_EVENT_TOGGLE_CHANGED:     { return "TOGGLE_CHANGED"; }
+		case MKGUI_EVENT_COMBOBOX_CHANGED:   { return "COMBOBOX_CHANGED"; }
+		case MKGUI_EVENT_COMBOBOX_SUBMIT:    { return "COMBOBOX_SUBMIT"; }
+		case MKGUI_EVENT_DATEPICKER_CHANGED: { return "DATEPICKER_CHANGED"; }
 		default:                             { return "UNKNOWN"; }
 	}
 }
@@ -249,6 +262,11 @@ static uint32_t ed_event_from_name(const char *name) {
 		{ "ITEMVIEW_SELECT",    MKGUI_EVENT_ITEMVIEW_SELECT },
 		{ "ITEMVIEW_DBLCLICK",  MKGUI_EVENT_ITEMVIEW_DBLCLICK },
 		{ "SCROLL",             MKGUI_EVENT_SCROLL },
+		{ "IPINPUT_CHANGED",    MKGUI_EVENT_IPINPUT_CHANGED },
+		{ "TOGGLE_CHANGED",     MKGUI_EVENT_TOGGLE_CHANGED },
+		{ "COMBOBOX_CHANGED",   MKGUI_EVENT_COMBOBOX_CHANGED },
+		{ "COMBOBOX_SUBMIT",    MKGUI_EVENT_COMBOBOX_SUBMIT },
+		{ "DATEPICKER_CHANGED", MKGUI_EVENT_DATEPICKER_CHANGED },
 	};
 	for(uint32_t i = 0; i < sizeof(map) / sizeof(map[0]); ++i) {
 		if(strcmp(map[i].name, name) == 0) {
@@ -569,6 +587,10 @@ static struct ed_help_entry ed_help[] = {
 	{ MKGUI_GLVIEW,    "OpenGL viewport. Creates a native child window for GL rendering. You create and manage the GL context." },
 	{ MKGUI_IMAGE,     "Displays ARGB pixel data. Centered and scaled down to fit. Use PANEL_BORDER for a frame, IMAGE_STRETCH to fill." },
 	{ MKGUI_INPUT,     "Single-line text input. Supports clipboard, cursor movement, and selection. PASSWORD flag hides text." },
+	{ MKGUI_IPINPUT,   "IPv4 address input. Four 0-255 fields separated by dots. Tab/dot advances fields. Emits IPINPUT_CHANGED." },
+	{ MKGUI_TOGGLE,    "On/off toggle switch. Click or spacebar toggles. Visual pill-shaped track with sliding knob." },
+	{ MKGUI_COMBOBOX,  "Editable dropdown. Type to filter items, arrow keys to navigate, Enter to select. Supports freeform text." },
+	{ MKGUI_DATEPICKER,"Date picker. Shows YYYY-MM-DD. Click calendar button for a popup calendar. Editable text field." },
 	{ MKGUI_ITEMVIEW,  "Multi-mode item view: icons, thumbnails, compact list, or detail. Uses callbacks for labels and icons." },
 	{ MKGUI_LABEL,     "Static text display. Not interactive. Use mkgui_label_set() to change text at runtime." },
 	{ MKGUI_LISTVIEW,  "Scrollable multi-column list. Fully virtual (callback provides data). Supports sorting, column reorder, row drag." },
@@ -1161,6 +1183,10 @@ static void ed_gen_id_name(struct ed_widget *w) {
 		case MKGUI_GLVIEW:     { prefix = "ID_GLVIEW"; } break;
 		case MKGUI_CANVAS:     { prefix = "ID_CANVAS"; } break;
 		case MKGUI_SPACER:     { prefix = "ID_SPACER"; } break;
+		case MKGUI_IPINPUT:    { prefix = "ID_IPINPUT"; } break;
+		case MKGUI_TOGGLE:     { prefix = "ID_TOGGLE"; } break;
+		case MKGUI_COMBOBOX:   { prefix = "ID_COMBOBOX"; } break;
+		case MKGUI_DATEPICKER: { prefix = "ID_DATEPICKER"; } break;
 		case MKGUI_VBOX:       { prefix = "ID_VBOX"; } break;
 		case MKGUI_HBOX:       { prefix = "ID_HBOX"; } break;
 		case MKGUI_FORM:       { prefix = "ID_FORM"; } break;
@@ -1204,6 +1230,26 @@ static int32_t ed_add_widget(uint32_t type, int32_t x, int32_t y) {
 		} break;
 
 		case MKGUI_INPUT: {
+			w->w = 150;
+			w->h = 24;
+		} break;
+
+		case MKGUI_IPINPUT: {
+			w->w = 180;
+			w->h = 24;
+		} break;
+
+		case MKGUI_TOGGLE: {
+			w->w = 80;
+			w->h = 24;
+		} break;
+
+		case MKGUI_COMBOBOX: {
+			w->w = 180;
+			w->h = 24;
+		} break;
+
+		case MKGUI_DATEPICKER: {
 			w->w = 150;
 			w->h = 24;
 		} break;
@@ -1737,6 +1783,51 @@ static void ed_draw_widget(struct mkgui_ctx *ctx, uint32_t idx) {
 				int32_t ty = ry + (rh - ctx->font_height) / 2;
 				push_text_clip(rx + 4, ty, ew->label, ctx->theme.text_disabled, rx + 1, ry + 1, rx + rw - 1, ry + rh - 1);
 			}
+		} break;
+
+		case MKGUI_IPINPUT: {
+			draw_patch(ctx, MKGUI_STYLE_SUNKEN, rx, ry, rw, rh, ctx->theme.input_bg, ctx->theme.widget_border);
+			int32_t ty = ry + (rh - ctx->font_height) / 2;
+			push_text_clip(rx + 4, ty, "0.0.0.0", ctx->theme.text_disabled, rx + 1, ry + 1, rx + rw - 1, ry + rh - 1);
+		} break;
+
+		case MKGUI_TOGGLE: {
+			int32_t track_h = 20;
+			int32_t track_w = 38;
+			int32_t track_y = ry + (rh - track_h) / 2;
+			int32_t track_r = track_h / 2;
+			draw_rounded_rect(ctx->pixels, ctx->win_w, ctx->win_h, rx, track_y, track_w, track_h, ctx->theme.bg, ctx->theme.widget_border, track_r);
+			int32_t knob_pad = 3;
+			int32_t knob_sz = track_h - knob_pad * 2;
+			int32_t knob_r = knob_sz / 2;
+			draw_rounded_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, rx + knob_pad, track_y + knob_pad, knob_sz, knob_sz, ctx->theme.widget_border, knob_r);
+			if(ew->label[0]) {
+				int32_t lty = ry + (rh - ctx->font_height) / 2;
+				push_text_clip(rx + track_w + 6, lty, ew->label, ctx->theme.text, rx, ry, rx + rw, ry + rh);
+			}
+		} break;
+
+		case MKGUI_COMBOBOX: {
+			int32_t text_w = rw - 20;
+			draw_patch(ctx, MKGUI_STYLE_SUNKEN, rx, ry, text_w, rh, ctx->theme.input_bg, ctx->theme.widget_border);
+			draw_patch(ctx, MKGUI_STYLE_RAISED, rx + text_w, ry, 20, rh, ctx->theme.widget_bg, ctx->theme.widget_border);
+			int32_t ax = rx + text_w + 3;
+			int32_t ay = ry + rh / 2 - 2;
+			for(int32_t j = 0; j < 5; ++j) {
+				draw_hline(ctx->pixels, ctx->win_w, ctx->win_h, ax + j, ay + j, 9 - j * 2, ctx->theme.text);
+			}
+			if(ew->label[0]) {
+				int32_t cty = ry + (rh - ctx->font_height) / 2;
+				push_text_clip(rx + 4, cty, ew->label, ctx->theme.text_disabled, rx + 1, ry + 1, rx + text_w - 1, ry + rh - 1);
+			}
+		} break;
+
+		case MKGUI_DATEPICKER: {
+			int32_t text_w = rw - 24;
+			draw_patch(ctx, MKGUI_STYLE_SUNKEN, rx, ry, text_w, rh, ctx->theme.input_bg, ctx->theme.widget_border);
+			draw_patch(ctx, MKGUI_STYLE_RAISED, rx + text_w, ry, 24, rh, ctx->theme.widget_bg, ctx->theme.widget_border);
+			int32_t dty = ry + (rh - ctx->font_height) / 2;
+			push_text_clip(rx + 4, dty, "2026-01-01", ctx->theme.text_disabled, rx + 1, ry + 1, rx + text_w - 1, ry + rh - 1);
 		} break;
 
 		case MKGUI_CHECKBOX: {
@@ -2953,7 +3044,7 @@ static void ed_sync_data(struct mkgui_ctx *ctx) {
 	}
 
 	struct ed_widget *w = &ed.widgets[ed.selected];
-	if(w->type != MKGUI_DROPDOWN) {
+	if(w->type != MKGUI_DROPDOWN && w->type != MKGUI_COMBOBOX) {
 		ed_set_widget_vis(ctx, ED_DATA_GROUP, 0);
 		mkgui_listview_set_rows(ctx, ED_DATA_LIST, 0);
 		return;
@@ -3502,6 +3593,10 @@ static const char *ed_type_name_upper(uint32_t type) {
 		case MKGUI_GLVIEW:     { return "MKGUI_GLVIEW"; }
 		case MKGUI_CANVAS:     { return "MKGUI_CANVAS"; }
 		case MKGUI_SPACER:     { return "MKGUI_SPACER"; }
+		case MKGUI_IPINPUT:    { return "MKGUI_IPINPUT"; }
+		case MKGUI_TOGGLE:     { return "MKGUI_TOGGLE"; }
+		case MKGUI_COMBOBOX:   { return "MKGUI_COMBOBOX"; }
+		case MKGUI_DATEPICKER: { return "MKGUI_DATEPICKER"; }
 		case MKGUI_VBOX:       { return "MKGUI_VBOX"; }
 		case MKGUI_HBOX:       { return "MKGUI_HBOX"; }
 		case MKGUI_FORM:       { return "MKGUI_FORM"; }
@@ -3584,6 +3679,19 @@ static void ed_generate_code(struct mkgui_ctx *ctx) {
 				}
 				fprintf(f, " };\n");
 				fprintf(f, "\t\tmkgui_dropdown_setup(ctx, %s, %s_items, %u);\n", w->id_name, w->id_name, d->item_count);
+				fprintf(f, "\t}\n");
+			}
+
+		} else if(w->type == MKGUI_COMBOBOX) {
+			struct ed_widget_data *d = ed_find_widget_data(w->id);
+			if(d && d->item_count > 0) {
+				fprintf(f, "\t{\n");
+				fprintf(f, "\t\tconst char *%s_items[] = {", w->id_name);
+				for(uint32_t j = 0; j < d->item_count; ++j) {
+					fprintf(f, "%s\"%s\"", j ? ", " : " ", d->items[j]);
+				}
+				fprintf(f, " };\n");
+				fprintf(f, "\t\tmkgui_combobox_setup(ctx, %s, %s_items, %u);\n", w->id_name, w->id_name, d->item_count);
 				fprintf(f, "\t}\n");
 			}
 
@@ -3739,14 +3847,18 @@ static void ed_test_gui(struct mkgui_ctx *editor_ctx) {
 
 	for(uint32_t i = 0; i < ed.widget_count; ++i) {
 		struct ed_widget *ew = &ed.widgets[i];
-		if(ew->type == MKGUI_DROPDOWN) {
+		if(ew->type == MKGUI_DROPDOWN || ew->type == MKGUI_COMBOBOX) {
 			struct ed_widget_data *d = ed_find_widget_data(ew->id);
 			if(d && d->item_count > 0) {
 				const char *items[ED_MAX_DATA_ITEMS];
 				for(uint32_t j = 0; j < d->item_count; ++j) {
 					items[j] = d->items[j];
 				}
-				mkgui_dropdown_setup(test, ew->id, items, d->item_count);
+				if(ew->type == MKGUI_DROPDOWN) {
+					mkgui_dropdown_setup(test, ew->id, items, d->item_count);
+				} else {
+					mkgui_combobox_setup(test, ew->id, items, d->item_count);
+				}
 			}
 		}
 	}
