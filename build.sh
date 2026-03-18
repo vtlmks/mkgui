@@ -82,4 +82,5 @@ fi
 wait
 
 
-./tools/gen_icons ext/materialdesignicons-webfont.ttf 18 mdi_icons.dat
+./tools/gen_icons ext/materialdesignicons-webfont.ttf 16 mdi_icons.dat
+./tools/gen_icons ext/materialdesignicons-webfont.ttf 40 mdi_icons_toolbar.dat
