@@ -20,7 +20,7 @@ enum {
 	ID_VIEW_SMALL, ID_VIEW_MEDIUM, ID_VIEW_LARGE,
 	ID_HELP_ABOUT,
 
-	ID_TOOLBAR, ID_TB_NEW, ID_TB_OPEN, ID_TB_SAVE,
+	ID_TOOLBAR, ID_TB_NEW, ID_TB_SEP1, ID_TB_OPEN, ID_TB_SAVE,
 
 	ID_TABS,
 	ID_TAB_CONTROLS, ID_TAB_TREE, ID_TAB_DATA, ID_TAB_LAYOUT, ID_TAB_MEDIA,
@@ -259,7 +259,8 @@ int main(void) {
 		/* Toolbar */
 		{ MKGUI_TOOLBAR,  ID_TOOLBAR,   "",                  "", ID_WINDOW,   0, 0, 0, 0, 0, 0 },
 		{ MKGUI_BUTTON,   ID_TB_NEW,    "New",               "file-plus",    ID_TOOLBAR, 0, 0, 0, 0, 0, 0 },
-		{ MKGUI_BUTTON,   ID_TB_OPEN,   "Open",              "folder-open",  ID_TOOLBAR, 0, 0, 0, 0, MKGUI_TOOLBAR_SEP, 0 },
+		{ MKGUI_BUTTON,   ID_TB_SEP1,   "",                  "",             ID_TOOLBAR, 0, 0, 0, 0, MKGUI_SEPARATOR, 0 },
+		{ MKGUI_BUTTON,   ID_TB_OPEN,   "Open",              "folder-open",  ID_TOOLBAR, 0, 0, 0, 0, 0, 0 },
 		{ MKGUI_BUTTON,   ID_TB_SAVE,   "Save",              "content-save", ID_TOOLBAR, 0, 0, 0, 0, 0, 0 },
 
 		/* Tabs */

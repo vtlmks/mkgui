@@ -919,7 +919,11 @@ static uint32_t handle_listview_key(struct mkgui_ctx *ctx, struct mkgui_event *e
 // [=]===^=[ mkgui_listview_setup ]==============================[=]
 static void mkgui_listview_setup(struct mkgui_ctx *ctx, uint32_t id, uint32_t row_count, uint32_t col_count, struct mkgui_column *columns, mkgui_row_cb cb, void *userdata) {
 	struct mkgui_listview_data *lv = find_listv_data(ctx, id);
-	if(!lv && ctx->listv_count < 32) {
+	if(!lv) {
+		MKGUI_AUX_GROW(ctx->listvs, ctx->listv_count, ctx->listv_cap, struct mkgui_listview_data);
+		if(ctx->listv_count >= ctx->listv_cap) {
+			return;
+		}
 		lv = &ctx->listvs[ctx->listv_count++];
 		memset(lv, 0, sizeof(*lv));
 		lv->widget_id = id;

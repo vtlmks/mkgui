@@ -329,6 +329,40 @@ while(running) {
 
 When the caller owns timing (emulators, games), omit `mkgui_wait` and use your own frame pacing instead.
 
+### Runtime widget management
+
+```c
+uint32_t mkgui_add_widget(struct mkgui_ctx *ctx, struct mkgui_widget w, uint32_t after_id);
+uint32_t mkgui_remove_widget(struct mkgui_ctx *ctx, uint32_t id);
+```
+
+`mkgui_add_widget` inserts a widget into the context at runtime. The widget's `parent_id` determines which container it belongs to. The `after_id` parameter controls where it appears among its siblings:
+
+| `after_id` | Behavior |
+|------------|----------|
+| `0` | Append as the last widget in the array |
+| parent's ID | Insert as the first child of that container |
+| sibling's ID | Insert immediately after that sibling |
+
+Returns 1 on success, 0 on allocation failure. The widget's aux data (slider state, input buffer, etc.) is automatically initialized. All arrays grow dynamically as needed.
+
+`mkgui_remove_widget` removes a widget and all its descendants. It cleans up aux data (frees textarea buffers, treeview nodes, image pixels, GL views), clears any references in focus/hover/drag state, and destroys open popups for the removed widgets. Returns 1 on success, 0 if the widget was not found. Removing a MKGUI_WINDOW widget is not allowed.
+
+**Important:** Pointers returned by `find_widget()` or any `find_*_data()` function are invalidated after calling `mkgui_add_widget` or `mkgui_remove_widget`, because the underlying arrays may be reallocated. Always re-query after adding or removing widgets.
+
+```c
+// add a slider as the first child of a vbox
+struct mkgui_widget slider = { MKGUI_SLIDER, 500, "Volume", "", VBOX_ID, 0, 0, 0, 24, 0, 0 };
+mkgui_add_widget(ctx, slider, VBOX_ID);
+
+// add a button after an existing sibling
+struct mkgui_widget btn = { MKGUI_BUTTON, 501, "Mute", "", VBOX_ID, 0, 0, 80, 24, 0, 0 };
+mkgui_add_widget(ctx, btn, 500);  // after the slider
+
+// remove the slider and anything nested inside it
+mkgui_remove_widget(ctx, 500);
+```
+
 ### Performance timing
 
 After each `mkgui_poll` call that renders, the context contains timing data for the last frame:

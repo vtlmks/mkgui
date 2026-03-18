@@ -21,10 +21,18 @@ static void render_toolbar(struct mkgui_ctx *ctx, uint32_t idx) {
 			continue;
 		}
 
-		if(btn->flags & MKGUI_TOOLBAR_SEP) {
+		if(btn->flags & MKGUI_SEPARATOR) {
 			int32_t sx = bx + MKGUI_TOOLBAR_SEP_W / 2;
 			draw_vline(ctx->pixels, ctx->win_w, ctx->win_h, sx, ry + 4, rh - 8, ctx->theme.widget_border);
 			bx += MKGUI_TOOLBAR_SEP_W;
+			int32_t sep_idx = find_widget_idx(ctx, btn->id);
+			if(sep_idx >= 0) {
+				ctx->rects[sep_idx].x = 0;
+				ctx->rects[sep_idx].y = 0;
+				ctx->rects[sep_idx].w = 0;
+				ctx->rects[sep_idx].h = 0;
+			}
+			continue;
 		}
 
 		int32_t ii = show_icons ? toolbar_icon_idx(btn) : -1;

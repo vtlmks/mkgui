@@ -84,7 +84,8 @@ static uint32_t mkgui_glview_init(struct mkgui_ctx *ctx, uint32_t id) {
 		return gv->created;
 	}
 
-	if(ctx->glview_count >= 8) {
+	MKGUI_AUX_GROW(ctx->glviews, ctx->glview_count, ctx->glview_cap, struct mkgui_glview_data);
+	if(ctx->glview_count >= ctx->glview_cap) {
 		return 0;
 	}
 	gv = &ctx->glviews[ctx->glview_count++];

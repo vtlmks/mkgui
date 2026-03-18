@@ -15,7 +15,8 @@ static struct mkgui_image_data *find_image_data(struct mkgui_ctx *ctx, uint32_t 
 static void mkgui_image_set(struct mkgui_ctx *ctx, uint32_t id, const uint32_t *pixels, int32_t w, int32_t h) {
 	struct mkgui_image_data *img = find_image_data(ctx, id);
 	if(!img) {
-		if(ctx->image_count >= 32) {
+		MKGUI_AUX_GROW(ctx->images, ctx->image_count, ctx->image_cap, struct mkgui_image_data);
+		if(ctx->image_count >= ctx->image_cap) {
 			return;
 		}
 		img = &ctx->images[ctx->image_count++];

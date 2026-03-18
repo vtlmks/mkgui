@@ -12,7 +12,8 @@ enum {
 };
 
 #define BM_COLS 5
-#define BM_MAX_ROWS ((MKGUI_MAX_WIDGETS - BM_FIRST_ROW) / (BM_COLS + 1))
+#define BM_WIDGET_LIMIT 4096
+#define BM_MAX_ROWS ((BM_WIDGET_LIMIT - BM_FIRST_ROW) / (BM_COLS + 1))
 
 static double bm_clock_us(void) {
 	struct timespec ts;
@@ -30,12 +31,12 @@ int32_t main(int32_t argc, char **argv) {
 	}
 
 	uint32_t widget_count = BM_FIRST_ROW + rows * (BM_COLS + 1);
-	if(widget_count > MKGUI_MAX_WIDGETS) {
-		widget_count = MKGUI_MAX_WIDGETS;
+	if(widget_count > BM_WIDGET_LIMIT) {
+		widget_count = BM_WIDGET_LIMIT;
 		rows = (widget_count - BM_FIRST_ROW) / (BM_COLS + 1);
 	}
 
-	struct mkgui_widget widgets[MKGUI_MAX_WIDGETS];
+	struct mkgui_widget widgets[BM_WIDGET_LIMIT];
 	memset(widgets, 0, sizeof(widgets));
 
 	widgets[BM_WINDOW] = (struct mkgui_widget){ MKGUI_WINDOW, BM_WINDOW, "mkgui benchmark", "", 0, 0, 0, 900, 700, 0, 0 };
@@ -70,7 +71,7 @@ int32_t main(int32_t argc, char **argv) {
 		++idx;
 	}
 
-	printf("benchmark: %u rows, %u widgets (max %u)\n", rows, idx, MKGUI_MAX_WIDGETS);
+	printf("benchmark: %u rows, %u widgets (max %u)\n", rows, idx, BM_WIDGET_LIMIT);
 
 	struct mkgui_ctx *ctx = mkgui_create(widgets, idx);
 	mkgui_set_poll_timeout(ctx, 0);

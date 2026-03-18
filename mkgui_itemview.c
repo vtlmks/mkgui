@@ -925,7 +925,11 @@ static uint32_t handle_itemview_key(struct mkgui_ctx *ctx, struct mkgui_itemview
 // [=]===^=[ mkgui_itemview_setup ]================================[=]
 static void mkgui_itemview_setup(struct mkgui_ctx *ctx, uint32_t id, uint32_t item_count, uint32_t view_mode, mkgui_itemview_label_cb label_cb, mkgui_itemview_icon_cb icon_cb, void *userdata) {
 	struct mkgui_itemview_data *iv = find_itemview_data(ctx, id);
-	if(!iv && ctx->itemview_count < 16) {
+	if(!iv) {
+		MKGUI_AUX_GROW(ctx->itemviews, ctx->itemview_count, ctx->itemview_cap, struct mkgui_itemview_data);
+		if(ctx->itemview_count >= ctx->itemview_cap) {
+			return;
+		}
 		iv = &ctx->itemviews[ctx->itemview_count++];
 		memset(iv, 0, sizeof(*iv));
 		iv->widget_id = id;

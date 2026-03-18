@@ -21,7 +21,6 @@
 // Constants
 // ---------------------------------------------------------------------------
 
-#define MKGUI_MAX_WIDGETS    1024
 #define MKGUI_MAX_COLS       32
 #define MKGUI_MAX_TEXT       256
 #define MKGUI_MAX_DROPDOWN   64
@@ -677,61 +676,68 @@ static struct mdi_pack mdi;
 static struct mdi_pack mdi_toolbar;
 
 
+struct mkgui_rect {
+	int32_t x, y, w, h;
+};
+
 struct mkgui_ctx {
 	struct mkgui_platform plat;
 
 	uint32_t *pixels;
 	int32_t win_w, win_h;
 
-	struct mkgui_widget widgets[MKGUI_MAX_WIDGETS];
+	struct mkgui_widget *widgets;
 	uint32_t widget_count;
+	uint32_t widget_cap;
 
-	struct { int32_t x, y, w, h; } rects[MKGUI_MAX_WIDGETS];
+	struct mkgui_rect *rects;
 
-	struct mkgui_listview_data listvs[32];
-	uint32_t listv_count;
-	struct mkgui_input_data inputs[64];
-	uint32_t input_count;
-	struct mkgui_dropdown_data dropdowns[32];
-	uint32_t dropdown_count;
-	struct mkgui_slider_data sliders[32];
-	uint32_t slider_count;
-	struct mkgui_tabs_data tabs[32];
-	uint32_t tab_count;
-	struct mkgui_split_data splits[32];
-	uint32_t split_count;
-	struct mkgui_treeview_data treeviews[8];
-	uint32_t treeview_count;
-	struct mkgui_statusbar_data statusbars[8];
-	uint32_t statusbar_count;
-	struct mkgui_spinbox_data spinboxes[32];
-	uint32_t spinbox_count;
-	struct mkgui_progress_data progress[32];
-	uint32_t progress_count;
-	struct mkgui_textarea_data textareas[16];
-	uint32_t textarea_count;
-	struct mkgui_itemview_data itemviews[16];
-	uint32_t itemview_count;
-	struct mkgui_scrollbar_data scrollbars[32];
-	uint32_t scrollbar_count;
-	struct mkgui_box_scroll box_scrolls[32];
-	uint32_t box_scroll_count;
-	struct mkgui_image_data images[32];
-	uint32_t image_count;
-	struct mkgui_glview_data glviews[8];
-	uint32_t glview_count;
-	struct mkgui_canvas_data canvases[16];
-	uint32_t canvas_count;
-	struct mkgui_pathbar_data pathbars[8];
-	uint32_t pathbar_count;
-	struct mkgui_ipinput_data ipinputs[16];
-	uint32_t ipinput_count;
-	struct mkgui_toggle_data toggles[32];
-	uint32_t toggle_count;
-	struct mkgui_combobox_data comboboxes[16];
-	uint32_t combobox_count;
-	struct mkgui_datepicker_data datepickers[16];
-	uint32_t datepicker_count;
+	char (*tooltip_texts)[MKGUI_MAX_TEXT];
+
+	struct mkgui_listview_data *listvs;
+	uint32_t listv_count, listv_cap;
+	struct mkgui_input_data *inputs;
+	uint32_t input_count, input_cap;
+	struct mkgui_dropdown_data *dropdowns;
+	uint32_t dropdown_count, dropdown_cap;
+	struct mkgui_slider_data *sliders;
+	uint32_t slider_count, slider_cap;
+	struct mkgui_tabs_data *tabs;
+	uint32_t tab_count, tab_cap;
+	struct mkgui_split_data *splits;
+	uint32_t split_count, split_cap;
+	struct mkgui_treeview_data *treeviews;
+	uint32_t treeview_count, treeview_cap;
+	struct mkgui_statusbar_data *statusbars;
+	uint32_t statusbar_count, statusbar_cap;
+	struct mkgui_spinbox_data *spinboxes;
+	uint32_t spinbox_count, spinbox_cap;
+	struct mkgui_progress_data *progress;
+	uint32_t progress_count, progress_cap;
+	struct mkgui_textarea_data *textareas;
+	uint32_t textarea_count, textarea_cap;
+	struct mkgui_itemview_data *itemviews;
+	uint32_t itemview_count, itemview_cap;
+	struct mkgui_scrollbar_data *scrollbars;
+	uint32_t scrollbar_count, scrollbar_cap;
+	struct mkgui_box_scroll *box_scrolls;
+	uint32_t box_scroll_count, box_scroll_cap;
+	struct mkgui_image_data *images;
+	uint32_t image_count, image_cap;
+	struct mkgui_glview_data *glviews;
+	uint32_t glview_count, glview_cap;
+	struct mkgui_canvas_data *canvases;
+	uint32_t canvas_count, canvas_cap;
+	struct mkgui_pathbar_data *pathbars;
+	uint32_t pathbar_count, pathbar_cap;
+	struct mkgui_ipinput_data *ipinputs;
+	uint32_t ipinput_count, ipinput_cap;
+	struct mkgui_toggle_data *toggles;
+	uint32_t toggle_count, toggle_cap;
+	struct mkgui_combobox_data *comboboxes;
+	uint32_t combobox_count, combobox_cap;
+	struct mkgui_datepicker_data *datepickers;
+	uint32_t datepicker_count, datepicker_cap;
 
 	struct mkgui_popup popups[MKGUI_MAX_POPUPS];
 	uint32_t popup_count;
@@ -761,15 +767,13 @@ struct mkgui_ctx {
 	int32_t dblclick_row;
 	uint32_t dblclick_time;
 
-	struct { int32_t x, y, w, h; } dirty_rects[32];
+	struct mkgui_rect dirty_rects[32];
 	uint32_t dirty_count;
 	uint32_t dirty_full;
 
 	uint32_t tooltip_id;
 	uint32_t tooltip_timer;
 	int32_t tooltip_x, tooltip_y;
-
-	char tooltip_texts[MKGUI_MAX_WIDGETS][MKGUI_MAX_TEXT];
 
 	struct mkgui_theme theme;
 
@@ -801,6 +805,25 @@ struct mkgui_ctx {
 	char clip_text[MKGUI_CLIP_MAX];
 	uint32_t clip_len;
 };
+
+// ---------------------------------------------------------------------------
+// Dynamic array growth
+// ---------------------------------------------------------------------------
+
+#define MKGUI_GROW_WIDGETS 256
+#define MKGUI_GROW_AUX     16
+
+#define MKGUI_AUX_GROW(arr, count, cap, type) do { \
+	if((count) >= (cap)) { \
+		uint32_t _nc = (cap) + MKGUI_GROW_AUX; \
+		type *_tmp = (type *)realloc((arr), (size_t)_nc * sizeof(type)); \
+		if(_tmp) { \
+			memset(&_tmp[(cap)], 0, (size_t)MKGUI_GROW_AUX * sizeof(type)); \
+			(arr) = _tmp; \
+			(cap) = _nc; \
+		} \
+	} \
+} while(0)
 
 // ---------------------------------------------------------------------------
 // Default theme
@@ -1717,9 +1740,10 @@ static struct {
 	uint32_t idx;
 } layout_id_map[LAYOUT_HASH_SIZE];
 
-static uint32_t layout_parent[MKGUI_MAX_WIDGETS];
-static uint32_t layout_first_child[MKGUI_MAX_WIDGETS];
-static uint32_t layout_next_sibling[MKGUI_MAX_WIDGETS];
+static uint32_t *layout_parent;
+static uint32_t *layout_first_child;
+static uint32_t *layout_next_sibling;
+static uint32_t layout_arr_cap;
 
 // [=]===^=[ layout_find_idx ]====================================[=]
 static uint32_t layout_find_idx(uint32_t id) {
@@ -1737,6 +1761,18 @@ static uint32_t layout_find_idx(uint32_t id) {
 
 // [=]===^=[ layout_build_index ]==================================[=]
 static void layout_build_index(struct mkgui_ctx *ctx) {
+	if(ctx->widget_count > layout_arr_cap) {
+		uint32_t nc = (ctx->widget_count + MKGUI_GROW_WIDGETS - 1) & ~(uint32_t)(MKGUI_GROW_WIDGETS - 1);
+		uint32_t *np = (uint32_t *)realloc(layout_parent, (size_t)nc * sizeof(uint32_t));
+		uint32_t *nf = (uint32_t *)realloc(layout_first_child, (size_t)nc * sizeof(uint32_t));
+		uint32_t *ns = (uint32_t *)realloc(layout_next_sibling, (size_t)nc * sizeof(uint32_t));
+		if(np) { layout_parent = np; }
+		if(nf) { layout_first_child = nf; }
+		if(ns) { layout_next_sibling = ns; }
+		if(np && nf && ns) {
+			layout_arr_cap = nc;
+		}
+	}
 	for(uint32_t i = 0; i < LAYOUT_HASH_SIZE; ++i) {
 		layout_id_map[i].idx = UINT32_MAX;
 	}
@@ -2745,211 +2781,756 @@ static void render_widgets(struct mkgui_ctx *ctx) {
 // Init auxiliary data
 // ---------------------------------------------------------------------------
 
-// [=]===^=[ init_aux_data ]=====================================[=]
-static void init_aux_data(struct mkgui_ctx *ctx) {
-	for(uint32_t i = 0; i < ctx->widget_count; ++i) {
-		struct mkgui_widget *w = &ctx->widgets[i];
-		switch(w->type) {
-			case MKGUI_INPUT: {
-				if(ctx->input_count < 64) {
-					struct mkgui_input_data *inp = &ctx->inputs[ctx->input_count++];
-					memset(inp, 0, sizeof(*inp));
-					inp->widget_id = w->id;
-				}
-			} break;
+// [=]===^=[ init_widget_aux ]====================================[=]
+static void init_widget_aux(struct mkgui_ctx *ctx, struct mkgui_widget *w) {
+	switch(w->type) {
+		case MKGUI_INPUT: {
+			MKGUI_AUX_GROW(ctx->inputs, ctx->input_count, ctx->input_cap, struct mkgui_input_data);
+			if(ctx->input_count < ctx->input_cap) {
+				struct mkgui_input_data *inp = &ctx->inputs[ctx->input_count++];
+				memset(inp, 0, sizeof(*inp));
+				inp->widget_id = w->id;
+			}
+		} break;
 
-			case MKGUI_IPINPUT: {
-				if(ctx->ipinput_count < 16) {
-					struct mkgui_ipinput_data *ip = &ctx->ipinputs[ctx->ipinput_count++];
-					memset(ip, 0, sizeof(*ip));
-					ip->widget_id = w->id;
-				}
-			} break;
+		case MKGUI_IPINPUT: {
+			MKGUI_AUX_GROW(ctx->ipinputs, ctx->ipinput_count, ctx->ipinput_cap, struct mkgui_ipinput_data);
+			if(ctx->ipinput_count < ctx->ipinput_cap) {
+				struct mkgui_ipinput_data *ip = &ctx->ipinputs[ctx->ipinput_count++];
+				memset(ip, 0, sizeof(*ip));
+				ip->widget_id = w->id;
+			}
+		} break;
 
-			case MKGUI_TOGGLE: {
-				if(ctx->toggle_count < 32) {
-					struct mkgui_toggle_data *td = &ctx->toggles[ctx->toggle_count++];
-					memset(td, 0, sizeof(*td));
-					td->widget_id = w->id;
-				}
-			} break;
+		case MKGUI_TOGGLE: {
+			MKGUI_AUX_GROW(ctx->toggles, ctx->toggle_count, ctx->toggle_cap, struct mkgui_toggle_data);
+			if(ctx->toggle_count < ctx->toggle_cap) {
+				struct mkgui_toggle_data *td = &ctx->toggles[ctx->toggle_count++];
+				memset(td, 0, sizeof(*td));
+				td->widget_id = w->id;
+			}
+		} break;
 
-			case MKGUI_COMBOBOX: {
-				if(ctx->combobox_count < 16) {
-					struct mkgui_combobox_data *cb = &ctx->comboboxes[ctx->combobox_count++];
-					memset(cb, 0, sizeof(*cb));
-					cb->widget_id = w->id;
-					cb->selected = -1;
-				}
-			} break;
+		case MKGUI_COMBOBOX: {
+			MKGUI_AUX_GROW(ctx->comboboxes, ctx->combobox_count, ctx->combobox_cap, struct mkgui_combobox_data);
+			if(ctx->combobox_count < ctx->combobox_cap) {
+				struct mkgui_combobox_data *cb = &ctx->comboboxes[ctx->combobox_count++];
+				memset(cb, 0, sizeof(*cb));
+				cb->widget_id = w->id;
+				cb->selected = -1;
+			}
+		} break;
 
-			case MKGUI_DATEPICKER: {
-				if(ctx->datepicker_count < 16) {
-					struct mkgui_datepicker_data *dp = &ctx->datepickers[ctx->datepicker_count++];
-					memset(dp, 0, sizeof(*dp));
-					dp->widget_id = w->id;
-					dp->year = 2026;
-					dp->month = 1;
-					dp->day = 1;
-				}
-			} break;
+		case MKGUI_DATEPICKER: {
+			MKGUI_AUX_GROW(ctx->datepickers, ctx->datepicker_count, ctx->datepicker_cap, struct mkgui_datepicker_data);
+			if(ctx->datepicker_count < ctx->datepicker_cap) {
+				struct mkgui_datepicker_data *dp = &ctx->datepickers[ctx->datepicker_count++];
+				memset(dp, 0, sizeof(*dp));
+				dp->widget_id = w->id;
+				dp->year = 2026;
+				dp->month = 1;
+				dp->day = 1;
+			}
+		} break;
 
-			case MKGUI_DROPDOWN: {
-				if(ctx->dropdown_count < 32) {
-					struct mkgui_dropdown_data *dd = &ctx->dropdowns[ctx->dropdown_count++];
-					memset(dd, 0, sizeof(*dd));
-					dd->widget_id = w->id;
-					dd->selected = -1;
-				}
-			} break;
+		case MKGUI_DROPDOWN: {
+			MKGUI_AUX_GROW(ctx->dropdowns, ctx->dropdown_count, ctx->dropdown_cap, struct mkgui_dropdown_data);
+			if(ctx->dropdown_count < ctx->dropdown_cap) {
+				struct mkgui_dropdown_data *dd = &ctx->dropdowns[ctx->dropdown_count++];
+				memset(dd, 0, sizeof(*dd));
+				dd->widget_id = w->id;
+				dd->selected = -1;
+			}
+		} break;
 
-			case MKGUI_SLIDER: {
-				if(ctx->slider_count < 32) {
-					struct mkgui_slider_data *sd = &ctx->sliders[ctx->slider_count++];
-					memset(sd, 0, sizeof(*sd));
-					sd->widget_id = w->id;
-					sd->min_val = 0;
-					sd->max_val = 100;
-					sd->value = 50;
-				}
-			} break;
+		case MKGUI_SLIDER: {
+			MKGUI_AUX_GROW(ctx->sliders, ctx->slider_count, ctx->slider_cap, struct mkgui_slider_data);
+			if(ctx->slider_count < ctx->slider_cap) {
+				struct mkgui_slider_data *sd = &ctx->sliders[ctx->slider_count++];
+				memset(sd, 0, sizeof(*sd));
+				sd->widget_id = w->id;
+				sd->min_val = 0;
+				sd->max_val = 100;
+				sd->value = 50;
+			}
+		} break;
 
-			case MKGUI_TABS: {
-				if(ctx->tab_count < 32) {
-					struct mkgui_tabs_data *td = &ctx->tabs[ctx->tab_count++];
-					td->widget_id = w->id;
-					td->active_tab = 0;
-					for(uint32_t j = 0; j < ctx->widget_count; ++j) {
-						if(ctx->widgets[j].type == MKGUI_TAB && ctx->widgets[j].parent_id == w->id) {
-							td->active_tab = ctx->widgets[j].id;
-							break;
-						}
+		case MKGUI_TABS: {
+			MKGUI_AUX_GROW(ctx->tabs, ctx->tab_count, ctx->tab_cap, struct mkgui_tabs_data);
+			if(ctx->tab_count < ctx->tab_cap) {
+				struct mkgui_tabs_data *td = &ctx->tabs[ctx->tab_count++];
+				td->widget_id = w->id;
+				td->active_tab = 0;
+				for(uint32_t j = 0; j < ctx->widget_count; ++j) {
+					if(ctx->widgets[j].type == MKGUI_TAB && ctx->widgets[j].parent_id == w->id) {
+						td->active_tab = ctx->widgets[j].id;
+						break;
 					}
 				}
-			} break;
+			}
+		} break;
 
-			case MKGUI_VBOX:
-			case MKGUI_HBOX: {
-				if((w->flags & MKGUI_SCROLL) && ctx->box_scroll_count < 32) {
+		case MKGUI_VBOX:
+		case MKGUI_HBOX: {
+			if(w->flags & MKGUI_SCROLL) {
+				MKGUI_AUX_GROW(ctx->box_scrolls, ctx->box_scroll_count, ctx->box_scroll_cap, struct mkgui_box_scroll);
+				if(ctx->box_scroll_count < ctx->box_scroll_cap) {
 					struct mkgui_box_scroll *bs = &ctx->box_scrolls[ctx->box_scroll_count++];
 					bs->widget_id = w->id;
 					bs->scroll_y = 0;
 					bs->content_h = 0;
 				}
-			} break;
+			}
+		} break;
 
-			case MKGUI_HSPLIT:
-			case MKGUI_VSPLIT: {
-				if(ctx->split_count < 32) {
-					struct mkgui_split_data *sd = &ctx->splits[ctx->split_count++];
-					sd->widget_id = w->id;
-					sd->ratio = 0.5f;
+		case MKGUI_HSPLIT:
+		case MKGUI_VSPLIT: {
+			MKGUI_AUX_GROW(ctx->splits, ctx->split_count, ctx->split_cap, struct mkgui_split_data);
+			if(ctx->split_count < ctx->split_cap) {
+				struct mkgui_split_data *sd = &ctx->splits[ctx->split_count++];
+				sd->widget_id = w->id;
+				sd->ratio = 0.5f;
+			}
+		} break;
+
+		case MKGUI_TREEVIEW: {
+			MKGUI_AUX_GROW(ctx->treeviews, ctx->treeview_count, ctx->treeview_cap, struct mkgui_treeview_data);
+			if(ctx->treeview_count < ctx->treeview_cap) {
+				struct mkgui_treeview_data *tv = &ctx->treeviews[ctx->treeview_count++];
+				memset(tv, 0, sizeof(*tv));
+				tv->widget_id = w->id;
+				tv->selected_node = -1;
+			}
+		} break;
+
+		case MKGUI_STATUSBAR: {
+			MKGUI_AUX_GROW(ctx->statusbars, ctx->statusbar_count, ctx->statusbar_cap, struct mkgui_statusbar_data);
+			if(ctx->statusbar_count < ctx->statusbar_cap) {
+				struct mkgui_statusbar_data *sb = &ctx->statusbars[ctx->statusbar_count++];
+				memset(sb, 0, sizeof(*sb));
+				sb->widget_id = w->id;
+			}
+		} break;
+
+		case MKGUI_SPINBOX: {
+			MKGUI_AUX_GROW(ctx->spinboxes, ctx->spinbox_count, ctx->spinbox_cap, struct mkgui_spinbox_data);
+			if(ctx->spinbox_count < ctx->spinbox_cap) {
+				struct mkgui_spinbox_data *sd = &ctx->spinboxes[ctx->spinbox_count++];
+				memset(sd, 0, sizeof(*sd));
+				sd->widget_id = w->id;
+				sd->min_val = 0;
+				sd->max_val = 100;
+				sd->value = 0;
+				sd->step = 1;
+			}
+		} break;
+
+		case MKGUI_PROGRESS: {
+			MKGUI_AUX_GROW(ctx->progress, ctx->progress_count, ctx->progress_cap, struct mkgui_progress_data);
+			if(ctx->progress_count < ctx->progress_cap) {
+				struct mkgui_progress_data *pd = &ctx->progress[ctx->progress_count++];
+				memset(pd, 0, sizeof(*pd));
+				pd->widget_id = w->id;
+				pd->max_val = 100;
+			}
+		} break;
+
+		case MKGUI_TEXTAREA: {
+			MKGUI_AUX_GROW(ctx->textareas, ctx->textarea_count, ctx->textarea_cap, struct mkgui_textarea_data);
+			if(ctx->textarea_count < ctx->textarea_cap) {
+				struct mkgui_textarea_data *ta = &ctx->textareas[ctx->textarea_count++];
+				memset(ta, 0, sizeof(*ta));
+				ta->widget_id = w->id;
+				ta->text = (char *)calloc(1, MKGUI_TEXTAREA_INIT_CAP);
+				if(!ta->text) {
+					--ctx->textarea_count;
+					break;
 				}
-			} break;
+				ta->text_cap = MKGUI_TEXTAREA_INIT_CAP;
+			}
+		} break;
 
-			case MKGUI_TREEVIEW: {
-				if(ctx->treeview_count < 8) {
-					struct mkgui_treeview_data *tv = &ctx->treeviews[ctx->treeview_count++];
-					memset(tv, 0, sizeof(*tv));
-					tv->widget_id = w->id;
-					tv->selected_node = -1;
-				}
-			} break;
+		case MKGUI_ITEMVIEW: {
+			MKGUI_AUX_GROW(ctx->itemviews, ctx->itemview_count, ctx->itemview_cap, struct mkgui_itemview_data);
+			if(ctx->itemview_count < ctx->itemview_cap) {
+				struct mkgui_itemview_data *iv = &ctx->itemviews[ctx->itemview_count++];
+				memset(iv, 0, sizeof(*iv));
+				iv->widget_id = w->id;
+				iv->selected = -1;
+			}
+		} break;
 
-			case MKGUI_STATUSBAR: {
-				if(ctx->statusbar_count < 8) {
-					struct mkgui_statusbar_data *sb = &ctx->statusbars[ctx->statusbar_count++];
-					memset(sb, 0, sizeof(*sb));
-					sb->widget_id = w->id;
-				}
-			} break;
+		case MKGUI_CANVAS: {
+			MKGUI_AUX_GROW(ctx->canvases, ctx->canvas_count, ctx->canvas_cap, struct mkgui_canvas_data);
+			if(ctx->canvas_count < ctx->canvas_cap) {
+				struct mkgui_canvas_data *cd = &ctx->canvases[ctx->canvas_count++];
+				memset(cd, 0, sizeof(*cd));
+				cd->widget_id = w->id;
+			}
+		} break;
 
-			case MKGUI_SPINBOX: {
-				if(ctx->spinbox_count < 32) {
-					struct mkgui_spinbox_data *sd = &ctx->spinboxes[ctx->spinbox_count++];
-					memset(sd, 0, sizeof(*sd));
-					sd->widget_id = w->id;
-					sd->min_val = 0;
-					sd->max_val = 100;
-					sd->value = 0;
-					sd->step = 1;
-				}
-			} break;
+		case MKGUI_PATHBAR: {
+			MKGUI_AUX_GROW(ctx->pathbars, ctx->pathbar_count, ctx->pathbar_cap, struct mkgui_pathbar_data);
+			if(ctx->pathbar_count < ctx->pathbar_cap) {
+				struct mkgui_pathbar_data *pb = &ctx->pathbars[ctx->pathbar_count++];
+				memset(pb, 0, sizeof(*pb));
+				pb->widget_id = w->id;
+				pb->hover_seg = -1;
+			}
+		} break;
 
-			case MKGUI_PROGRESS: {
-				if(ctx->progress_count < 32) {
-					struct mkgui_progress_data *pd = &ctx->progress[ctx->progress_count++];
-					memset(pd, 0, sizeof(*pd));
-					pd->widget_id = w->id;
-					pd->max_val = 100;
-				}
-			} break;
+		default: {
+		} break;
+	}
+}
 
-			case MKGUI_TEXTAREA: {
-				if(ctx->textarea_count < 16) {
-					struct mkgui_textarea_data *ta = &ctx->textareas[ctx->textarea_count++];
-					memset(ta, 0, sizeof(*ta));
-					ta->widget_id = w->id;
-					ta->text = (char *)calloc(1, MKGUI_TEXTAREA_INIT_CAP);
-					if(!ta->text) {
-						--ctx->textarea_count;
-						break;
-					}
-					ta->text_cap = MKGUI_TEXTAREA_INIT_CAP;
-				}
-			} break;
-
-			case MKGUI_ITEMVIEW: {
-				if(ctx->itemview_count < 16) {
-					struct mkgui_itemview_data *iv = &ctx->itemviews[ctx->itemview_count++];
-					memset(iv, 0, sizeof(*iv));
-					iv->widget_id = w->id;
-					iv->selected = -1;
-				}
-			} break;
-
-			case MKGUI_CANVAS: {
-				if(ctx->canvas_count < 16) {
-					struct mkgui_canvas_data *cd = &ctx->canvases[ctx->canvas_count++];
-					memset(cd, 0, sizeof(*cd));
-					cd->widget_id = w->id;
-				}
-			} break;
-
-			case MKGUI_PATHBAR: {
-				if(ctx->pathbar_count < 8) {
-					struct mkgui_pathbar_data *pb = &ctx->pathbars[ctx->pathbar_count++];
-					memset(pb, 0, sizeof(*pb));
-					pb->widget_id = w->id;
-					pb->hover_seg = -1;
-				}
-			} break;
-
-			default: {
-			} break;
-		}
+// [=]===^=[ init_aux_data ]=====================================[=]
+static void init_aux_data(struct mkgui_ctx *ctx) {
+	for(uint32_t i = 0; i < ctx->widget_count; ++i) {
+		init_widget_aux(ctx, &ctx->widgets[i]);
 	}
 	for(uint32_t i = 0; i < ctx->widget_count; ++i) {
 		struct mkgui_widget *w = &ctx->widgets[i];
 		if(w->type == MKGUI_BUTTON && w->label[0] != '\0') {
 			struct mkgui_widget *parent = find_widget(ctx, w->parent_id);
 			if(parent && parent->type == MKGUI_TOOLBAR) {
-				snprintf(ctx->tooltip_texts[i], sizeof(ctx->tooltip_texts[i]), "%s", w->label);
+				snprintf(ctx->tooltip_texts[i], MKGUI_MAX_TEXT, "%s", w->label);
 			}
 		}
 	}
+}
+
+// [=]===^=[ mkgui_grow_widgets ]=================================[=]
+static uint32_t mkgui_grow_widgets(struct mkgui_ctx *ctx) {
+	uint32_t new_cap = ctx->widget_cap + MKGUI_GROW_WIDGETS;
+	struct mkgui_widget *nw = (struct mkgui_widget *)realloc(ctx->widgets, (size_t)new_cap * sizeof(struct mkgui_widget));
+	struct mkgui_rect *nr = (struct mkgui_rect *)realloc(ctx->rects, (size_t)new_cap * sizeof(struct mkgui_rect));
+	char (*nt)[MKGUI_MAX_TEXT] = (char (*)[MKGUI_MAX_TEXT])realloc(ctx->tooltip_texts, (size_t)new_cap * MKGUI_MAX_TEXT);
+	if(!nw || !nr || !nt) {
+		if(nw) { ctx->widgets = nw; }
+		if(nr) { ctx->rects = nr; }
+		if(nt) { ctx->tooltip_texts = nt; }
+		return 0;
+	}
+	memset(&nw[ctx->widget_cap], 0, (size_t)MKGUI_GROW_WIDGETS * sizeof(struct mkgui_widget));
+	memset(&nr[ctx->widget_cap], 0, (size_t)MKGUI_GROW_WIDGETS * sizeof(struct mkgui_rect));
+	memset(&nt[ctx->widget_cap], 0, (size_t)MKGUI_GROW_WIDGETS * MKGUI_MAX_TEXT);
+	ctx->widgets = nw;
+	ctx->rects = nr;
+	ctx->tooltip_texts = nt;
+	ctx->widget_cap = new_cap;
+	return 1;
+}
+
+// [=]===^=[ mkgui_add_widget ]===================================[=]
+static uint32_t mkgui_add_widget(struct mkgui_ctx *ctx, struct mkgui_widget w, uint32_t after_id) {
+	if(ctx->widget_count >= ctx->widget_cap) {
+		if(!mkgui_grow_widgets(ctx)) {
+			return 0;
+		}
+	}
+
+	uint32_t pos = ctx->widget_count;
+	if(after_id) {
+		for(uint32_t i = 0; i < ctx->widget_count; ++i) {
+			if(ctx->widgets[i].id == after_id) {
+				pos = i + 1;
+				break;
+			}
+		}
+	}
+
+	if(pos < ctx->widget_count) {
+		uint32_t tail = ctx->widget_count - pos;
+		memmove(&ctx->widgets[pos + 1], &ctx->widgets[pos], tail * sizeof(struct mkgui_widget));
+		memmove(&ctx->rects[pos + 1], &ctx->rects[pos], tail * sizeof(struct mkgui_rect));
+		memmove(&ctx->tooltip_texts[pos + 1], &ctx->tooltip_texts[pos], tail * MKGUI_MAX_TEXT);
+	}
+
+	ctx->widgets[pos] = w;
+	memset(&ctx->rects[pos], 0, sizeof(struct mkgui_rect));
+	ctx->tooltip_texts[pos][0] = '\0';
+	++ctx->widget_count;
+
+	init_widget_aux(ctx, &ctx->widgets[pos]);
+
+	if(w.type == MKGUI_BUTTON && w.label[0] != '\0') {
+		struct mkgui_widget *parent = find_widget(ctx, w.parent_id);
+		if(parent && parent->type == MKGUI_TOOLBAR) {
+			snprintf(ctx->tooltip_texts[pos], MKGUI_MAX_TEXT, "%s", w.label);
+		}
+	}
+
+	if(w.icon[0] != '\0') {
+		icon_resolve(w.icon);
+	}
+
+	dirty_all(ctx);
+	return 1;
+}
+
+// [=]===^=[ mkgui_remove_aux_ ]==================================[=]
+static void mkgui_remove_aux_(struct mkgui_ctx *ctx, uint32_t id, uint32_t type) {
+	switch(type) {
+		case MKGUI_INPUT: {
+			for(uint32_t i = 0; i < ctx->input_count; ++i) {
+				if(ctx->inputs[i].widget_id == id) {
+					if(i < ctx->input_count - 1) {
+						ctx->inputs[i] = ctx->inputs[ctx->input_count - 1];
+					}
+					--ctx->input_count;
+					break;
+				}
+			}
+		} break;
+
+		case MKGUI_IPINPUT: {
+			for(uint32_t i = 0; i < ctx->ipinput_count; ++i) {
+				if(ctx->ipinputs[i].widget_id == id) {
+					if(i < ctx->ipinput_count - 1) {
+						ctx->ipinputs[i] = ctx->ipinputs[ctx->ipinput_count - 1];
+					}
+					--ctx->ipinput_count;
+					break;
+				}
+			}
+		} break;
+
+		case MKGUI_TOGGLE: {
+			for(uint32_t i = 0; i < ctx->toggle_count; ++i) {
+				if(ctx->toggles[i].widget_id == id) {
+					if(i < ctx->toggle_count - 1) {
+						ctx->toggles[i] = ctx->toggles[ctx->toggle_count - 1];
+					}
+					--ctx->toggle_count;
+					break;
+				}
+			}
+		} break;
+
+		case MKGUI_COMBOBOX: {
+			for(uint32_t i = 0; i < ctx->combobox_count; ++i) {
+				if(ctx->comboboxes[i].widget_id == id) {
+					if(i < ctx->combobox_count - 1) {
+						ctx->comboboxes[i] = ctx->comboboxes[ctx->combobox_count - 1];
+					}
+					--ctx->combobox_count;
+					break;
+				}
+			}
+		} break;
+
+		case MKGUI_DATEPICKER: {
+			for(uint32_t i = 0; i < ctx->datepicker_count; ++i) {
+				if(ctx->datepickers[i].widget_id == id) {
+					if(i < ctx->datepicker_count - 1) {
+						ctx->datepickers[i] = ctx->datepickers[ctx->datepicker_count - 1];
+					}
+					--ctx->datepicker_count;
+					break;
+				}
+			}
+		} break;
+
+		case MKGUI_DROPDOWN: {
+			for(uint32_t i = 0; i < ctx->dropdown_count; ++i) {
+				if(ctx->dropdowns[i].widget_id == id) {
+					if(i < ctx->dropdown_count - 1) {
+						ctx->dropdowns[i] = ctx->dropdowns[ctx->dropdown_count - 1];
+					}
+					--ctx->dropdown_count;
+					break;
+				}
+			}
+		} break;
+
+		case MKGUI_SLIDER: {
+			for(uint32_t i = 0; i < ctx->slider_count; ++i) {
+				if(ctx->sliders[i].widget_id == id) {
+					if(i < ctx->slider_count - 1) {
+						ctx->sliders[i] = ctx->sliders[ctx->slider_count - 1];
+					}
+					--ctx->slider_count;
+					break;
+				}
+			}
+		} break;
+
+		case MKGUI_TABS: {
+			for(uint32_t i = 0; i < ctx->tab_count; ++i) {
+				if(ctx->tabs[i].widget_id == id) {
+					if(i < ctx->tab_count - 1) {
+						ctx->tabs[i] = ctx->tabs[ctx->tab_count - 1];
+					}
+					--ctx->tab_count;
+					break;
+				}
+			}
+		} break;
+
+		case MKGUI_VBOX:
+		case MKGUI_HBOX: {
+			for(uint32_t i = 0; i < ctx->box_scroll_count; ++i) {
+				if(ctx->box_scrolls[i].widget_id == id) {
+					if(i < ctx->box_scroll_count - 1) {
+						ctx->box_scrolls[i] = ctx->box_scrolls[ctx->box_scroll_count - 1];
+					}
+					--ctx->box_scroll_count;
+					break;
+				}
+			}
+		} break;
+
+		case MKGUI_HSPLIT:
+		case MKGUI_VSPLIT: {
+			for(uint32_t i = 0; i < ctx->split_count; ++i) {
+				if(ctx->splits[i].widget_id == id) {
+					if(i < ctx->split_count - 1) {
+						ctx->splits[i] = ctx->splits[ctx->split_count - 1];
+					}
+					--ctx->split_count;
+					break;
+				}
+			}
+		} break;
+
+		case MKGUI_TREEVIEW: {
+			for(uint32_t i = 0; i < ctx->treeview_count; ++i) {
+				if(ctx->treeviews[i].widget_id == id) {
+					free(ctx->treeviews[i].nodes);
+					if(i < ctx->treeview_count - 1) {
+						ctx->treeviews[i] = ctx->treeviews[ctx->treeview_count - 1];
+					}
+					--ctx->treeview_count;
+					break;
+				}
+			}
+		} break;
+
+		case MKGUI_STATUSBAR: {
+			for(uint32_t i = 0; i < ctx->statusbar_count; ++i) {
+				if(ctx->statusbars[i].widget_id == id) {
+					if(i < ctx->statusbar_count - 1) {
+						ctx->statusbars[i] = ctx->statusbars[ctx->statusbar_count - 1];
+					}
+					--ctx->statusbar_count;
+					break;
+				}
+			}
+		} break;
+
+		case MKGUI_SPINBOX: {
+			for(uint32_t i = 0; i < ctx->spinbox_count; ++i) {
+				if(ctx->spinboxes[i].widget_id == id) {
+					if(i < ctx->spinbox_count - 1) {
+						ctx->spinboxes[i] = ctx->spinboxes[ctx->spinbox_count - 1];
+					}
+					--ctx->spinbox_count;
+					break;
+				}
+			}
+		} break;
+
+		case MKGUI_PROGRESS: {
+			for(uint32_t i = 0; i < ctx->progress_count; ++i) {
+				if(ctx->progress[i].widget_id == id) {
+					if(i < ctx->progress_count - 1) {
+						ctx->progress[i] = ctx->progress[ctx->progress_count - 1];
+					}
+					--ctx->progress_count;
+					break;
+				}
+			}
+		} break;
+
+		case MKGUI_TEXTAREA: {
+			for(uint32_t i = 0; i < ctx->textarea_count; ++i) {
+				if(ctx->textareas[i].widget_id == id) {
+					free(ctx->textareas[i].text);
+					if(i < ctx->textarea_count - 1) {
+						ctx->textareas[i] = ctx->textareas[ctx->textarea_count - 1];
+					}
+					--ctx->textarea_count;
+					break;
+				}
+			}
+		} break;
+
+		case MKGUI_ITEMVIEW: {
+			for(uint32_t i = 0; i < ctx->itemview_count; ++i) {
+				if(ctx->itemviews[i].widget_id == id) {
+					free(ctx->itemviews[i].thumb_buf);
+					if(i < ctx->itemview_count - 1) {
+						ctx->itemviews[i] = ctx->itemviews[ctx->itemview_count - 1];
+					}
+					--ctx->itemview_count;
+					break;
+				}
+			}
+		} break;
+
+		case MKGUI_LISTVIEW: {
+			for(uint32_t i = 0; i < ctx->listv_count; ++i) {
+				if(ctx->listvs[i].widget_id == id) {
+					if(i < ctx->listv_count - 1) {
+						ctx->listvs[i] = ctx->listvs[ctx->listv_count - 1];
+					}
+					--ctx->listv_count;
+					break;
+				}
+			}
+		} break;
+
+		case MKGUI_SCROLLBAR: {
+			for(uint32_t i = 0; i < ctx->scrollbar_count; ++i) {
+				if(ctx->scrollbars[i].id == id) {
+					if(i < ctx->scrollbar_count - 1) {
+						ctx->scrollbars[i] = ctx->scrollbars[ctx->scrollbar_count - 1];
+					}
+					--ctx->scrollbar_count;
+					break;
+				}
+			}
+		} break;
+
+		case MKGUI_IMAGE: {
+			for(uint32_t i = 0; i < ctx->image_count; ++i) {
+				if(ctx->images[i].id == id) {
+					free(ctx->images[i].pixels);
+					if(i < ctx->image_count - 1) {
+						ctx->images[i] = ctx->images[ctx->image_count - 1];
+					}
+					--ctx->image_count;
+					break;
+				}
+			}
+		} break;
+
+		case MKGUI_GLVIEW: {
+			for(uint32_t i = 0; i < ctx->glview_count; ++i) {
+				if(ctx->glviews[i].id == id) {
+					if(ctx->glviews[i].created) {
+						platform_glview_destroy(ctx, &ctx->glviews[i]);
+					}
+					if(i < ctx->glview_count - 1) {
+						ctx->glviews[i] = ctx->glviews[ctx->glview_count - 1];
+					}
+					--ctx->glview_count;
+					break;
+				}
+			}
+		} break;
+
+		case MKGUI_CANVAS: {
+			for(uint32_t i = 0; i < ctx->canvas_count; ++i) {
+				if(ctx->canvases[i].widget_id == id) {
+					if(i < ctx->canvas_count - 1) {
+						ctx->canvases[i] = ctx->canvases[ctx->canvas_count - 1];
+					}
+					--ctx->canvas_count;
+					break;
+				}
+			}
+		} break;
+
+		case MKGUI_PATHBAR: {
+			for(uint32_t i = 0; i < ctx->pathbar_count; ++i) {
+				if(ctx->pathbars[i].widget_id == id) {
+					if(i < ctx->pathbar_count - 1) {
+						ctx->pathbars[i] = ctx->pathbars[ctx->pathbar_count - 1];
+					}
+					--ctx->pathbar_count;
+					break;
+				}
+			}
+		} break;
+
+		default: {
+		} break;
+	}
+}
+
+// [=]===^=[ mkgui_remove_widget ]================================[=]
+static uint32_t mkgui_remove_widget(struct mkgui_ctx *ctx, uint32_t id) {
+	int32_t idx = find_widget_idx(ctx, id);
+	if(idx < 0) {
+		return 0;
+	}
+	if(ctx->widgets[idx].type == MKGUI_WINDOW) {
+		return 0;
+	}
+
+	uint8_t *marked = (uint8_t *)calloc(ctx->widget_count, 1);
+	if(!marked) {
+		return 0;
+	}
+	marked[idx] = 1;
+	uint32_t changed = 1;
+	while(changed) {
+		changed = 0;
+		for(uint32_t i = 0; i < ctx->widget_count; ++i) {
+			if(!marked[i]) {
+				int32_t pidx = find_widget_idx(ctx, ctx->widgets[i].parent_id);
+				if(pidx >= 0 && marked[pidx]) {
+					marked[i] = 1;
+					changed = 1;
+				}
+			}
+		}
+	}
+
+	for(uint32_t i = 0; i < ctx->widget_count; ++i) {
+		if(marked[i]) {
+			uint32_t wid = ctx->widgets[i].id;
+			if(ctx->hover_id == wid) { ctx->hover_id = 0; }
+			if(ctx->prev_hover_id == wid) { ctx->prev_hover_id = 0; }
+			if(ctx->press_id == wid) { ctx->press_id = 0; }
+			if(ctx->focus_id == wid) { ctx->focus_id = 0; }
+			if(ctx->prev_focus_id == wid) { ctx->prev_focus_id = 0; }
+			if(ctx->drag_scrollbar_id == wid) { ctx->drag_scrollbar_id = 0; }
+			if(ctx->drag_col_id == wid) { ctx->drag_col_id = 0; }
+			if(ctx->drag_col_resize_id == wid) { ctx->drag_col_resize_id = 0; }
+			if(ctx->drag_select_id == wid) { ctx->drag_select_id = 0; }
+			if(ctx->dblclick_id == wid) { ctx->dblclick_id = 0; }
+			if(ctx->tooltip_id == wid) { ctx->tooltip_id = 0; }
+
+			for(uint32_t p = 0; p < ctx->popup_count; ++p) {
+				if(ctx->popups[p].widget_id == wid) {
+					popup_destroy(ctx, p);
+					break;
+				}
+			}
+
+			mkgui_remove_aux_(ctx, wid, ctx->widgets[i].type);
+		}
+	}
+
+	for(int32_t i = (int32_t)ctx->widget_count - 1; i >= 0; --i) {
+		if(marked[i]) {
+			uint32_t last = ctx->widget_count - 1;
+			if((uint32_t)i < last) {
+				uint32_t tail = last - (uint32_t)i;
+				memmove(&ctx->widgets[i], &ctx->widgets[i + 1], tail * sizeof(struct mkgui_widget));
+				memmove(&ctx->rects[i], &ctx->rects[i + 1], tail * sizeof(struct mkgui_rect));
+				memmove(&ctx->tooltip_texts[i], &ctx->tooltip_texts[i + 1], tail * MKGUI_MAX_TEXT);
+				for(uint32_t j = (uint32_t)i; j < last; ++j) {
+					marked[j] = marked[j + 1];
+				}
+			}
+			--ctx->widget_count;
+		}
+	}
+
+	free(marked);
+	dirty_all(ctx);
+	return 1;
 }
 
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
 
+// [=]===^=[ mkgui_alloc_arrays ]=================================[=]
+static uint32_t mkgui_alloc_arrays(struct mkgui_ctx *ctx, uint32_t widget_cap) {
+	ctx->widget_cap = widget_cap;
+	ctx->widgets = (struct mkgui_widget *)calloc(widget_cap, sizeof(struct mkgui_widget));
+	ctx->rects = (struct mkgui_rect *)calloc(widget_cap, sizeof(struct mkgui_rect));
+	ctx->tooltip_texts = (char (*)[MKGUI_MAX_TEXT])calloc(widget_cap, MKGUI_MAX_TEXT);
+	if(!ctx->widgets || !ctx->rects || !ctx->tooltip_texts) {
+		free(ctx->widgets);
+		free(ctx->rects);
+		free(ctx->tooltip_texts);
+		return 0;
+	}
+
+	ctx->listv_cap = 32;
+	ctx->listvs = (struct mkgui_listview_data *)calloc(ctx->listv_cap, sizeof(struct mkgui_listview_data));
+	ctx->input_cap = 64;
+	ctx->inputs = (struct mkgui_input_data *)calloc(ctx->input_cap, sizeof(struct mkgui_input_data));
+	ctx->dropdown_cap = 32;
+	ctx->dropdowns = (struct mkgui_dropdown_data *)calloc(ctx->dropdown_cap, sizeof(struct mkgui_dropdown_data));
+	ctx->slider_cap = 32;
+	ctx->sliders = (struct mkgui_slider_data *)calloc(ctx->slider_cap, sizeof(struct mkgui_slider_data));
+	ctx->tab_cap = 32;
+	ctx->tabs = (struct mkgui_tabs_data *)calloc(ctx->tab_cap, sizeof(struct mkgui_tabs_data));
+	ctx->split_cap = 32;
+	ctx->splits = (struct mkgui_split_data *)calloc(ctx->split_cap, sizeof(struct mkgui_split_data));
+	ctx->treeview_cap = 8;
+	ctx->treeviews = (struct mkgui_treeview_data *)calloc(ctx->treeview_cap, sizeof(struct mkgui_treeview_data));
+	ctx->statusbar_cap = 8;
+	ctx->statusbars = (struct mkgui_statusbar_data *)calloc(ctx->statusbar_cap, sizeof(struct mkgui_statusbar_data));
+	ctx->spinbox_cap = 32;
+	ctx->spinboxes = (struct mkgui_spinbox_data *)calloc(ctx->spinbox_cap, sizeof(struct mkgui_spinbox_data));
+	ctx->progress_cap = 32;
+	ctx->progress = (struct mkgui_progress_data *)calloc(ctx->progress_cap, sizeof(struct mkgui_progress_data));
+	ctx->textarea_cap = 16;
+	ctx->textareas = (struct mkgui_textarea_data *)calloc(ctx->textarea_cap, sizeof(struct mkgui_textarea_data));
+	ctx->itemview_cap = 16;
+	ctx->itemviews = (struct mkgui_itemview_data *)calloc(ctx->itemview_cap, sizeof(struct mkgui_itemview_data));
+	ctx->scrollbar_cap = 32;
+	ctx->scrollbars = (struct mkgui_scrollbar_data *)calloc(ctx->scrollbar_cap, sizeof(struct mkgui_scrollbar_data));
+	ctx->box_scroll_cap = 32;
+	ctx->box_scrolls = (struct mkgui_box_scroll *)calloc(ctx->box_scroll_cap, sizeof(struct mkgui_box_scroll));
+	ctx->image_cap = 32;
+	ctx->images = (struct mkgui_image_data *)calloc(ctx->image_cap, sizeof(struct mkgui_image_data));
+	ctx->glview_cap = 8;
+	ctx->glviews = (struct mkgui_glview_data *)calloc(ctx->glview_cap, sizeof(struct mkgui_glview_data));
+	ctx->canvas_cap = 16;
+	ctx->canvases = (struct mkgui_canvas_data *)calloc(ctx->canvas_cap, sizeof(struct mkgui_canvas_data));
+	ctx->pathbar_cap = 8;
+	ctx->pathbars = (struct mkgui_pathbar_data *)calloc(ctx->pathbar_cap, sizeof(struct mkgui_pathbar_data));
+	ctx->ipinput_cap = 16;
+	ctx->ipinputs = (struct mkgui_ipinput_data *)calloc(ctx->ipinput_cap, sizeof(struct mkgui_ipinput_data));
+	ctx->toggle_cap = 32;
+	ctx->toggles = (struct mkgui_toggle_data *)calloc(ctx->toggle_cap, sizeof(struct mkgui_toggle_data));
+	ctx->combobox_cap = 16;
+	ctx->comboboxes = (struct mkgui_combobox_data *)calloc(ctx->combobox_cap, sizeof(struct mkgui_combobox_data));
+	ctx->datepicker_cap = 16;
+	ctx->datepickers = (struct mkgui_datepicker_data *)calloc(ctx->datepicker_cap, sizeof(struct mkgui_datepicker_data));
+
+	return 1;
+}
+
+// [=]===^=[ mkgui_free_arrays ]==================================[=]
+static void mkgui_free_arrays(struct mkgui_ctx *ctx) {
+	free(ctx->widgets);
+	free(ctx->rects);
+	free(ctx->tooltip_texts);
+	free(ctx->listvs);
+	free(ctx->inputs);
+	free(ctx->dropdowns);
+	free(ctx->sliders);
+	free(ctx->tabs);
+	free(ctx->splits);
+	free(ctx->treeviews);
+	free(ctx->statusbars);
+	free(ctx->spinboxes);
+	free(ctx->progress);
+	free(ctx->textareas);
+	free(ctx->itemviews);
+	free(ctx->scrollbars);
+	free(ctx->box_scrolls);
+	free(ctx->images);
+	free(ctx->glviews);
+	free(ctx->canvases);
+	free(ctx->pathbars);
+	free(ctx->ipinputs);
+	free(ctx->toggles);
+	free(ctx->comboboxes);
+	free(ctx->datepickers);
+}
+
 // [=]===^=[ mkgui_create ]======================================[=]
 static struct mkgui_ctx *mkgui_create(struct mkgui_widget *widgets, uint32_t count) {
 	struct mkgui_ctx *ctx = (struct mkgui_ctx *)calloc(1, sizeof(struct mkgui_ctx));
 
-	if(count > MKGUI_MAX_WIDGETS) {
-		count = MKGUI_MAX_WIDGETS;
+	uint32_t cap = (count + MKGUI_GROW_WIDGETS - 1) & ~(uint32_t)(MKGUI_GROW_WIDGETS - 1);
+	if(cap < MKGUI_GROW_WIDGETS) {
+		cap = MKGUI_GROW_WIDGETS;
+	}
+	if(!mkgui_alloc_arrays(ctx, cap)) {
+		free(ctx);
+		return NULL;
 	}
 	memcpy(ctx->widgets, widgets, count * sizeof(struct mkgui_widget));
 	ctx->widget_count = count;
@@ -2972,6 +3553,7 @@ static struct mkgui_ctx *mkgui_create(struct mkgui_widget *widgets, uint32_t cou
 	}
 
 	if(!platform_init(ctx, title, init_w, init_h)) {
+		mkgui_free_arrays(ctx);
 		free(ctx);
 		return NULL;
 	}
@@ -3052,6 +3634,7 @@ static void mkgui_destroy(struct mkgui_ctx *ctx) {
 			platform_glview_destroy(ctx, &ctx->glviews[i]);
 		}
 	}
+	mkgui_free_arrays(ctx);
 	platform_font_fini(ctx);
 	platform_destroy(ctx);
 	mdi_dat_free();
@@ -3062,13 +3645,19 @@ static void mkgui_destroy(struct mkgui_ctx *ctx) {
 static struct mkgui_ctx *mkgui_create_child(struct mkgui_ctx *parent, struct mkgui_widget *widgets, uint32_t count, const char *title, int32_t w, int32_t h) {
 	struct mkgui_ctx *ctx = (struct mkgui_ctx *)calloc(1, sizeof(struct mkgui_ctx));
 
-	if(count > MKGUI_MAX_WIDGETS) {
-		count = MKGUI_MAX_WIDGETS;
+	uint32_t cap = (count + MKGUI_GROW_WIDGETS - 1) & ~(uint32_t)(MKGUI_GROW_WIDGETS - 1);
+	if(cap < MKGUI_GROW_WIDGETS) {
+		cap = MKGUI_GROW_WIDGETS;
+	}
+	if(!mkgui_alloc_arrays(ctx, cap)) {
+		free(ctx);
+		return NULL;
 	}
 	memcpy(ctx->widgets, widgets, count * sizeof(struct mkgui_widget));
 	ctx->widget_count = count;
 
 	if(!platform_init_child(ctx, parent, title, w, h)) {
+		mkgui_free_arrays(ctx);
 		free(ctx);
 		return NULL;
 	}
@@ -3119,6 +3708,7 @@ static void mkgui_destroy_child(struct mkgui_ctx *ctx) {
 	for(uint32_t i = 0; i < ctx->itemview_count; ++i) {
 		free(ctx->itemviews[i].thumb_buf);
 	}
+	mkgui_free_arrays(ctx);
 	platform_destroy(ctx);
 	free(ctx);
 }

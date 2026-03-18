@@ -36,6 +36,7 @@ enum {
 	FD_ID_BTN_BACK,
 	FD_ID_BTN_FWD,
 	FD_ID_BTN_UP,
+	FD_ID_TB_SEP1,
 	FD_ID_PATHBAR,
 	FD_ID_SPLIT,
 	FD_ID_BOOKMARKS,
@@ -1100,7 +1101,8 @@ static uint32_t fd_run_dialog(struct mkgui_ctx *ctx, uint32_t mode, const struct
 		{ MKGUI_BUTTON,   FD_ID_BTN_BACK,      "",          "arrow-left",        FD_ID_TOOLBAR,  0,   0,   0,   0, 0, 0 },
 		{ MKGUI_BUTTON,   FD_ID_BTN_FWD,       "",          "arrow-right",       FD_ID_TOOLBAR,  0,   0,   0,   0, 0, 0 },
 		{ MKGUI_BUTTON,   FD_ID_BTN_UP,        "",          "arrow-up",          FD_ID_TOOLBAR,  0,   0,   0,   0, 0, 0 },
-		{ MKGUI_BUTTON,   FD_ID_BTN_NEWFOLDER, "",          "folder-plus",       FD_ID_TOOLBAR,  0,   0,   0,   0, MKGUI_TOOLBAR_SEP, 0 },
+		{ MKGUI_BUTTON,   FD_ID_TB_SEP1,       "",          "",                  FD_ID_TOOLBAR,  0,   0,   0,   0, MKGUI_SEPARATOR, 0 },
+		{ MKGUI_BUTTON,   FD_ID_BTN_NEWFOLDER, "",          "folder-plus",       FD_ID_TOOLBAR,  0,   0,   0,   0, 0, 0 },
 
 		{ MKGUI_PATHBAR,  FD_ID_PATHBAR,       "",          "",                  FD_ID_WINDOW, 126,  2, 80, 24, MKGUI_ANCHOR_LEFT | MKGUI_ANCHOR_TOP | MKGUI_ANCHOR_RIGHT, 0 },
 		{ MKGUI_VSPLIT,   FD_ID_SPLIT,         "",          "",                  FD_ID_WINDOW,   0, 30,   0, FD_BOTTOM_H, MKGUI_ANCHOR_LEFT | MKGUI_ANCHOR_TOP | MKGUI_ANCHOR_RIGHT | MKGUI_ANCHOR_BOTTOM, 0 },

@@ -35,9 +35,10 @@ enum {
 	ED_MENU, ED_FILE_MENU, ED_EDIT_MENU,
 	ED_MI_NEW, ED_MI_OPEN, ED_MI_SAVE, ED_MI_SAVEAS, ED_MI_RECENT, ED_MI_GENERATE, ED_MI_SNIPPET, ED_MI_EXIT,
 	ED_MI_UNDO, ED_MI_REDO, ED_MI_COPY, ED_MI_PASTE, ED_MI_DELETE,
+	ED_MI_SEP1, ED_MI_SEP2, ED_MI_SEP3, ED_MI_SEP4,
 	ED_TOOLBAR = 20,
-	ED_TB_NEW, ED_TB_OPEN, ED_TB_SAVE, ED_TB_GEN, ED_TB_TEST,
-	ED_TB_UNDO, ED_TB_REDO,
+	ED_TB_NEW, ED_TB_OPEN, ED_TB_SAVE, ED_TB_SEP1, ED_TB_GEN, ED_TB_TEST,
+	ED_TB_SEP2, ED_TB_UNDO, ED_TB_REDO,
 	ED_SPLIT_MAIN = 30,
 	ED_SPLIT_RIGHT = 31,
 	ED_TREE = 32,
@@ -851,7 +852,7 @@ static struct ed_prop_desc ed_props[] = {
 	{ ED_PK_ACTION,        "Remove Item",     0,                                        0,                  0,      0,    ED_VIS_MENU,      ED_ACT_REM_ITEM,     ED_PROP_REM_ITEM,     0,                   0,                 0 },
 	{ ED_PK_ACTION,        "Add Button",      0,                                        0,                  0,      0,    ED_VIS_TOOLBAR,   ED_ACT_ADD_TB_BTN,   ED_PROP_ADD_TB_BTN,   0,                   0,                 0 },
 	{ ED_PK_ACTION,        "Remove Button",   0,                                        0,                  0,      0,    ED_VIS_TOOLBAR,   ED_ACT_REM_TB_BTN,   ED_PROP_REM_TB_BTN,   0,                   0,                 0 },
-	{ ED_PK_FLAG,          "TbSep",           offsetof(struct ed_widget, flags),         MKGUI_TOOLBAR_SEP,  0,      0,    ED_VIS_IN_TOOLBAR,ED_ACT_NONE,         ED_PROP_FL_TBSEP,     0,                   0,                 0 },
+	{ ED_PK_FLAG,          "Sep",             offsetof(struct ed_widget, flags),         MKGUI_SEPARATOR,    0,      0,    ED_VIS_IN_TOOLBAR,ED_ACT_NONE,         ED_PROP_FL_TBSEP,     0,                   0,                 0 },
 	{ ED_PK_MENU_TREE,     "",                0,                                        0,                  0,      0,    ED_VIS_MENU,      ED_ACT_NONE,         ED_MENU_TREE,         0,                   0,                 0 },
 };
 #define ED_PROP_COUNT (sizeof(ed_props) / sizeof(ed_props[0]))
@@ -2039,10 +2040,11 @@ static void ed_draw_widget(struct mkgui_ctx *ctx, uint32_t idx) {
 				if(btn->type != MKGUI_BUTTON || btn->parent_id != ew->id) {
 					continue;
 				}
-				if(btn->flags & MKGUI_TOOLBAR_SEP) {
+				if(btn->flags & MKGUI_SEPARATOR) {
 					int32_t sx = bx + MKGUI_TOOLBAR_SEP_W / 2;
 					draw_vline(buf, bw, bh, sx, ry + 4, rh - 8, ctx->theme.widget_border);
 					bx += MKGUI_TOOLBAR_SEP_W;
+					continue;
 				}
 				int32_t icon_idx = ed_show_icons && btn->icon[0] ? toolbar_icon_resolve(btn->icon) : -1;
 				int32_t tw = ed_show_text ? text_width(ctx, btn->label) : 0;
@@ -2653,8 +2655,9 @@ static void ed_layout_node(struct mkgui_ctx *ctx, uint32_t idx) {
 			if(btn->type != MKGUI_BUTTON) {
 				continue;
 			}
-			if(btn->flags & MKGUI_TOOLBAR_SEP) {
+			if(btn->flags & MKGUI_SEPARATOR) {
 				bx += MKGUI_TOOLBAR_SEP_W;
+				continue;
 			}
 			int32_t tw = edl_show_text ? text_width(ctx, btn->label) : 0;
 			int32_t ed_ii = edl_show_icons && btn->icon[0] ? toolbar_icon_resolve(btn->icon) : -1;
@@ -4148,7 +4151,8 @@ int main(void) {
 		{ MKGUI_MENUITEM, ED_MI_NEW,      "New",              "document-new",  ED_FILE_MENU, 0, 0, 0, 0, 0, 0 },
 		{ MKGUI_MENUITEM, ED_MI_OPEN,     "Open",             "document-open", ED_FILE_MENU, 0, 0, 0, 0, 0, 0 },
 		{ MKGUI_MENUITEM, ED_MI_SAVE,     "Save",             "document-save", ED_FILE_MENU, 0, 0, 0, 0, 0, 0 },
-		{ MKGUI_MENUITEM, ED_MI_SAVEAS,   "Save As...",       "", ED_FILE_MENU, 0, 0, 0, 0, MKGUI_SEPARATOR, 0 },
+		{ MKGUI_MENUITEM, ED_MI_SAVEAS,   "Save As...",       "", ED_FILE_MENU, 0, 0, 0, 0, 0, 0 },
+		{ MKGUI_MENUITEM, ED_MI_SEP1,     "",                 "", ED_FILE_MENU, 0, 0, 0, 0, MKGUI_SEPARATOR, 0 },
 		{ MKGUI_MENUITEM, ED_MI_RECENT,   "Recent Files",     "", ED_FILE_MENU, 0, 0, 0, 0, 0, 0 },
 		{ MKGUI_MENUITEM, ED_RECENT_FIRST + 0, "", "", ED_MI_RECENT, 0, 0, 0, 0, MKGUI_HIDDEN, 0 },
 		{ MKGUI_MENUITEM, ED_RECENT_FIRST + 1, "", "", ED_MI_RECENT, 0, 0, 0, 0, MKGUI_HIDDEN, 0 },
@@ -4160,20 +4164,25 @@ int main(void) {
 		{ MKGUI_MENUITEM, ED_RECENT_FIRST + 7, "", "", ED_MI_RECENT, 0, 0, 0, 0, MKGUI_HIDDEN, 0 },
 		{ MKGUI_MENUITEM, ED_RECENT_FIRST + 8, "", "", ED_MI_RECENT, 0, 0, 0, 0, MKGUI_HIDDEN, 0 },
 		{ MKGUI_MENUITEM, ED_RECENT_FIRST + 9, "", "", ED_MI_RECENT, 0, 0, 0, 0, MKGUI_HIDDEN, 0 },
-		{ MKGUI_MENUITEM, ED_MI_GENERATE, "Generate Code",    "", ED_FILE_MENU, 0, 0, 0, 0, MKGUI_SEPARATOR, 0 },
+		{ MKGUI_MENUITEM, ED_MI_SEP2,     "",                 "", ED_FILE_MENU, 0, 0, 0, 0, MKGUI_SEPARATOR, 0 },
+		{ MKGUI_MENUITEM, ED_MI_GENERATE, "Generate Code",    "", ED_FILE_MENU, 0, 0, 0, 0, 0, 0 },
 		{ MKGUI_MENUITEM, ED_MI_SNIPPET,  "Generate Snippet", "", ED_FILE_MENU, 0, 0, 0, 0, 0, 0 },
-		{ MKGUI_MENUITEM, ED_MI_EXIT,     "Exit",             "application-exit", ED_FILE_MENU, 0, 0, 0, 0, MKGUI_SEPARATOR, 0 },
+		{ MKGUI_MENUITEM, ED_MI_SEP3,     "",                 "", ED_FILE_MENU, 0, 0, 0, 0, MKGUI_SEPARATOR, 0 },
+		{ MKGUI_MENUITEM, ED_MI_EXIT,     "Exit",             "application-exit", ED_FILE_MENU, 0, 0, 0, 0, 0, 0 },
 		{ MKGUI_MENUITEM, ED_MI_UNDO,     "Undo",             "edit-undo", ED_EDIT_MENU, 0, 0, 0, 0, 0, 0 },
 		{ MKGUI_MENUITEM, ED_MI_REDO,     "Redo",             "edit-redo", ED_EDIT_MENU, 0, 0, 0, 0, 0, 0 },
-		{ MKGUI_MENUITEM, ED_MI_DELETE,   "Delete",           "edit-delete", ED_EDIT_MENU, 0, 0, 0, 0, MKGUI_SEPARATOR, 0 },
+		{ MKGUI_MENUITEM, ED_MI_SEP4,     "",                 "", ED_EDIT_MENU, 0, 0, 0, 0, MKGUI_SEPARATOR, 0 },
+		{ MKGUI_MENUITEM, ED_MI_DELETE,   "Delete",           "edit-delete", ED_EDIT_MENU, 0, 0, 0, 0, 0, 0 },
 
 		{ MKGUI_TOOLBAR,  ED_TOOLBAR,     "",                 "", ED_WINDOW,  0, 0, 0, 0, 0, 0 },
 		{ MKGUI_BUTTON,   ED_TB_NEW,      "New",              "document-new",  ED_TOOLBAR, 0, 0, 0, 0, 0, 0 },
-		{ MKGUI_BUTTON,   ED_TB_OPEN,     "Open",             "document-open", ED_TOOLBAR, 0, 0, 0, 0, MKGUI_TOOLBAR_SEP, 0 },
+		{ MKGUI_BUTTON,   ED_TB_OPEN,     "Open",             "document-open", ED_TOOLBAR, 0, 0, 0, 0, 0, 0 },
 		{ MKGUI_BUTTON,   ED_TB_SAVE,     "Save",             "document-save", ED_TOOLBAR, 0, 0, 0, 0, 0, 0 },
-		{ MKGUI_BUTTON,   ED_TB_GEN,      "Gen",              "", ED_TOOLBAR, 0, 0, 0, 0, MKGUI_TOOLBAR_SEP, 0 },
+		{ MKGUI_BUTTON,   ED_TB_SEP1,     "",                 "", ED_TOOLBAR, 0, 0, 0, 0, MKGUI_SEPARATOR, 0 },
+		{ MKGUI_BUTTON,   ED_TB_GEN,      "Gen",              "", ED_TOOLBAR, 0, 0, 0, 0, 0, 0 },
 		{ MKGUI_BUTTON,   ED_TB_TEST,     "Test",             "", ED_TOOLBAR, 0, 0, 0, 0, 0, 0 },
-		{ MKGUI_BUTTON,   ED_TB_UNDO,     "Undo",             "edit-undo", ED_TOOLBAR, 0, 0, 0, 0, MKGUI_TOOLBAR_SEP, 0 },
+		{ MKGUI_BUTTON,   ED_TB_SEP2,     "",                 "", ED_TOOLBAR, 0, 0, 0, 0, MKGUI_SEPARATOR, 0 },
+		{ MKGUI_BUTTON,   ED_TB_UNDO,     "Undo",             "edit-undo", ED_TOOLBAR, 0, 0, 0, 0, 0, 0 },
 		{ MKGUI_BUTTON,   ED_TB_REDO,     "Redo",             "edit-redo", ED_TOOLBAR, 0, 0, 0, 0, 0, 0 },
 
 		{ MKGUI_VSPLIT, ED_SPLIT_MAIN, "",              "", ED_WINDOW,  0, 0, 0, 0, MKGUI_ANCHOR_LEFT | MKGUI_ANCHOR_TOP | MKGUI_ANCHOR_RIGHT | MKGUI_ANCHOR_BOTTOM, 0 },

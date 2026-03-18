@@ -15,7 +15,8 @@ static struct mkgui_scrollbar_data *find_scrollbar_data(struct mkgui_ctx *ctx, u
 static void mkgui_scrollbar_setup(struct mkgui_ctx *ctx, uint32_t id, int32_t max_value, int32_t page_size) {
 	struct mkgui_scrollbar_data *sb = find_scrollbar_data(ctx, id);
 	if(!sb) {
-		if(ctx->scrollbar_count >= 32) {
+		MKGUI_AUX_GROW(ctx->scrollbars, ctx->scrollbar_count, ctx->scrollbar_cap, struct mkgui_scrollbar_data);
+		if(ctx->scrollbar_count >= ctx->scrollbar_cap) {
 			return;
 		}
 		sb = &ctx->scrollbars[ctx->scrollbar_count++];
