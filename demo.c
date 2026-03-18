@@ -588,7 +588,7 @@ int main(void) {
 						}
 
 					} else if(ev.id == ID_HELP_ABOUT) {
-						mkgui_message_box(ctx, "About", "mkgui demo v1.0\nDemonstrates all widget types.");
+						mkgui_message_box(ctx, "About", "mkgui demo v1.0\nDemonstrates all widget types.", MKGUI_DLG_ICON_INFO, MKGUI_DLG_BUTTONS_OK);
 					}
 				} break;
 

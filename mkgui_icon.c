@@ -168,7 +168,7 @@ static int32_t icon_resolve(const char *name) {
 
 // [=]===^=[ toolbar_icon_resolve ]====================================[=]
 static int32_t toolbar_icon_resolve(const char *name) {
-	char tb_name[MKGUI_ICON_NAME_LEN];
+	char tb_name[MKGUI_ICON_NAME_LEN + MKGUI_TOOLBAR_ICON_PREFIX_LEN];
 	snprintf(tb_name, sizeof(tb_name), "%s%s", MKGUI_TOOLBAR_ICON_PREFIX, name);
 	int32_t idx = icon_find_idx(tb_name);
 	if(idx >= 0) {

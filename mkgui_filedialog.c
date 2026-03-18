@@ -1121,7 +1121,7 @@ static uint32_t fd_run_dialog(struct mkgui_ctx *ctx, uint32_t mode, const struct
 	};
 
 	strncpy(widgets[0].label, title, MKGUI_MAX_TEXT - 1);
-	strncpy(widgets[15].label, confirm_label, MKGUI_MAX_TEXT - 1);
+	strncpy(widgets[16].label, confirm_label, MKGUI_MAX_TEXT - 1);
 
 	uint32_t wcount = sizeof(widgets) / sizeof(widgets[0]);
 	struct mkgui_ctx *dlg = mkgui_create_child(ctx, widgets, wcount, title, FD_INIT_W, FD_INIT_H);
