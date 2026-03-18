@@ -198,38 +198,36 @@ enum {
 // Anchor / layout flags
 // ---------------------------------------------------------------------------
 
-enum {
-	MKGUI_ANCHOR_LEFT   = (1 << 0),
-	MKGUI_ANCHOR_TOP    = (1 << 1),
-	MKGUI_ANCHOR_RIGHT  = (1 << 2),
-	MKGUI_ANCHOR_BOTTOM = (1 << 3),
-	MKGUI_REGION_TOP    = (1 << 4),
-	MKGUI_REGION_BOTTOM = (1 << 5),
-	MKGUI_REGION_LEFT   = (1 << 6),
-	MKGUI_REGION_RIGHT  = (1 << 7),
-	MKGUI_HIDDEN        = (1 << 8),
-	MKGUI_DISABLED      = (1 << 9),
-	MKGUI_CHECKED       = (1 << 10),
-	MKGUI_PASSWORD      = (1 << 11),
-	MKGUI_READONLY      = (1 << 12),
-	MKGUI_SEPARATOR     = (1 << 13),
-	MKGUI_TOOLBAR_SEP   = (1 << 14),
-	MKGUI_MENU_CHECK    = (1 << 15),
-	MKGUI_MENU_RADIO    = (1 << 16),
-	MKGUI_PANEL_BORDER  = (1 << 17),
-	MKGUI_PANEL_SUNKEN  = (1 << 18),
-	MKGUI_SCROLLBAR_HORIZ = (1 << 19),
-	MKGUI_IMAGE_STRETCH = (1 << 20),
-	MKGUI_SCROLL        = (1 << 21),
-	MKGUI_NO_PAD        = (1 << 22),
-	MKGUI_TAB_CLOSABLE  = (1 << 23),
-	MKGUI_MULTI_SELECT  = (1 << 24),
-	MKGUI_ALIGN_START   = (1 << 25),
-	MKGUI_ALIGN_CENTER  = (2 << 25),
-	MKGUI_ALIGN_END     = (3 << 25),
-	MKGUI_ALIGN_MASK    = (3 << 25),
-	MKGUI_FIXED         = (1 << 27),
-};
+#define MKGUI_ANCHOR_LEFT     (1u << 0)
+#define MKGUI_ANCHOR_TOP      (1u << 1)
+#define MKGUI_ANCHOR_RIGHT    (1u << 2)
+#define MKGUI_ANCHOR_BOTTOM   (1u << 3)
+#define MKGUI_REGION_TOP      (1u << 4)
+#define MKGUI_REGION_BOTTOM   (1u << 5)
+#define MKGUI_REGION_LEFT     (1u << 6)
+#define MKGUI_REGION_RIGHT    (1u << 7)
+#define MKGUI_HIDDEN          (1u << 8)
+#define MKGUI_DISABLED        (1u << 9)
+#define MKGUI_CHECKED         (1u << 10)
+#define MKGUI_PASSWORD        (1u << 11)
+#define MKGUI_READONLY        (1u << 12)
+#define MKGUI_SEPARATOR       (1u << 13)
+#define MKGUI_TOOLBAR_SEP     (1u << 14)
+#define MKGUI_MENU_CHECK      (1u << 15)
+#define MKGUI_MENU_RADIO      (1u << 16)
+#define MKGUI_PANEL_BORDER    (1u << 17)
+#define MKGUI_PANEL_SUNKEN    (1u << 18)
+#define MKGUI_SCROLLBAR_HORIZ (1u << 19)
+#define MKGUI_IMAGE_STRETCH   (1u << 20)
+#define MKGUI_SCROLL          (1u << 21)
+#define MKGUI_NO_PAD          (1u << 22)
+#define MKGUI_TAB_CLOSABLE    (1u << 23)
+#define MKGUI_MULTI_SELECT    (1u << 24)
+#define MKGUI_ALIGN_START     (1u << 25)
+#define MKGUI_ALIGN_CENTER    (2u << 25)
+#define MKGUI_ALIGN_END       (3u << 25)
+#define MKGUI_ALIGN_MASK      (3u << 25)
+#define MKGUI_FIXED           (1u << 27)
 
 // ---------------------------------------------------------------------------
 // Event types
@@ -759,7 +757,7 @@ struct mkgui_ctx {
 	uint32_t tooltip_timer;
 	int32_t tooltip_x, tooltip_y;
 
-	char tooltip_texts[MKGUI_MAX_WIDGETS][128];
+	char tooltip_texts[MKGUI_MAX_WIDGETS][MKGUI_MAX_TEXT];
 
 	struct mkgui_theme theme;
 
@@ -902,7 +900,7 @@ static void draw_rect_fill(uint32_t *buf, int32_t bw, int32_t bh, int32_t x, int
 	}
 	for(int32_t row = y0; row < y1; ++row) {
 		uint32_t *dst = &buf[row * bw + x0];
-		for(int32_t i = 0; i < span; ++i) {
+		for(uint32_t i = 0; i < (uint32_t)span; ++i) {
 			dst[i] = color;
 		}
 	}
@@ -912,14 +910,14 @@ static void draw_rect_fill(uint32_t *buf, int32_t bw, int32_t bh, int32_t x, int
 
 // [=]===^=[ rounded_rect_insets ]=================================[=]
 static void rounded_rect_insets(int32_t radius, int32_t *out) {
-	for(int32_t row = 0; row < radius; ++row) {
-		int32_t dy = 2 * (radius - row) - 1;
+	for(uint32_t row = 0; row < (uint32_t)radius; ++row) {
+		int32_t dy = 2 * (radius - (int32_t)row) - 1;
 		int32_t r2x4 = 4 * radius * radius;
 		int32_t inset = 0;
-		for(int32_t col = 0; col < radius; ++col) {
-			int32_t dx = 2 * (radius - col) - 1;
+		for(uint32_t col = 0; col < (uint32_t)radius; ++col) {
+			int32_t dx = 2 * (radius - (int32_t)col) - 1;
 			if(dx * dx + dy * dy > r2x4) {
-				inset = col + 1;
+				inset = (int32_t)(col + 1);
 			}
 		}
 		out[row] = inset;
@@ -933,14 +931,14 @@ static uint32_t corner_coverage(int32_t col, int32_t crow, int32_t radius) {
 	int32_t base_dx8 = 8 * radius - 8 * col;
 	int32_t base_dy8 = 8 * radius - 8 * crow;
 	uint32_t count = 0;
-	for(int32_t sy = 0; sy < 4; ++sy) {
-		int32_t dy8 = base_dy8 - 2 * sy - 1;
+	for(uint32_t sy = 0; sy < 4; ++sy) {
+		int32_t dy8 = base_dy8 - 2 * (int32_t)sy - 1;
 		int32_t remain = r8sq - dy8 * dy8;
 		if(remain < 0) {
 			continue;
 		}
-		for(int32_t sx = 0; sx < 4; ++sx) {
-			int32_t dx8 = base_dx8 - 2 * sx - 1;
+		for(uint32_t sx = 0; sx < 4; ++sx) {
+			int32_t dx8 = base_dx8 - 2 * (int32_t)sx - 1;
 			if(dx8 * dx8 <= remain) {
 				++count;
 			}
@@ -958,7 +956,7 @@ static void fill_span_clipped(uint32_t *buf, int32_t bw, int32_t py, int32_t lef
 	if(left < right) {
 		uint32_t *dst = &buf[py * bw + left];
 		int32_t cnt = right - left;
-		for(int32_t i = 0; i < cnt; ++i) {
+		for(uint32_t i = 0; i < (uint32_t)cnt; ++i) {
 			dst[i] = color;
 		}
 	}
@@ -979,28 +977,28 @@ static void draw_rounded_rect_fill(uint32_t *buf, int32_t bw, int32_t bh, int32_
 		radius = MKGUI_MAX_CORNER_RADIUS;
 	}
 
-	for(int32_t row = 0; row < h; ++row) {
-		int32_t py = y + row;
+	for(uint32_t row = 0; row < (uint32_t)h; ++row) {
+		int32_t py = y + (int32_t)row;
 		if(py < 0 || py >= bh || py < render_clip_y1 || py >= render_clip_y2) {
 			continue;
 		}
 
 		int32_t crow = -1;
-		if(row < radius) {
-			crow = row;
-		} else if(row >= h - radius) {
-			crow = h - 1 - row;
+		if((int32_t)row < radius) {
+			crow = (int32_t)row;
+		} else if((int32_t)row >= h - radius) {
+			crow = h - 1 - (int32_t)row;
 		}
 
 		if(crow >= 0 && radius > 0) {
 			uint32_t *rowp = &buf[py * bw];
-			for(int32_t col = 0; col < radius; ++col) {
-				uint32_t cov = corner_coverage(col, crow, radius);
+			for(uint32_t col = 0; col < (uint32_t)radius; ++col) {
+				uint32_t cov = corner_coverage((int32_t)col, crow, radius);
 				if(cov == 0) {
 					continue;
 				}
-				int32_t pl = x + col;
-				int32_t pr = x + w - 1 - col;
+				int32_t pl = x + (int32_t)col;
+				int32_t pr = x + w - 1 - (int32_t)col;
 				if(cov >= 16) {
 					if(pl >= 0 && pl < bw && pl >= render_clip_x1 && pl < render_clip_x2) {
 						rowp[pl] = color;
@@ -1083,9 +1081,9 @@ static void draw_rect_border(uint32_t *buf, int32_t bw, int32_t bh, int32_t x, i
 
 // [=]===^=[ draw_rect_dashed ]===================================[=]
 static void draw_rect_dashed(uint32_t *buf, int32_t bw, int32_t bh, int32_t x, int32_t y, int32_t w, int32_t h, uint32_t color, int32_t dash) {
-	for(int32_t i = 0; i < w; ++i) {
-		if((i / dash) & 1) { continue; }
-		int32_t px = x + i;
+	for(uint32_t i = 0; i < (uint32_t)w; ++i) {
+		if(((int32_t)i / dash) & 1) { continue; }
+		int32_t px = x + (int32_t)i;
 		if(px >= 0 && px < bw && px >= render_clip_x1 && px < render_clip_x2) {
 			if(y >= 0 && y < bh && y >= render_clip_y1 && y < render_clip_y2) {
 				buf[y * bw + px] = color;
@@ -1096,9 +1094,9 @@ static void draw_rect_dashed(uint32_t *buf, int32_t bw, int32_t bh, int32_t x, i
 			}
 		}
 	}
-	for(int32_t i = 0; i < h; ++i) {
-		if((i / dash) & 1) { continue; }
-		int32_t py = y + i;
+	for(uint32_t i = 0; i < (uint32_t)h; ++i) {
+		if(((int32_t)i / dash) & 1) { continue; }
+		int32_t py = y + (int32_t)i;
 		if(py >= 0 && py < bh && py >= render_clip_y1 && py < render_clip_y2) {
 			if(x >= 0 && x < bw && x >= render_clip_x1 && x < render_clip_x2) {
 				buf[py * bw + x] = color;
@@ -2055,7 +2053,7 @@ static void layout_node(struct mkgui_ctx *ctx, uint32_t idx) {
 					}
 				} else {
 					uint32_t wt = ctx->widgets[j].weight > 0 ? ctx->widgets[j].weight : 1;
-					ch = ctx->widgets[j].h + (weight_total > 0 ? (int32_t)(remaining * wt / weight_total) : 0);
+					ch = ctx->widgets[j].h + (weight_total > 0 ? (int32_t)(remaining * (int32_t)wt / (int32_t)weight_total) : 0);
 					uint32_t extra = wdist + wt * (uint32_t)(remaining % (int32_t)weight_total);
 					if(extra >= weight_total && weight_total > 0) {
 						++ch;
@@ -2138,7 +2136,7 @@ static void layout_node(struct mkgui_ctx *ctx, uint32_t idx) {
 					}
 				} else {
 					uint32_t wt = ctx->widgets[j].weight > 0 ? ctx->widgets[j].weight : 1;
-					cw = ctx->widgets[j].w + (weight_total > 0 ? (int32_t)(remaining * wt / weight_total) : 0);
+					cw = ctx->widgets[j].w + (weight_total > 0 ? (int32_t)(remaining * (int32_t)wt / (int32_t)weight_total) : 0);
 					uint32_t extra = wdist + wt * (uint32_t)(remaining % (int32_t)weight_total);
 					if(extra >= weight_total && weight_total > 0) {
 						++cw;

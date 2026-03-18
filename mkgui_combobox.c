@@ -54,8 +54,8 @@ static void render_combobox(struct mkgui_ctx *ctx, uint32_t idx) {
 	uint32_t tc = disabled ? ctx->theme.text_disabled : ctx->theme.text;
 	int32_t ax = rx + text_w + 3;
 	int32_t ay = ry + rh / 2 - 2;
-	for(int32_t j = 0; j < 5; ++j) {
-		draw_hline(ctx->pixels, ctx->win_w, ctx->win_h, ax + j, ay + j, 9 - j * 2, tc);
+	for(uint32_t j = 0; j < 5; ++j) {
+		draw_hline(ctx->pixels, ctx->win_w, ctx->win_h, ax + (int32_t)j, ay + (int32_t)j, 9 - (int32_t)j * 2, tc);
 	}
 
 	struct mkgui_combobox_data *cb = find_combobox_data(ctx, w->id);
@@ -155,7 +155,7 @@ static void combobox_open_popup(struct mkgui_ctx *ctx, uint32_t widget_id, uint3
 	cb->scroll_y = 0;
 	cb->popup_open = 1;
 
-	uint32_t widx = find_widget_idx(ctx, widget_id);
+	uint32_t widx = (uint32_t)find_widget_idx(ctx, widget_id);
 	if(widx >= ctx->widget_count) {
 		return;
 	}
@@ -193,7 +193,7 @@ static void handle_combobox_click(struct mkgui_ctx *ctx, struct mkgui_event *ev,
 		return;
 	}
 
-	uint32_t widx = find_widget_idx(ctx, widget_id);
+	uint32_t widx = (uint32_t)find_widget_idx(ctx, widget_id);
 	if(widx >= ctx->widget_count) {
 		return;
 	}

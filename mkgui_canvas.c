@@ -15,7 +15,7 @@ static void render_canvas(struct mkgui_ctx *ctx, uint32_t idx) {
 	}
 
 	struct mkgui_canvas_data *cd = find_canvas_data(ctx, w->id);
-	if(cd && cd->callback) {
+	if(cd && cd->callback && rw > 0 && rh > 0) {
 		int32_t old_x1 = render_clip_x1;
 		int32_t old_y1 = render_clip_y1;
 		int32_t old_x2 = render_clip_x2;

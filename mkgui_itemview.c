@@ -162,13 +162,13 @@ static void render_itemview_icon(struct mkgui_ctx *ctx, uint32_t idx, struct mkg
 	char label[MKGUI_MAX_TEXT];
 
 	for(int32_t row = first_row; row <= last_row; ++row) {
-		for(int32_t col = 0; col < cols; ++col) {
-			int32_t item = row * cols + col;
+		for(uint32_t col = 0; col < (uint32_t)cols; ++col) {
+			int32_t item = row * cols + (int32_t)col;
 			if(item < 0 || item >= (int32_t)iv->item_count) {
 				continue;
 			}
 
-			int32_t cx = ca_x + pad_x + col * cw;
+			int32_t cx = ca_x + pad_x + (int32_t)col * cw;
 			int32_t cy = ca_y + row * ch - iv->scroll_y;
 
 			if(cy + ch <= ca_y || cy >= clip_y2) {
@@ -194,20 +194,20 @@ static void render_itemview_icon(struct mkgui_ctx *ctx, uint32_t idx, struct mkg
 				uint32_t tc = (item == iv->selected) ? ctx->theme.sel_text : ((ctx->widgets[idx].flags & MKGUI_DISABLED) ? ctx->theme.text_disabled : ctx->theme.text);
 				int32_t ty = cy + MKGUI_ICON_SIZE + 12;
 				const char *p = label;
-				for(int32_t line = 0; line < MKGUI_ITEMVIEW_ICON_LINES && *p; ++line) {
+				for(uint32_t line = 0; line < MKGUI_ITEMVIEW_ICON_LINES && *p; ++line) {
 					int32_t w = 0;
 					int32_t brk = 0;
 					int32_t last_sep = -1;
-					for(int32_t k = 0; p[k]; ++k) {
+					for(uint32_t k = 0; p[k]; ++k) {
 						uint32_t ch = (uint8_t)p[k];
 						int32_t gw = (ch >= MKGUI_GLYPH_FIRST && ch <= MKGUI_GLYPH_LAST) ? ctx->glyphs[ch - MKGUI_GLYPH_FIRST].advance : ctx->char_width;
 						if(w + gw > max_tw && k > 0) {
-							brk = (last_sep >= 0) ? last_sep + 1 : k;
+							brk = (last_sep >= 0) ? last_sep + 1 : (int32_t)k;
 							break;
 						}
 						w += gw;
 						if(p[k] == '-' || p[k] == '_' || p[k] == ' ') {
-							last_sep = k;
+							last_sep = (int32_t)k;
 						}
 					}
 					char tmp[MKGUI_MAX_TEXT];
@@ -263,13 +263,13 @@ static void render_itemview_thumbnail(struct mkgui_ctx *ctx, uint32_t idx, struc
 	char label[MKGUI_MAX_TEXT];
 
 	for(int32_t row = first_row; row <= last_row; ++row) {
-		for(int32_t col = 0; col < cols; ++col) {
-			int32_t item = row * cols + col;
+		for(uint32_t col = 0; col < (uint32_t)cols; ++col) {
+			int32_t item = row * cols + (int32_t)col;
 			if(item < 0 || item >= (int32_t)iv->item_count) {
 				continue;
 			}
 
-			int32_t cx = ca_x + pad_x + col * cw;
+			int32_t cx = ca_x + pad_x + (int32_t)col * cw;
 			int32_t cy = ca_y + row * ch - iv->scroll_y;
 
 			if(cy + ch <= ca_y || cy >= clip_y2) {
@@ -288,23 +288,24 @@ static void render_itemview_thumbnail(struct mkgui_ctx *ctx, uint32_t idx, struc
 			draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, thumb_x, thumb_y, ts, ts, ctx->theme.input_bg);
 
 			if(iv->thumbnail_cb && iv->thumb_buf) {
+				uint32_t uts = (uint32_t)ts;
 				iv->thumbnail_cb((uint32_t)item, iv->thumb_buf, ts, ts, iv->userdata);
-				for(int32_t py = 0; py < ts; ++py) {
-					int32_t dy = thumb_y + py;
+				for(uint32_t py = 0; py < uts; ++py) {
+					int32_t dy = thumb_y + (int32_t)py;
 					if(dy < ca_y || dy >= clip_y2 || dy < 0 || dy >= ctx->win_h) {
 						continue;
 					}
-					for(int32_t px = 0; px < ts; ++px) {
-						int32_t dx = thumb_x + px;
+					for(uint32_t px = 0; px < uts; ++px) {
+						int32_t dx = thumb_x + (int32_t)px;
 						if(dx < ca_x || dx >= clip_x2 || dx < 0 || dx >= ctx->win_w) {
 							continue;
 						}
-						uint32_t spx = iv->thumb_buf[py * ts + px];
+						uint32_t spx = iv->thumb_buf[py * uts + px];
 						uint32_t alpha = (spx >> 24) & 0xff;
 						if(alpha == 255) {
-							ctx->pixels[dy * ctx->win_w + dx] = spx;
+							ctx->pixels[(uint32_t)dy * (uint32_t)ctx->win_w + (uint32_t)dx] = spx;
 						} else if(alpha > 0) {
-							ctx->pixels[dy * ctx->win_w + dx] = blend_pixel(ctx->pixels[dy * ctx->win_w + dx], spx, (uint8_t)alpha);
+							ctx->pixels[(uint32_t)dy * (uint32_t)ctx->win_w + (uint32_t)dx] = blend_pixel(ctx->pixels[(uint32_t)dy * (uint32_t)ctx->win_w + (uint32_t)dx], spx, (uint8_t)alpha);
 						}
 					}
 				}
@@ -357,8 +358,8 @@ static void render_itemview_compact(struct mkgui_ctx *ctx, uint32_t idx, struct 
 
 	char label[MKGUI_MAX_TEXT];
 
-	for(int32_t vc = 0; vc < visible_cols; ++vc) {
-		int32_t c = first_col_off + vc;
+	for(uint32_t vc = 0; vc < (uint32_t)visible_cols; ++vc) {
+		int32_t c = first_col_off + (int32_t)vc;
 		if(c >= total_cols) {
 			break;
 		}
@@ -366,13 +367,13 @@ static void render_itemview_compact(struct mkgui_ctx *ctx, uint32_t idx, struct 
 		if(col_x >= clip_x2 || col_x + col_w <= ca_x) {
 			continue;
 		}
-		for(int32_t r = 0; r < rows_per_col; ++r) {
-			int32_t item = c * rows_per_col + r;
+		for(uint32_t r = 0; r < (uint32_t)rows_per_col; ++r) {
+			int32_t item = c * rows_per_col + (int32_t)r;
 			if(item >= (int32_t)iv->item_count) {
 				break;
 			}
 
-			int32_t cy = ca_y + r * row_h;
+			int32_t cy = ca_y + (int32_t)r * row_h;
 
 			if(item == iv->selected) {
 				draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, col_x, cy, col_w, row_h, ctx->theme.selection);
@@ -413,8 +414,8 @@ static void render_itemview_detail(struct mkgui_ctx *ctx, uint32_t idx, struct m
 
 	char label[MKGUI_MAX_TEXT];
 
-	for(int32_t r = 0; r < visible; ++r) {
-		int32_t item = first_row + r;
+	for(uint32_t r = 0; r < (uint32_t)visible; ++r) {
+		int32_t item = first_row + (int32_t)r;
 		if(item >= (int32_t)iv->item_count) {
 			break;
 		}

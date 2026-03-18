@@ -14,9 +14,9 @@ static void draw_aa_line(uint32_t *buf, int32_t bw, int32_t bh, int32_t x0, int3
 		return;
 	}
 	int32_t half = thickness * 4;
-	for(int32_t i = 0; i <= steps * 8; ++i) {
-		int32_t cx8 = x0 * 8 + dx * i / steps;
-		int32_t cy8 = y0 * 8 + dy * i / steps;
+	for(uint32_t i = 0; i <= (uint32_t)(steps * 8); ++i) {
+		int32_t cx8 = x0 * 8 + dx * (int32_t)i / steps;
+		int32_t cy8 = y0 * 8 + dy * (int32_t)i / steps;
 		int32_t px_lo = (cx8 - half) >> 3;
 		int32_t px_hi = (cx8 + half) >> 3;
 		int32_t py_lo = (cy8 - half) >> 3;

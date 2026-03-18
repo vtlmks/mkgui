@@ -30,8 +30,8 @@ static void render_dropdown(struct mkgui_ctx *ctx, uint32_t idx) {
 
 	int32_t ax = rx + rw - 14;
 	int32_t ay = ry + rh / 2 - 2;
-	for(int32_t j = 0; j < 5; ++j) {
-		draw_hline(ctx->pixels, ctx->win_w, ctx->win_h, ax + j, ay + j, 9 - j * 2, tc);
+	for(uint32_t j = 0; j < 5; ++j) {
+		draw_hline(ctx->pixels, ctx->win_w, ctx->win_h, ax + (int32_t)j, ay + (int32_t)j, 9 - (int32_t)j * 2, tc);
 	}
 }
 

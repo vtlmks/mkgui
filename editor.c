@@ -377,7 +377,7 @@ struct ed_state {
 	uint32_t undo_pos;
 	uint32_t undo_count;
 
-	char project_path[512];
+	char project_path[FD_PATH_SIZE + 260];
 
 	struct ed_tab_state tab_states[32];
 	uint32_t tab_state_count;
@@ -422,7 +422,7 @@ static void ed_config_dir(char *buf, uint32_t buf_size) {
 static void ed_config_path(char *buf, uint32_t buf_size) {
 	char dir[ED_CONFIG_PATH_LEN];
 	ed_config_dir(dir, sizeof(dir));
-	snprintf(buf, buf_size, "%s/config", dir);
+	snprintf(buf, buf_size, "%.504s/config", dir);
 }
 
 // [=]===^=[ ed_config_ensure_dir ]================================[=]
@@ -473,11 +473,11 @@ static void ed_config_load(void) {
 		}
 
 		if(strncmp(line, "file ", 5) == 0 && ed_cfg.recent_count < ED_MAX_RECENT) {
-			snprintf(ed_cfg.recent[ed_cfg.recent_count], ED_CONFIG_PATH_LEN, "%s", line + 5);
+			snprintf(ed_cfg.recent[ed_cfg.recent_count], ED_CONFIG_PATH_LEN, "%.511s", line + 5);
 			++ed_cfg.recent_count;
 
 		} else if(strncmp(line, "last_dir ", 9) == 0) {
-			snprintf(ed_cfg.last_dir, ED_CONFIG_PATH_LEN, "%s", line + 9);
+			snprintf(ed_cfg.last_dir, ED_CONFIG_PATH_LEN, "%.511s", line + 9);
 
 		} else if(strncmp(line, "window_size ", 12) == 0) {
 			sscanf(line + 12, "%d %d", &ed_cfg.window_w, &ed_cfg.window_h);
@@ -1713,9 +1713,9 @@ static int32_t ed_handle_hit(int32_t lx, int32_t ly) {
 	int32_t wh = ed_rects[ed.selected].h;
 	int32_t hx[] = { wx, wx + ww / 2, wx + ww, wx + ww, wx + ww, wx + ww / 2, wx, wx };
 	int32_t hy[] = { wy, wy, wy, wy + wh / 2, wy + wh, wy + wh, wy + wh, wy + wh / 2 };
-	for(int32_t i = 0; i < 8; ++i) {
+	for(uint32_t i = 0; i < 8; ++i) {
 		if(sx >= hx[i] - 4 && sx <= hx[i] + 4 && sy >= hy[i] - 4 && sy <= hy[i] + 4) {
-			return i;
+			return (int32_t)i;
 		}
 	}
 	return -1;
@@ -1825,8 +1825,8 @@ static void ed_draw_widget(struct mkgui_ctx *ctx, uint32_t idx) {
 			draw_patch(ctx, MKGUI_STYLE_RAISED, rx + text_w, ry, 20, rh, ctx->theme.widget_bg, ctx->theme.widget_border);
 			int32_t ax = rx + text_w + 3;
 			int32_t ay = ry + rh / 2 - 2;
-			for(int32_t j = 0; j < 5; ++j) {
-				draw_hline(ctx->pixels, ctx->win_w, ctx->win_h, ax + j, ay + j, 9 - j * 2, ctx->theme.text);
+			for(uint32_t j = 0; j < 5; ++j) {
+				draw_hline(ctx->pixels, ctx->win_w, ctx->win_h, ax + (int32_t)j, ay + (int32_t)j, 9 - (int32_t)j * 2, ctx->theme.text);
 			}
 			if(ew->label[0]) {
 				int32_t cty = ry + (rh - ctx->font_height) / 2;
@@ -1888,8 +1888,8 @@ static void ed_draw_widget(struct mkgui_ctx *ctx, uint32_t idx) {
 			push_text_clip(rx + 4, ty, ew->label, ctx->theme.text, rx + 1, ry + 1, rx + rw - 16, ry + rh - 1);
 			int32_t ax = rx + rw - 14;
 			int32_t ay = ry + rh / 2 - 2;
-			for(int32_t j = 0; j < 5; ++j) {
-				draw_hline(buf, bw, bh, ax + j, ay + j, 9 - j * 2, ctx->theme.text);
+			for(uint32_t j = 0; j < 5; ++j) {
+				draw_hline(buf, bw, bh, ax + (int32_t)j, ay + (int32_t)j, 9 - (int32_t)j * 2, ctx->theme.text);
 			}
 		} break;
 
@@ -1904,11 +1904,11 @@ static void ed_draw_widget(struct mkgui_ctx *ctx, uint32_t idx) {
 			draw_patch(ctx, MKGUI_STYLE_RAISED, bx, ry, 20, half, ctx->theme.widget_bg, ctx->theme.widget_border);
 			draw_patch(ctx, MKGUI_STYLE_RAISED, bx, ry + half, 20, rh - half, ctx->theme.widget_bg, ctx->theme.widget_border);
 			int32_t ac = bx + 10;
-			for(int32_t j = 0; j < 3; ++j) {
-				draw_hline(buf, bw, bh, ac - j, ry + half / 2 - j, j * 2 + 1, ctx->theme.text);
+			for(uint32_t j = 0; j < 3; ++j) {
+				draw_hline(buf, bw, bh, ac - (int32_t)j, ry + half / 2 - (int32_t)j, (int32_t)j * 2 + 1, ctx->theme.text);
 			}
-			for(int32_t j = 0; j < 3; ++j) {
-				draw_hline(buf, bw, bh, ac - j, ry + half + (rh - half) / 2 + j, j * 2 + 1, ctx->theme.text);
+			for(uint32_t j = 0; j < 3; ++j) {
+				draw_hline(buf, bw, bh, ac - (int32_t)j, ry + half + (rh - half) / 2 + (int32_t)j, (int32_t)j * 2 + 1, ctx->theme.text);
 			}
 		} break;
 
@@ -2467,7 +2467,7 @@ static void ed_layout_node(struct mkgui_ctx *ctx, uint32_t idx) {
 					}
 				} else {
 					uint32_t wt = ed.widgets[j].weight > 0 ? ed.widgets[j].weight : 1;
-					ch = ed.widgets[j].h + (weight_total > 0 ? (int32_t)(remaining * wt / weight_total) : 0);
+					ch = ed.widgets[j].h + (weight_total > 0 ? (int32_t)(remaining * (int32_t)wt / (int32_t)weight_total) : 0);
 					uint32_t extra = wdist + wt * (uint32_t)(remaining % (int32_t)weight_total);
 					if(extra >= weight_total && weight_total > 0) {
 						++ch;
@@ -2536,7 +2536,7 @@ static void ed_layout_node(struct mkgui_ctx *ctx, uint32_t idx) {
 					}
 				} else {
 					uint32_t wt = ed.widgets[j].weight > 0 ? ed.widgets[j].weight : 1;
-					cw = ed.widgets[j].w + (weight_total > 0 ? (int32_t)(remaining * wt / weight_total) : 0);
+					cw = ed.widgets[j].w + (weight_total > 0 ? (int32_t)(remaining * (int32_t)wt / (int32_t)weight_total) : 0);
 					uint32_t extra = wdist + wt * (uint32_t)(remaining % (int32_t)weight_total);
 					if(extra >= weight_total && weight_total > 0) {
 						++cw;
@@ -2663,10 +2663,10 @@ static void ed_render_canvas(struct mkgui_ctx *ctx, uint32_t id, uint32_t *pixel
 	draw_rect_border(ctx->pixels, ctx->win_w, ctx->win_h, win_x, win_y, ed.canvas_w, ed.canvas_h, 0xFF555555);
 
 	if(ed.grid_size >= 4) {
-		for(int32_t gy = 0; gy < ed.canvas_h; gy += ed.grid_size) {
-			for(int32_t gx = 0; gx < ed.canvas_w; gx += ed.grid_size) {
-				int32_t px = win_x + gx;
-				int32_t py = win_y + gy;
+		for(uint32_t gy = 0; gy < (uint32_t)ed.canvas_h; gy += (uint32_t)ed.grid_size) {
+			for(uint32_t gx = 0; gx < (uint32_t)ed.canvas_w; gx += (uint32_t)ed.grid_size) {
+				int32_t px = win_x + (int32_t)gx;
+				int32_t py = win_y + (int32_t)gy;
 				if(px >= cx && px < cx + cw && py >= cy && py < cy + ch) {
 					if(px >= 0 && px < ctx->win_w && py >= 0 && py < ctx->win_h) {
 						ctx->pixels[py * ctx->win_w + px] = 0xFF4A4A4A;
@@ -2746,7 +2746,7 @@ static void ed_render_canvas(struct mkgui_ctx *ctx, uint32_t id, uint32_t *pixel
 
 		int32_t hx[] = { wx, wx + ww / 2, wx + ww, wx + ww, wx + ww, wx + ww / 2, wx, wx };
 		int32_t hy[] = { wy, wy, wy, wy + wh / 2, wy + wh, wy + wh, wy + wh, wy + wh / 2 };
-		for(int32_t j = 0; j < 8; ++j) {
+		for(uint32_t j = 0; j < 8; ++j) {
 			draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, hx[j] - 3, hy[j] - 3, 6, 6, 0xFF007ACC);
 		}
 	}
@@ -3372,7 +3372,7 @@ static void ed_save_project(struct mkgui_ctx *ctx, uint32_t save_as) {
 
 	fclose(f);
 
-	char buf[256];
+	char buf[FD_PATH_SIZE + 320];
 	const char *fname = strrchr(ed.project_path, '/');
 	if(!fname) {
 		fname = ed.project_path;
@@ -3468,19 +3468,19 @@ static void ed_load_file(struct mkgui_ctx *ctx, const char *path) {
 				sscanf(line + 5, "%u", &w->type);
 
 			} else if(strncmp(line, "id_name ", 8) == 0) {
-				snprintf(w->id_name, sizeof(w->id_name), "%s", line + 8);
+				snprintf(w->id_name, sizeof(w->id_name), "%.63s", line + 8);
 
 			} else if(strncmp(line, "id ", 3) == 0) {
 				sscanf(line + 3, "%u", &w->id);
 
 			} else if(strncmp(line, "label ", 6) == 0) {
-				snprintf(w->label, sizeof(w->label), "%s", line + 6);
+				snprintf(w->label, sizeof(w->label), "%.255s", line + 6);
 
 			} else if(strncmp(line, "label", 5) == 0 && line[5] == '\0') {
 				w->label[0] = '\0';
 
 			} else if(strncmp(line, "icon ", 5) == 0) {
-				snprintf(w->icon, sizeof(w->icon), "%s", line + 5);
+				snprintf(w->icon, sizeof(w->icon), "%.63s", line + 5);
 
 			} else if(strncmp(line, "icon", 4) == 0 && line[4] == '\0') {
 				w->icon[0] = '\0';
@@ -3516,7 +3516,7 @@ static void ed_load_file(struct mkgui_ctx *ctx, const char *path) {
 				}
 				struct ed_widget_data *d = ed_get_or_create_widget_data(cur_data_id);
 				if(d && d->item_count < ED_MAX_DATA_ITEMS) {
-					snprintf(d->items[d->item_count], MKGUI_MAX_TEXT, "%s", line + 5);
+					snprintf(d->items[d->item_count], MKGUI_MAX_TEXT, "%.255s", line + 5);
 					++d->item_count;
 				}
 			}
@@ -3797,7 +3797,7 @@ static void ed_generate_code(struct mkgui_ctx *ctx) {
 
 	fclose(f);
 
-	char buf[256];
+	char buf[FD_PATH_SIZE + 320];
 	const char *fname = strrchr(out_path, '/');
 	if(!fname) {
 		fname = out_path;

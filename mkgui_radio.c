@@ -8,14 +8,14 @@ static uint32_t circle_coverage(int32_t dx, int32_t dy, int32_t radius) {
 	int32_t base_dx8 = 8 * dx;
 	int32_t base_dy8 = 8 * dy;
 	uint32_t count = 0;
-	for(int32_t sy = 0; sy < 4; ++sy) {
-		int32_t sdy = base_dy8 + 2 * sy + 1;
+	for(uint32_t sy = 0; sy < 4; ++sy) {
+		int32_t sdy = base_dy8 + 2 * (int32_t)sy + 1;
 		int32_t remain = r8sq - sdy * sdy;
 		if(remain < 0) {
 			continue;
 		}
-		for(int32_t sx = 0; sx < 4; ++sx) {
-			int32_t sdx = base_dx8 + 2 * sx + 1;
+		for(uint32_t sx = 0; sx < 4; ++sx) {
+			int32_t sdx = base_dx8 + 2 * (int32_t)sx + 1;
 			if(sdx * sdx <= remain) {
 				++count;
 			}

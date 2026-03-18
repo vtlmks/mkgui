@@ -562,7 +562,7 @@ static uint32_t handle_textarea_key(struct mkgui_ctx *ctx, struct mkgui_event *e
 		if(textarea_has_selection(ta)) {
 			textarea_delete_selection(ta);
 		}
-		for(int32_t i = 0; i < len; ++i) {
+		for(uint32_t i = 0; i < (uint32_t)len; ++i) {
 			textarea_insert_char(ta, buf[i]);
 		}
 		textarea_clear_selection(ta);

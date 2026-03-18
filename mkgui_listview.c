@@ -323,12 +323,12 @@ static void render_listview(struct mkgui_ctx *ctx, uint32_t idx) {
 				int32_t ay = ry + hh / 2;
 				if(ax >= clip_left && ax + 7 <= clip_right) {
 					if(lv->sort_dir > 0) {
-						for(int32_t j = 0; j < 4; ++j) {
-							draw_hline(ctx->pixels, ctx->win_w, ctx->win_h, ax + j, ay - j + 2, 7 - j * 2, ctx->theme.text);
+						for(uint32_t j = 0; j < 4; ++j) {
+							draw_hline(ctx->pixels, ctx->win_w, ctx->win_h, ax + (int32_t)j, ay - (int32_t)j + 2, 7 - (int32_t)j * 2, ctx->theme.text);
 						}
 					} else {
-						for(int32_t j = 0; j < 4; ++j) {
-							draw_hline(ctx->pixels, ctx->win_w, ctx->win_h, ax + j, ay + j - 2, 7 - j * 2, ctx->theme.text);
+						for(uint32_t j = 0; j < 4; ++j) {
+							draw_hline(ctx->pixels, ctx->win_w, ctx->win_h, ax + (int32_t)j, ay + (int32_t)j - 2, 7 - (int32_t)j * 2, ctx->theme.text);
 						}
 					}
 				}
@@ -346,7 +346,7 @@ static void render_listview(struct mkgui_ctx *ctx, uint32_t idx) {
 		int32_t insert_d = listview_col_insert_pos(ctx, lv, idx);
 		if(insert_d >= 0) {
 			int32_t ix = rx + 1 - sx;
-			for(int32_t d = 0; d < insert_d; ++d) {
+			for(uint32_t d = 0; d < (uint32_t)insert_d; ++d) {
 				ix += lv->columns[lv->col_order[d]].width;
 			}
 			if(ix >= clip_left && ix <= clip_right) {
@@ -362,9 +362,9 @@ static void render_listview(struct mkgui_ctx *ctx, uint32_t idx) {
 	int32_t clip_bottom = content_y + content_h;
 
 	char cell_buf[MKGUI_MAX_TEXT];
-	for(int32_t r = 0; r <= visible_rows + 1 && (first_row + r) < (int32_t)lv->row_count; ++r) {
-		int32_t row_idx = first_row + r;
-		int32_t row_y = content_y + r * MKGUI_ROW_HEIGHT - (lv->scroll_y % MKGUI_ROW_HEIGHT);
+	for(uint32_t r = 0; r <= (uint32_t)(visible_rows + 1) && (first_row + (int32_t)r) < (int32_t)lv->row_count; ++r) {
+		int32_t row_idx = first_row + (int32_t)r;
+		int32_t row_y = content_y + (int32_t)r * MKGUI_ROW_HEIGHT - (lv->scroll_y % MKGUI_ROW_HEIGHT);
 
 		if(row_y >= clip_bottom || row_y + MKGUI_ROW_HEIGHT <= clip_top) {
 			continue;

@@ -84,6 +84,12 @@ static uint32_t platform_init(struct mkgui_ctx *ctx, const char *title, int32_t 
 
 	platform_fb_create(plat, &plat->shm, &plat->img, &ctx->pixels, w, h);
 
+	XSizeHints hints = {0};
+	hints.flags = PMinSize;
+	hints.min_width = 128;
+	hints.min_height = 64;
+	XSetWMNormalHints(plat->dpy, plat->win, &hints);
+
 	plat->cursor_default = XCreateFontCursor(plat->dpy, XC_left_ptr);
 	plat->cursor_h_resize = XCreateFontCursor(plat->dpy, XC_sb_h_double_arrow);
 	plat->cursor_active = 0;
@@ -175,6 +181,9 @@ static void platform_set_cursor(struct mkgui_ctx *ctx, uint32_t cursor_type) {
 
 // [=]===^=[ platform_fb_resize ]==================================[=]
 static void platform_fb_resize(struct mkgui_ctx *ctx) {
+	if(ctx->win_w <= 0 || ctx->win_h <= 0) {
+		return;
+	}
 	struct mkgui_platform *plat = &ctx->plat;
 	if(plat->img) {
 		platform_fb_destroy(plat, &plat->shm, plat->img);
@@ -196,6 +205,9 @@ static void platform_blit(struct mkgui_ctx *ctx) {
 
 // [=]===^=[ platform_blit_region ]================================[=]
 static void platform_blit_region(struct mkgui_ctx *ctx, int32_t x, int32_t y, int32_t w, int32_t h) {
+	if(w <= 0 || h <= 0) {
+		return;
+	}
 	struct mkgui_platform *plat = &ctx->plat;
 	XShmPutImage(plat->dpy, plat->win, plat->gc, plat->img, x, y, x, y, (uint32_t)w, (uint32_t)h, False);
 	XSync(plat->dpy, False);

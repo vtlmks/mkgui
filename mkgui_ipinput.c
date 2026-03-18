@@ -132,7 +132,7 @@ static void handle_ipinput_click(struct mkgui_ctx *ctx, uint32_t widget_id, int3
 	if(!ip) {
 		return;
 	}
-	uint32_t widx = find_widget_idx(ctx, widget_id);
+	uint32_t widx = (uint32_t)find_widget_idx(ctx, widget_id);
 	if(widx >= ctx->widget_count) {
 		return;
 	}

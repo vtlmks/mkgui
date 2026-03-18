@@ -73,7 +73,7 @@ struct mkgui_file_dialog_opts {
 // ---------------------------------------------------------------------------
 
 struct fd_entry {
-	char name[256];
+	char name[260];
 	uint32_t is_dir;
 	int64_t size;
 	int64_t mtime;
@@ -81,7 +81,7 @@ struct fd_entry {
 
 struct fd_bookmark {
 	char label[64];
-	char path[1024];
+	char path[FD_PATH_SIZE];
 };
 
 struct fd_state {
@@ -116,7 +116,7 @@ struct fd_state {
 };
 
 static struct fd_state fd;
-static char fd_results[FD_MAX_RESULTS][FD_PATH_SIZE];
+static char fd_results[FD_MAX_RESULTS][FD_PATH_SIZE + 260];
 static uint32_t fd_result_count;
 
 // ---------------------------------------------------------------------------
@@ -391,7 +391,7 @@ static void fd_scan_dir(void) {
 			}
 		}
 
-		char fullpath[FD_PATH_SIZE];
+		char fullpath[FD_PATH_SIZE + 260];
 		snprintf(fullpath, sizeof(fullpath), "%s/%s", fd.path, de->d_name);
 
 		struct stat st;
@@ -433,7 +433,7 @@ static void fd_add_bookmark(const char *label, const char *path) {
 		return;
 	}
 	struct fd_bookmark *b = &fd.bookmarks[fd.bookmark_count++];
-	snprintf(b->label, sizeof(b->label), "%s", label);
+	snprintf(b->label, sizeof(b->label), "%.63s", label);
 	snprintf(b->path, sizeof(b->path), "%s", path);
 }
 
@@ -713,7 +713,7 @@ static void fd_navigate_entry(struct mkgui_ctx *dlg, int32_t idx) {
 		return;
 	}
 
-	char newpath[FD_PATH_SIZE];
+	char newpath[FD_PATH_SIZE + 260];
 	if(strcmp(e->name, "..") == 0) {
 		char *last = strrchr(fd.path, '/');
 #ifdef _WIN32
@@ -768,7 +768,7 @@ static void fd_navigate_up(struct mkgui_ctx *dlg) {
 		return;
 	}
 #endif
-	char newpath[FD_PATH_SIZE];
+	char newpath[FD_PATH_SIZE + 260];
 	snprintf(newpath, sizeof(newpath), "%.*s", (int)(last - fd.path), fd.path);
 	fd_navigate(dlg, newpath);
 }
@@ -856,13 +856,13 @@ static void fd_build_results(struct mkgui_ctx *dlg) {
 	if(fd.mode == 1) {
 		const char *name = mkgui_input_get(dlg, FD_ID_NAME_INPUT);
 		if(name && name[0] != '\0') {
-			char fname[512];
+			char fname[260];
 			snprintf(fname, sizeof(fname), "%s", name);
 			fd_append_filter_ext(fname, sizeof(fname));
 			if(strcmp(fd.path, "/") == 0) {
-				snprintf(fd_results[0], FD_PATH_SIZE, "/%s", fname);
+				snprintf(fd_results[0], sizeof(fd_results[0]), "/%s", fname);
 			} else {
-				snprintf(fd_results[0], FD_PATH_SIZE, "%s/%s", fd.path, fname);
+				snprintf(fd_results[0], sizeof(fd_results[0]), "%s/%s", fd.path, fname);
 			}
 			fd_result_count = 1;
 		}
@@ -879,9 +879,9 @@ static void fd_build_results(struct mkgui_ctx *dlg) {
 				struct fd_entry *e = fd_filtered_entry((uint32_t)row);
 				if(e && !e->is_dir) {
 					if(strcmp(fd.path, "/") == 0) {
-						snprintf(fd_results[fd_result_count], FD_PATH_SIZE, "/%s", e->name);
+						snprintf(fd_results[fd_result_count], sizeof(fd_results[0]), "/%s", e->name);
 					} else {
-						snprintf(fd_results[fd_result_count], FD_PATH_SIZE, "%s/%s", fd.path, e->name);
+						snprintf(fd_results[fd_result_count], sizeof(fd_results[0]), "%s/%s", fd.path, e->name);
 					}
 					++fd_result_count;
 				}
@@ -891,9 +891,9 @@ static void fd_build_results(struct mkgui_ctx *dlg) {
 			struct fd_entry *e = fd_filtered_entry((uint32_t)lv->selected_row);
 			if(e && !e->is_dir) {
 				if(strcmp(fd.path, "/") == 0) {
-					snprintf(fd_results[0], FD_PATH_SIZE, "/%s", e->name);
+					snprintf(fd_results[0], sizeof(fd_results[0]), "/%s", e->name);
 				} else {
-					snprintf(fd_results[0], FD_PATH_SIZE, "%s/%s", fd.path, e->name);
+					snprintf(fd_results[0], sizeof(fd_results[0]), "%s/%s", fd.path, e->name);
 				}
 				fd_result_count = 1;
 			}
@@ -915,7 +915,7 @@ static uint32_t fd_confirm(struct mkgui_ctx *dlg) {
 		} else {
 			++fname;
 		}
-		char msg[512];
+		char msg[FD_PATH_SIZE + 320];
 		snprintf(msg, sizeof(msg), "Overwrite existing file %s?", fname);
 		if(!mkgui_confirm_dialog(dlg, "Confirm Save", msg)) {
 			return 0;
@@ -1046,7 +1046,7 @@ static void fd_new_folder(struct mkgui_ctx *dlg) {
 		return;
 	}
 
-	char fullpath[FD_PATH_SIZE];
+	char fullpath[FD_PATH_SIZE + 260];
 	snprintf(fullpath, sizeof(fullpath), "%s/%s", fd.path, name);
 
 #ifdef _WIN32

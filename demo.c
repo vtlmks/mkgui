@@ -209,14 +209,19 @@ static void demo_itemview_icon(uint32_t item, char *buf, uint32_t buf_size, void
 // [=]===^=[ demo_canvas_cb ]=====================================[=]
 static void demo_canvas_cb(struct mkgui_ctx *ctx, uint32_t id, uint32_t *pixels, int32_t x, int32_t y, int32_t w, int32_t h, void *userdata) {
 	(void)ctx; (void)id; (void)userdata;
-	for(int32_t iy = 0; iy < h; ++iy) {
-		for(int32_t ix = 0; ix < w; ++ix) {
-			int32_t px = x + ix;
-			int32_t py = y + iy;
-			uint32_t r = (uint32_t)(ix * 255 / (w > 1 ? w - 1 : 1));
-			uint32_t g = (uint32_t)(iy * 255 / (h > 1 ? h - 1 : 1));
-			uint32_t b = (uint32_t)((ix + iy) * 128 / (w + h > 2 ? w + h - 2 : 1));
-			pixels[py * ctx->win_w + px] = 0xff000000 | (r << 16) | (g << 8) | b;
+	if(w <= 0 || h <= 0) {
+		return;
+	}
+	uint32_t uw = (uint32_t)w;
+	uint32_t uh = (uint32_t)h;
+	for(uint32_t iy = 0; iy < uh; ++iy) {
+		for(uint32_t ix = 0; ix < uw; ++ix) {
+			uint32_t px = (uint32_t)x + ix;
+			uint32_t py = (uint32_t)y + iy;
+			uint32_t r = ix * 255 / (uw > 1 ? uw - 1 : 1);
+			uint32_t g = iy * 255 / (uh > 1 ? uh - 1 : 1);
+			uint32_t b = (ix + iy) * 128 / (uw + uh > 2 ? uw + uh - 2 : 1);
+			pixels[py * (uint32_t)ctx->win_w + px] = 0xff000000 | (r << 16) | (g << 8) | b;
 		}
 	}
 }
@@ -550,7 +555,7 @@ int main(void) {
 					} else if(ev.id == ID_FILE_NEW || ev.id == ID_TB_NEW) {
 						char name[256];
 						if(mkgui_input_dialog(ctx, "New File", "File name:", "untitled.txt", name, sizeof(name))) {
-							char buf[256];
+							char buf[512];
 							snprintf(buf, sizeof(buf), "Created: %s", name);
 							mkgui_statusbar_set(ctx, ID_STATUSBAR, 0, buf);
 						}
@@ -559,7 +564,7 @@ int main(void) {
 						struct mkgui_file_dialog_opts open_opts = {0};
 						uint32_t count = mkgui_open_dialog(ctx, &open_opts);
 						if(count > 0) {
-							char buf[256];
+							char buf[FD_PATH_SIZE + 320];
 							snprintf(buf, sizeof(buf), "Opened %u file(s): %s", count, mkgui_dialog_path(ctx, 0));
 							mkgui_statusbar_set(ctx, ID_STATUSBAR, 0, buf);
 						}
@@ -568,7 +573,7 @@ int main(void) {
 						struct mkgui_file_dialog_opts save_opts = {0};
 						save_opts.default_name = "untitled.txt";
 						if(mkgui_save_dialog(ctx, &save_opts)) {
-							char buf[256];
+							char buf[FD_PATH_SIZE + 320];
 							snprintf(buf, sizeof(buf), "Save to: %s", mkgui_dialog_path(ctx, 0));
 							mkgui_statusbar_set(ctx, ID_STATUSBAR, 0, buf);
 						}

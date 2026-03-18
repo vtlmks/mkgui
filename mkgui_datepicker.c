@@ -159,17 +159,17 @@ static void render_datepicker_popup(struct mkgui_ctx *ctx, struct mkgui_popup *p
 	uint32_t lbg = left_hover ? ctx->theme.widget_hover : ctx->theme.menu_bg;
 	draw_rounded_rect_fill(p->pixels, p->w, p->h, left_x, btn_y, arrow_w, btn_h, lbg, ctx->theme.corner_radius);
 	int32_t acx_l = left_x + arrow_w / 2;
-	for(int32_t j = 0; j < 4; ++j) {
-		draw_vline(p->pixels, p->w, p->h, acx_l + 2 - j, acy - 3 + j, 1, ctx->theme.text);
-		draw_vline(p->pixels, p->w, p->h, acx_l + 2 - j, acy + 3 - j, 1, ctx->theme.text);
+	for(uint32_t j = 0; j < 4; ++j) {
+		draw_vline(p->pixels, p->w, p->h, acx_l + 2 - (int32_t)j, acy - 3 + (int32_t)j, 1, ctx->theme.text);
+		draw_vline(p->pixels, p->w, p->h, acx_l + 2 - (int32_t)j, acy + 3 - (int32_t)j, 1, ctx->theme.text);
 	}
 
 	uint32_t rbg = right_hover ? ctx->theme.widget_hover : ctx->theme.menu_bg;
 	draw_rounded_rect_fill(p->pixels, p->w, p->h, right_x, btn_y, arrow_w, btn_h, rbg, ctx->theme.corner_radius);
 	int32_t acx_r = right_x + arrow_w / 2;
-	for(int32_t j = 0; j < 4; ++j) {
-		draw_vline(p->pixels, p->w, p->h, acx_r - 2 + j, acy - 3 + j, 1, ctx->theme.text);
-		draw_vline(p->pixels, p->w, p->h, acx_r - 2 + j, acy + 3 - j, 1, ctx->theme.text);
+	for(uint32_t j = 0; j < 4; ++j) {
+		draw_vline(p->pixels, p->w, p->h, acx_r - 2 + (int32_t)j, acy - 3 + (int32_t)j, 1, ctx->theme.text);
+		draw_vline(p->pixels, p->w, p->h, acx_r - 2 + (int32_t)j, acy + 3 - (int32_t)j, 1, ctx->theme.text);
 	}
 
 	uint32_t mbg = month_hover ? ctx->theme.widget_hover : ctx->theme.widget_bg;
@@ -178,8 +178,8 @@ static void render_datepicker_popup(struct mkgui_ctx *ctx, struct mkgui_popup *p
 	push_text_clip(p->x + inner_x + 4, hdr_y + p->y, mname, ctx->theme.text, p->x + inner_x, p->y, p->x + inner_x + month_w - 12, p->y + p->h);
 	int32_t drop_ax = inner_x + month_w - 12;
 	int32_t drop_ay = acy - 2;
-	for(int32_t j = 0; j < 4; ++j) {
-		draw_hline(p->pixels, p->w, p->h, drop_ax + j, drop_ay + j, 7 - j * 2, ctx->theme.text);
+	for(uint32_t j = 0; j < 4; ++j) {
+		draw_hline(p->pixels, p->w, p->h, drop_ax + (int32_t)j, drop_ay + (int32_t)j, 7 - (int32_t)j * 2, ctx->theme.text);
 	}
 	(void)mname_tw;
 
@@ -196,15 +196,15 @@ static void render_datepicker_popup(struct mkgui_ctx *ctx, struct mkgui_popup *p
 	draw_rounded_rect(p->pixels, p->w, p->h, sbx, btn_y, year_btn_w, year_half, up_bg, ctx->theme.widget_border, yr);
 	int32_t sacx = sbx + year_btn_w / 2;
 	int32_t sacy_up = btn_y + year_half / 2 - 2;
-	for(int32_t j = 0; j < 4; ++j) {
-		draw_hline(p->pixels, p->w, p->h, sacx - j, sacy_up + j, 1 + j * 2, ctx->theme.text);
+	for(uint32_t j = 0; j < 4; ++j) {
+		draw_hline(p->pixels, p->w, p->h, sacx - (int32_t)j, sacy_up + (int32_t)j, 1 + (int32_t)j * 2, ctx->theme.text);
 	}
 
 	uint32_t dn_bg = year_dn_hover ? ctx->theme.widget_hover : ctx->theme.widget_bg;
 	draw_rounded_rect(p->pixels, p->w, p->h, sbx, btn_y + year_half, year_btn_w, btn_h - year_half, dn_bg, ctx->theme.widget_border, yr);
 	int32_t sacy_dn = btn_y + year_half + (btn_h - year_half) / 2 - 2;
-	for(int32_t j = 0; j < 4; ++j) {
-		draw_hline(p->pixels, p->w, p->h, sacx - (3 - j), sacy_dn + j, 1 + (3 - j) * 2, ctx->theme.text);
+	for(uint32_t j = 0; j < 4; ++j) {
+		draw_hline(p->pixels, p->w, p->h, sacx - (int32_t)(3 - j), sacy_dn + (int32_t)j, 1 + (int32_t)(3 - j) * 2, ctx->theme.text);
 	}
 
 	cy += DATEPICKER_HDR_H;
@@ -323,7 +323,7 @@ static void datepicker_open_popup(struct mkgui_ctx *ctx, uint32_t widget_id) {
 	dp->cal_hover = -1;
 	dp->month_select = 0;
 
-	uint32_t widx = find_widget_idx(ctx, widget_id);
+	uint32_t widx = (uint32_t)find_widget_idx(ctx, widget_id);
 	if(widx >= ctx->widget_count) {
 		return;
 	}
@@ -412,7 +412,7 @@ static void handle_datepicker_click(struct mkgui_ctx *ctx, uint32_t widget_id) {
 		return;
 	}
 
-	uint32_t widx = find_widget_idx(ctx, widget_id);
+	uint32_t widx = (uint32_t)find_widget_idx(ctx, widget_id);
 	if(widx >= ctx->widget_count) {
 		return;
 	}

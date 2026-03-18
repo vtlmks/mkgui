@@ -118,16 +118,16 @@ static void render_spinbox(struct mkgui_ctx *ctx, uint32_t idx) {
 
 	int32_t acx = bx + MKGUI_SPINBOX_BTN_W / 2;
 	int32_t acy = ry + half / 2 - 2;
-	for(int32_t j = 0; j < 4; ++j) {
-		draw_hline(ctx->pixels, ctx->win_w, ctx->win_h, acx - j, acy + j, 1 + j * 2, tc);
+	for(uint32_t j = 0; j < 4; ++j) {
+		draw_hline(ctx->pixels, ctx->win_w, ctx->win_h, acx - (int32_t)j, acy + (int32_t)j, 1 + (int32_t)j * 2, tc);
 	}
 
 	uint32_t dn_bg = (hover_btn == -1) ? ctx->theme.widget_hover : ctx->theme.widget_bg;
 	draw_patch(ctx, MKGUI_STYLE_RAISED, bx, ry + half, MKGUI_SPINBOX_BTN_W, rh - half, dn_bg, ctx->theme.widget_border);
 
 	int32_t acy2 = ry + half + (rh - half) / 2 - 2;
-	for(int32_t j = 0; j < 4; ++j) {
-		draw_hline(ctx->pixels, ctx->win_w, ctx->win_h, acx - (3 - j), acy2 + j, 1 + (3 - j) * 2, tc);
+	for(uint32_t j = 0; j < 4; ++j) {
+		draw_hline(ctx->pixels, ctx->win_w, ctx->win_h, acx - (int32_t)(3 - j), acy2 + (int32_t)j, 1 + (int32_t)(3 - j) * 2, tc);
 	}
 }
 
@@ -219,7 +219,7 @@ static uint32_t handle_spinbox_key(struct mkgui_ctx *ctx, struct mkgui_event *ev
 	}
 
 	if(text_len > 0) {
-		for(int32_t i = 0; i < text_len; ++i) {
+		for(uint32_t i = 0; i < (uint32_t)text_len; ++i) {
 			char c = text[i];
 			uint32_t is_digit = (c >= '0' && c <= '9');
 			uint32_t is_minus = (c == '-' && sd->min_val < 0);

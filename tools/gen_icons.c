@@ -31,22 +31,22 @@ static uint32_t render_glyph(FT_Face face, uint32_t codepoint, uint8_t *dst, uin
 	uint32_t pixels = size * size;
 	memset(dst, 0, pixels);
 
-	int32_t gw = (int32_t)bmp->width;
-	int32_t gh = (int32_t)bmp->rows;
-	int32_t ox = ((int32_t)size - gw) / 2;
-	int32_t oy = ((int32_t)size - gh) / 2;
+	uint32_t gw = bmp->width;
+	uint32_t gh = bmp->rows;
+	int32_t ox = ((int32_t)size - (int32_t)gw) / 2;
+	int32_t oy = ((int32_t)size - (int32_t)gh) / 2;
 
-	for(int32_t y = 0; y < gh; ++y) {
-		int32_t dy = y + oy;
+	for(uint32_t y = 0; y < gh; ++y) {
+		int32_t dy = (int32_t)y + oy;
 		if(dy < 0 || dy >= (int32_t)size) {
 			continue;
 		}
-		for(int32_t x = 0; x < gw; ++x) {
-			int32_t dx = x + ox;
+		for(uint32_t x = 0; x < gw; ++x) {
+			int32_t dx = (int32_t)x + ox;
 			if(dx < 0 || dx >= (int32_t)size) {
 				continue;
 			}
-			dst[dy * (int32_t)size + dx] = bmp->buffer[y * bmp->pitch + x];
+			dst[dy * (int32_t)size + dx] = bmp->buffer[(int32_t)y * bmp->pitch + (int32_t)x];
 		}
 	}
 

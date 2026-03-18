@@ -194,8 +194,8 @@ static void render_menu_popup(struct mkgui_ctx *ctx, struct mkgui_popup *p, uint
 			if(menu_item_has_children(ctx, mi->id)) {
 				int32_t ax = p->w - 12;
 				int32_t ay = iy + MKGUI_ROW_HEIGHT / 2;
-				for(int32_t j = 0; j < 4; ++j) {
-					draw_vline(p->pixels, p->w, p->h, ax + j, ay - 3 + j, 7 - j * 2, ctx->theme.text);
+				for(uint32_t j = 0; j < 4; ++j) {
+					draw_vline(p->pixels, p->w, p->h, ax + (int32_t)j, ay - 3 + (int32_t)j, 7 - (int32_t)j * 2, ctx->theme.text);
 				}
 			}
 

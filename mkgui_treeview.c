@@ -130,13 +130,13 @@ static void render_treeview(struct mkgui_ctx *ctx, uint32_t idx) {
 
 			if(ay >= clip_top && ay < clip_bottom) {
 				if(tv->nodes[i].expanded) {
-					for(int32_t j = 0; j < MKGUI_TREE_ARROW_SIZE; ++j) {
-						draw_hline(ctx->pixels, ctx->win_w, ctx->win_h, ax + j, ay - MKGUI_TREE_ARROW_SIZE / 2 + j, MKGUI_TREE_ARROW_SIZE - j, ctx->theme.text);
+					for(uint32_t j = 0; j < MKGUI_TREE_ARROW_SIZE; ++j) {
+						draw_hline(ctx->pixels, ctx->win_w, ctx->win_h, ax + (int32_t)j, ay - MKGUI_TREE_ARROW_SIZE / 2 + (int32_t)j, MKGUI_TREE_ARROW_SIZE - (int32_t)j, ctx->theme.text);
 					}
 
 				} else {
-					for(int32_t j = 0; j < MKGUI_TREE_ARROW_SIZE; ++j) {
-						draw_vline(ctx->pixels, ctx->win_w, ctx->win_h, ax + j, ay - MKGUI_TREE_ARROW_SIZE / 2 + j, MKGUI_TREE_ARROW_SIZE - j * 2, ctx->theme.text);
+					for(uint32_t j = 0; j < MKGUI_TREE_ARROW_SIZE; ++j) {
+						draw_vline(ctx->pixels, ctx->win_w, ctx->win_h, ax + (int32_t)j, ay - MKGUI_TREE_ARROW_SIZE / 2 + (int32_t)j, MKGUI_TREE_ARROW_SIZE - (int32_t)j * 2, ctx->theme.text);
 					}
 				}
 			}
