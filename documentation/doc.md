@@ -101,7 +101,7 @@ struct mkgui_widget {
 | `MKGUI_TAB` | Individual tab page (parent must be `MKGUI_TABS`). |
 | `MKGUI_MENU` | Menu bar. Children are top-level `MKGUI_MENUITEM`. |
 | `MKGUI_MENUITEM` | Menu entry. Parent is `MKGUI_MENU` or another `MKGUI_MENUITEM` (submenu). Leaf items emit `MKGUI_EVENT_MENU`. |
-| `MKGUI_TOOLBAR` | Toolbar bar. Children are `MKGUI_BUTTON`. |
+| `MKGUI_TOOLBAR` | Toolbar bar. Children are `MKGUI_BUTTON`. Supports display modes: icons+text (default), icons only, text only. Height adapts to content. |
 | `MKGUI_STATUSBAR` | Status bar with sections. |
 | `MKGUI_HSPLIT` | Horizontal splitter. Children use `MKGUI_REGION_TOP`/`MKGUI_REGION_BOTTOM`. |
 | `MKGUI_VSPLIT` | Vertical splitter. Children use `MKGUI_REGION_LEFT`/`MKGUI_REGION_RIGHT`. |
@@ -203,6 +203,18 @@ Used on children of HBOX/VBOX to control alignment perpendicular to the layout d
 | Flag | Value | Description |
 |------|-------|-------------|
 | `MKGUI_FIXED` | `1 << 27` | Fixed size in container layout. Widget keeps its declared dimensions; weight is ignored. |
+
+### Toolbar display mode flags
+
+Set on `MKGUI_TOOLBAR` widgets to control how buttons are rendered:
+
+| Flag | Value | Description |
+|------|-------|-------------|
+| `MKGUI_TOOLBAR_ICONS_TEXT` | `0` | Show both icons and text (default) |
+| `MKGUI_TOOLBAR_ICONS_ONLY` | `1 << 28` | Show only icons |
+| `MKGUI_TOOLBAR_TEXT_ONLY` | `2 << 28` | Show only text |
+
+Change at runtime with `mkgui_toolbar_set_mode()`. The toolbar height adapts automatically.
 
 ## Events
 
@@ -612,16 +624,45 @@ Check items toggle on click. Radio items auto-uncheck siblings. Only leaf items 
 
 ## Toolbar
 
-Toolbar children are `MKGUI_BUTTON` widgets. Use `MKGUI_TOOLBAR_SEP` on a button to draw a separator before it. Toolbar buttons support tooltips via the widget label:
+Toolbar children are `MKGUI_BUTTON` widgets. Use `MKGUI_TOOLBAR_SEP` on a button to draw a separator before it:
 
 ```c
-{ MKGUI_TOOLBAR, ID_TB,      "",     "",             ID_WINDOW, 0, 22, 0, 28, MKGUI_ANCHOR_LEFT | MKGUI_ANCHOR_TOP | MKGUI_ANCHOR_RIGHT, 0 },
+{ MKGUI_TOOLBAR, ID_TB,      "",     "",             ID_WINDOW, 0, 0, 0, 0, 0, 0 },
 { MKGUI_BUTTON,  ID_TB_NEW,  "New",  "file-plus",    ID_TB,     0, 0, 0, 0, 0, 0 },
 { MKGUI_BUTTON,  ID_TB_OPEN, "Open", "folder-open",  ID_TB,     0, 0, 0, 0, MKGUI_TOOLBAR_SEP, 0 },
 { MKGUI_BUTTON,  ID_TB_SAVE, "Save", "content-save", ID_TB,     0, 0, 0, 0, 0, 0 },
 ```
 
-Toolbar buttons emit `MKGUI_EVENT_CLICK`. When a toolbar button has a label but shows only an icon, the label appears as a tooltip after a short hover delay.
+Toolbar buttons render flat (Breeze style) -- no border when idle, highlighted on hover, pressed on click. They emit `MKGUI_EVENT_CLICK`.
+
+### Display modes
+
+```c
+void mkgui_toolbar_set_mode(struct mkgui_ctx *ctx, uint32_t toolbar_id, uint32_t mode);
+```
+
+Switch between icons+text, icons only, or text only at runtime. The toolbar height adapts automatically -- text-only toolbars are shorter, icon toolbars size to the loaded icon dimensions.
+
+```c
+mkgui_toolbar_set_mode(ctx, ID_TB, MKGUI_TOOLBAR_ICONS_ONLY);
+```
+
+Or set the mode in the widget flags at init time:
+
+```c
+{ MKGUI_TOOLBAR, ID_TB, "", "", ID_WINDOW, 0, 0, 0, 0, MKGUI_TOOLBAR_ICONS_ONLY, 0 },
+```
+
+### Toolbar icon pack
+
+mkgui supports a separate icon pack for toolbar icons. If `mdi_icons_toolbar.dat` (or `ext/mdi_icons_toolbar.dat`) exists, toolbar buttons use icons from that pack. Otherwise they fall back to the regular `mdi_icons.dat`.
+
+This allows larger icons for icon-only toolbars while keeping the standard 18x18 icons for menus, tabs, and treeviews:
+
+```bash
+# Generate 32x32 toolbar icons (only the ones you need)
+./tools/gen_icons ext/materialdesignicons-webfont.ttf 32 mdi_icons_toolbar.dat toolbar_icons.txt
+```
 
 ## Splitters
 
@@ -850,7 +891,7 @@ MKGUI_MOD_CONTROL    (1 << 2)
 MKGUI_ROW_HEIGHT       20    // default row height (listview, treeview, dropdown)
 MKGUI_TAB_HEIGHT       26    // tab bar height
 MKGUI_MENU_HEIGHT      22    // menu bar height
-MKGUI_TOOLBAR_HEIGHT   28    // toolbar height
+MKGUI_TOOLBAR_HEIGHT_DEFAULT 28  // toolbar height (adapts to icon size)
 MKGUI_STATUSBAR_HEIGHT 22    // statusbar height
 MKGUI_SCROLLBAR_W      14    // scrollbar width
 MKGUI_SPLIT_THICK       5    // splitter handle thickness

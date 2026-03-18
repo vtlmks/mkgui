@@ -81,6 +81,12 @@ static void mkgui_slider_setup(struct mkgui_ctx *ctx, uint32_t id, int32_t min_v
 	sd->min_val = min_val;
 	sd->max_val = max_val;
 	sd->value = value;
+	if(sd->value < sd->min_val) {
+		sd->value = sd->min_val;
+	}
+	if(sd->value > sd->max_val) {
+		sd->value = sd->max_val;
+	}
 	dirty_all(ctx);
 }
 

@@ -2891,6 +2891,10 @@ static void init_aux_data(struct mkgui_ctx *ctx) {
 					memset(ta, 0, sizeof(*ta));
 					ta->widget_id = w->id;
 					ta->text = (char *)calloc(1, MKGUI_TEXTAREA_INIT_CAP);
+					if(!ta->text) {
+						--ctx->textarea_count;
+						break;
+					}
 					ta->text_cap = MKGUI_TEXTAREA_INIT_CAP;
 				}
 			} break;

@@ -371,6 +371,9 @@ static void platform_set_cursor(struct mkgui_ctx *ctx, uint32_t cursor_type) {
 
 // [=]===^=[ platform_fb_resize ]==================================[=]
 static void platform_fb_resize(struct mkgui_ctx *ctx) {
+	if(ctx->win_w <= 0 || ctx->win_h <= 0) {
+		return;
+	}
 	struct mkgui_platform *plat = &ctx->plat;
 	platform_fb_destroy_dib(&plat->hdc_mem, &plat->hbmp, &plat->hbmp_old);
 	HDC hdc = GetDC(plat->hwnd);

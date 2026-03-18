@@ -117,6 +117,7 @@ A grid of checkboxes for widget flags:
 | Readonly | Prevent editing (input, textarea) |
 | Fixed    | Lock size in flex container |
 | RgnTop, RgnBot, RgnLeft, RgnRight | Split region assignment |
+| TbSep   | Toolbar separator (visible for toolbar button children) |
 | Separator, MChk, MRad | Menu item options |
 
 ### Tab management
@@ -135,13 +136,27 @@ Visible when a MENU or MENUITEM is selected:
 - A dedicated **menu tree** shows the menu hierarchy with drag-and-drop
   reordering.
 
-### Data items
+### Toolbar management
 
-Visible when a DROPDOWN or COMBOBOX is selected:
+Visible when a TOOLBAR widget is selected:
+
+- **Add Button** -- create a new toolbar button
+- **Remove Button** -- delete the last toolbar button
+
+Select a toolbar button child to set its icon (the icon browser shows the
+toolbar icon pack if `mdi_icons_toolbar.dat` exists), label, and the **TbSep**
+flag (draws a vertical separator before this button).
+
+### Data items / Sections
+
+Visible when a DROPDOWN, COMBOBOX, or STATUSBAR is selected:
 
 - Item list with add, remove, move up, move down buttons
 - Edit item text inline
-- These items are used in code generation to pre-populate the widget
+- **Dropdown/Combobox**: items are string values used to pre-populate the widget
+- **Statusbar**: items are section widths. Positive values = fixed pixel width,
+  negative values = flex (e.g. `-1` fills remaining space). Add sections with
+  "Add", edit widths inline
 
 ### Events
 
@@ -187,7 +202,8 @@ the checkboxes. Enabled events generate `case` stubs in the output code.
 - **Save** -- save to current file
 - **Save As...** -- save with new filename
 - **Recent Files** -- submenu with up to 10 recently opened projects
-- **Generate Code** -- export compilable C source
+- **Generate Code** -- export complete compilable C source
+- **Generate Snippet** -- export IDs and widget array only
 - **Exit** -- close editor
 
 ### Edit
@@ -242,20 +258,29 @@ Tab container. Children must be TAB type widgets.
 
 ## Code generation
 
+### Generate Code
+
 **File > Generate Code** (or the Gen toolbar button) opens a save dialog and
 writes a complete C source file containing:
 
 1. `#include "mkgui.c"` (unity build)
 2. An `enum` with all widget IDs
-3. Listview row callback stubs (for LISTVIEW widgets)
+3. Callback stubs (listview row callbacks, itemview label/icon callbacks)
 4. A `main()` function with:
    - Widget array initialization with types, IDs, labels, positions, anchors
    - Setup calls for widgets that need them (dropdown items, slider range,
-     spinbox range, combobox items, listview columns)
+     spinbox range, combobox items, listview columns, statusbar sections,
+     progress bar, itemview, scrollbar, treeview)
    - Event loop with `case` stubs for every enabled event
    - Automatic `MKGUI_EVENT_CLOSE` handler
 
 The generated file compiles directly with no modifications needed.
+
+### Generate Snippet
+
+**File > Generate Snippet** exports just the widget IDs enum and the widget
+array -- no main function, no callbacks, no event loop. Useful for updating
+widget definitions in an existing project without regenerating the full source.
 
 ## Test preview
 
