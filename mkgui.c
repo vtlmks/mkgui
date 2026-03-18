@@ -3825,7 +3825,12 @@ static uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 								listview_clamp_scroll_x(lv, content_w);
 							} else {
 								lv->scroll_y += delta;
-								int32_t max_scroll = (int32_t)lv->row_count * MKGUI_ROW_HEIGHT - (ctx->rects[hi].h - MKGUI_ROW_HEIGHT - 2);
+								int32_t content_h = ctx->rects[hi].h - MKGUI_ROW_HEIGHT - 2;
+								int32_t content_w = ctx->rects[hi].w - 2 - MKGUI_SCROLLBAR_W;
+								if(listview_total_col_w(lv) > content_w) {
+									content_h -= MKGUI_SCROLLBAR_W;
+								}
+								int32_t max_scroll = (int32_t)lv->row_count * MKGUI_ROW_HEIGHT - content_h;
 								if(max_scroll < 0) {
 									max_scroll = 0;
 								}
@@ -3835,7 +3840,6 @@ static uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 								if(lv->scroll_y > max_scroll) {
 									lv->scroll_y = max_scroll;
 								}
-								lv->scroll_y = (lv->scroll_y / MKGUI_ROW_HEIGHT) * MKGUI_ROW_HEIGHT;
 							}
 							dirty_all(ctx);
 						}

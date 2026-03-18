@@ -226,7 +226,7 @@ static void render_cell(struct mkgui_ctx *ctx, struct mkgui_listview_data *lv, u
 			int32_t box_size = 14;
 			int32_t bx = cx + (col_w - box_size) / 2;
 			int32_t by = row_y + (MKGUI_ROW_HEIGHT - box_size) / 2;
-			if(bx + box_size > clip_left && bx < clip_right) {
+			if(bx + box_size > clip_left && bx < clip_right && by + box_size > clip_top && by < clip_bottom) {
 				uint32_t bg = checked ? ctx->theme.splitter : ctx->theme.input_bg;
 				draw_patch(ctx, MKGUI_STYLE_SUNKEN, bx, by, box_size, box_size, bg, ctx->theme.widget_border);
 				if(checked) {
@@ -388,34 +388,32 @@ static void render_listview(struct mkgui_ctx *ctx, uint32_t idx) {
 		draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, rx + 1, draw_y, content_w, draw_h, row_bg);
 
 		int32_t ty = row_y + (MKGUI_ROW_HEIGHT - ctx->font_height) / 2;
-		if(ty >= clip_top && ty + ctx->font_height <= clip_bottom) {
-			cx = rx + 1 - sx;
-			for(uint32_t d = 0; d < lv->col_count; ++d) {
-				uint32_t c = lv->col_order[d];
-				int32_t col_w = lv->columns[c].width;
-				if(cx + col_w <= clip_left) {
-					cx += col_w;
-					continue;
-				}
-				if(cx >= clip_right) {
-					break;
-				}
-				cell_buf[0] = '\0';
-				if(lv->row_cb) {
-					lv->row_cb((uint32_t)row_idx, c, cell_buf, sizeof(cell_buf), lv->userdata);
-				}
-				uint32_t tc = is_selected ? ctx->theme.sel_text : ((w->flags & MKGUI_DISABLED) ? ctx->theme.text_disabled : ctx->theme.text);
-				int32_t cell_cl = cx;
-				int32_t cell_cr = cx + col_w;
-				if(cell_cl < clip_left) {
-					cell_cl = clip_left;
-				}
-				if(cell_cr > clip_right) {
-					cell_cr = clip_right;
-				}
-				render_cell(ctx, lv, c, cell_buf, cx, ty, col_w, cell_cl, cell_cr, clip_top, clip_bottom, tc, row_y);
+		cx = rx + 1 - sx;
+		for(uint32_t d = 0; d < lv->col_count; ++d) {
+			uint32_t c = lv->col_order[d];
+			int32_t col_w = lv->columns[c].width;
+			if(cx + col_w <= clip_left) {
 				cx += col_w;
+				continue;
 			}
+			if(cx >= clip_right) {
+				break;
+			}
+			cell_buf[0] = '\0';
+			if(lv->row_cb) {
+				lv->row_cb((uint32_t)row_idx, c, cell_buf, sizeof(cell_buf), lv->userdata);
+			}
+			uint32_t tc = is_selected ? ctx->theme.sel_text : ((w->flags & MKGUI_DISABLED) ? ctx->theme.text_disabled : ctx->theme.text);
+			int32_t cell_cl = cx;
+			int32_t cell_cr = cx + col_w;
+			if(cell_cl < clip_left) {
+				cell_cl = clip_left;
+			}
+			if(cell_cr > clip_right) {
+				cell_cr = clip_right;
+			}
+			render_cell(ctx, lv, c, cell_buf, cx, ty, col_w, cell_cl, cell_cr, clip_top, clip_bottom, tc, row_y);
+			cx += col_w;
 		}
 	}
 
@@ -627,7 +625,7 @@ static void listview_page_scroll(struct mkgui_ctx *ctx, uint32_t idx, int32_t di
 		max_scroll = 0;
 	}
 
-	int32_t page = (content_h / MKGUI_ROW_HEIGHT) * MKGUI_ROW_HEIGHT;
+	int32_t page = content_h;
 	lv->scroll_y += direction * page;
 	if(lv->scroll_y < 0) {
 		lv->scroll_y = 0;
@@ -687,7 +685,6 @@ static void listview_scroll_to_y(struct mkgui_ctx *ctx, uint32_t widget_id, int3
 	}
 
 	lv->scroll_y = (int32_t)(frac * (float)max_scroll);
-	lv->scroll_y = (lv->scroll_y / MKGUI_ROW_HEIGHT) * MKGUI_ROW_HEIGHT;
 	dirty_all(ctx);
 }
 
@@ -855,7 +852,7 @@ static uint32_t handle_listview_key(struct mkgui_ctx *ctx, struct mkgui_event *e
 			++lv->selected_row;
 			int32_t row_bottom = (lv->selected_row + 1) * MKGUI_ROW_HEIGHT;
 			if(row_bottom > lv->scroll_y + content_h) {
-				lv->scroll_y = ((row_bottom - content_h + MKGUI_ROW_HEIGHT - 1) / MKGUI_ROW_HEIGHT) * MKGUI_ROW_HEIGHT;
+				lv->scroll_y = row_bottom - content_h;
 			}
 			dirty_all(ctx);
 			ev->type = MKGUI_EVENT_LISTVIEW_SELECT;
@@ -886,7 +883,7 @@ static uint32_t handle_listview_key(struct mkgui_ctx *ctx, struct mkgui_event *e
 		}
 		int32_t row_bottom = (lv->selected_row + 1) * MKGUI_ROW_HEIGHT;
 		if(row_bottom > lv->scroll_y + content_h) {
-			lv->scroll_y = ((row_bottom - content_h + MKGUI_ROW_HEIGHT - 1) / MKGUI_ROW_HEIGHT) * MKGUI_ROW_HEIGHT;
+			lv->scroll_y = row_bottom - content_h;
 		}
 		if(lv->scroll_y > max_scroll) {
 			lv->scroll_y = max_scroll;
@@ -1064,7 +1061,7 @@ static void mkgui_listview_visible_range(struct mkgui_ctx *ctx, uint32_t id, int
 	int32_t hh = lv->header_height > 0 ? lv->header_height : MKGUI_ROW_HEIGHT;
 	int32_t content_h = rh - hh - 2;
 	*first = lv->scroll_y / MKGUI_ROW_HEIGHT;
-	*last = *first + content_h / MKGUI_ROW_HEIGHT;
+	*last = (lv->scroll_y + content_h - 1) / MKGUI_ROW_HEIGHT;
 	if(*last >= (int32_t)lv->row_count) {
 		*last = (int32_t)lv->row_count - 1;
 	}
