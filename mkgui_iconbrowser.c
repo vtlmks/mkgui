@@ -30,6 +30,7 @@ struct ib_state {
 	int32_t prev_selected;
 	uint32_t saved_icon_count;
 	uint32_t saved_pixels_used;
+	struct mdi_pack *pack;
 };
 
 static struct ib_state ib;
@@ -47,8 +48,8 @@ static void ib_scan_category(uint32_t cat) {
 	char lo = ib_cat_start[cat];
 	char hi = ib_cat_end[cat];
 
-	for(uint32_t i = 0; i < mdi_icon_count && ib.count < IB_MAX_ICONS; ++i) {
-		const char *name = mdi_name_block + mdi_name_offsets[i];
+	for(uint32_t i = 0; i < ib.pack->icon_count && ib.count < IB_MAX_ICONS; ++i) {
+		const char *name = ib.pack->name_block + ib.pack->name_offsets[i];
 		char first = name[0];
 		if(first < lo) {
 			continue;
@@ -85,12 +86,16 @@ static void ib_icon_cb(uint32_t item, char *buf, uint32_t buf_size, void *userda
 }
 
 // [=]===^=[ mkgui_icon_browser ]===================================[=]
-static uint32_t mkgui_icon_browser(struct mkgui_ctx *ctx, char *out, uint32_t out_size) {
+static uint32_t mkgui_icon_browser_pack(struct mkgui_ctx *ctx, struct mdi_pack *pack, char *out, uint32_t out_size) {
 	memset(&ib, 0, sizeof(ib));
 	ib.result[0] = '\0';
 	ib.prev_selected = -1;
 	ib.saved_icon_count = icon_count;
 	ib.saved_pixels_used = icon_pixels_used;
+	ib.pack = pack;
+
+	struct mdi_pack saved_mdi = mdi;
+	mdi = *pack;
 
 	popup_destroy_all(ctx);
 
@@ -168,12 +173,9 @@ static uint32_t mkgui_icon_browser(struct mkgui_ctx *ctx, char *out, uint32_t ou
 
 	mkgui_destroy_child(dlg);
 
+	mdi = saved_mdi;
 	icon_count = ib.saved_icon_count;
 	icon_pixels_used = ib.saved_pixels_used;
-
-	if(ib.confirmed && ib.result[0] != '\0') {
-		icon_resolve(ib.result);
-	}
 
 	dirty_all(ctx);
 
@@ -183,4 +185,13 @@ static uint32_t mkgui_icon_browser(struct mkgui_ctx *ctx, char *out, uint32_t ou
 		return 1;
 	}
 	return 0;
+}
+
+// [=]===^=[ mkgui_icon_browser ]===================================[=]
+static uint32_t mkgui_icon_browser(struct mkgui_ctx *ctx, char *out, uint32_t out_size) {
+	uint32_t r = mkgui_icon_browser_pack(ctx, &mdi, out, out_size);
+	if(r) {
+		icon_resolve(out);
+	}
+	return r;
 }

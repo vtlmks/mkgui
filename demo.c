@@ -45,6 +45,7 @@ enum {
 	ID_LBL_POWER, ID_TOGGLE1,
 	ID_LBL_DATE, ID_DATEPICKER1,
 	ID_LBL_IP, ID_IPINPUT1,
+	ID_LBL_TBMODE, ID_TBMODE_DROP,
 
 	/* Tree / Text tab */
 	ID_TREE_SPLIT, ID_TREE_LVBOX, ID_TREE_LBL, ID_TREEVIEW1,
@@ -317,6 +318,8 @@ int main(void) {
 		{ MKGUI_DATEPICKER, ID_DATEPICKER1, "",              "", ID_EXTRA_FORM, 0, 0, 0, 0, 0, 0 },
 		{ MKGUI_LABEL,    ID_LBL_IP,    "IP Address:",       "", ID_EXTRA_FORM, 0, 0, 0, 0, 0, 0 },
 		{ MKGUI_IPINPUT,  ID_IPINPUT1,  "",                  "", ID_EXTRA_FORM, 0, 0, 0, 0, 0, 0 },
+		{ MKGUI_LABEL,    ID_LBL_TBMODE,"Toolbar:",          "", ID_EXTRA_FORM, 0, 0, 0, 0, 0, 0 },
+		{ MKGUI_DROPDOWN, ID_TBMODE_DROP,"",                 "", ID_EXTRA_FORM, 0, 0, 0, 0, 0, 0 },
 
 		/* ---- Tree / Text tab ---- */
 		{ MKGUI_VSPLIT,   ID_TREE_SPLIT,"",                  "", ID_TAB_TREE, 0, 0, 0, 0, ANCHOR_ALL, 0 },
@@ -398,8 +401,13 @@ int main(void) {
 	mkgui_progress_set(ctx, ID_PROGRESS1, 65);
 
 	mkgui_toggle_set(ctx, ID_TOGGLE1, 1);
-	mkgui_datepicker_set(ctx, ID_DATEPICKER1, 2026, 3, 17);
+	int32_t today_y, today_m, today_d;
+	datepicker_today(&today_y, &today_m, &today_d);
+	mkgui_datepicker_set(ctx, ID_DATEPICKER1, today_y, today_m, today_d);
 	mkgui_ipinput_set(ctx, ID_IPINPUT1, "192.168.1.100");
+
+	const char *tb_modes[] = { "Icons + Text", "Icons Only", "Text Only" };
+	mkgui_dropdown_setup(ctx, ID_TBMODE_DROP, tb_modes, 3);
 
 	/* Statusbar setup */
 	int32_t sb_widths[] = { -1, 150, 100 };
@@ -627,6 +635,15 @@ int main(void) {
 					char buf[64];
 					snprintf(buf, sizeof(buf), "Combobox selection: %d", ev.value);
 					mkgui_statusbar_set(ctx, ID_STATUSBAR, 0, buf);
+				} break;
+
+				case MKGUI_EVENT_DROPDOWN_CHANGED: {
+					if(ev.id == ID_TBMODE_DROP) {
+						uint32_t tb_mode_flags[] = { MKGUI_TOOLBAR_ICONS_TEXT, MKGUI_TOOLBAR_ICONS_ONLY, MKGUI_TOOLBAR_TEXT_ONLY };
+						if(ev.value >= 0 && ev.value < 3) {
+							mkgui_toolbar_set_mode(ctx, ID_TOOLBAR, tb_mode_flags[ev.value]);
+						}
+					}
 				} break;
 
 				case MKGUI_EVENT_ITEMVIEW_SELECT: {

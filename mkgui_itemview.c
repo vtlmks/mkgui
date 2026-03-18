@@ -180,8 +180,9 @@ static void render_itemview_icon(struct mkgui_ctx *ctx, uint32_t idx, struct mkg
 			}
 
 			int32_t icon_idx = itemview_get_icon_idx(iv, (uint32_t)item);
+			int32_t ic_h = (icon_idx >= 0) ? icons[icon_idx].h : 0;
 			if(icon_idx >= 0) {
-				int32_t ix = cx + (cw - MKGUI_ICON_SIZE) / 2;
+				int32_t ix = cx + (cw - icons[icon_idx].w) / 2;
 				int32_t iy = cy + 8;
 				draw_icon(ctx->pixels, ctx->win_w, ctx->win_h, &icons[icon_idx], ix, iy, ca_x, ca_y, clip_x2, clip_y2);
 			}
@@ -192,7 +193,7 @@ static void render_itemview_icon(struct mkgui_ctx *ctx, uint32_t idx, struct mkg
 				int32_t cell_cx1 = cx + 3 > ca_x ? cx + 3 : ca_x;
 				int32_t cell_cx2 = cx + cw - 3 < clip_x2 ? cx + cw - 3 : clip_x2;
 				uint32_t tc = (item == iv->selected) ? ctx->theme.sel_text : ((ctx->widgets[idx].flags & MKGUI_DISABLED) ? ctx->theme.text_disabled : ctx->theme.text);
-				int32_t ty = cy + MKGUI_ICON_SIZE + 12;
+				int32_t ty = cy + ic_h + 12;
 				const char *p = label;
 				for(uint32_t line = 0; line < MKGUI_ITEMVIEW_ICON_LINES && *p; ++line) {
 					int32_t w = 0;
@@ -312,8 +313,8 @@ static void render_itemview_thumbnail(struct mkgui_ctx *ctx, uint32_t idx, struc
 			} else {
 				int32_t icon_idx = itemview_get_icon_idx(iv, (uint32_t)item);
 				if(icon_idx >= 0) {
-					int32_t ix = cx + (cw - MKGUI_ICON_SIZE) / 2;
-					int32_t iy = cy + (ts - MKGUI_ICON_SIZE) / 2 + ty_off;
+					int32_t ix = cx + (cw - icons[icon_idx].w) / 2;
+					int32_t iy = cy + (ts - icons[icon_idx].h) / 2 + ty_off;
 					draw_icon(ctx->pixels, ctx->win_w, ctx->win_h, &icons[icon_idx], ix, iy, ca_x, ca_y, clip_x2, clip_y2);
 				}
 			}
@@ -382,9 +383,9 @@ static void render_itemview_compact(struct mkgui_ctx *ctx, uint32_t idx, struct 
 			int32_t tx = col_x + 4;
 			int32_t icon_idx = itemview_get_icon_idx(iv, (uint32_t)item);
 			if(icon_idx >= 0) {
-				int32_t iy = cy + (row_h - MKGUI_ICON_SIZE) / 2;
+				int32_t iy = cy + (row_h - icons[icon_idx].h) / 2;
 				draw_icon(ctx->pixels, ctx->win_w, ctx->win_h, &icons[icon_idx], tx, iy, ca_x, ca_y, clip_x2, clip_y2);
-				tx += MKGUI_ICON_SIZE + 4;
+				tx += icons[icon_idx].w + 4;
 			}
 
 			itemview_get_label(iv, (uint32_t)item, label, sizeof(label));
@@ -434,9 +435,9 @@ static void render_itemview_detail(struct mkgui_ctx *ctx, uint32_t idx, struct m
 		int32_t tx = ca_x + 4;
 		int32_t icon_idx = itemview_get_icon_idx(iv, (uint32_t)item);
 		if(icon_idx >= 0) {
-			int32_t iy = cy + (row_h - MKGUI_ICON_SIZE) / 2;
+			int32_t iy = cy + (row_h - icons[icon_idx].h) / 2;
 			draw_icon(ctx->pixels, ctx->win_w, ctx->win_h, &icons[icon_idx], tx, iy, ca_x, ca_y, ca_x + ca_w, clip_y2);
-			tx += MKGUI_ICON_SIZE + 4;
+			tx += icons[icon_idx].w + 4;
 		}
 
 		itemview_get_label(iv, (uint32_t)item, label, sizeof(label));

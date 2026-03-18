@@ -189,19 +189,27 @@ static uint32_t handle_spinbox_key(struct mkgui_ctx *ctx, struct mkgui_event *ev
 		}
 	}
 
-	if(!sd->editing) {
+	if(ks == MKGUI_KEY_UP || ks == MKGUI_KEY_DOWN || ks == MKGUI_KEY_HOME || ks == MKGUI_KEY_END) {
+		if(sd->editing) {
+			spinbox_commit_edit(sd);
+		}
+		int32_t delta = 0;
 		if(ks == MKGUI_KEY_UP) {
-			return spinbox_adjust(ctx, ev, ctx->focus_id, sd->step);
+			delta = sd->step;
+		} else if(ks == MKGUI_KEY_DOWN) {
+			delta = -sd->step;
+		} else if(ks == MKGUI_KEY_HOME) {
+			delta = sd->min_val - sd->value;
+		} else {
+			delta = sd->max_val - sd->value;
 		}
-		if(ks == MKGUI_KEY_DOWN) {
-			return spinbox_adjust(ctx, ev, ctx->focus_id, -sd->step);
-		}
-		if(ks == MKGUI_KEY_HOME) {
-			return spinbox_adjust(ctx, ev, ctx->focus_id, sd->min_val - sd->value);
-		}
-		if(ks == MKGUI_KEY_END) {
-			return spinbox_adjust(ctx, ev, ctx->focus_id, sd->max_val - sd->value);
-		}
+		uint32_t r = spinbox_adjust(ctx, ev, ctx->focus_id, delta);
+		sd->editing = 1;
+		sd->select_all = 1;
+		snprintf(sd->edit_buf, sizeof(sd->edit_buf), "%d", sd->value);
+		sd->edit_len = (uint32_t)strlen(sd->edit_buf);
+		dirty_all(ctx);
+		return r ? r : 1;
 	}
 
 	if(ks == MKGUI_KEY_BACKSPACE) {

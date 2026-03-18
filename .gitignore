@@ -5,7 +5,8 @@ ext/nanosvg.h
 ext/nanosvgrast.h
 tools/gen_icons
 ext/mdi_icons.dat
-mdi_icons_gui.dat
 mdi_icons.dat
+mdi_icons_gui.dat
+mdi_icons_toolbar.dat
 benchmark
 mkcamview/mkcamview

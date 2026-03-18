@@ -39,7 +39,9 @@
 #define MKGUI_GLYPH_COUNT    (MKGUI_GLYPH_LAST - MKGUI_GLYPH_FIRST + 1)
 #define MKGUI_GLYPH_MAX_BMP  1024
 
-#define MKGUI_TOOLBAR_HEIGHT  28
+#define MKGUI_TOOLBAR_HEIGHT_DEFAULT  28
+#define MKGUI_TOOLBAR_BTN_W   28
+#define MKGUI_TOOLBAR_SEP_W   8
 #define MKGUI_STATUSBAR_HEIGHT 22
 
 #define MKGUI_ICON_SIZE       18
@@ -228,6 +230,10 @@ enum {
 #define MKGUI_ALIGN_END       (3u << 25)
 #define MKGUI_ALIGN_MASK      (3u << 25)
 #define MKGUI_FIXED           (1u << 27)
+#define MKGUI_TOOLBAR_ICONS_TEXT  0
+#define MKGUI_TOOLBAR_ICONS_ONLY  (1u << 28)
+#define MKGUI_TOOLBAR_TEXT_ONLY   (2u << 28)
+#define MKGUI_TOOLBAR_MODE_MASK   (3u << 28)
 
 // ---------------------------------------------------------------------------
 // Event types
@@ -657,13 +663,19 @@ static uint32_t icon_count;
 
 static uint32_t icon_text_color;
 
-static uint8_t *mdi_dat;
-static uint32_t mdi_dat_size;
-static uint16_t mdi_icon_size;
-static uint16_t mdi_icon_count;
-static const char *mdi_name_block;
-static const uint32_t *mdi_name_offsets;
-static const uint8_t *mdi_pixel_data;
+struct mdi_pack {
+	uint8_t *dat;
+	uint32_t dat_size;
+	uint16_t icon_size;
+	uint16_t icon_count;
+	const char *name_block;
+	const uint32_t *name_offsets;
+	const uint8_t *pixel_data;
+};
+
+static struct mdi_pack mdi;
+static struct mdi_pack mdi_toolbar;
+
 
 struct mkgui_ctx {
 	struct mkgui_platform plat;
@@ -1933,11 +1945,30 @@ static void layout_node(struct mkgui_ctx *ctx, uint32_t idx) {
 		}
 		for(uint32_t c = layout_first_child[idx]; c < ctx->widget_count; c = layout_next_sibling[c]) {
 			if(ctx->widgets[c].type == MKGUI_TOOLBAR) {
+				uint32_t tb_mode = ctx->widgets[c].flags & MKGUI_TOOLBAR_MODE_MASK;
+				int32_t th;
+				if(tb_mode == MKGUI_TOOLBAR_TEXT_ONLY) {
+					th = ctx->font_height + 10;
+				} else {
+					uint32_t tb_has_icons = 0;
+					for(uint32_t j = layout_first_child[c]; j < ctx->widget_count; j = layout_next_sibling[j]) {
+						if(ctx->widgets[j].icon[0]) {
+							tb_has_icons = 1;
+							break;
+						}
+					}
+					if(tb_has_icons && mdi_toolbar.icon_size > 0) {
+						int32_t ih = (int32_t)mdi_toolbar.icon_size;
+						th = (tb_mode == MKGUI_TOOLBAR_ICONS_ONLY) ? ih + 10 : ((ih > ctx->font_height ? ih : ctx->font_height) + 10);
+					} else {
+						th = ctx->font_height + 10;
+					}
+				}
 				ctx->rects[c].x = px;
 				ctx->rects[c].y = top_y;
 				ctx->rects[c].w = pw;
-				ctx->rects[c].h = MKGUI_TOOLBAR_HEIGHT;
-				top_y += MKGUI_TOOLBAR_HEIGHT;
+				ctx->rects[c].h = th;
+				top_y += th;
 			}
 		}
 		for(uint32_t c = layout_first_child[idx]; c < ctx->widget_count; c = layout_next_sibling[c]) {
@@ -2196,27 +2227,7 @@ static void layout_node(struct mkgui_ctx *ctx, uint32_t idx) {
 		}
 
 	} else if(w->type == MKGUI_TOOLBAR) {
-		int32_t bx = px + 2;
-		for(uint32_t c = layout_first_child[idx]; c < ctx->widget_count; c = layout_next_sibling[c]) {
-			struct mkgui_widget *btn = &ctx->widgets[c];
-			if(btn->type != MKGUI_BUTTON) {
-				continue;
-			}
-			if(btn->flags & MKGUI_TOOLBAR_SEP) {
-				bx += 8;
-			}
-			int32_t tw = text_width(ctx, btn->label);
-			int32_t icon_w = btn->icon[0] ? 22 : 0;
-			int32_t btn_w = icon_w + tw + 12;
-			if(btn_w < 28) {
-				btn_w = 28;
-			}
-			ctx->rects[c].x = bx;
-			ctx->rects[c].y = py + 2;
-			ctx->rects[c].w = btn_w;
-			ctx->rects[c].h = ph - 4;
-			bx += btn_w + 2;
-		}
+		// toolbar children are positioned by render_toolbar
 
 	} else {
 		for(uint32_t c = layout_first_child[idx]; c < ctx->widget_count; c = layout_next_sibling[c]) {
@@ -2479,6 +2490,10 @@ static void draw_icon_popup(struct mkgui_popup *p, struct mkgui_icon *icon, int3
 static void render_widget(struct mkgui_ctx *ctx, uint32_t idx) {
 	switch(ctx->widgets[idx].type) {
 		case MKGUI_BUTTON: {
+			uint32_t pidx = layout_parent[idx];
+			if(pidx < ctx->widget_count && ctx->widgets[pidx].type == MKGUI_TOOLBAR) {
+				break;
+			}
 			render_button(ctx, idx);
 		} break;
 
@@ -2996,6 +3011,15 @@ static void mkgui_set_weight(struct mkgui_ctx *ctx, uint32_t id, uint32_t weight
 	struct mkgui_widget *w = find_widget(ctx, id);
 	if(w) {
 		w->weight = weight;
+		dirty_all(ctx);
+	}
+}
+
+// [=]===^=[ mkgui_toolbar_set_mode ]==============================[=]
+static void mkgui_toolbar_set_mode(struct mkgui_ctx *ctx, uint32_t toolbar_id, uint32_t mode) {
+	struct mkgui_widget *w = find_widget(ctx, toolbar_id);
+	if(w && w->type == MKGUI_TOOLBAR) {
+		w->flags = (w->flags & ~MKGUI_TOOLBAR_MODE_MASK) | (mode & MKGUI_TOOLBAR_MODE_MASK);
 		dirty_all(ctx);
 	}
 }

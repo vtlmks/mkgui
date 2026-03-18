@@ -1,8 +1,11 @@
 // Copyright (c) 2026, Peter Fors
 // SPDX-License-Identifier: MIT
 
-// [=]===^=[ mdi_dat_load ]===========================================[=]
-static uint32_t mdi_dat_load(const char *path) {
+#define MKGUI_TOOLBAR_ICON_PREFIX "tb:"
+#define MKGUI_TOOLBAR_ICON_PREFIX_LEN 3
+
+// [=]===^=[ mdi_pack_load ]===========================================[=]
+static uint32_t mdi_pack_load(struct mdi_pack *pack, const char *path) {
 	FILE *fp = fopen(path, "rb");
 	if(!fp) {
 		return 0;
@@ -15,39 +18,39 @@ static uint32_t mdi_dat_load(const char *path) {
 		return 0;
 	}
 
-	mdi_dat = (uint8_t *)malloc((size_t)sz);
-	if(!mdi_dat) {
+	pack->dat = (uint8_t *)malloc((size_t)sz);
+	if(!pack->dat) {
 		fclose(fp);
 		return 0;
 	}
-	if(fread(mdi_dat, 1, (size_t)sz, fp) != (size_t)sz) {
-		free(mdi_dat);
-		mdi_dat = NULL;
+	if(fread(pack->dat, 1, (size_t)sz, fp) != (size_t)sz) {
+		free(pack->dat);
+		pack->dat = NULL;
 		fclose(fp);
 		return 0;
 	}
 	fclose(fp);
-	mdi_dat_size = (uint32_t)sz;
+	pack->dat_size = (uint32_t)sz;
 
-	if(memcmp(mdi_dat, "MKIC", 4) != 0) {
-		free(mdi_dat);
-		mdi_dat = NULL;
+	if(memcmp(pack->dat, "MKIC", 4) != 0) {
+		free(pack->dat);
+		pack->dat = NULL;
 		return 0;
 	}
 
-	memcpy(&mdi_icon_size, mdi_dat + 4, 2);
-	memcpy(&mdi_icon_count, mdi_dat + 6, 2);
+	memcpy(&pack->icon_size, pack->dat + 4, 2);
+	memcpy(&pack->icon_count, pack->dat + 6, 2);
 
-	mdi_name_block = (const char *)(mdi_dat + 8);
+	pack->name_block = (const char *)(pack->dat + 8);
 
 	uint32_t name_block_size = 0;
-	for(uint16_t i = 0; i < mdi_icon_count; ++i) {
-		name_block_size += (uint32_t)strlen(mdi_name_block + name_block_size) + 1;
+	for(uint16_t i = 0; i < pack->icon_count; ++i) {
+		name_block_size += (uint32_t)strlen(pack->name_block + name_block_size) + 1;
 	}
 	uint32_t name_block_padded = (name_block_size + 3) & ~3u;
 
-	mdi_name_offsets = (const uint32_t *)(mdi_dat + 8 + name_block_padded);
-	mdi_pixel_data = (const uint8_t *)(mdi_dat + 8 + name_block_padded + (uint32_t)mdi_icon_count * 4);
+	pack->name_offsets = (const uint32_t *)(pack->dat + 8 + name_block_padded);
+	pack->pixel_data = (const uint8_t *)(pack->dat + 8 + name_block_padded + (uint32_t)pack->icon_count * 4);
 
 	return 1;
 }
@@ -59,23 +62,26 @@ static void mdi_dat_free(void) {
 			free(icons[i].pixels);
 		}
 	}
-	if(mdi_dat) {
-		free(mdi_dat);
-		mdi_dat = NULL;
+	if(mdi_toolbar.dat && mdi_toolbar.dat != mdi.dat) {
+		free(mdi_toolbar.dat);
 	}
-	mdi_icon_count = 0;
+	if(mdi.dat) {
+		free(mdi.dat);
+	}
+	memset(&mdi, 0, sizeof(mdi));
+	memset(&mdi_toolbar, 0, sizeof(mdi_toolbar));
 }
 
-// [=]===^=[ mdi_lookup ]=============================================[=]
-static int32_t mdi_lookup(const char *name) {
-	if(!mdi_dat || mdi_icon_count == 0) {
+// [=]===^=[ mdi_pack_lookup ]=========================================[=]
+static int32_t mdi_pack_lookup(struct mdi_pack *pack, const char *name) {
+	if(!pack->dat || pack->icon_count == 0) {
 		return -1;
 	}
 	int32_t lo = 0;
-	int32_t hi = (int32_t)mdi_icon_count - 1;
+	int32_t hi = (int32_t)pack->icon_count - 1;
 	while(lo <= hi) {
 		int32_t mid = (lo + hi) / 2;
-		const char *mid_name = mdi_name_block + mdi_name_offsets[mid];
+		const char *mid_name = pack->name_block + pack->name_offsets[mid];
 		int32_t cmp = strcmp(name, mid_name);
 		if(cmp == 0) {
 			return mid;
@@ -88,10 +94,10 @@ static int32_t mdi_lookup(const char *name) {
 	return -1;
 }
 
-// [=]===^=[ mdi_tint_icon ]==========================================[=]
-static void mdi_tint_icon(int32_t mdi_idx, uint32_t color, uint32_t *dst, uint32_t size) {
+// [=]===^=[ mdi_pack_tint ]===========================================[=]
+static void mdi_pack_tint(struct mdi_pack *pack, int32_t mdi_idx, uint32_t color, uint32_t *dst, uint32_t size) {
 	uint32_t pixel_count = size * size;
-	const uint8_t *src = mdi_pixel_data + (uint32_t)mdi_idx * pixel_count;
+	const uint8_t *src = pack->pixel_data + (uint32_t)mdi_idx * pixel_count;
 	uint8_t cr = (color >> 16) & 0xff;
 	uint8_t cg = (color >> 8) & 0xff;
 	uint8_t cb = color & 0xff;
@@ -105,36 +111,34 @@ static void mdi_tint_icon(int32_t mdi_idx, uint32_t color, uint32_t *dst, uint32
 	}
 }
 
-// [=]===^=[ icon_load_one ]==========================================[=]
-static int32_t icon_load_one(const char *name) {
+// [=]===^=[ icon_load_from_pack ]=====================================[=]
+static int32_t icon_load_from_pack(struct mdi_pack *pack, const char *name, const char *cache_name) {
 	if(icon_count >= MKGUI_MAX_ICONS) {
 		return -1;
 	}
-	if(name[0] == '\0') {
-		return -1;
-	}
 
-	int32_t mi = mdi_lookup(name);
+	int32_t mi = mdi_pack_lookup(pack, name);
 	if(mi < 0) {
 		return -1;
 	}
 
-	uint32_t pixel_count = MKGUI_ICON_PIXELS;
+	uint32_t sz = (uint32_t)pack->icon_size;
+	uint32_t pixel_count = sz * sz;
 	if(icon_pixels_used + pixel_count > MKGUI_ICON_PIXEL_POOL) {
 		return -1;
 	}
 
 	uint32_t *dst = &icon_pixels[icon_pixels_used];
-	mdi_tint_icon(mi, icon_text_color, dst, MKGUI_ICON_SIZE);
+	mdi_pack_tint(pack, mi, icon_text_color, dst, sz);
 	icon_pixels_used += pixel_count;
 
 	int32_t idx = (int32_t)icon_count;
 	struct mkgui_icon *ic = &icons[icon_count++];
-	strncpy(ic->name, name, MKGUI_ICON_NAME_LEN - 1);
+	strncpy(ic->name, cache_name, MKGUI_ICON_NAME_LEN - 1);
 	ic->name[MKGUI_ICON_NAME_LEN - 1] = '\0';
 	ic->pixels = dst;
-	ic->w = MKGUI_ICON_SIZE;
-	ic->h = MKGUI_ICON_SIZE;
+	ic->w = (int32_t)sz;
+	ic->h = (int32_t)sz;
 	ic->custom = 0;
 
 	return idx;
@@ -159,7 +163,18 @@ static int32_t icon_resolve(const char *name) {
 	if(idx >= 0) {
 		return idx;
 	}
-	return icon_load_one(name);
+	return icon_load_from_pack(&mdi, name, name);
+}
+
+// [=]===^=[ toolbar_icon_resolve ]====================================[=]
+static int32_t toolbar_icon_resolve(const char *name) {
+	char tb_name[MKGUI_ICON_NAME_LEN];
+	snprintf(tb_name, sizeof(tb_name), "%s%s", MKGUI_TOOLBAR_ICON_PREFIX, name);
+	int32_t idx = icon_find_idx(tb_name);
+	if(idx >= 0) {
+		return idx;
+	}
+	return icon_load_from_pack(&mdi_toolbar, name, tb_name);
 }
 
 // [=]===^=[ widget_icon_idx ]========================================[=]
@@ -168,6 +183,14 @@ static int32_t widget_icon_idx(struct mkgui_widget *w) {
 		return -1;
 	}
 	return icon_resolve(w->icon);
+}
+
+// [=]===^=[ toolbar_icon_idx ]========================================[=]
+static int32_t toolbar_icon_idx(struct mkgui_widget *w) {
+	if(w->icon[0] == '\0') {
+		return -1;
+	}
+	return toolbar_icon_resolve(w->icon);
 }
 
 // [=]===^=[ mkgui_icon_init ]========================================[=]
@@ -182,12 +205,32 @@ static void mkgui_icon_init(void) {
 	};
 
 	for(uint32_t i = 0; paths[i]; ++i) {
-		if(mdi_dat_load(paths[i])) {
-			fprintf(stderr, "mkgui: icon pack loaded from %s (%u icons, %ux%u)\n", paths[i], mdi_icon_count, mdi_icon_size, mdi_icon_size);
-			return;
+		if(mdi_pack_load(&mdi, paths[i])) {
+			fprintf(stderr, "mkgui: icon pack loaded from %s (%u icons, %ux%u)\n", paths[i], mdi.icon_count, mdi.icon_size, mdi.icon_size);
+			break;
 		}
 	}
-	fprintf(stderr, "mkgui: warning: mdi_icons.dat not found, icons unavailable\n");
+	if(!mdi.dat) {
+		fprintf(stderr, "mkgui: warning: mdi_icons.dat not found, icons unavailable\n");
+	}
+
+	const char *tb_paths[] = {
+		"mdi_icons_toolbar.dat",
+		"ext/mdi_icons_toolbar.dat",
+		NULL
+	};
+
+	uint32_t tb_loaded = 0;
+	for(uint32_t i = 0; tb_paths[i]; ++i) {
+		if(mdi_pack_load(&mdi_toolbar, tb_paths[i])) {
+			fprintf(stderr, "mkgui: toolbar icon pack loaded from %s (%u icons, %ux%u)\n", tb_paths[i], mdi_toolbar.icon_count, mdi_toolbar.icon_size, mdi_toolbar.icon_size);
+			tb_loaded = 1;
+			break;
+		}
+	}
+	if(!tb_loaded) {
+		mdi_toolbar = mdi;
+	}
 }
 
 // [=]===^=[ icon_load_from_widgets ]=================================[=]
@@ -205,9 +248,12 @@ static void icon_reload_all(void) {
 		if(icons[i].custom) {
 			continue;
 		}
-		int32_t mi = mdi_lookup(icons[i].name);
+		uint32_t is_toolbar = (strncmp(icons[i].name, MKGUI_TOOLBAR_ICON_PREFIX, MKGUI_TOOLBAR_ICON_PREFIX_LEN) == 0);
+		struct mdi_pack *pack = is_toolbar ? &mdi_toolbar : &mdi;
+		const char *lookup_name = is_toolbar ? icons[i].name + MKGUI_TOOLBAR_ICON_PREFIX_LEN : icons[i].name;
+		int32_t mi = mdi_pack_lookup(pack, lookup_name);
 		if(mi >= 0) {
-			mdi_tint_icon(mi, icon_text_color, icons[i].pixels, MKGUI_ICON_SIZE);
+			mdi_pack_tint(pack, mi, icon_text_color, icons[i].pixels, (uint32_t)icons[i].w);
 		}
 	}
 }

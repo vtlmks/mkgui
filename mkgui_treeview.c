@@ -115,7 +115,8 @@ static void render_treeview(struct mkgui_ctx *ctx, uint32_t idx) {
 			} else {
 				draw_vline(ctx->pixels, ctx->win_w, ctx->win_h, lx, row_y, MKGUI_ROW_HEIGHT, line_color);
 			}
-			draw_hline(ctx->pixels, ctx->win_w, ctx->win_h, lx + 1, cy, MKGUI_TREE_INDENT / 2 - 1, line_color);
+			int32_t hlen = tv->nodes[i].has_children ? MKGUI_TREE_INDENT / 2 - 1 : MKGUI_TREE_INDENT + MKGUI_TREE_INDENT / 2 - 1;
+			draw_hline(ctx->pixels, ctx->win_w, ctx->win_h, lx + 1, cy, hlen, line_color);
 		}
 
 		if((int32_t)tv->nodes[i].id == tv->selected_node) {
@@ -144,9 +145,10 @@ static void render_treeview(struct mkgui_ctx *ctx, uint32_t idx) {
 
 		int32_t text_x = rx + 4 + indent + MKGUI_TREE_INDENT;
 		if(tv->nodes[i].icon_idx >= 0 && tv->nodes[i].icon_idx < (int32_t)icon_count) {
-			int32_t iy = row_y + (MKGUI_ROW_HEIGHT - MKGUI_ICON_SIZE) / 2;
-			draw_icon(ctx->pixels, ctx->win_w, ctx->win_h, &icons[tv->nodes[i].icon_idx], text_x, iy, rx + 1, clip_top, rx + rw - 1, clip_bottom);
-			text_x += MKGUI_ICON_SIZE + 2;
+			int32_t ti = tv->nodes[i].icon_idx;
+			int32_t iy = row_y + (MKGUI_ROW_HEIGHT - icons[ti].h) / 2;
+			draw_icon(ctx->pixels, ctx->win_w, ctx->win_h, &icons[ti], text_x, iy, rx + 1, clip_top, rx + rw - 1, clip_bottom);
+			text_x += icons[ti].w + 2;
 		}
 		int32_t ty = row_y + (MKGUI_ROW_HEIGHT - ctx->font_height) / 2;
 		if(ty >= clip_top && ty + ctx->font_height <= clip_bottom) {

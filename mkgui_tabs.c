@@ -4,8 +4,9 @@
 // [=]===^=[ tab_calc_width ]=====================================[=]
 static int32_t tab_calc_width(struct mkgui_ctx *ctx, struct mkgui_widget *child) {
 	int32_t tw = text_width(ctx, child->label) + 20;
-	if(widget_icon_idx(child) >= 0) {
-		tw += MKGUI_ICON_SIZE + 4;
+	int32_t ii = widget_icon_idx(child);
+	if(ii >= 0) {
+		tw += icons[ii].w + 4;
 	}
 	if(child->flags & MKGUI_TAB_CLOSABLE) {
 		tw += 16;
@@ -97,11 +98,11 @@ static void render_tabs(struct mkgui_ctx *ctx, uint32_t idx) {
 			draw_hline(ctx->pixels, ctx->win_w, ctx->win_h, tx, ry, tw, ctx->theme.splitter);
 		}
 		int32_t cx = tx + 10;
-		uint32_t has_icon = (widget_icon_idx(child) >= 0);
-		if(has_icon) {
-			int32_t iy = ry + (MKGUI_TAB_HEIGHT - MKGUI_ICON_SIZE) / 2;
-			draw_icon(ctx->pixels, ctx->win_w, ctx->win_h, &icons[widget_icon_idx(child)], cx, iy, tx, ry, tx + tw, ry + MKGUI_TAB_HEIGHT);
-			cx += MKGUI_ICON_SIZE + 4;
+		int32_t ii = widget_icon_idx(child);
+		if(ii >= 0) {
+			int32_t iy = ry + (MKGUI_TAB_HEIGHT - icons[ii].h) / 2;
+			draw_icon(ctx->pixels, ctx->win_w, ctx->win_h, &icons[ii], cx, iy, tx + 1, ry + 1, tx + tw - 1, ry + MKGUI_TAB_HEIGHT - 1);
+			cx += icons[ii].w + 4;
 		}
 		int32_t tty = ry + (MKGUI_TAB_HEIGHT - ctx->font_height) / 2;
 		push_text_clip(cx, tty, child->label, ctx->theme.text, tx, ry, tx + tw, ry + MKGUI_TAB_HEIGHT);

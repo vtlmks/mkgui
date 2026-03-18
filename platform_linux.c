@@ -341,6 +341,20 @@ static uint32_t platform_pending(struct mkgui_ctx *ctx) {
 
 // [=]===^=[ platform_translate_keysym ]===========================[=]
 static uint32_t platform_translate_keysym(KeySym ks) {
+	switch(ks) {
+		case 0xff8d: { return 0xff0d; } break; // KP_Enter  -> Return
+		case 0xff89: { return 0xff09; } break; // KP_Tab    -> Tab
+		case 0xff9f: { return 0xffff; } break; // KP_Delete -> Delete
+		case 0xff95: { return 0xff50; } break; // KP_Home   -> Home
+		case 0xff96: { return 0xff51; } break; // KP_Left   -> Left
+		case 0xff97: { return 0xff52; } break; // KP_Up     -> Up
+		case 0xff98: { return 0xff53; } break; // KP_Right  -> Right
+		case 0xff99: { return 0xff54; } break; // KP_Down   -> Down
+		case 0xff9a: { return 0xff55; } break; // KP_Prior  -> Prior
+		case 0xff9b: { return 0xff56; } break; // KP_Next   -> Next
+		case 0xff9c: { return 0xff57; } break; // KP_End    -> End
+		default: break;
+	}
 	return (uint32_t)ks;
 }
 

@@ -161,7 +161,7 @@ static void render_menu_popup(struct mkgui_ctx *ctx, struct mkgui_popup *p, uint
 
 			int32_t mi_icon = widget_icon_idx(mi);
 			if(mi_icon >= 0 && !(mi->flags & (MKGUI_MENU_CHECK | MKGUI_MENU_RADIO))) {
-				int32_t iy2 = iy + (MKGUI_ROW_HEIGHT - MKGUI_ICON_SIZE) / 2;
+				int32_t iy2 = iy + (MKGUI_ROW_HEIGHT - icons[mi_icon].h) / 2;
 				draw_icon_popup(p, &icons[mi_icon], 2, iy2);
 
 			} else if(mi->flags & MKGUI_MENU_CHECK) {

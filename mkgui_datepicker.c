@@ -189,7 +189,8 @@ static void render_datepicker_popup(struct mkgui_ctx *ctx, struct mkgui_popup *p
 	char year_buf[8];
 	snprintf(year_buf, sizeof(year_buf), "%d", dp->view_year);
 	int32_t year_tw = text_width(ctx, year_buf);
-	push_text_clip(p->x + year_x + (year_spin_w - year_tw) / 2, hdr_y + p->y, year_buf, ctx->theme.text, p->x + year_x + year_btn_w, p->y, p->x + year_x + year_spin_w - year_btn_w, p->y + p->h);
+	int32_t year_text_w = year_spin_w - year_btn_w;
+	push_text_clip(p->x + year_x + (year_text_w - year_tw) / 2, hdr_y + p->y, year_buf, ctx->theme.text, p->x + year_x + 1, p->y, p->x + year_x + year_text_w, p->y + p->h);
 
 	uint32_t up_bg = year_up_hover ? ctx->theme.widget_hover : ctx->theme.widget_bg;
 	int32_t sbx = year_x + year_spin_w - year_btn_w;
