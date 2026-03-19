@@ -90,7 +90,7 @@ struct mkgui_widget {
 | `MKGUI_CHECKBOX` | Toggle checkbox. Emits `MKGUI_EVENT_CHECKBOX_CHANGED`. |
 | `MKGUI_RADIO` | Radio button (mutually exclusive within parent). Emits `MKGUI_EVENT_RADIO_CHANGED`. |
 | `MKGUI_DROPDOWN` | Drop-down selector. Emits `MKGUI_EVENT_DROPDOWN_CHANGED`. |
-| `MKGUI_SLIDER` | Horizontal slider. Emits `MKGUI_EVENT_SLIDER_START`, `MKGUI_EVENT_SLIDER_CHANGED`, `MKGUI_EVENT_SLIDER_END`. |
+| `MKGUI_SLIDER` | Horizontal slider. `MKGUI_VERTICAL` for vertical, `MKGUI_SLIDER_MIXER` for tapered volume style with meter. Emits `MKGUI_EVENT_SLIDER_START`, `MKGUI_EVENT_SLIDER_CHANGED`, `MKGUI_EVENT_SLIDER_END`. |
 | `MKGUI_SPINBOX` | Numeric input with +/- buttons. Emits `MKGUI_EVENT_SPINBOX_CHANGED`. Click the text area to type directly, Enter to confirm (clears focus), Escape to cancel editing. |
 | `MKGUI_PROGRESS` | Progress bar with animated shimmer effect. No events. |
 | `MKGUI_SPINNER` | Animated spinning arc indicator. No events, no setup needed. |
@@ -107,7 +107,7 @@ struct mkgui_widget {
 | `MKGUI_VSPLIT` | Vertical splitter. Children use `MKGUI_REGION_LEFT`/`MKGUI_REGION_RIGHT`. |
 | `MKGUI_GROUP` | Group box container. Draws a thin rounded border with a label in the top edge. Children are inset inside the frame. |
 | `MKGUI_PANEL` | Plain container. No border by default. Use `MKGUI_PANEL_BORDER` for a border, `MKGUI_PANEL_SUNKEN` for a recessed look. Children positioned relative to panel. |
-| `MKGUI_SCROLLBAR` | Standalone scrollbar. Vertical by default, `MKGUI_SCROLLBAR_HORIZ` for horizontal. Emits `MKGUI_EVENT_SCROLL`. |
+| `MKGUI_SCROLLBAR` | Standalone scrollbar. Horizontal by default, `MKGUI_VERTICAL` for vertical. Emits `MKGUI_EVENT_SCROLL`. |
 | `MKGUI_IMAGE` | Displays ARGB pixel data. Centered by default, `MKGUI_IMAGE_STRETCH` to fill. `MKGUI_PANEL_BORDER` for a border. |
 | `MKGUI_GLVIEW` | OpenGL viewport. Creates a native child window for GL rendering. The user creates their own GL context. Automatically triggers 60fps redraws when visible. |
 | `MKGUI_CANVAS` | Custom drawing area. Calls a user callback with clipping set to the widget rect. Supports `MKGUI_PANEL_BORDER`. |
@@ -181,7 +181,8 @@ Combine horizontal and vertical anchors freely. Common patterns:
 | `MKGUI_MENU_RADIO` | `1 << 16` | Menu item with radio indicator |
 | `MKGUI_PANEL_BORDER` | `1 << 17` | Draw border on panel, image, canvas, or glview |
 | `MKGUI_PANEL_SUNKEN` | `1 << 18` | Recessed background on panel |
-| `MKGUI_SCROLLBAR_HORIZ` | `1 << 19` | Horizontal scrollbar (default is vertical) |
+| `MKGUI_SLIDER_MIXER` | `1 << 19` | Tapered volume style with meter support for slider |
+| `MKGUI_VERTICAL` | `1 << 30` | Vertical orientation for scrollbar, slider |
 | `MKGUI_IMAGE_STRETCH` | `1 << 20` | Stretch image to fill widget area |
 | `MKGUI_SCROLL` | `1 << 21` | Enable scrolling on VBOX (adds scrollbar when content overflows) |
 | `MKGUI_NO_PAD` | `1 << 22` | Suppress automatic container padding |
@@ -426,7 +427,15 @@ void mkgui_slider_setup(struct mkgui_ctx *ctx, uint32_t id, int32_t min_val, int
 int32_t mkgui_slider_get(struct mkgui_ctx *ctx, uint32_t id);
 ```
 
-The slider renders a horizontal track with a draggable thumb. It does not display any text -- add your own label and/or value display if needed (e.g. using a FORM row or an HBOX with a label widget).
+The slider renders a horizontal track with a draggable thumb. Set `MKGUI_VERTICAL` for vertical orientation. It does not display any text -- add your own label and/or value display if needed (e.g. using a FORM row or an HBOX with a label widget).
+
+Set `MKGUI_SLIDER_MIXER` for a tapered volume-style slider (like the Windows volume mixer). The track becomes a triangle shape, narrow at the quiet end and wide at the loud end. Use `mkgui_slider_set_meter()` to overlay RMS/peak meter fill colors on the mixer track.
+
+```c
+void mkgui_slider_set_meter(struct mkgui_ctx *ctx, uint32_t id, float pre, float post, uint32_t pre_color, uint32_t post_color);
+```
+
+Meter values are 0.0--1.0 (clamped). The `pre` layer is drawn first, then `post` on top. Only active when `MKGUI_SLIDER_MIXER` is set.
 
 ### Spinbox
 
@@ -733,10 +742,10 @@ Flags: `MKGUI_PANEL_BORDER` draws a rounded border, `MKGUI_PANEL_SUNKEN` darkens
 
 ## Scrollbar
 
-Standalone scrollbar widget. Vertical by default.
+Standalone scrollbar widget. Horizontal by default, set `MKGUI_VERTICAL` for vertical orientation.
 
 ```c
-{ MKGUI_SCROLLBAR, ID_SB, "", "", ID_TAB1, 10, 10, MKGUI_SCROLLBAR_W, 200, 0, 0 },
+{ MKGUI_SCROLLBAR, ID_SB, "", "", ID_TAB1, 10, 10, MKGUI_SCROLLBAR_W, 200, MKGUI_VERTICAL, 0 },
 ```
 
 ```c
@@ -749,7 +758,7 @@ int32_t mkgui_scrollbar_get(struct mkgui_ctx *ctx, uint32_t id);
 - `page_size`: visible area size (determines thumb size)
 - `value`: scroll position (0 to `max_value - page_size`)
 
-Use `MKGUI_SCROLLBAR_HORIZ` flag for a horizontal scrollbar. Emits `MKGUI_EVENT_SCROLL` on interaction (thumb drag, click, scroll wheel).
+Use `MKGUI_VERTICAL` flag for a vertical scrollbar. Emits `MKGUI_EVENT_SCROLL` on interaction (thumb drag, click, scroll wheel).
 
 ## Image
 

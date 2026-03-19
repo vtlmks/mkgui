@@ -63,7 +63,7 @@ static void scrollbar_thumb_rect(struct mkgui_ctx *ctx, uint32_t idx, struct mkg
 	int32_t ry = ctx->rects[idx].y;
 	int32_t rw = ctx->rects[idx].w;
 	int32_t rh = ctx->rects[idx].h;
-	uint32_t horizontal = (w->flags & MKGUI_SCROLLBAR_HORIZ) ? 1 : 0;
+	uint32_t horizontal = (w->flags & MKGUI_VERTICAL) ? 0 : 1;
 
 	int32_t track = horizontal ? rw : rh;
 	if(track < 1) {
@@ -110,7 +110,7 @@ static void render_scrollbar(struct mkgui_ctx *ctx, uint32_t idx) {
 	int32_t ry = ctx->rects[idx].y;
 	int32_t rw = ctx->rects[idx].w;
 	int32_t rh = ctx->rects[idx].h;
-	uint32_t horizontal = (w->flags & MKGUI_SCROLLBAR_HORIZ) ? 1 : 0;
+	uint32_t horizontal = (w->flags & MKGUI_VERTICAL) ? 0 : 1;
 
 	draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, rx, ry, rw, rh, ctx->theme.scrollbar_bg);
 
@@ -145,7 +145,7 @@ static uint32_t scrollbar_hit_thumb(struct mkgui_ctx *ctx, uint32_t idx, int32_t
 	int32_t thumb_pos, thumb_len;
 	scrollbar_thumb_rect(ctx, idx, sb, &thumb_pos, &thumb_len);
 
-	uint32_t horizontal = (w->flags & MKGUI_SCROLLBAR_HORIZ) ? 1 : 0;
+	uint32_t horizontal = (w->flags & MKGUI_VERTICAL) ? 0 : 1;
 	int32_t coord = horizontal ? mx : my;
 	return (coord >= thumb_pos && coord < thumb_pos + thumb_len) ? 1 : 0;
 }
@@ -161,7 +161,7 @@ static int32_t scrollbar_thumb_drag_offset(struct mkgui_ctx *ctx, uint32_t idx, 
 	int32_t thumb_pos, thumb_len;
 	scrollbar_thumb_rect(ctx, idx, sb, &thumb_pos, &thumb_len);
 
-	uint32_t horizontal = (w->flags & MKGUI_SCROLLBAR_HORIZ) ? 1 : 0;
+	uint32_t horizontal = (w->flags & MKGUI_VERTICAL) ? 0 : 1;
 	int32_t coord = horizontal ? mx : my;
 	return coord - thumb_pos;
 }
@@ -178,7 +178,7 @@ static void scrollbar_drag_to(struct mkgui_ctx *ctx, uint32_t id, int32_t mx, in
 		return;
 	}
 
-	uint32_t horizontal = (w->flags & MKGUI_SCROLLBAR_HORIZ) ? 1 : 0;
+	uint32_t horizontal = (w->flags & MKGUI_VERTICAL) ? 0 : 1;
 	int32_t track = horizontal ? ctx->rects[idx].w : ctx->rects[idx].h;
 	int32_t origin = horizontal ? ctx->rects[idx].x : ctx->rects[idx].y;
 	int32_t coord = horizontal ? mx : my;

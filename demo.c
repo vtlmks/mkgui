@@ -371,7 +371,7 @@ int main(void) {
 		{ MKGUI_LABEL,    ID_PATH_LBL,  "Pathbar:",          "", ID_MEDIA_LVBOX, 0, 0, 0, 20, MKGUI_FIXED, 0 },
 		{ MKGUI_PATHBAR,  ID_PATHBAR1,  "",                  "", ID_MEDIA_LVBOX, 0, 0, 0, 24, MKGUI_FIXED, 0 },
 		{ MKGUI_LABEL,    ID_SB_LBL,    "Scrollbar:",        "", ID_MEDIA_LVBOX, 0, 0, 0, 20, MKGUI_FIXED, 0 },
-		{ MKGUI_SCROLLBAR,ID_SCROLLBAR1,"",                  "", ID_MEDIA_LVBOX, 0, 0, MKGUI_SCROLLBAR_W, 0, 0, 1 },
+		{ MKGUI_SCROLLBAR,ID_SCROLLBAR1,"",                  "", ID_MEDIA_LVBOX, 0, 0, MKGUI_SCROLLBAR_W, 0, MKGUI_VERTICAL, 1 },
 		{ MKGUI_VBOX,     ID_MEDIA_RVBOX,"",                 "", ID_MEDIA_HBOX, 0, 0, 0, 0, 0, 1 },
 		{ MKGUI_LABEL,    ID_CANVAS_LBL,"Canvas:",           "", ID_MEDIA_RVBOX, 0, 0, 0, 20, MKGUI_FIXED, 0 },
 		{ MKGUI_CANVAS,   ID_CANVAS1,   "",                  "", ID_MEDIA_RVBOX, 0, 0, 0, 120, MKGUI_PANEL_BORDER | MKGUI_FIXED, 0 },
