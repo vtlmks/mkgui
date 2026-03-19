@@ -23,7 +23,13 @@ static void render_toolbar(struct mkgui_ctx *ctx, uint32_t idx) {
 
 		if(btn->flags & MKGUI_SEPARATOR) {
 			int32_t sx = bx + MKGUI_TOOLBAR_SEP_W / 2;
-			draw_vline(ctx->pixels, ctx->win_w, ctx->win_h, sx, ry + 4, rh - 8, ctx->theme.widget_border);
+			int32_t sep_margin = rh / 5;
+			if(sep_margin < 4) {
+				sep_margin = 4;
+			} else if(sep_margin > 8) {
+				sep_margin = 8;
+			}
+			draw_vline(ctx->pixels, ctx->win_w, ctx->win_h, sx, ry + sep_margin, rh - sep_margin * 2, ctx->theme.widget_border);
 			bx += MKGUI_TOOLBAR_SEP_W;
 			int32_t sep_idx = find_widget_idx(ctx, btn->id);
 			if(sep_idx >= 0) {
