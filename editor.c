@@ -76,6 +76,7 @@ enum {
 	ED_PROP_FL_PASSWORD, ED_PROP_FL_READONLY,
 	ED_PROP_FL_FIXED,
 	ED_PROP_FL_TBSEP,
+	ED_PROP_FL_VERTICAL,
 	ED_PROP_WEIGHT_LBL, ED_PROP_WEIGHT_SPN,
 	ED_PROP_ALIGN_LBL, ED_PROP_ALIGN_DRP,
 	ED_PROP_ICON_BROWSE,
@@ -607,7 +608,7 @@ static struct ed_help_entry ed_help[] = {
 	{ MKGUI_RADIO,     "Radio button. Mutually exclusive within the same parent container. Clicking one unchecks siblings." },
 	{ MKGUI_SCROLLBAR, "Standalone scrollbar. Vertical by default, SCROLLBAR_HORIZ for horizontal. Emits scroll events." },
 	{ MKGUI_SPACER,    "Invisible spacer. Use w=0 or h=0 for flex fill inside HBox/VBox. Pushes siblings to the opposite edge." },
-	{ MKGUI_SLIDER,    "Horizontal slider with draggable thumb. Set range with mkgui_slider_setup(). Does not render its own label." },
+	{ MKGUI_SLIDER,    "Slider with draggable thumb. Set MKGUI_VERTICAL flag for vertical orientation. Set range with mkgui_slider_setup(). Does not render its own label." },
 	{ MKGUI_SPINBOX,   "Numeric input with +/- buttons. Click text to type, use arrows or mouse wheel to step. Enter confirms." },
 	{ MKGUI_SPINNER,   "Animated spinning arc. Place it as a loading indicator. Animates automatically when visible, zero CPU when hidden." },
 	{ MKGUI_STATUSBAR, "Status bar with multiple sections. Set section widths (positive=fixed, negative=flex) and text per section." },
@@ -786,6 +787,7 @@ enum {
 	ED_VIS_IN_BOX    = (1 << 8),
 	ED_VIS_TOOLBAR   = (1 << 9),
 	ED_VIS_IN_TOOLBAR = (1 << 10),
+	ED_VIS_SLIDER     = (1 << 11),
 };
 
 enum {
@@ -853,6 +855,7 @@ static struct ed_prop_desc ed_props[] = {
 	{ ED_PK_ACTION,        "Add Button",      0,                                        0,                  0,      0,    ED_VIS_TOOLBAR,   ED_ACT_ADD_TB_BTN,   ED_PROP_ADD_TB_BTN,   0,                   0,                 0 },
 	{ ED_PK_ACTION,        "Remove Button",   0,                                        0,                  0,      0,    ED_VIS_TOOLBAR,   ED_ACT_REM_TB_BTN,   ED_PROP_REM_TB_BTN,   0,                   0,                 0 },
 	{ ED_PK_FLAG,          "Sep",             offsetof(struct ed_widget, flags),         MKGUI_SEPARATOR,    0,      0,    ED_VIS_IN_TOOLBAR,ED_ACT_NONE,         ED_PROP_FL_TBSEP,     0,                   0,                 0 },
+	{ ED_PK_FLAG,          "Vertical",       offsetof(struct ed_widget, flags),         MKGUI_VERTICAL,     0,      0,    ED_VIS_SLIDER,    ED_ACT_NONE,         ED_PROP_FL_VERTICAL,  0,                   0,                 0 },
 	{ ED_PK_MENU_TREE,     "",                0,                                        0,                  0,      0,    ED_VIS_MENU,      ED_ACT_NONE,         ED_MENU_TREE,         0,                   0,                 0 },
 };
 #define ED_PROP_COUNT (sizeof(ed_props) / sizeof(ed_props[0]))
@@ -880,6 +883,9 @@ static uint32_t ed_compute_vis_mask(struct ed_widget *w) {
 	}
 	if(w->type == MKGUI_INPUT || w->type == MKGUI_TEXTAREA) {
 		mask |= ED_VIS_INPUT;
+	}
+	if(w->type == MKGUI_SLIDER) {
+		mask |= ED_VIS_SLIDER;
 	}
 	if(w->type == MKGUI_MENU || w->type == MKGUI_MENUITEM) {
 		mask |= ED_VIS_MENU;
@@ -1886,15 +1892,16 @@ static void ed_draw_widget(struct mkgui_ctx *ctx, uint32_t idx) {
 		} break;
 
 		case MKGUI_SLIDER: {
-			int32_t track_y = ry + rh / 2 - 2;
-			draw_rounded_rect_fill(buf, bw, bh, rx, track_y, rw, 4, ctx->theme.widget_border, 2);
-			int32_t thumb_x = rx + rw / 3;
-			draw_patch(ctx, MKGUI_STYLE_RAISED, thumb_x, ry + 2, 10, rh - 4, ctx->theme.splitter, ctx->theme.splitter);
-			if(ew->label[0]) {
-				int32_t ty = ry - ctx->font_height - 2;
-				if(ty >= 0) {
-					push_text_clip(rx, ty, ew->label, ctx->theme.text, rx, ty, rx + rw, ry + rh);
-				}
+			if(ew->flags & MKGUI_VERTICAL) {
+				int32_t track_x = rx + rw / 2 - 2;
+				draw_rounded_rect_fill(buf, bw, bh, track_x, ry, 4, rh, ctx->theme.widget_border, 2);
+				int32_t thumb_y = ry + rh / 3;
+				draw_patch(ctx, MKGUI_STYLE_RAISED, rx + 2, thumb_y, rw - 4, 10, ctx->theme.splitter, ctx->theme.splitter);
+			} else {
+				int32_t track_y = ry + rh / 2 - 2;
+				draw_rounded_rect_fill(buf, bw, bh, rx, track_y, rw, 4, ctx->theme.widget_border, 2);
+				int32_t thumb_x = rx + rw / 3;
+				draw_patch(ctx, MKGUI_STYLE_RAISED, thumb_x, ry + 2, 10, rh - 4, ctx->theme.splitter, ctx->theme.splitter);
 			}
 		} break;
 
@@ -3145,6 +3152,10 @@ static void ed_update_prop_group_h(struct mkgui_ctx *ctx) {
 	if(w && !(w->flags & MKGUI_HIDDEN)) {
 		h += 22 + MKGUI_BOX_GAP;
 	}
+	w = find_widget(ctx, ED_PROP_ALIGN_LBL);
+	if(w && !(w->flags & MKGUI_HIDDEN)) {
+		h += 24 + MKGUI_BOX_GAP;
+	}
 	w = find_widget(ctx, ED_PROP_ALIGN_DRP);
 	if(w && !(w->flags & MKGUI_HIDDEN)) {
 		h += 24 + MKGUI_BOX_GAP;
@@ -3207,9 +3218,15 @@ static void ed_read_props(struct mkgui_ctx *ctx) {
 		return;
 	}
 	struct ed_widget *w = &ed.widgets[ed.selected];
+	uint32_t old_flags = w->flags;
 	w->flags = 0;
 	for(uint32_t i = 0; i < ED_PROP_COUNT; ++i) {
 		ed_read_prop_value(ctx, &ed_props[i], w);
+	}
+	if(w->type == MKGUI_SLIDER && ((old_flags ^ w->flags) & MKGUI_VERTICAL)) {
+		int32_t tmp = w->w;
+		w->w = w->h;
+		w->h = tmp;
 	}
 	dirty_all(ctx);
 }
@@ -4271,6 +4288,7 @@ int main(void) {
 		{ MKGUI_CHECKBOX, ED_PROP_FL_READONLY, "Readonly",      "", ED_PROP_FL_COL1, 0, 0, 0, 20, MKGUI_FIXED, 0 },
 		{ MKGUI_CHECKBOX, ED_PROP_FL_FIXED,    "Fixed",         "", ED_PROP_FL_COL2, 0, 0, 0, 20, MKGUI_FIXED, 0 },
 		{ MKGUI_CHECKBOX, ED_PROP_FL_TBSEP,    "TbSep",         "", ED_PROP_FL_COL3, 0, 0, 0, 20, MKGUI_FIXED, 0 },
+		{ MKGUI_CHECKBOX, ED_PROP_FL_VERTICAL, "Vertical",      "", ED_PROP_FL_COL0, 0, 0, 0, 20, MKGUI_FIXED, 0 },
 
 		/* Cross-axis alignment (visible when parent is HBOX/VBOX) */
 		{ MKGUI_LABEL,    ED_PROP_ALIGN_LBL,  "Align:",         "", ED_PROP_VBOX, 0, 0, 0, 24, MKGUI_HIDDEN | MKGUI_FIXED, 0 },

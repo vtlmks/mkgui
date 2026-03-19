@@ -233,6 +233,7 @@ enum {
 #define MKGUI_TOOLBAR_ICONS_ONLY  (1u << 28)
 #define MKGUI_TOOLBAR_TEXT_ONLY   (2u << 28)
 #define MKGUI_TOOLBAR_MODE_MASK   (3u << 28)
+#define MKGUI_VERTICAL            (1u << 30)
 
 // ---------------------------------------------------------------------------
 // Event types
@@ -4055,10 +4056,17 @@ static uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 						struct mkgui_slider_data *sd = find_slider_data(ctx, pw->id);
 						int32_t pi = find_widget_idx(ctx, pw->id);
 						if(sd && pi >= 0) {
-							int32_t rx = ctx->rects[pi].x;
-							int32_t rw = ctx->rects[pi].w;
 							int32_t range = sd->max_val - sd->min_val;
-							int32_t new_val = sd->min_val + (int32_t)((int64_t)(ctx->mouse_x - rx) * range / (rw > 0 ? rw : 1));
+							int32_t new_val;
+							if(pw->flags & MKGUI_VERTICAL) {
+								int32_t ry = ctx->rects[pi].y;
+								int32_t rh = ctx->rects[pi].h;
+								new_val = sd->max_val - (int32_t)((int64_t)(ctx->mouse_y - ry) * range / (rh > 0 ? rh : 1));
+							} else {
+								int32_t rx = ctx->rects[pi].x;
+								int32_t rw = ctx->rects[pi].w;
+								new_val = sd->min_val + (int32_t)((int64_t)(ctx->mouse_x - rx) * range / (rw > 0 ? rw : 1));
+							}
 							if(new_val < sd->min_val) {
 								new_val = sd->min_val;
 							}
@@ -4486,7 +4494,8 @@ static uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 							if(step < 1) {
 								step = 1;
 							}
-							sd->value += (pev.button == 4) ? -step : step;
+							uint32_t vert = (ctx->widgets[hi].flags & MKGUI_VERTICAL);
+							sd->value += (pev.button == 4) ? (vert ? step : -step) : (vert ? -step : step);
 							if(sd->value < sd->min_val) {
 								sd->value = sd->min_val;
 							}
@@ -4904,10 +4913,17 @@ static uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 					if(hw->type == MKGUI_SLIDER) {
 						struct mkgui_slider_data *sd = find_slider_data(ctx, hw->id);
 						if(sd) {
-							int32_t rx = ctx->rects[hi].x;
-							int32_t rw = ctx->rects[hi].w;
 							int32_t range = sd->max_val - sd->min_val;
-							int32_t new_val = sd->min_val + (int32_t)((int64_t)(ctx->mouse_x - rx) * range / (rw > 0 ? rw : 1));
+							int32_t new_val;
+							if(hw->flags & MKGUI_VERTICAL) {
+								int32_t ry = ctx->rects[hi].y;
+								int32_t rh = ctx->rects[hi].h;
+								new_val = sd->max_val - (int32_t)((int64_t)(ctx->mouse_y - ry) * range / (rh > 0 ? rh : 1));
+							} else {
+								int32_t rx = ctx->rects[hi].x;
+								int32_t rw = ctx->rects[hi].w;
+								new_val = sd->min_val + (int32_t)((int64_t)(ctx->mouse_x - rx) * range / (rw > 0 ? rw : 1));
+							}
 							if(new_val < sd->min_val) {
 								new_val = sd->min_val;
 							}
