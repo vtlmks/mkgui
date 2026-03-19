@@ -21,8 +21,8 @@ static void render_slider(struct mkgui_ctx *ctx, uint32_t idx) {
 
 	uint32_t has_meter = (sd->meter_pre_color != 0 || sd->meter_post_color != 0);
 	if(has_meter) {
-		track_h = rh - 8;
-		track_y = ry + 4;
+		track_h = 8;
+		track_y = ry + rh / 2 - track_h / 2;
 		draw_rounded_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, rx, track_y, rw, track_h, ctx->theme.widget_border, 2);
 
 		int32_t meter_w = rw - 2;
