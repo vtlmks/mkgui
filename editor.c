@@ -1897,21 +1897,19 @@ static void ed_draw_widget(struct mkgui_ctx *ctx, uint32_t idx) {
 
 		case MKGUI_SLIDER: {
 			if(ew->flags & MKGUI_VERTICAL) {
+				int32_t track_x = rx + rw / 2 - 2;
+				draw_rounded_rect_fill(buf, bw, bh, track_x, ry, 4, rh, ctx->theme.widget_border, 2);
 				if(ew->flags & MKGUI_SLIDER_MIXER) {
-					slider_draw_taper_v(buf, bw, bh, rx + rw / 2, ry, rh, 0, rh, MKGUI_SLIDER_TAPER_MIN, rw - 4, ctx->theme.widget_border);
-				} else {
-					int32_t track_x = rx + rw / 2 - 2;
-					draw_rounded_rect_fill(buf, bw, bh, track_x, ry, 4, rh, ctx->theme.widget_border, 2);
+					slider_draw_wedge_v(buf, bw, bh, track_x + 4, ry, rh, 0, rh, MKGUI_SLIDER_WEDGE_MAX_W, ctx->theme.widget_border);
 				}
 				int32_t thumb_y = ry + rh / 3;
 				draw_patch(ctx, MKGUI_STYLE_RAISED, rx + 2, thumb_y, rw - 4, 10, ctx->theme.splitter, ctx->theme.splitter);
 
 			} else {
+				int32_t track_y = ry + rh / 2 - 2;
+				draw_rounded_rect_fill(buf, bw, bh, rx, track_y, rw, 4, ctx->theme.widget_border, 2);
 				if(ew->flags & MKGUI_SLIDER_MIXER) {
-					slider_draw_taper_h(buf, bw, bh, ry + rh / 2, rx, rw, 0, rw, MKGUI_SLIDER_TAPER_MIN, rh - 4, ctx->theme.widget_border);
-				} else {
-					int32_t track_y = ry + rh / 2 - 2;
-					draw_rounded_rect_fill(buf, bw, bh, rx, track_y, rw, 4, ctx->theme.widget_border, 2);
+					slider_draw_wedge_h(buf, bw, bh, rx, track_y + 4, rw, 0, rw, MKGUI_SLIDER_WEDGE_MAX_W, ctx->theme.widget_border);
 				}
 				int32_t thumb_x = rx + rw / 3;
 				draw_patch(ctx, MKGUI_STYLE_RAISED, thumb_x, ry + 2, 10, rh - 4, ctx->theme.splitter, ctx->theme.splitter);
@@ -4376,6 +4374,7 @@ int main(void) {
 		{ MKGUI_CHECKBOX, ED_PROP_FL_FIXED,    "Fixed",         "", ED_PROP_FL_COL2, 0, 0, 0, 20, MKGUI_FIXED, 0 },
 		{ MKGUI_CHECKBOX, ED_PROP_FL_TBSEP,    "TbSep",         "", ED_PROP_FL_COL3, 0, 0, 0, 20, MKGUI_FIXED, 0 },
 		{ MKGUI_CHECKBOX, ED_PROP_FL_VERTICAL, "Vertical",      "", ED_PROP_FL_COL0, 0, 0, 0, 20, MKGUI_FIXED, 0 },
+		{ MKGUI_CHECKBOX, ED_PROP_FL_MIXER,    "Mixer",         "", ED_PROP_FL_COL1, 0, 0, 0, 20, MKGUI_FIXED, 0 },
 
 		/* Cross-axis alignment (visible when parent is HBOX/VBOX) */
 		{ MKGUI_LABEL,    ED_PROP_ALIGN_LBL,  "Align:",         "", ED_PROP_VBOX, 0, 0, 0, 24, MKGUI_HIDDEN | MKGUI_FIXED, 0 },

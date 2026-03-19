@@ -3,86 +3,72 @@
 
 #define MKGUI_SLIDER_TRACK_SIZE       4
 #define MKGUI_SLIDER_THUMB_SIZE       10
-#define MKGUI_SLIDER_TAPER_MIN        2
+#define MKGUI_SLIDER_WEDGE_MAX_W      10
 
-// [=]===^=[ slider_draw_taper_v ]================================[=]
-static void slider_draw_taper_v(uint32_t *buf, int32_t bw, int32_t bh,
-	int32_t cx, int32_t y, int32_t h,
+// [=]===^=[ slider_draw_wedge_v ]================================[=]
+static void slider_draw_wedge_v(uint32_t *buf, int32_t bw, int32_t bh,
+	int32_t x, int32_t y, int32_t h,
 	int32_t row_start, int32_t row_count,
-	int32_t min_w, int32_t max_w, uint32_t color) {
-	if(h <= 1 || row_count <= 0) {
+	int32_t max_w, uint32_t color) {
+	if(h <= 1 || row_count <= 0 || max_w <= 0) {
 		return;
 	}
 	for(int32_t i = 0; i < row_count; ++i) {
 		int32_t row = row_start + i;
-		int32_t w_at_row = max_w - (max_w - min_w) * row / (h - 1);
-		draw_rect_fill(buf, bw, bh, cx - w_at_row / 2, y + row, w_at_row, 1, color);
+		int32_t py = y + row;
+		if(py < 0 || py >= bh) {
+			continue;
+		}
+		float t = (float)(h - 1 - row) / (float)(h - 1);
+		float w_f = t * (float)max_w;
+		int32_t w_full = (int32_t)w_f;
+		float frac = w_f - (float)w_full;
+		if(w_full > 0 && x < bw && x + w_full > 0) {
+			int32_t x0 = x < 0 ? 0 : x;
+			int32_t x1 = (x + w_full) > bw ? bw : (x + w_full);
+			for(int32_t px = x0; px < x1; ++px) {
+				buf[py * bw + px] = color;
+			}
+		}
+		if(frac > 0.01f) {
+			int32_t ex = x + w_full;
+			if(ex >= 0 && ex < bw) {
+				buf[py * bw + ex] = blend_pixel(buf[py * bw + ex], color, (uint8_t)(frac * 255.0f));
+			}
+		}
 	}
 }
 
-// [=]===^=[ slider_draw_taper_h ]================================[=]
-static void slider_draw_taper_h(uint32_t *buf, int32_t bw, int32_t bh,
-	int32_t cy, int32_t x, int32_t w,
+// [=]===^=[ slider_draw_wedge_h ]================================[=]
+static void slider_draw_wedge_h(uint32_t *buf, int32_t bw, int32_t bh,
+	int32_t x, int32_t y, int32_t w,
 	int32_t col_start, int32_t col_count,
-	int32_t min_h, int32_t max_h, uint32_t color) {
-	if(w <= 1 || col_count <= 0) {
+	int32_t max_h, uint32_t color) {
+	if(w <= 1 || col_count <= 0 || max_h <= 0) {
 		return;
 	}
 	for(int32_t i = 0; i < col_count; ++i) {
 		int32_t col = col_start + i;
-		int32_t h_at_col = min_h + (max_h - min_h) * col / (w - 1);
-		draw_rect_fill(buf, bw, bh, x + col, cy - h_at_col / 2, 1, h_at_col, color);
-	}
-}
-
-// [=]===^=[ slider_draw_meter_v ]================================[=]
-static void slider_draw_meter_v(uint32_t *buf, int32_t bw, int32_t bh,
-	int32_t cx, int32_t y, int32_t h,
-	int32_t min_w, int32_t max_w, struct mkgui_slider_data *sd) {
-	if(sd->meter_pre_color != 0 && sd->meter_pre > 0.0f) {
-		float pre = sd->meter_pre;
-		if(pre > 1.0f) {
-			pre = 1.0f;
+		int32_t px = x + col;
+		if(px < 0 || px >= bw) {
+			continue;
 		}
-		int32_t ph = (int32_t)(pre * (float)h);
-		if(ph > 0) {
-			slider_draw_taper_v(buf, bw, bh, cx, y, h, h - ph, ph, min_w, max_w, sd->meter_pre_color);
+		float t = (float)col / (float)(w - 1);
+		float h_f = t * (float)max_h;
+		int32_t h_full = (int32_t)h_f;
+		float frac = h_f - (float)h_full;
+		if(h_full > 0) {
+			int32_t y0 = y < 0 ? 0 : y;
+			int32_t y1 = (y + h_full) > bh ? bh : (y + h_full);
+			for(int32_t py = y0; py < y1; ++py) {
+				buf[py * bw + px] = color;
+			}
 		}
-	}
-	if(sd->meter_post_color != 0 && sd->meter_post > 0.0f) {
-		float post = sd->meter_post;
-		if(post > 1.0f) {
-			post = 1.0f;
-		}
-		int32_t ph = (int32_t)(post * (float)h);
-		if(ph > 0) {
-			slider_draw_taper_v(buf, bw, bh, cx, y, h, h - ph, ph, min_w, max_w, sd->meter_post_color);
-		}
-	}
-}
-
-// [=]===^=[ slider_draw_meter_h ]================================[=]
-static void slider_draw_meter_h(uint32_t *buf, int32_t bw, int32_t bh,
-	int32_t cy, int32_t x, int32_t w,
-	int32_t min_h, int32_t max_h, struct mkgui_slider_data *sd) {
-	if(sd->meter_pre_color != 0 && sd->meter_pre > 0.0f) {
-		float pre = sd->meter_pre;
-		if(pre > 1.0f) {
-			pre = 1.0f;
-		}
-		int32_t pw = (int32_t)(pre * (float)w);
-		if(pw > 0) {
-			slider_draw_taper_h(buf, bw, bh, cy, x, w, 0, pw, min_h, max_h, sd->meter_pre_color);
-		}
-	}
-	if(sd->meter_post_color != 0 && sd->meter_post > 0.0f) {
-		float post = sd->meter_post;
-		if(post > 1.0f) {
-			post = 1.0f;
-		}
-		int32_t pw = (int32_t)(post * (float)w);
-		if(pw > 0) {
-			slider_draw_taper_h(buf, bw, bh, cy, x, w, 0, pw, min_h, max_h, sd->meter_post_color);
+		if(frac > 0.01f) {
+			int32_t ey = y + h_full;
+			if(ey >= 0 && ey < bh) {
+				buf[ey * bw + px] = blend_pixel(buf[ey * bw + px], color, (uint8_t)(frac * 255.0f));
+			}
 		}
 	}
 }
@@ -113,31 +99,61 @@ static void render_slider(struct mkgui_ctx *ctx, uint32_t idx) {
 	uint32_t thumb_border = disabled ? ctx->theme.widget_border : ctx->theme.splitter;
 
 	if(vertical) {
-		if(mixer) {
-			int32_t cx = rx + rw / 2;
-			int32_t taper_max = rw - 4;
-			slider_draw_taper_v(ctx->pixels, ctx->win_w, ctx->win_h, cx, ry, rh, 0, rh, MKGUI_SLIDER_TAPER_MIN, taper_max, ctx->theme.widget_border);
-			slider_draw_meter_v(ctx->pixels, ctx->win_w, ctx->win_h, cx, ry, rh, MKGUI_SLIDER_TAPER_MIN, taper_max, sd);
+		int32_t track_w = MKGUI_SLIDER_TRACK_SIZE;
+		int32_t track_x = rx + rw / 2 - track_w / 2;
+		draw_rounded_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, track_x, ry, track_w, rh, ctx->theme.widget_border, 2);
 
-		} else {
-			int32_t track_w = MKGUI_SLIDER_TRACK_SIZE;
-			int32_t track_x = rx + rw / 2 - track_w / 2;
-			draw_rounded_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, track_x, ry, track_w, rh, ctx->theme.widget_border, 2);
+		if(mixer) {
+			int32_t wedge_x = track_x + track_w;
+			int32_t wedge_max = MKGUI_SLIDER_WEDGE_MAX_W;
+			if(wedge_max > rx + rw - wedge_x) {
+				wedge_max = rx + rw - wedge_x;
+			}
+			slider_draw_wedge_v(ctx->pixels, ctx->win_w, ctx->win_h, wedge_x, ry, rh, 0, rh, wedge_max, ctx->theme.widget_border);
+			if(sd->meter_pre_color != 0 && sd->meter_pre > 0.0f) {
+				float pre = sd->meter_pre > 1.0f ? 1.0f : sd->meter_pre;
+				int32_t ph = (int32_t)(pre * (float)rh);
+				if(ph > 0) {
+					slider_draw_wedge_v(ctx->pixels, ctx->win_w, ctx->win_h, wedge_x, ry, rh, rh - ph, ph, wedge_max, sd->meter_pre_color);
+				}
+			}
+			if(sd->meter_post_color != 0 && sd->meter_post > 0.0f) {
+				float post = sd->meter_post > 1.0f ? 1.0f : sd->meter_post;
+				int32_t ph = (int32_t)(post * (float)rh);
+				if(ph > 0) {
+					slider_draw_wedge_v(ctx->pixels, ctx->win_w, ctx->win_h, wedge_x, ry, rh, rh - ph, ph, wedge_max, sd->meter_post_color);
+				}
+			}
 		}
 
 		int32_t thumb_y = ry + rh - MKGUI_SLIDER_THUMB_SIZE - (int32_t)((int64_t)(sd->value - sd->min_val) * (rh - MKGUI_SLIDER_THUMB_SIZE) / range);
 		draw_patch(ctx, MKGUI_STYLE_RAISED, rx + 2, thumb_y, rw - 4, MKGUI_SLIDER_THUMB_SIZE, thumb_color, thumb_border);
 
 	} else {
-		if(mixer) {
-			int32_t cy = ry + rh / 2;
-			int32_t taper_max = rh - 4;
-			slider_draw_taper_h(ctx->pixels, ctx->win_w, ctx->win_h, cy, rx, rw, 0, rw, MKGUI_SLIDER_TAPER_MIN, taper_max, ctx->theme.widget_border);
-			slider_draw_meter_h(ctx->pixels, ctx->win_w, ctx->win_h, cy, rx, rw, MKGUI_SLIDER_TAPER_MIN, taper_max, sd);
+		int32_t track_y = ry + rh / 2 - MKGUI_SLIDER_TRACK_SIZE / 2;
+		draw_rounded_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, rx, track_y, rw, MKGUI_SLIDER_TRACK_SIZE, ctx->theme.widget_border, 2);
 
-		} else {
-			int32_t track_y = ry + rh / 2 - MKGUI_SLIDER_TRACK_SIZE / 2;
-			draw_rounded_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, rx, track_y, rw, MKGUI_SLIDER_TRACK_SIZE, ctx->theme.widget_border, 2);
+		if(mixer) {
+			int32_t wedge_y = track_y + MKGUI_SLIDER_TRACK_SIZE;
+			int32_t wedge_max = MKGUI_SLIDER_WEDGE_MAX_W;
+			if(wedge_max > ry + rh - wedge_y) {
+				wedge_max = ry + rh - wedge_y;
+			}
+			slider_draw_wedge_h(ctx->pixels, ctx->win_w, ctx->win_h, rx, wedge_y, rw, 0, rw, wedge_max, ctx->theme.widget_border);
+			if(sd->meter_pre_color != 0 && sd->meter_pre > 0.0f) {
+				float pre = sd->meter_pre > 1.0f ? 1.0f : sd->meter_pre;
+				int32_t pw = (int32_t)(pre * (float)rw);
+				if(pw > 0) {
+					slider_draw_wedge_h(ctx->pixels, ctx->win_w, ctx->win_h, rx, wedge_y, rw, 0, pw, wedge_max, sd->meter_pre_color);
+				}
+			}
+			if(sd->meter_post_color != 0 && sd->meter_post > 0.0f) {
+				float post = sd->meter_post > 1.0f ? 1.0f : sd->meter_post;
+				int32_t pw = (int32_t)(post * (float)rw);
+				if(pw > 0) {
+					slider_draw_wedge_h(ctx->pixels, ctx->win_w, ctx->win_h, rx, wedge_y, rw, 0, pw, wedge_max, sd->meter_post_color);
+				}
+			}
 		}
 
 		int32_t thumb_x = rx + (int32_t)((int64_t)(sd->value - sd->min_val) * (rw - MKGUI_SLIDER_THUMB_SIZE) / range);
