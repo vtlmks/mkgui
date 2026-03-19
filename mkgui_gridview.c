@@ -254,6 +254,72 @@ static void render_gridview(struct mkgui_ctx *ctx, uint32_t idx) {
 	}
 }
 
+// [=]===^=[ gridview_autosize_col ]===============================[=]
+static void gridview_autosize_col(struct mkgui_ctx *ctx, struct mkgui_gridview_data *gv, uint32_t col) {
+	if(col >= gv->col_count) {
+		return;
+	}
+
+	int32_t max_w = text_width(ctx, gv->columns[col].label);
+
+	char buf[MKGUI_MAX_TEXT];
+	for(uint32_t row = 0; row < gv->row_count; ++row) {
+		int32_t cell_w = 0;
+		switch(gv->columns[col].col_type) {
+			case MKGUI_GRID_CHECK: {
+				cell_w = 14;
+			} break;
+
+			case MKGUI_GRID_CHECK_TEXT: {
+				buf[0] = '\0';
+				if(gv->cell_cb) {
+					gv->cell_cb(row, col, buf, sizeof(buf), gv->userdata);
+				}
+				cell_w = 14 + 4 + text_width(ctx, buf);
+			} break;
+
+			default: {
+				buf[0] = '\0';
+				if(gv->cell_cb) {
+					gv->cell_cb(row, col, buf, sizeof(buf), gv->userdata);
+				}
+				cell_w = text_width(ctx, buf);
+			} break;
+		}
+		if(cell_w > max_w) {
+			max_w = cell_w;
+		}
+	}
+
+	gv->columns[col].width = max_w + 12;
+	dirty_all(ctx);
+}
+
+// [=]===^=[ gridview_divider_hit ]================================[=]
+static int32_t gridview_divider_hit(struct mkgui_ctx *ctx, uint32_t idx, int32_t mx, int32_t my) {
+	int32_t rx = ctx->rects[idx].x;
+	int32_t ry = ctx->rects[idx].y;
+
+	struct mkgui_gridview_data *gv = find_gridv_data(ctx, ctx->widgets[idx].id);
+	if(!gv) {
+		return -1;
+	}
+
+	int32_t hh = gv->header_height > 0 ? gv->header_height : MKGUI_ROW_HEIGHT;
+	if(my < ry || my >= ry + hh) {
+		return -1;
+	}
+
+	int32_t cx = rx + 1;
+	for(uint32_t c = 0; c < gv->col_count; ++c) {
+		cx += gv->columns[c].width;
+		if(mx >= cx - 3 && mx <= cx + 3) {
+			return (int32_t)c;
+		}
+	}
+	return -1;
+}
+
 // [=]===^=[ gridview_scrollbar_hit ]=============================[=]
 static uint32_t gridview_scrollbar_hit(struct mkgui_ctx *ctx, uint32_t idx, int32_t mx, int32_t my) {
 	struct mkgui_widget *w = &ctx->widgets[idx];

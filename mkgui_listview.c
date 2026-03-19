@@ -244,6 +244,59 @@ static void render_cell(struct mkgui_ctx *ctx, struct mkgui_listview_data *lv, u
 	}
 }
 
+// [=]===^=[ listview_autosize_col ]===============================[=]
+static void listview_autosize_col(struct mkgui_ctx *ctx, struct mkgui_listview_data *lv, uint32_t col) {
+	if(col >= lv->col_count || !lv->row_cb) {
+		return;
+	}
+
+	int32_t max_w = text_width(ctx, lv->columns[col].label);
+
+	char buf[MKGUI_MAX_TEXT];
+	for(uint32_t row = 0; row < lv->row_count; ++row) {
+		buf[0] = '\0';
+		lv->row_cb(row, col, buf, sizeof(buf), lv->userdata);
+
+		int32_t cell_w = 0;
+		switch(lv->columns[col].cell_type) {
+			case MKGUI_CELL_ICON_TEXT: {
+				const char *tab = strchr(buf, '\t');
+				cell_w = text_width(ctx, tab ? tab + 1 : buf) + MKGUI_ICON_SIZE + 4;
+			} break;
+
+			case MKGUI_CELL_SIZE: {
+				char fmt[32];
+				format_size(strtoll(buf, NULL, 10), fmt, sizeof(fmt));
+				cell_w = text_width(ctx, fmt);
+			} break;
+
+			case MKGUI_CELL_DATE: {
+				char fmt[32];
+				format_date(buf, fmt, sizeof(fmt));
+				cell_w = text_width(ctx, fmt);
+			} break;
+
+			case MKGUI_CELL_CHECKBOX: {
+				cell_w = 14;
+			} break;
+
+			case MKGUI_CELL_PROGRESS: {
+				cell_w = 0;
+			} break;
+
+			default: {
+				cell_w = text_width(ctx, buf);
+			} break;
+		}
+		if(cell_w > max_w) {
+			max_w = cell_w;
+		}
+	}
+
+	lv->columns[col].width = max_w + 12;
+	dirty_all(ctx);
+}
+
 // [=]===^=[ listview_total_col_w ]===============================[=]
 static int32_t listview_total_col_w(struct mkgui_listview_data *lv) {
 	int32_t total = 0;

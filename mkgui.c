@@ -804,6 +804,10 @@ struct mkgui_ctx {
 	int32_t dblclick_row;
 	uint32_t dblclick_time;
 
+	uint32_t divider_dblclick_id;
+	int32_t divider_dblclick_col;
+	uint32_t divider_dblclick_time;
+
 	struct mkgui_rect dirty_rects[32];
 	uint32_t dirty_count;
 	uint32_t dirty_full;
@@ -3474,6 +3478,7 @@ static uint32_t mkgui_remove_widget(struct mkgui_ctx *ctx, uint32_t id) {
 			if(ctx->drag_col_resize_id == wid) { ctx->drag_col_resize_id = 0; }
 			if(ctx->drag_select_id == wid) { ctx->drag_select_id = 0; }
 			if(ctx->dblclick_id == wid) { ctx->dblclick_id = 0; }
+			if(ctx->divider_dblclick_id == wid) { ctx->divider_dblclick_id = 0; }
 			if(ctx->tooltip_id == wid) { ctx->tooltip_id = 0; }
 
 			for(uint32_t p = 0; p < ctx->popup_count; ++p) {
@@ -4086,14 +4091,21 @@ static uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 				}
 
 				if(ctx->drag_col_resize_id) {
+					int32_t nw = ctx->drag_col_resize_start_w + (ctx->mouse_x - ctx->drag_col_resize_start_x);
+					if(nw < 40) {
+						nw = 40;
+					}
 					struct mkgui_listview_data *lv = find_listv_data(ctx, ctx->drag_col_resize_id);
 					if(lv) {
-						int32_t nw = ctx->drag_col_resize_start_w + (ctx->mouse_x - ctx->drag_col_resize_start_x);
-						if(nw < 40) {
-							nw = 40;
-						}
 						lv->columns[ctx->drag_col_resize_col].width = nw;
 						dirty_all(ctx);
+
+					} else {
+						struct mkgui_gridview_data *gv = find_gridv_data(ctx, ctx->drag_col_resize_id);
+						if(gv) {
+							gv->columns[ctx->drag_col_resize_col].width = nw;
+							dirty_all(ctx);
+						}
 					}
 					break;
 				}
@@ -4285,6 +4297,11 @@ static uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 				uint32_t want_resize_cursor = 0;
 				if(hi >= 0 && ctx->widgets[hi].type == MKGUI_LISTVIEW) {
 					if(listview_divider_hit(ctx, (uint32_t)hi, ctx->mouse_x, ctx->mouse_y) >= 0) {
+						want_resize_cursor = 1;
+					}
+				}
+				if(hi >= 0 && ctx->widgets[hi].type == MKGUI_GRIDVIEW) {
+					if(gridview_divider_hit(ctx, (uint32_t)hi, ctx->mouse_x, ctx->mouse_y) >= 0) {
 						want_resize_cursor = 1;
 					}
 				}
@@ -4886,10 +4903,20 @@ static uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 								struct mkgui_listview_data *lv = find_listv_data(ctx, hw->id);
 								if(lv) {
 									uint32_t logical = lv->col_order[div];
-									ctx->drag_col_resize_id = hw->id;
-									ctx->drag_col_resize_col = (int32_t)logical;
-									ctx->drag_col_resize_start_x = ctx->mouse_x;
-									ctx->drag_col_resize_start_w = lv->columns[logical].width;
+									uint32_t now_ms = mkgui_time_ms();
+									if(ctx->divider_dblclick_id == hw->id && ctx->divider_dblclick_col == (int32_t)logical && (now_ms - ctx->divider_dblclick_time) < 400) {
+										listview_autosize_col(ctx, lv, logical);
+										ctx->divider_dblclick_id = 0;
+
+									} else {
+										ctx->divider_dblclick_id = hw->id;
+										ctx->divider_dblclick_col = (int32_t)logical;
+										ctx->divider_dblclick_time = now_ms;
+										ctx->drag_col_resize_id = hw->id;
+										ctx->drag_col_resize_col = (int32_t)logical;
+										ctx->drag_col_resize_start_x = ctx->mouse_x;
+										ctx->drag_col_resize_start_w = lv->columns[logical].width;
+									}
 								}
 
 							} else {
@@ -4960,34 +4987,56 @@ static uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 							}
 
 						} else {
-							struct mkgui_gridview_data *gv = find_gridv_data(ctx, hw->id);
-							if(gv) {
-								int32_t ghh = gv->header_height > 0 ? gv->header_height : MKGUI_ROW_HEIGHT;
-								int32_t gcontent_y = ctx->rects[hi].y + ghh + 1;
-								int32_t grow = (ctx->mouse_y - gcontent_y + gv->scroll_y) / MKGUI_ROW_HEIGHT;
-								int32_t gcol = gridview_col_at_x(gv, ctx->mouse_x, ctx->rects[hi].x + 1);
-								if(grow >= 0 && grow < (int32_t)gv->row_count) {
-									gv->selected_row = grow;
-									gv->selected_col = gcol;
-									if(gcol >= 0 && gcol < (int32_t)gv->col_count) {
-										uint32_t ct = gv->columns[gcol].col_type;
-										if(ct == MKGUI_GRID_CHECK || ct == MKGUI_GRID_CHECK_TEXT) {
-											uint32_t cur = gridview_get_bit(gv, (uint32_t)grow, (uint32_t)gcol);
-											gridview_set_bit(gv, (uint32_t)grow, (uint32_t)gcol, !cur);
-											ev->type = MKGUI_EVENT_GRID_CHECK;
-											ev->id = hw->id;
-											ev->value = grow;
-											ev->col = gcol;
-											dirty_all(ctx);
-											return 1;
-										}
+							int32_t gv_div = gridview_divider_hit(ctx, (uint32_t)hi, ctx->mouse_x, ctx->mouse_y);
+							if(gv_div >= 0) {
+								struct mkgui_gridview_data *gv = find_gridv_data(ctx, hw->id);
+								if(gv) {
+									uint32_t now_ms = mkgui_time_ms();
+									if(ctx->divider_dblclick_id == hw->id && ctx->divider_dblclick_col == gv_div && (now_ms - ctx->divider_dblclick_time) < 400) {
+										gridview_autosize_col(ctx, gv, (uint32_t)gv_div);
+										ctx->divider_dblclick_id = 0;
+
+									} else {
+										ctx->divider_dblclick_id = hw->id;
+										ctx->divider_dblclick_col = gv_div;
+										ctx->divider_dblclick_time = now_ms;
+										ctx->drag_col_resize_id = hw->id;
+										ctx->drag_col_resize_col = gv_div;
+										ctx->drag_col_resize_start_x = ctx->mouse_x;
+										ctx->drag_col_resize_start_w = gv->columns[gv_div].width;
 									}
-									ev->type = MKGUI_EVENT_GRID_CLICK;
-									ev->id = hw->id;
-									ev->value = grow;
-									ev->col = gcol;
-									dirty_all(ctx);
-									return 1;
+								}
+
+							} else {
+								struct mkgui_gridview_data *gv = find_gridv_data(ctx, hw->id);
+								if(gv) {
+									int32_t ghh = gv->header_height > 0 ? gv->header_height : MKGUI_ROW_HEIGHT;
+									int32_t gcontent_y = ctx->rects[hi].y + ghh + 1;
+									int32_t grow = (ctx->mouse_y - gcontent_y + gv->scroll_y) / MKGUI_ROW_HEIGHT;
+									int32_t gcol = gridview_col_at_x(gv, ctx->mouse_x, ctx->rects[hi].x + 1);
+									if(grow >= 0 && grow < (int32_t)gv->row_count) {
+										gv->selected_row = grow;
+										gv->selected_col = gcol;
+										if(gcol >= 0 && gcol < (int32_t)gv->col_count) {
+											uint32_t ct = gv->columns[gcol].col_type;
+											if(ct == MKGUI_GRID_CHECK || ct == MKGUI_GRID_CHECK_TEXT) {
+												uint32_t cur = gridview_get_bit(gv, (uint32_t)grow, (uint32_t)gcol);
+												gridview_set_bit(gv, (uint32_t)grow, (uint32_t)gcol, !cur);
+												ev->type = MKGUI_EVENT_GRID_CHECK;
+												ev->id = hw->id;
+												ev->value = grow;
+												ev->col = gcol;
+												dirty_all(ctx);
+												return 1;
+											}
+										}
+										ev->type = MKGUI_EVENT_GRID_CLICK;
+										ev->id = hw->id;
+										ev->value = grow;
+										ev->col = gcol;
+										dirty_all(ctx);
+										return 1;
+									}
 								}
 							}
 						}

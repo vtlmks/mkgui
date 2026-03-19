@@ -116,13 +116,13 @@ static struct ed_palette_entry ed_widgets[] = {
 	{ "Button",     MKGUI_BUTTON },
 	{ "Canvas",     MKGUI_CANVAS },
 	{ "Checkbox",   MKGUI_CHECKBOX },
+	{ "Combobox",   MKGUI_COMBOBOX },
+	{ "DatePicker", MKGUI_DATEPICKER },
 	{ "Dropdown",   MKGUI_DROPDOWN },
 	{ "GLView",     MKGUI_GLVIEW },
 	{ "Gridview",   MKGUI_GRIDVIEW },
 	{ "Image",      MKGUI_IMAGE },
 	{ "Input",      MKGUI_INPUT },
-	{ "Combobox",   MKGUI_COMBOBOX },
-	{ "DatePicker", MKGUI_DATEPICKER },
 	{ "IPInput",    MKGUI_IPINPUT },
 	{ "ItemView",   MKGUI_ITEMVIEW },
 	{ "Label",      MKGUI_LABEL },
@@ -161,7 +161,7 @@ static struct ed_palette_entry ed_containers[] = {
 // Event-to-widget mapping
 // ---------------------------------------------------------------------------
 
-#define ED_MAX_TYPE_EVENTS 8
+#define ED_MAX_TYPE_EVENTS 16
 
 struct ed_type_event_map {
 	uint32_t widget_type;
@@ -170,29 +170,29 @@ struct ed_type_event_map {
 };
 
 static struct ed_type_event_map ed_type_events[] = {
-	{ MKGUI_WINDOW,    { MKGUI_EVENT_CLOSE, MKGUI_EVENT_RESIZE }, 2 },
-	{ MKGUI_BUTTON,    { MKGUI_EVENT_CLICK }, 1 },
-	{ MKGUI_INPUT,     { MKGUI_EVENT_INPUT_CHANGED, MKGUI_EVENT_INPUT_SUBMIT }, 2 },
-	{ MKGUI_CHECKBOX,  { MKGUI_EVENT_CHECKBOX_CHANGED }, 1 },
-	{ MKGUI_DROPDOWN,  { MKGUI_EVENT_DROPDOWN_CHANGED }, 1 },
-	{ MKGUI_SLIDER,    { MKGUI_EVENT_SLIDER_CHANGED }, 1 },
-	{ MKGUI_LISTVIEW,  { MKGUI_EVENT_LISTVIEW_SELECT, MKGUI_EVENT_LISTVIEW_DBLCLICK, MKGUI_EVENT_LISTVIEW_SORT }, 3 },
-	{ MKGUI_TREEVIEW,  { MKGUI_EVENT_TREEVIEW_SELECT, MKGUI_EVENT_TREEVIEW_DBLCLICK, MKGUI_EVENT_TREEVIEW_EXPAND, MKGUI_EVENT_TREEVIEW_COLLAPSE }, 4 },
-	{ MKGUI_TABS,      { MKGUI_EVENT_TAB_CHANGED, MKGUI_EVENT_TAB_CLOSE }, 2 },
-	{ MKGUI_RADIO,     { MKGUI_EVENT_RADIO_CHANGED }, 1 },
-	{ MKGUI_TEXTAREA,  { MKGUI_EVENT_TEXTAREA_CHANGED }, 1 },
-	{ MKGUI_SPINBOX,   { MKGUI_EVENT_SPINBOX_CHANGED }, 1 },
-	{ MKGUI_SCROLLBAR, { MKGUI_EVENT_SCROLL }, 1 },
-	{ MKGUI_IPINPUT,   { MKGUI_EVENT_IPINPUT_CHANGED }, 1 },
-	{ MKGUI_TOGGLE,    { MKGUI_EVENT_TOGGLE_CHANGED }, 1 },
-	{ MKGUI_COMBOBOX,  { MKGUI_EVENT_COMBOBOX_CHANGED, MKGUI_EVENT_COMBOBOX_SUBMIT }, 2 },
-	{ MKGUI_DATEPICKER,{ MKGUI_EVENT_DATEPICKER_CHANGED }, 1 },
-	{ MKGUI_GRIDVIEW,  { MKGUI_EVENT_GRID_CLICK, MKGUI_EVENT_GRID_CHECK }, 2 },
-	{ MKGUI_PATHBAR,   { MKGUI_EVENT_PATHBAR_NAV, MKGUI_EVENT_PATHBAR_SUBMIT }, 2 },
-	{ MKGUI_ITEMVIEW,  { MKGUI_EVENT_ITEMVIEW_SELECT, MKGUI_EVENT_ITEMVIEW_DBLCLICK }, 2 },
-	{ MKGUI_MENUITEM,  { MKGUI_EVENT_MENU }, 1 },
-	{ MKGUI_HSPLIT,    { MKGUI_EVENT_SPLIT_MOVED }, 1 },
-	{ MKGUI_VSPLIT,    { MKGUI_EVENT_SPLIT_MOVED }, 1 },
+	{ MKGUI_WINDOW,    { MKGUI_EVENT_CLOSE, MKGUI_EVENT_RESIZE, MKGUI_EVENT_KEY }, 3 },
+	{ MKGUI_BUTTON,    { MKGUI_EVENT_CLICK, MKGUI_EVENT_CONTEXT, MKGUI_EVENT_FOCUS, MKGUI_EVENT_UNFOCUS, MKGUI_EVENT_HOVER_ENTER, MKGUI_EVENT_HOVER_LEAVE, MKGUI_EVENT_KEY }, 7 },
+	{ MKGUI_INPUT,     { MKGUI_EVENT_INPUT_CHANGED, MKGUI_EVENT_INPUT_SUBMIT, MKGUI_EVENT_CONTEXT, MKGUI_EVENT_FOCUS, MKGUI_EVENT_UNFOCUS, MKGUI_EVENT_HOVER_ENTER, MKGUI_EVENT_HOVER_LEAVE, MKGUI_EVENT_KEY }, 8 },
+	{ MKGUI_CHECKBOX,  { MKGUI_EVENT_CHECKBOX_CHANGED, MKGUI_EVENT_CONTEXT, MKGUI_EVENT_FOCUS, MKGUI_EVENT_UNFOCUS, MKGUI_EVENT_HOVER_ENTER, MKGUI_EVENT_HOVER_LEAVE, MKGUI_EVENT_KEY }, 7 },
+	{ MKGUI_DROPDOWN,  { MKGUI_EVENT_DROPDOWN_CHANGED, MKGUI_EVENT_CONTEXT, MKGUI_EVENT_FOCUS, MKGUI_EVENT_UNFOCUS, MKGUI_EVENT_HOVER_ENTER, MKGUI_EVENT_HOVER_LEAVE, MKGUI_EVENT_KEY }, 7 },
+	{ MKGUI_SLIDER,    { MKGUI_EVENT_SLIDER_CHANGED, MKGUI_EVENT_SLIDER_START, MKGUI_EVENT_SLIDER_END, MKGUI_EVENT_CONTEXT, MKGUI_EVENT_FOCUS, MKGUI_EVENT_UNFOCUS, MKGUI_EVENT_HOVER_ENTER, MKGUI_EVENT_HOVER_LEAVE, MKGUI_EVENT_KEY }, 9 },
+	{ MKGUI_LISTVIEW,  { MKGUI_EVENT_LISTVIEW_SELECT, MKGUI_EVENT_LISTVIEW_DBLCLICK, MKGUI_EVENT_LISTVIEW_SORT, MKGUI_EVENT_LISTVIEW_COL_REORDER, MKGUI_EVENT_LISTVIEW_REORDER, MKGUI_EVENT_DRAG_START, MKGUI_EVENT_DRAG_END, MKGUI_EVENT_CONTEXT, MKGUI_EVENT_FOCUS, MKGUI_EVENT_UNFOCUS, MKGUI_EVENT_HOVER_ENTER, MKGUI_EVENT_HOVER_LEAVE, MKGUI_EVENT_KEY }, 13 },
+	{ MKGUI_TREEVIEW,  { MKGUI_EVENT_TREEVIEW_SELECT, MKGUI_EVENT_TREEVIEW_DBLCLICK, MKGUI_EVENT_TREEVIEW_EXPAND, MKGUI_EVENT_TREEVIEW_COLLAPSE, MKGUI_EVENT_TREEVIEW_MOVE, MKGUI_EVENT_DRAG_START, MKGUI_EVENT_DRAG_END, MKGUI_EVENT_CONTEXT, MKGUI_EVENT_FOCUS, MKGUI_EVENT_UNFOCUS, MKGUI_EVENT_HOVER_ENTER, MKGUI_EVENT_HOVER_LEAVE, MKGUI_EVENT_KEY }, 13 },
+	{ MKGUI_TABS,      { MKGUI_EVENT_TAB_CHANGED, MKGUI_EVENT_TAB_CLOSE, MKGUI_EVENT_CONTEXT, MKGUI_EVENT_FOCUS, MKGUI_EVENT_UNFOCUS, MKGUI_EVENT_HOVER_ENTER, MKGUI_EVENT_HOVER_LEAVE, MKGUI_EVENT_KEY }, 8 },
+	{ MKGUI_RADIO,     { MKGUI_EVENT_RADIO_CHANGED, MKGUI_EVENT_CONTEXT, MKGUI_EVENT_FOCUS, MKGUI_EVENT_UNFOCUS, MKGUI_EVENT_HOVER_ENTER, MKGUI_EVENT_HOVER_LEAVE, MKGUI_EVENT_KEY }, 7 },
+	{ MKGUI_TEXTAREA,  { MKGUI_EVENT_TEXTAREA_CHANGED, MKGUI_EVENT_TEXTAREA_CURSOR, MKGUI_EVENT_CONTEXT, MKGUI_EVENT_FOCUS, MKGUI_EVENT_UNFOCUS, MKGUI_EVENT_HOVER_ENTER, MKGUI_EVENT_HOVER_LEAVE, MKGUI_EVENT_KEY }, 8 },
+	{ MKGUI_SPINBOX,   { MKGUI_EVENT_SPINBOX_CHANGED, MKGUI_EVENT_CONTEXT, MKGUI_EVENT_FOCUS, MKGUI_EVENT_UNFOCUS, MKGUI_EVENT_HOVER_ENTER, MKGUI_EVENT_HOVER_LEAVE, MKGUI_EVENT_KEY }, 7 },
+	{ MKGUI_SCROLLBAR, { MKGUI_EVENT_SCROLL, MKGUI_EVENT_CONTEXT, MKGUI_EVENT_FOCUS, MKGUI_EVENT_UNFOCUS, MKGUI_EVENT_HOVER_ENTER, MKGUI_EVENT_HOVER_LEAVE, MKGUI_EVENT_KEY }, 7 },
+	{ MKGUI_IPINPUT,   { MKGUI_EVENT_IPINPUT_CHANGED, MKGUI_EVENT_CONTEXT, MKGUI_EVENT_FOCUS, MKGUI_EVENT_UNFOCUS, MKGUI_EVENT_HOVER_ENTER, MKGUI_EVENT_HOVER_LEAVE, MKGUI_EVENT_KEY }, 7 },
+	{ MKGUI_TOGGLE,    { MKGUI_EVENT_TOGGLE_CHANGED, MKGUI_EVENT_CONTEXT, MKGUI_EVENT_FOCUS, MKGUI_EVENT_UNFOCUS, MKGUI_EVENT_HOVER_ENTER, MKGUI_EVENT_HOVER_LEAVE, MKGUI_EVENT_KEY }, 7 },
+	{ MKGUI_COMBOBOX,  { MKGUI_EVENT_COMBOBOX_CHANGED, MKGUI_EVENT_COMBOBOX_SUBMIT, MKGUI_EVENT_CONTEXT, MKGUI_EVENT_FOCUS, MKGUI_EVENT_UNFOCUS, MKGUI_EVENT_HOVER_ENTER, MKGUI_EVENT_HOVER_LEAVE, MKGUI_EVENT_KEY }, 8 },
+	{ MKGUI_DATEPICKER,{ MKGUI_EVENT_DATEPICKER_CHANGED, MKGUI_EVENT_CONTEXT, MKGUI_EVENT_FOCUS, MKGUI_EVENT_UNFOCUS, MKGUI_EVENT_HOVER_ENTER, MKGUI_EVENT_HOVER_LEAVE, MKGUI_EVENT_KEY }, 7 },
+	{ MKGUI_GRIDVIEW,  { MKGUI_EVENT_GRID_CLICK, MKGUI_EVENT_GRID_CHECK, MKGUI_EVENT_CONTEXT, MKGUI_EVENT_FOCUS, MKGUI_EVENT_UNFOCUS, MKGUI_EVENT_HOVER_ENTER, MKGUI_EVENT_HOVER_LEAVE, MKGUI_EVENT_KEY }, 8 },
+	{ MKGUI_PATHBAR,   { MKGUI_EVENT_PATHBAR_NAV, MKGUI_EVENT_PATHBAR_SUBMIT, MKGUI_EVENT_CONTEXT, MKGUI_EVENT_FOCUS, MKGUI_EVENT_UNFOCUS, MKGUI_EVENT_HOVER_ENTER, MKGUI_EVENT_HOVER_LEAVE, MKGUI_EVENT_KEY }, 8 },
+	{ MKGUI_ITEMVIEW,  { MKGUI_EVENT_ITEMVIEW_SELECT, MKGUI_EVENT_ITEMVIEW_DBLCLICK, MKGUI_EVENT_CONTEXT, MKGUI_EVENT_FOCUS, MKGUI_EVENT_UNFOCUS, MKGUI_EVENT_HOVER_ENTER, MKGUI_EVENT_HOVER_LEAVE, MKGUI_EVENT_KEY }, 8 },
+	{ MKGUI_MENUITEM,  { MKGUI_EVENT_MENU, MKGUI_EVENT_HOVER_ENTER, MKGUI_EVENT_HOVER_LEAVE }, 3 },
+	{ MKGUI_HSPLIT,    { MKGUI_EVENT_SPLIT_MOVED, MKGUI_EVENT_HOVER_ENTER, MKGUI_EVENT_HOVER_LEAVE }, 3 },
+	{ MKGUI_VSPLIT,    { MKGUI_EVENT_SPLIT_MOVED, MKGUI_EVENT_HOVER_ENTER, MKGUI_EVENT_HOVER_LEAVE }, 3 },
 };
 #define ED_TYPE_EVENT_COUNT (sizeof(ed_type_events) / sizeof(ed_type_events[0]))
 
@@ -216,19 +216,25 @@ static const char *ed_event_name(uint32_t event_type) {
 		case MKGUI_EVENT_LISTVIEW_SORT:      { return "LISTVIEW_SORT"; }
 		case MKGUI_EVENT_LISTVIEW_SELECT:    { return "LISTVIEW_SELECT"; }
 		case MKGUI_EVENT_LISTVIEW_DBLCLICK:  { return "LISTVIEW_DBLCLICK"; }
+		case MKGUI_EVENT_LISTVIEW_COL_REORDER: { return "LISTVIEW_COL_REORDER"; }
+		case MKGUI_EVENT_LISTVIEW_REORDER:   { return "LISTVIEW_REORDER"; }
 		case MKGUI_EVENT_INPUT_CHANGED:      { return "INPUT_CHANGED"; }
 		case MKGUI_EVENT_INPUT_SUBMIT:       { return "INPUT_SUBMIT"; }
 		case MKGUI_EVENT_CHECKBOX_CHANGED:   { return "CHECKBOX_CHANGED"; }
 		case MKGUI_EVENT_DROPDOWN_CHANGED:   { return "DROPDOWN_CHANGED"; }
 		case MKGUI_EVENT_SLIDER_CHANGED:     { return "SLIDER_CHANGED"; }
+		case MKGUI_EVENT_SLIDER_START:       { return "SLIDER_START"; }
+		case MKGUI_EVENT_SLIDER_END:         { return "SLIDER_END"; }
 		case MKGUI_EVENT_SPLIT_MOVED:        { return "SPLIT_MOVED"; }
 		case MKGUI_EVENT_TREEVIEW_SELECT:    { return "TREEVIEW_SELECT"; }
 		case MKGUI_EVENT_TREEVIEW_EXPAND:    { return "TREEVIEW_EXPAND"; }
 		case MKGUI_EVENT_TREEVIEW_COLLAPSE:  { return "TREEVIEW_COLLAPSE"; }
 		case MKGUI_EVENT_TREEVIEW_DBLCLICK:  { return "TREEVIEW_DBLCLICK"; }
+		case MKGUI_EVENT_TREEVIEW_MOVE:      { return "TREEVIEW_MOVE"; }
 		case MKGUI_EVENT_SPINBOX_CHANGED:    { return "SPINBOX_CHANGED"; }
 		case MKGUI_EVENT_RADIO_CHANGED:      { return "RADIO_CHANGED"; }
 		case MKGUI_EVENT_TEXTAREA_CHANGED:   { return "TEXTAREA_CHANGED"; }
+		case MKGUI_EVENT_TEXTAREA_CURSOR:    { return "TEXTAREA_CURSOR"; }
 		case MKGUI_EVENT_CLOSE:              { return "CLOSE"; }
 		case MKGUI_EVENT_RESIZE:             { return "RESIZE"; }
 		case MKGUI_EVENT_ITEMVIEW_SELECT:    { return "ITEMVIEW_SELECT"; }
@@ -243,6 +249,14 @@ static const char *ed_event_name(uint32_t event_type) {
 		case MKGUI_EVENT_GRID_CHECK:         { return "GRID_CHECK"; } break;
 		case MKGUI_EVENT_PATHBAR_NAV:        { return "PATHBAR_NAV"; }
 		case MKGUI_EVENT_PATHBAR_SUBMIT:     { return "PATHBAR_SUBMIT"; }
+		case MKGUI_EVENT_CONTEXT:            { return "CONTEXT"; }
+		case MKGUI_EVENT_DRAG_START:         { return "DRAG_START"; }
+		case MKGUI_EVENT_DRAG_END:           { return "DRAG_END"; }
+		case MKGUI_EVENT_FOCUS:              { return "FOCUS"; }
+		case MKGUI_EVENT_UNFOCUS:            { return "UNFOCUS"; }
+		case MKGUI_EVENT_HOVER_ENTER:        { return "HOVER_ENTER"; }
+		case MKGUI_EVENT_HOVER_LEAVE:        { return "HOVER_LEAVE"; }
+		case MKGUI_EVENT_KEY:                { return "KEY"; }
 		default:                             { return "UNKNOWN"; }
 	}
 }
@@ -257,19 +271,25 @@ static uint32_t ed_event_from_name(const char *name) {
 		{ "LISTVIEW_SORT",      MKGUI_EVENT_LISTVIEW_SORT },
 		{ "LISTVIEW_SELECT",    MKGUI_EVENT_LISTVIEW_SELECT },
 		{ "LISTVIEW_DBLCLICK",  MKGUI_EVENT_LISTVIEW_DBLCLICK },
+		{ "LISTVIEW_COL_REORDER", MKGUI_EVENT_LISTVIEW_COL_REORDER },
+		{ "LISTVIEW_REORDER",   MKGUI_EVENT_LISTVIEW_REORDER },
 		{ "INPUT_CHANGED",      MKGUI_EVENT_INPUT_CHANGED },
 		{ "INPUT_SUBMIT",       MKGUI_EVENT_INPUT_SUBMIT },
 		{ "CHECKBOX_CHANGED",   MKGUI_EVENT_CHECKBOX_CHANGED },
 		{ "DROPDOWN_CHANGED",   MKGUI_EVENT_DROPDOWN_CHANGED },
 		{ "SLIDER_CHANGED",     MKGUI_EVENT_SLIDER_CHANGED },
+		{ "SLIDER_START",       MKGUI_EVENT_SLIDER_START },
+		{ "SLIDER_END",         MKGUI_EVENT_SLIDER_END },
 		{ "SPLIT_MOVED",        MKGUI_EVENT_SPLIT_MOVED },
 		{ "TREEVIEW_SELECT",    MKGUI_EVENT_TREEVIEW_SELECT },
 		{ "TREEVIEW_EXPAND",    MKGUI_EVENT_TREEVIEW_EXPAND },
 		{ "TREEVIEW_COLLAPSE",  MKGUI_EVENT_TREEVIEW_COLLAPSE },
 		{ "TREEVIEW_DBLCLICK",  MKGUI_EVENT_TREEVIEW_DBLCLICK },
+		{ "TREEVIEW_MOVE",      MKGUI_EVENT_TREEVIEW_MOVE },
 		{ "SPINBOX_CHANGED",    MKGUI_EVENT_SPINBOX_CHANGED },
 		{ "RADIO_CHANGED",      MKGUI_EVENT_RADIO_CHANGED },
 		{ "TEXTAREA_CHANGED",   MKGUI_EVENT_TEXTAREA_CHANGED },
+		{ "TEXTAREA_CURSOR",    MKGUI_EVENT_TEXTAREA_CURSOR },
 		{ "CLOSE",              MKGUI_EVENT_CLOSE },
 		{ "RESIZE",             MKGUI_EVENT_RESIZE },
 		{ "ITEMVIEW_SELECT",    MKGUI_EVENT_ITEMVIEW_SELECT },
@@ -284,6 +304,14 @@ static uint32_t ed_event_from_name(const char *name) {
 		{ "GRID_CHECK",         MKGUI_EVENT_GRID_CHECK },
 		{ "PATHBAR_NAV",        MKGUI_EVENT_PATHBAR_NAV },
 		{ "PATHBAR_SUBMIT",     MKGUI_EVENT_PATHBAR_SUBMIT },
+		{ "CONTEXT",            MKGUI_EVENT_CONTEXT },
+		{ "DRAG_START",         MKGUI_EVENT_DRAG_START },
+		{ "DRAG_END",           MKGUI_EVENT_DRAG_END },
+		{ "FOCUS",              MKGUI_EVENT_FOCUS },
+		{ "UNFOCUS",            MKGUI_EVENT_UNFOCUS },
+		{ "HOVER_ENTER",        MKGUI_EVENT_HOVER_ENTER },
+		{ "HOVER_LEAVE",        MKGUI_EVENT_HOVER_LEAVE },
+		{ "KEY",                MKGUI_EVENT_KEY },
 	};
 	for(uint32_t i = 0; i < sizeof(map) / sizeof(map[0]); ++i) {
 		if(strcmp(map[i].name, name) == 0) {
@@ -4188,6 +4216,24 @@ static void ed_generate_snippet(struct mkgui_ctx *ctx) {
 // Test GUI
 // ---------------------------------------------------------------------------
 
+// [=]===^=[ ed_test_row_cb ]======================================[=]
+static void ed_test_row_cb(uint32_t row, uint32_t col, char *buf, uint32_t buf_size, void *userdata) {
+	(void)userdata;
+	snprintf(buf, buf_size, "Row %u Col %u", row, col);
+}
+
+// [=]===^=[ ed_test_item_label_cb ]===============================[=]
+static void ed_test_item_label_cb(uint32_t item, char *buf, uint32_t buf_size, void *userdata) {
+	(void)userdata;
+	snprintf(buf, buf_size, "Item %u", item);
+}
+
+// [=]===^=[ ed_test_item_icon_cb ]================================[=]
+static void ed_test_item_icon_cb(uint32_t item, char *buf, uint32_t buf_size, void *userdata) {
+	(void)item; (void)userdata;
+	buf[0] = '\0';
+}
+
 // [=]===^=[ ed_test_gui ]========================================[=]
 static void ed_test_gui(struct mkgui_ctx *editor_ctx) {
 	if(ed.widget_count == 0) {
@@ -4236,30 +4282,93 @@ static void ed_test_gui(struct mkgui_ctx *editor_ctx) {
 
 	for(uint32_t i = 0; i < ed.widget_count; ++i) {
 		struct ed_widget *ew = &ed.widgets[i];
-		if(ew->type == MKGUI_DROPDOWN || ew->type == MKGUI_COMBOBOX) {
-			struct ed_widget_data *d = ed_find_widget_data(ew->id);
-			if(d && d->item_count > 0) {
-				const char *items[ED_MAX_DATA_ITEMS];
-				for(uint32_t j = 0; j < d->item_count; ++j) {
-					items[j] = d->items[j];
-				}
-				if(ew->type == MKGUI_DROPDOWN) {
+		struct ed_widget_data *d = ed_find_widget_data(ew->id);
+
+		switch(ew->type) {
+			case MKGUI_DROPDOWN: {
+				if(d && d->item_count > 0) {
+					const char *items[ED_MAX_DATA_ITEMS];
+					for(uint32_t j = 0; j < d->item_count; ++j) {
+						items[j] = d->items[j];
+					}
 					mkgui_dropdown_setup(test, ew->id, items, d->item_count);
-				} else {
+				}
+			} break;
+
+			case MKGUI_COMBOBOX: {
+				if(d && d->item_count > 0) {
+					const char *items[ED_MAX_DATA_ITEMS];
+					for(uint32_t j = 0; j < d->item_count; ++j) {
+						items[j] = d->items[j];
+					}
 					mkgui_combobox_setup(test, ew->id, items, d->item_count);
 				}
-			}
-		}
-	}
+			} break;
 
-	for(uint32_t i = 0; i < ed.widget_count; ++i) {
-		struct ed_widget *ew = &ed.widgets[i];
-		if(ew->type == MKGUI_GRIDVIEW) {
-			struct mkgui_grid_column gcols[] = {
-				{ "Column 1", 100, MKGUI_GRID_TEXT },
-				{ "Check", 60, MKGUI_GRID_CHECK },
-			};
-			mkgui_gridview_setup(test, ew->id, 10, 2, gcols, NULL, NULL);
+			case MKGUI_LISTVIEW: {
+				struct mkgui_column cols[] = {
+					{ "Column", 200, MKGUI_CELL_TEXT },
+				};
+				mkgui_listview_setup(test, ew->id, 5, 1, cols, ed_test_row_cb, NULL);
+			} break;
+
+			case MKGUI_TREEVIEW: {
+				mkgui_treeview_setup(test, ew->id);
+				mkgui_treeview_add(test, ew->id, 1, 0, "Node 1");
+				mkgui_treeview_add(test, ew->id, 2, 1, "Child 1");
+				mkgui_treeview_add(test, ew->id, 3, 1, "Child 2");
+				mkgui_treeview_add(test, ew->id, 4, 0, "Node 2");
+			} break;
+
+			case MKGUI_ITEMVIEW: {
+				mkgui_itemview_setup(test, ew->id, 5, MKGUI_VIEW_ICON, ed_test_item_label_cb, ed_test_item_icon_cb, NULL);
+			} break;
+
+			case MKGUI_GRIDVIEW: {
+				struct mkgui_grid_column gcols[] = {
+					{ "Column 1", 100, MKGUI_GRID_TEXT },
+					{ "Check", 60, MKGUI_GRID_CHECK },
+				};
+				mkgui_gridview_setup(test, ew->id, 10, 2, gcols, NULL, NULL);
+			} break;
+
+			case MKGUI_SLIDER: {
+				mkgui_slider_setup(test, ew->id, 0, 100, 50);
+			} break;
+
+			case MKGUI_SPINBOX: {
+				mkgui_spinbox_setup(test, ew->id, 0, 100, 0, 1);
+			} break;
+
+			case MKGUI_SCROLLBAR: {
+				mkgui_scrollbar_setup(test, ew->id, 100, 10);
+			} break;
+
+			case MKGUI_STATUSBAR: {
+				uint32_t sc = (d && d->item_count > 0) ? d->item_count : 1;
+				int32_t widths[ED_MAX_DATA_ITEMS];
+				if(d && d->item_count > 0) {
+					for(uint32_t j = 0; j < d->item_count; ++j) {
+						widths[j] = atoi(d->items[j]);
+					}
+				} else {
+					widths[0] = -1;
+				}
+				mkgui_statusbar_setup(test, ew->id, sc, widths);
+				mkgui_statusbar_set(test, ew->id, 0, "Ready");
+			} break;
+
+			case MKGUI_PROGRESS: {
+				mkgui_progress_setup(test, ew->id, 100);
+				mkgui_progress_set(test, ew->id, 50);
+			} break;
+
+			case MKGUI_PATHBAR: {
+				mkgui_pathbar_set(test, ew->id, "/home/user/documents");
+			} break;
+
+			default: {
+			} break;
 		}
 	}
 
