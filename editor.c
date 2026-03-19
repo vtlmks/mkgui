@@ -118,6 +118,7 @@ static struct ed_palette_entry ed_widgets[] = {
 	{ "Checkbox",   MKGUI_CHECKBOX },
 	{ "Dropdown",   MKGUI_DROPDOWN },
 	{ "GLView",     MKGUI_GLVIEW },
+	{ "Gridview",   MKGUI_GRIDVIEW },
 	{ "Image",      MKGUI_IMAGE },
 	{ "Input",      MKGUI_INPUT },
 	{ "Combobox",   MKGUI_COMBOBOX },
@@ -186,6 +187,7 @@ static struct ed_type_event_map ed_type_events[] = {
 	{ MKGUI_TOGGLE,    { MKGUI_EVENT_TOGGLE_CHANGED }, 1 },
 	{ MKGUI_COMBOBOX,  { MKGUI_EVENT_COMBOBOX_CHANGED, MKGUI_EVENT_COMBOBOX_SUBMIT }, 2 },
 	{ MKGUI_DATEPICKER,{ MKGUI_EVENT_DATEPICKER_CHANGED }, 1 },
+	{ MKGUI_GRIDVIEW,  { MKGUI_EVENT_GRID_CLICK, MKGUI_EVENT_GRID_CHECK }, 2 },
 	{ MKGUI_PATHBAR,   { MKGUI_EVENT_PATHBAR_NAV, MKGUI_EVENT_PATHBAR_SUBMIT }, 2 },
 	{ MKGUI_ITEMVIEW,  { MKGUI_EVENT_ITEMVIEW_SELECT, MKGUI_EVENT_ITEMVIEW_DBLCLICK }, 2 },
 	{ MKGUI_MENUITEM,  { MKGUI_EVENT_MENU }, 1 },
@@ -236,6 +238,8 @@ static const char *ed_event_name(uint32_t event_type) {
 		case MKGUI_EVENT_COMBOBOX_CHANGED:   { return "COMBOBOX_CHANGED"; }
 		case MKGUI_EVENT_COMBOBOX_SUBMIT:    { return "COMBOBOX_SUBMIT"; }
 		case MKGUI_EVENT_DATEPICKER_CHANGED: { return "DATEPICKER_CHANGED"; }
+		case MKGUI_EVENT_GRID_CLICK:         { return "GRID_CLICK"; } break;
+		case MKGUI_EVENT_GRID_CHECK:         { return "GRID_CHECK"; } break;
 		case MKGUI_EVENT_PATHBAR_NAV:        { return "PATHBAR_NAV"; }
 		case MKGUI_EVENT_PATHBAR_SUBMIT:     { return "PATHBAR_SUBMIT"; }
 		default:                             { return "UNKNOWN"; }
@@ -274,6 +278,8 @@ static uint32_t ed_event_from_name(const char *name) {
 		{ "COMBOBOX_CHANGED",   MKGUI_EVENT_COMBOBOX_CHANGED },
 		{ "COMBOBOX_SUBMIT",    MKGUI_EVENT_COMBOBOX_SUBMIT },
 		{ "DATEPICKER_CHANGED", MKGUI_EVENT_DATEPICKER_CHANGED },
+		{ "GRID_CLICK",         MKGUI_EVENT_GRID_CLICK },
+		{ "GRID_CHECK",         MKGUI_EVENT_GRID_CHECK },
 		{ "PATHBAR_NAV",        MKGUI_EVENT_PATHBAR_NAV },
 		{ "PATHBAR_SUBMIT",     MKGUI_EVENT_PATHBAR_SUBMIT },
 	};
@@ -600,6 +606,7 @@ static struct ed_help_entry ed_help[] = {
 	{ MKGUI_TOGGLE,    "On/off toggle switch. Click or spacebar toggles. Visual pill-shaped track with sliding knob." },
 	{ MKGUI_COMBOBOX,  "Editable dropdown. Type to filter items, arrow keys to navigate, Enter to select. Supports freeform text." },
 	{ MKGUI_DATEPICKER,"Date picker. Shows YYYY-MM-DD. Click calendar button for a popup calendar. Editable text field." },
+	{ MKGUI_GRIDVIEW,  "Multi-column grid with checkboxes. Virtual data via callback. Per-cell checkbox state, grid lines, vertical scrolling." },
 	{ MKGUI_ITEMVIEW,  "Multi-mode item view: icons, thumbnails, compact list, or detail. Uses callbacks for labels and icons." },
 	{ MKGUI_LABEL,     "Static text display. Not interactive. Use mkgui_label_set() to change text at runtime." },
 	{ MKGUI_LISTVIEW,  "Scrollable multi-column list. Fully virtual (callback provides data). Supports sorting, column reorder, row drag." },
@@ -1210,6 +1217,7 @@ static void ed_gen_id_name(struct ed_widget *w) {
 		case MKGUI_SPINNER:    { prefix = "ID_SPINNER"; } break;
 		case MKGUI_ITEMVIEW:   { prefix = "ID_ITEMVIEW"; } break;
 		case MKGUI_PANEL:      { prefix = "ID_PANEL"; } break;
+		case MKGUI_GRIDVIEW:   { prefix = "ID_GRIDVIEW"; } break;
 		case MKGUI_SCROLLBAR:  { prefix = "ID_SCROLLBAR"; } break;
 		case MKGUI_IMAGE:      { prefix = "ID_IMAGE"; } break;
 		case MKGUI_GLVIEW:     { prefix = "ID_GLVIEW"; } break;
@@ -1393,6 +1401,11 @@ static int32_t ed_add_widget(uint32_t type, int32_t x, int32_t y) {
 		} break;
 
 		case MKGUI_PANEL: {
+			w->w = 300;
+			w->h = 200;
+		} break;
+
+		case MKGUI_GRIDVIEW: {
 			w->w = 300;
 			w->h = 200;
 		} break;
@@ -2024,6 +2037,24 @@ static void ed_draw_widget(struct mkgui_ctx *ctx, uint32_t idx) {
 			draw_hline(buf, bw, bh, rx + 1, ry + MKGUI_ROW_HEIGHT, rw - 2, ctx->theme.widget_border);
 			int32_t ty = ry + (MKGUI_ROW_HEIGHT - ctx->font_height) / 2 + 1;
 			push_text_clip(rx + 4, ty, ew->label[0] ? ew->label : "ListView", ctx->theme.text, rx + 1, ry + 1, rx + rw - 1, ry + MKGUI_ROW_HEIGHT);
+		} break;
+
+		case MKGUI_GRIDVIEW: {
+			draw_patch(ctx, MKGUI_STYLE_SUNKEN, rx, ry, rw, rh, ctx->theme.input_bg, ctx->theme.widget_border);
+			draw_rect_fill(buf, bw, bh, rx + 1, ry + 1, rw - 2, MKGUI_ROW_HEIGHT, ctx->theme.header_bg);
+			draw_hline(buf, bw, bh, rx + 1, ry + MKGUI_ROW_HEIGHT, rw - 2, ctx->theme.widget_border);
+			int32_t ty = ry + (MKGUI_ROW_HEIGHT - ctx->font_height) / 2 + 1;
+			push_text_clip(rx + 4, ty, ew->label[0] ? ew->label : "GridView", ctx->theme.text, rx + 1, ry + 1, rx + rw - 1, ry + MKGUI_ROW_HEIGHT);
+			uint32_t glc = blend_pixel(ctx->theme.input_bg, ctx->theme.widget_border, 80);
+			int32_t gy = ry + MKGUI_ROW_HEIGHT + MKGUI_ROW_HEIGHT;
+			while(gy < ry + rh - 2) {
+				draw_hline(buf, bw, bh, rx + 1, gy, rw - 2, glc);
+				gy += MKGUI_ROW_HEIGHT;
+			}
+			int32_t gx = rx + 1 + rw / 3;
+			draw_vline(buf, bw, bh, gx, ry + 1, rh - 2, glc);
+			gx += rw / 3;
+			draw_vline(buf, bw, bh, gx, ry + 1, rh - 2, glc);
 		} break;
 
 		case MKGUI_TREEVIEW: {
@@ -3737,6 +3768,7 @@ static const char *ed_type_name_upper(uint32_t type) {
 		case MKGUI_SPINNER:    { return "MKGUI_SPINNER"; }
 		case MKGUI_ITEMVIEW:   { return "MKGUI_ITEMVIEW"; }
 		case MKGUI_PANEL:      { return "MKGUI_PANEL"; }
+		case MKGUI_GRIDVIEW:   { return "MKGUI_GRIDVIEW"; }
 		case MKGUI_SCROLLBAR:  { return "MKGUI_SCROLLBAR"; }
 		case MKGUI_IMAGE:      { return "MKGUI_IMAGE"; }
 		case MKGUI_GLVIEW:     { return "MKGUI_GLVIEW"; }
@@ -3889,6 +3921,13 @@ static void ed_generate_code(struct mkgui_ctx *ctx) {
 			fprintf(f, "\tbuf[0] = '\\0';\n");
 			fprintf(f, "}\n\n");
 		}
+		if(ed.widgets[i].type == MKGUI_GRIDVIEW) {
+			fprintf(f, "// [=]===^=[ %s_cell_cb ]===\n", ed.widgets[i].id_name);
+			fprintf(f, "static void %s_cell_cb(uint32_t row, uint32_t col, char *buf, uint32_t buf_size, void *userdata) {\n", ed.widgets[i].id_name);
+			fprintf(f, "\t(void)row; (void)col; (void)userdata;\n");
+			fprintf(f, "\tbuf[0] = '\\0';\n");
+			fprintf(f, "}\n\n");
+		}
 	}
 
 	fprintf(f, "// [=]===^=[ main ]===\n");
@@ -3983,6 +4022,13 @@ static void ed_generate_code(struct mkgui_ctx *ctx) {
 
 		} else if(w->type == MKGUI_ITEMVIEW) {
 			fprintf(f, "\tmkgui_itemview_setup(ctx, %s, 0, MKGUI_VIEW_ICON, %s_label_cb, %s_icon_cb, NULL);\n", w->id_name, w->id_name, w->id_name);
+
+		} else if(w->type == MKGUI_GRIDVIEW) {
+			fprintf(f, "\tstruct mkgui_grid_column %s_cols[] = {\n", w->id_name);
+			fprintf(f, "\t\t{ \"Column 1\", 100, MKGUI_GRID_TEXT },\n");
+			fprintf(f, "\t\t{ \"Check\", 60, MKGUI_GRID_CHECK },\n");
+			fprintf(f, "\t};\n");
+			fprintf(f, "\tmkgui_gridview_setup(ctx, %s, 10, 2, %s_cols, %s_cell_cb, NULL);\n", w->id_name, w->id_name, w->id_name);
 
 		} else if(w->type == MKGUI_SCROLLBAR) {
 			fprintf(f, "\tmkgui_scrollbar_setup(ctx, %s, 100, 10);\n", w->id_name);
@@ -4201,6 +4247,17 @@ static void ed_test_gui(struct mkgui_ctx *editor_ctx) {
 					mkgui_combobox_setup(test, ew->id, items, d->item_count);
 				}
 			}
+		}
+	}
+
+	for(uint32_t i = 0; i < ed.widget_count; ++i) {
+		struct ed_widget *ew = &ed.widgets[i];
+		if(ew->type == MKGUI_GRIDVIEW) {
+			struct mkgui_grid_column gcols[] = {
+				{ "Column 1", 100, MKGUI_GRID_TEXT },
+				{ "Check", 60, MKGUI_GRID_CHECK },
+			};
+			mkgui_gridview_setup(test, ew->id, 10, 2, gcols, NULL, NULL);
 		}
 	}
 

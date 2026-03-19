@@ -193,6 +193,7 @@ enum {
 	MKGUI_TOGGLE,
 	MKGUI_COMBOBOX,
 	MKGUI_DATEPICKER,
+	MKGUI_GRIDVIEW,
 };
 
 // ---------------------------------------------------------------------------
@@ -288,6 +289,8 @@ enum {
 	MKGUI_EVENT_COMBOBOX_CHANGED,
 	MKGUI_EVENT_COMBOBOX_SUBMIT,
 	MKGUI_EVENT_DATEPICKER_CHANGED,
+	MKGUI_EVENT_GRID_CLICK,
+	MKGUI_EVENT_GRID_CHECK,
 };
 
 // ---------------------------------------------------------------------------
@@ -344,6 +347,19 @@ struct mkgui_column {
 };
 
 typedef void (*mkgui_row_cb)(uint32_t row, uint32_t col, char *buf, uint32_t buf_size, void *userdata);
+typedef void (*mkgui_grid_cell_cb)(uint32_t row, uint32_t col, char *buf, uint32_t buf_size, void *userdata);
+
+enum {
+	MKGUI_GRID_TEXT,
+	MKGUI_GRID_CHECK,
+	MKGUI_GRID_CHECK_TEXT,
+};
+
+struct mkgui_grid_column {
+	char label[MKGUI_MAX_TEXT];
+	int32_t width;
+	uint32_t col_type;
+};
 
 #define MKGUI_MAX_MULTI_SEL 4096
 
@@ -367,6 +383,21 @@ struct mkgui_listview_data {
 	uint32_t drag_active;
 	int32_t multi_sel[MKGUI_MAX_MULTI_SEL];
 	uint32_t multi_sel_count;
+};
+
+struct mkgui_gridview_data {
+	uint32_t widget_id;
+	uint32_t row_count;
+	uint32_t col_count;
+	struct mkgui_grid_column columns[MKGUI_MAX_COLS];
+	mkgui_grid_cell_cb cell_cb;
+	void *userdata;
+	int32_t scroll_y;
+	int32_t selected_row;
+	int32_t selected_col;
+	int32_t header_height;
+	uint8_t *checks;
+	uint32_t checks_cap;
 };
 
 struct mkgui_input_data {
@@ -743,6 +774,8 @@ struct mkgui_ctx {
 	uint32_t combobox_count, combobox_cap;
 	struct mkgui_datepicker_data *datepickers;
 	uint32_t datepicker_count, datepicker_cap;
+	struct mkgui_gridview_data *gridviews;
+	uint32_t gridview_count, gridview_cap;
 
 	struct mkgui_popup popups[MKGUI_MAX_POPUPS];
 	uint32_t popup_count;
@@ -1369,6 +1402,16 @@ static struct mkgui_listview_data *find_listv_data(struct mkgui_ctx *ctx, uint32
 	return NULL;
 }
 
+// [=]===^=[ find_gridv_data ]==================================[=]
+static struct mkgui_gridview_data *find_gridv_data(struct mkgui_ctx *ctx, uint32_t widget_id) {
+	for(uint32_t i = 0; i < ctx->gridview_count; ++i) {
+		if(ctx->gridviews[i].widget_id == widget_id) {
+			return &ctx->gridviews[i];
+		}
+	}
+	return NULL;
+}
+
 // [=]===^=[ find_input_data ]===================================[=]
 static struct mkgui_input_data *find_input_data(struct mkgui_ctx *ctx, uint32_t widget_id) {
 	for(uint32_t i = 0; i < ctx->input_count; ++i) {
@@ -1591,7 +1634,8 @@ static uint32_t is_focusable(struct mkgui_widget *w) {
 		case MKGUI_IPINPUT:
 		case MKGUI_TOGGLE:
 		case MKGUI_COMBOBOX:
-		case MKGUI_DATEPICKER: {
+		case MKGUI_DATEPICKER:
+		case MKGUI_GRIDVIEW: {
 			return 1;
 		} break;
 
@@ -2531,6 +2575,7 @@ static void draw_icon_popup(struct mkgui_popup *p, struct mkgui_icon *icon, int3
 #include "mkgui_toggle.c"
 #include "mkgui_combobox.c"
 #include "mkgui_datepicker.c"
+#include "mkgui_gridview.c"
 #include "mkgui_spinner.c"
 #include "mkgui_itemview.c"
 #include "mkgui_scrollbar.c"
@@ -2669,6 +2714,10 @@ static void render_widget(struct mkgui_ctx *ctx, uint32_t idx) {
 
 		case MKGUI_DATEPICKER: {
 			render_datepicker(ctx, idx);
+		} break;
+
+		case MKGUI_GRIDVIEW: {
+			render_gridview(ctx, idx);
 		} break;
 
 		case MKGUI_VBOX:
@@ -3302,6 +3351,19 @@ static void mkgui_remove_aux_(struct mkgui_ctx *ctx, uint32_t id, uint32_t type)
 			}
 		} break;
 
+		case MKGUI_GRIDVIEW: {
+			for(uint32_t i = 0; i < ctx->gridview_count; ++i) {
+				if(ctx->gridviews[i].widget_id == id) {
+					free(ctx->gridviews[i].checks);
+					if(i < ctx->gridview_count - 1) {
+						ctx->gridviews[i] = ctx->gridviews[ctx->gridview_count - 1];
+					}
+					--ctx->gridview_count;
+					break;
+				}
+			}
+		} break;
+
 		case MKGUI_SCROLLBAR: {
 			for(uint32_t i = 0; i < ctx->scrollbar_count; ++i) {
 				if(ctx->scrollbars[i].id == id) {
@@ -3508,6 +3570,8 @@ static uint32_t mkgui_alloc_arrays(struct mkgui_ctx *ctx, uint32_t widget_cap) {
 	ctx->comboboxes = (struct mkgui_combobox_data *)calloc(ctx->combobox_cap, sizeof(struct mkgui_combobox_data));
 	ctx->datepicker_cap = 16;
 	ctx->datepickers = (struct mkgui_datepicker_data *)calloc(ctx->datepicker_cap, sizeof(struct mkgui_datepicker_data));
+	ctx->gridview_cap = 16;
+	ctx->gridviews = (struct mkgui_gridview_data *)calloc(ctx->gridview_cap, sizeof(struct mkgui_gridview_data));
 
 	return 1;
 }
@@ -3539,6 +3603,10 @@ static void mkgui_free_arrays(struct mkgui_ctx *ctx) {
 	free(ctx->toggles);
 	free(ctx->comboboxes);
 	free(ctx->datepickers);
+	for(uint32_t i = 0; i < ctx->gridview_count; ++i) {
+		free(ctx->gridviews[i].checks);
+	}
+	free(ctx->gridviews);
 }
 
 // [=]===^=[ mkgui_create ]======================================[=]
@@ -4008,6 +4076,8 @@ static uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 							}
 							dirty_all(ctx);
 						}
+					} else if(dsi >= 0 && ctx->widgets[dsi].type == MKGUI_GRIDVIEW) {
+						gridview_scroll_to_y(ctx, ctx->drag_scrollbar_id, ctx->mouse_y);
 					} else if(ctx->drag_scrollbar_horiz) {
 						listview_scroll_to_x(ctx, ctx->drag_scrollbar_id, ctx->mouse_x);
 					} else {
@@ -4462,6 +4532,16 @@ static uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 							dirty_all(ctx);
 						}
 
+					} else if(hi >= 0 && ctx->widgets[hi].type == MKGUI_GRIDVIEW) {
+						struct mkgui_gridview_data *gv = find_gridv_data(ctx, ctx->widgets[hi].id);
+						if(gv) {
+							gv->scroll_y += delta;
+							int32_t hh = gv->header_height > 0 ? gv->header_height : MKGUI_ROW_HEIGHT;
+							int32_t content_h = ctx->rects[hi].h - hh - 2;
+							gridview_clamp_scroll(gv, content_h);
+							dirty_all(ctx);
+						}
+
 					} else if(hi >= 0 && ctx->widgets[hi].type == MKGUI_TREEVIEW) {
 						struct mkgui_treeview_data *tv = find_treeview_data(ctx, ctx->widgets[hi].id);
 						if(tv) {
@@ -4862,6 +4942,56 @@ static uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 							}
 						}
 					}
+					}
+
+					if(hw->type == MKGUI_GRIDVIEW) {
+						uint32_t gv_sb_hit = gridview_scrollbar_hit(ctx, (uint32_t)hi, ctx->mouse_x, ctx->mouse_y);
+						if(gv_sb_hit == 1) {
+							ctx->drag_scrollbar_id = hw->id;
+							ctx->drag_scrollbar_offset = gridview_thumb_offset(ctx, (uint32_t)hi, ctx->mouse_y);
+
+						} else if(gv_sb_hit == 2 || gv_sb_hit == 3) {
+							struct mkgui_gridview_data *gv = find_gridv_data(ctx, hw->id);
+							if(gv) {
+								int32_t ghh = gv->header_height > 0 ? gv->header_height : MKGUI_ROW_HEIGHT;
+								int32_t gcontent_h = ctx->rects[hi].h - ghh - 2;
+								gv->scroll_y += (gv_sb_hit == 2 ? -1 : 1) * gcontent_h;
+								gridview_clamp_scroll(gv, gcontent_h);
+								dirty_all(ctx);
+							}
+
+						} else {
+							struct mkgui_gridview_data *gv = find_gridv_data(ctx, hw->id);
+							if(gv) {
+								int32_t ghh = gv->header_height > 0 ? gv->header_height : MKGUI_ROW_HEIGHT;
+								int32_t gcontent_y = ctx->rects[hi].y + ghh + 1;
+								int32_t grow = (ctx->mouse_y - gcontent_y + gv->scroll_y) / MKGUI_ROW_HEIGHT;
+								int32_t gcol = gridview_col_at_x(gv, ctx->mouse_x, ctx->rects[hi].x + 1);
+								if(grow >= 0 && grow < (int32_t)gv->row_count) {
+									gv->selected_row = grow;
+									gv->selected_col = gcol;
+									if(gcol >= 0 && gcol < (int32_t)gv->col_count) {
+										uint32_t ct = gv->columns[gcol].col_type;
+										if(ct == MKGUI_GRID_CHECK || ct == MKGUI_GRID_CHECK_TEXT) {
+											uint32_t cur = gridview_get_bit(gv, (uint32_t)grow, (uint32_t)gcol);
+											gridview_set_bit(gv, (uint32_t)grow, (uint32_t)gcol, !cur);
+											ev->type = MKGUI_EVENT_GRID_CHECK;
+											ev->id = hw->id;
+											ev->value = grow;
+											ev->col = gcol;
+											dirty_all(ctx);
+											return 1;
+										}
+									}
+									ev->type = MKGUI_EVENT_GRID_CLICK;
+									ev->id = hw->id;
+									ev->value = grow;
+									ev->col = gcol;
+									dirty_all(ctx);
+									return 1;
+								}
+							}
+						}
 					}
 
 					if(hw->type == MKGUI_ITEMVIEW) {
@@ -5431,6 +5561,12 @@ static uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 
 							case MKGUI_LISTVIEW: {
 								if(handle_listview_key(ctx, ev, ks)) {
+									return 1;
+								}
+							} break;
+
+							case MKGUI_GRIDVIEW: {
+								if(handle_gridview_key(ctx, ev, ks)) {
 									return 1;
 								}
 							} break;

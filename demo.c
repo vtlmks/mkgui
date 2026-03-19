@@ -54,7 +54,7 @@ enum {
 	/* Data Views tab */
 	ID_DATA_SPLIT,
 	ID_DATA_LVBOX, ID_LV_LBL, ID_LISTVIEW1,
-	ID_DATA_RVBOX, ID_IV_HBOX,
+	ID_DATA_RVBOX, ID_GV_LBL, ID_GRIDVIEW1, ID_IV_HBOX,
 	ID_IV_ICON, ID_IV_THUMB, ID_IV_COMPACT, ID_IV_DETAIL, ID_ITEMVIEW1,
 
 	/* Layout tab */
@@ -74,6 +74,16 @@ enum {
 	ID_IMG_LBL, ID_IMAGE1,
 	ID_GL_LBL, ID_GLVIEW1,
 };
+
+// [=]===^=[ demo_grid_cb ]======================================[=]
+static void demo_grid_cb(uint32_t row, uint32_t col, char *buf, uint32_t buf_size, void *userdata) {
+	(void)userdata;
+	if(col == 0) {
+		snprintf(buf, buf_size, "Input %u", row + 1);
+	} else {
+		snprintf(buf, buf_size, "Out %u", col);
+	}
+}
 
 // [=]===^=[ demo_row_cb ]=======================================[=]
 static void demo_row_cb(uint32_t row, uint32_t col, char *buf, uint32_t buf_size, void *userdata) {
@@ -337,6 +347,8 @@ int main(void) {
 		{ MKGUI_LABEL,    ID_LV_LBL,   "Listview (1M rows):", "", ID_DATA_LVBOX, 0, 0, 0, 20, MKGUI_FIXED, 0 },
 		{ MKGUI_LISTVIEW, ID_LISTVIEW1, "",                  "", ID_DATA_LVBOX, 0, 0, 0, 0, 0, 1 },
 		{ MKGUI_VBOX,     ID_DATA_RVBOX,"",                  "", ID_DATA_SPLIT, 0, 0, 0, 0, MKGUI_REGION_RIGHT, 0 },
+		{ MKGUI_LABEL,    ID_GV_LBL,   "Gridview:",         "", ID_DATA_RVBOX, 0, 0, 0, 20, MKGUI_FIXED, 0 },
+		{ MKGUI_GRIDVIEW, ID_GRIDVIEW1, "",                  "", ID_DATA_RVBOX, 0, 0, 0, 150, MKGUI_FIXED, 0 },
 		{ MKGUI_HBOX,     ID_IV_HBOX,   "",                  "", ID_DATA_RVBOX, 0, 0, 0, 24, MKGUI_FIXED, 0 },
 		{ MKGUI_BUTTON,   ID_IV_ICON,   "Icons",             "", ID_IV_HBOX, 0, 0, 0, 0, 0, 1 },
 		{ MKGUI_BUTTON,   ID_IV_THUMB,  "Thumbs",            "", ID_IV_HBOX, 0, 0, 0, 0, 0, 1 },
@@ -425,6 +437,15 @@ int main(void) {
 		{ "Progress", 120, MKGUI_CELL_PROGRESS },
 	};
 	mkgui_listview_setup(ctx, ID_LISTVIEW1, 1000000, 4, cols, demo_row_cb, NULL);
+
+	struct mkgui_grid_column gcols[] = {
+		{ "Source", 80, MKGUI_GRID_TEXT },
+		{ "Out 1", 50, MKGUI_GRID_CHECK },
+		{ "Out 2", 50, MKGUI_GRID_CHECK },
+		{ "Out 3", 50, MKGUI_GRID_CHECK },
+		{ "Out 4", 50, MKGUI_GRID_CHECK },
+	};
+	mkgui_gridview_setup(ctx, ID_GRIDVIEW1, 8, 5, gcols, demo_grid_cb, NULL);
 
 	mkgui_itemview_setup(ctx, ID_ITEMVIEW1, 200, MKGUI_VIEW_ICON, demo_itemview_label, demo_itemview_icon, NULL);
 

@@ -95,6 +95,7 @@ struct mkgui_widget {
 | `MKGUI_PROGRESS` | Progress bar with animated shimmer effect. No events. |
 | `MKGUI_SPINNER` | Animated spinning arc indicator. No events, no setup needed. |
 | `MKGUI_LISTVIEW` | Scrollable multi-column list with virtual rows and per-column cell types. Emits `MKGUI_EVENT_LISTVIEW_SELECT`, `_DBLCLICK`, `_SORT`, `_COL_REORDER`, `_REORDER`. |
+| `MKGUI_GRIDVIEW` | Multi-column grid with per-cell checkboxes. Virtual data via callback. Emits `MKGUI_EVENT_GRID_CLICK`, `MKGUI_EVENT_GRID_CHECK`. |
 | `MKGUI_ITEMVIEW` | Multi-mode item view (icon, thumbnail, compact, detail). Emits `MKGUI_EVENT_ITEMVIEW_SELECT`, `_DBLCLICK`. |
 | `MKGUI_TREEVIEW` | Hierarchical tree. Emits `MKGUI_EVENT_TREEVIEW_SELECT`, `_DBLCLICK`, `_EXPAND`, `_COLLAPSE`. |
 | `MKGUI_TABS` | Tab container. Children must be `MKGUI_TAB`. Emits `MKGUI_EVENT_TAB_CHANGED`. |
@@ -521,6 +522,38 @@ Rows can be reordered by dragging. Click and drag a row 4+ pixels vertically to 
 Column headers support drag-and-drop reordering and resize. Drag a header to a new position to rearrange columns. A short click (< 4px movement) sorts by that column instead. Drag the divider between columns to resize (minimum 20px, cursor changes to a resize arrow on hover). The column order maps display positions to logical column indices -- the row callback always receives the logical column index regardless of display order. Use `mkgui_listview_get_col_order` / `mkgui_listview_set_col_order` and `mkgui_listview_get_col_width` / `mkgui_listview_set_col_width` to save and restore layouts.
 
 Sorting is application-side. When a header is clicked, `MKGUI_EVENT_LISTVIEW_SORT` is emitted with `ev->col` set to the column and `ev->value` set to the sort direction (1 ascending, -1 descending). The listview tracks the sort arrow visual internally but the application must sort its data and call `dirty_all`.
+
+### Gridview
+
+Multi-column grid with per-cell checkbox support. Ideal for patchbays, routing matrices, and tabular data with toggles.
+
+```c
+typedef void (*mkgui_grid_cell_cb)(uint32_t row, uint32_t col, char *buf, uint32_t buf_size, void *userdata);
+
+void mkgui_gridview_setup(struct mkgui_ctx *ctx, uint32_t id, uint32_t row_count, uint32_t col_count,
+    struct mkgui_grid_column *columns, mkgui_grid_cell_cb cell_cb, void *userdata);
+void mkgui_gridview_set_rows(struct mkgui_ctx *ctx, uint32_t id, uint32_t row_count);
+int32_t mkgui_gridview_get_selected(struct mkgui_ctx *ctx, uint32_t id);
+uint32_t mkgui_gridview_get_check(struct mkgui_ctx *ctx, uint32_t id, uint32_t row, uint32_t col);
+void mkgui_gridview_set_check(struct mkgui_ctx *ctx, uint32_t id, uint32_t row, uint32_t col, uint32_t checked);
+```
+
+Column types (set in `struct mkgui_grid_column`):
+
+| Type | Description |
+|------|-------------|
+| `MKGUI_GRID_TEXT` | Plain text cell (data from callback) |
+| `MKGUI_GRID_CHECK` | Checkbox-only cell (state owned by gridview) |
+| `MKGUI_GRID_CHECK_TEXT` | Checkbox + text (checkbox state owned by gridview, text from callback) |
+
+The cell callback is called for `MKGUI_GRID_TEXT` and `MKGUI_GRID_CHECK_TEXT` columns only. Checkbox state is managed internally by the widget and accessed via `mkgui_gridview_get_check()` / `mkgui_gridview_set_check()`.
+
+Events:
+
+- `MKGUI_EVENT_GRID_CLICK` -- cell selected. `ev->value` = row, `ev->col` = column.
+- `MKGUI_EVENT_GRID_CHECK` -- checkbox toggled. `ev->value` = row, `ev->col` = column. Read new state with `mkgui_gridview_get_check()`.
+
+Grid lines are drawn between cells. Keyboard navigation: arrow keys to move selection, Space to toggle checkbox in the selected cell.
 
 ### Itemview
 
