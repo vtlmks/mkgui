@@ -528,7 +528,8 @@ int main(void) {
 	uint32_t running = 1;
 	while(running) {
 		while(mkgui_poll(ctx, &ev)) {
-			switch(ev.type) {
+			char buf[128];
+		switch(ev.type) {
 				case MKGUI_EVENT_CLOSE: {
 					running = 0;
 				} break;
@@ -599,13 +600,11 @@ int main(void) {
 				} break;
 
 				case MKGUI_EVENT_SLIDER_CHANGED: {
-					char buf[64];
 					snprintf(buf, sizeof(buf), "Volume: %d", ev.value);
 					mkgui_statusbar_set(ctx, ID_STATUSBAR, 0, buf);
 				} break;
 
 				case MKGUI_EVENT_TOGGLE_CHANGED: {
-					char buf[64];
 					snprintf(buf, sizeof(buf), "Power: %s", ev.value ? "ON" : "OFF");
 					mkgui_statusbar_set(ctx, ID_STATUSBAR, 0, buf);
 					uint32_t ids[] = { ID_DATEPICKER1, ID_IPINPUT1 };
@@ -623,7 +622,6 @@ int main(void) {
 				} break;
 
 				case MKGUI_EVENT_DATEPICKER_CHANGED: {
-					char buf[64];
 					snprintf(buf, sizeof(buf), "Date changed: %d", ev.value);
 					mkgui_statusbar_set(ctx, ID_STATUSBAR, 0, buf);
 				} break;
@@ -633,7 +631,6 @@ int main(void) {
 				} break;
 
 				case MKGUI_EVENT_COMBOBOX_CHANGED: {
-					char buf[64];
 					snprintf(buf, sizeof(buf), "Combobox selection: %d", ev.value);
 					mkgui_statusbar_set(ctx, ID_STATUSBAR, 0, buf);
 				} break;
@@ -648,25 +645,21 @@ int main(void) {
 				} break;
 
 				case MKGUI_EVENT_ITEMVIEW_SELECT: {
-					char buf[64];
 					snprintf(buf, sizeof(buf), "Item selected: %d", ev.value);
 					mkgui_statusbar_set(ctx, ID_STATUSBAR, 0, buf);
 				} break;
 
 				case MKGUI_EVENT_LISTVIEW_SELECT: {
-					char buf[64];
 					snprintf(buf, sizeof(buf), "Selected row: %d", ev.value);
 					mkgui_statusbar_set(ctx, ID_STATUSBAR, 0, buf);
 				} break;
 
 				case MKGUI_EVENT_SCROLL: {
-					char buf[64];
 					snprintf(buf, sizeof(buf), "Scroll: %d", ev.value);
 					mkgui_statusbar_set(ctx, ID_STATUSBAR, 0, buf);
 				} break;
 
 				case MKGUI_EVENT_PATHBAR_NAV: {
-					char buf[128];
 					snprintf(buf, sizeof(buf), "Pathbar navigate: segment %d", ev.value);
 					mkgui_statusbar_set(ctx, ID_STATUSBAR, 0, buf);
 				} break;

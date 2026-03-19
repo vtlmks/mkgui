@@ -2839,9 +2839,9 @@ static void ed_render_canvas(struct mkgui_ctx *ctx, uint32_t id, uint32_t *pixel
 // [=]===^=[ ed_sync_tree ]=======================================[=]
 static void ed_sync_tree(struct mkgui_ctx *ctx) {
 	mkgui_treeview_setup(ctx, ED_TREE);
+	char buf[128];
 	for(uint32_t i = 0; i < ed.widget_count; ++i) {
 		struct ed_widget *w = &ed.widgets[i];
-		char buf[128];
 		snprintf(buf, sizeof(buf), "%s: %s", ed_type_name(w->type), w->id_name);
 		uint32_t parent_node = 0;
 		if(w->parent_id != 0) {
@@ -2911,10 +2911,10 @@ static void ed_sync_menu_tree(struct mkgui_ctx *ctx) {
 
 	mkgui_treeview_setup(ctx, ED_MENU_TREE);
 
+	char buf[128];
 	int32_t menu_idx = ed_find_widget(menu_id);
 	if(menu_idx >= 0) {
 		struct ed_widget *mw = &ed.widgets[menu_idx];
-		char buf[128];
 		snprintf(buf, sizeof(buf), "%s: %s", ed_type_name(mw->type), mw->id_name);
 		mkgui_treeview_add(ctx, ED_MENU_TREE, mw->id, 0, buf);
 	}
@@ -2922,7 +2922,6 @@ static void ed_sync_menu_tree(struct mkgui_ctx *ctx) {
 	for(uint32_t i = 0; i < ed.widget_count; ++i) {
 		struct ed_widget *w = &ed.widgets[i];
 		if(w->type == MKGUI_MENUITEM && ed_is_descendant(i, menu_id)) {
-			char buf[128];
 			snprintf(buf, sizeof(buf), "%s: %s", ed_type_name(w->type), w->label[0] ? w->label : w->id_name);
 			mkgui_treeview_add(ctx, ED_MENU_TREE, w->id, w->parent_id, buf);
 		}
@@ -4414,6 +4413,7 @@ int main(void) {
 	uint32_t prev_press = 0;
 
 	while(running) {
+		char buf[128];
 		while(mkgui_poll(ctx, &ev)) {
 			switch(ev.type) {
 				case MKGUI_EVENT_CLOSE: {
@@ -4607,7 +4607,6 @@ int main(void) {
 							if(ev.id == ED_PAL_FIRST + pi) {
 								ed.placement_type = ed_widgets[pi].type;
 								dirty_all(ctx);
-								char buf[128];
 								snprintf(buf, sizeof(buf), "Place: %s", ed_widgets[pi].name);
 								mkgui_statusbar_set(ctx, ED_STATUSBAR, 0, buf);
 								break;
@@ -4617,7 +4616,6 @@ int main(void) {
 							if(ev.id == ED_CTN_FIRST + pi) {
 								ed.placement_type = ed_containers[pi].type;
 								dirty_all(ctx);
-								char buf[128];
 								snprintf(buf, sizeof(buf), "Place: %s", ed_containers[pi].name);
 								mkgui_statusbar_set(ctx, ED_STATUSBAR, 0, buf);
 								break;
