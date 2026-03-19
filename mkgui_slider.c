@@ -98,6 +98,7 @@ static void render_slider(struct mkgui_ctx *ctx, uint32_t idx) {
 
 	uint32_t thumb_color = disabled ? ctx->theme.widget_border : ((ctx->focus_id == w->id) ? ctx->theme.sel_text : ctx->theme.splitter);
 	uint32_t thumb_border = disabled ? ctx->theme.widget_border : ctx->theme.splitter;
+	uint32_t wedge_color = blend_pixel(ctx->theme.bg, ctx->theme.widget_border, 128);
 
 	if(vertical) {
 		int32_t track_w = mixer ? MKGUI_SLIDER_METER_TRACK_SIZE : MKGUI_SLIDER_TRACK_SIZE;
@@ -125,7 +126,7 @@ static void render_slider(struct mkgui_ctx *ctx, uint32_t idx) {
 			}
 
 			int32_t wedge_x = track_x + track_w + 1;
-			slider_draw_wedge_v(ctx->pixels, ctx->win_w, ctx->win_h, wedge_x, ry, rh, 0, rh, MKGUI_SLIDER_WEDGE_MAX_W, ctx->theme.widget_border);
+			slider_draw_wedge_v(ctx->pixels, ctx->win_w, ctx->win_h, wedge_x, ry, rh, 0, rh, MKGUI_SLIDER_WEDGE_MAX_W, wedge_color);
 		}
 
 		int32_t thumb_y = ry + rh - MKGUI_SLIDER_THUMB_SIZE - (int32_t)((int64_t)(sd->value - sd->min_val) * (rh - MKGUI_SLIDER_THUMB_SIZE) / range);
@@ -157,7 +158,7 @@ static void render_slider(struct mkgui_ctx *ctx, uint32_t idx) {
 			}
 
 			int32_t wedge_y = track_y + track_h + 1;
-			slider_draw_wedge_h(ctx->pixels, ctx->win_w, ctx->win_h, rx, wedge_y, rw, 0, rw, MKGUI_SLIDER_WEDGE_MAX_W, ctx->theme.widget_border);
+			slider_draw_wedge_h(ctx->pixels, ctx->win_w, ctx->win_h, rx, wedge_y, rw, 0, rw, MKGUI_SLIDER_WEDGE_MAX_W, wedge_color);
 		}
 
 		int32_t thumb_x = rx + (int32_t)((int64_t)(sd->value - sd->min_val) * (rw - MKGUI_SLIDER_THUMB_SIZE) / range);
