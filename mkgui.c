@@ -435,6 +435,10 @@ struct mkgui_slider_data {
 	int32_t min_val;
 	int32_t max_val;
 	int32_t value;
+	float meter_pre;
+	float meter_post;
+	uint32_t meter_pre_color;
+	uint32_t meter_post_color;
 };
 
 struct mkgui_tabs_data {
