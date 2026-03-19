@@ -83,7 +83,7 @@ struct mkgui_widget {
 | Type | Description |
 |------|-------------|
 | `MKGUI_WINDOW` | Root window. Must be first widget. |
-| `MKGUI_BUTTON` | Push button. Emits `MKGUI_EVENT_CLICK`, `MKGUI_EVENT_BUTTON_DBLCLICK` on double-click. |
+| `MKGUI_BUTTON` | Push button. Emits `MKGUI_EVENT_CLICK` on every click. |
 | `MKGUI_LABEL` | Static text. |
 | `MKGUI_INPUT` | Single-line text input. Emits `MKGUI_EVENT_INPUT_CHANGED`, `MKGUI_EVENT_INPUT_SUBMIT` on Enter. |
 | `MKGUI_TEXTAREA` | Multi-line text editor. Emits `MKGUI_EVENT_TEXTAREA_CHANGED`, `MKGUI_EVENT_TEXTAREA_CURSOR` on cursor movement. |
@@ -270,7 +270,6 @@ struct mkgui_event {
 | `MKGUI_EVENT_TEXTAREA_CURSOR` | Textarea cursor moved | cursor position | -- |
 | `MKGUI_EVENT_DRAG_START` | DnD drag started | source id/row | -- |
 | `MKGUI_EVENT_DRAG_END` | DnD drag cancelled | -- | -- |
-| `MKGUI_EVENT_BUTTON_DBLCLICK` | Button double-clicked | -- | -- |
 | `MKGUI_EVENT_TAB_CLOSE` | Tab close button clicked | tab id | -- |
 
 ## API reference

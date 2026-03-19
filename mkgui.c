@@ -280,7 +280,6 @@ enum {
 	MKGUI_EVENT_TEXTAREA_CURSOR,
 	MKGUI_EVENT_DRAG_START,
 	MKGUI_EVENT_DRAG_END,
-	MKGUI_EVENT_BUTTON_DBLCLICK,
 	MKGUI_EVENT_TAB_CLOSE,
 	MKGUI_EVENT_PATHBAR_NAV,
 	MKGUI_EVENT_PATHBAR_SUBMIT,
@@ -5300,17 +5299,7 @@ static uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 						struct mkgui_widget *hw = &ctx->widgets[hi];
 
 						if(hw->type == MKGUI_BUTTON) {
-							uint32_t now_ms = mkgui_time_ms();
-							uint32_t is_dblclick = (ctx->dblclick_id == hw->id && (now_ms - ctx->dblclick_time) < 400);
-							ctx->dblclick_id = hw->id;
-							ctx->dblclick_row = 0;
-							ctx->dblclick_time = now_ms;
-							if(is_dblclick) {
-								ev->type = MKGUI_EVENT_BUTTON_DBLCLICK;
-								ctx->dblclick_id = 0;
-							} else {
-								ev->type = MKGUI_EVENT_CLICK;
-							}
+							ev->type = MKGUI_EVENT_CLICK;
 							ev->id = hw->id;
 							return 1;
 						}
