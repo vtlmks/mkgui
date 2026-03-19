@@ -520,6 +520,14 @@ static int32_t mkgui_gridview_get_selected(struct mkgui_ctx *ctx, uint32_t id) {
 	return gv ? gv->selected_row : -1;
 }
 
+// [=]===^=[ mkgui_gridview_set_selected ]=========================[=]
+static void mkgui_gridview_set_selected(struct mkgui_ctx *ctx, uint32_t id, int32_t row) {
+	struct mkgui_gridview_data *gv = find_gridv_data(ctx, id);
+	if(gv) {
+		gv->selected_row = row;
+	}
+}
+
 // [=]===^=[ mkgui_gridview_get_check ]============================[=]
 static uint32_t mkgui_gridview_get_check(struct mkgui_ctx *ctx, uint32_t id, uint32_t row, uint32_t col) {
 	struct mkgui_gridview_data *gv = find_gridv_data(ctx, id);
