@@ -166,12 +166,12 @@ static void render_ctxmenu_popup(struct mkgui_ctx *ctx, struct mkgui_popup *p, i
 }
 
 // [=]===^=[ mkgui_context_menu_clear ]=============================[=]
-static void mkgui_context_menu_clear(struct mkgui_ctx *ctx) {
+MKGUI_API void mkgui_context_menu_clear(struct mkgui_ctx *ctx) {
 	ctx->ctxmenu_count = 0;
 }
 
 // [=]===^=[ mkgui_context_menu_add ]===============================[=]
-static void mkgui_context_menu_add(struct mkgui_ctx *ctx, uint32_t id, const char *label, const char *icon, uint32_t flags) {
+MKGUI_API void mkgui_context_menu_add(struct mkgui_ctx *ctx, uint32_t id, const char *label, const char *icon, uint32_t flags) {
 	if(ctx->ctxmenu_count >= MKGUI_MAX_CTXMENU) {
 		return;
 	}
@@ -189,12 +189,12 @@ static void mkgui_context_menu_add(struct mkgui_ctx *ctx, uint32_t id, const cha
 }
 
 // [=]===^=[ mkgui_context_menu_add_separator ]=====================[=]
-static void mkgui_context_menu_add_separator(struct mkgui_ctx *ctx) {
+MKGUI_API void mkgui_context_menu_add_separator(struct mkgui_ctx *ctx) {
 	mkgui_context_menu_add(ctx, 0, NULL, NULL, MKGUI_SEPARATOR);
 }
 
 // [=]===^=[ mkgui_context_menu_show ]==============================[=]
-static void mkgui_context_menu_show(struct mkgui_ctx *ctx) {
+MKGUI_API void mkgui_context_menu_show(struct mkgui_ctx *ctx) {
 	if(ctx->ctxmenu_count == 0) {
 		return;
 	}
@@ -234,7 +234,7 @@ static void mkgui_context_menu_show(struct mkgui_ctx *ctx) {
 }
 
 // [=]===^=[ mkgui_context_menu_show_at ]============================[=]
-static void mkgui_context_menu_show_at(struct mkgui_ctx *ctx, int32_t x, int32_t y) {
+MKGUI_API void mkgui_context_menu_show_at(struct mkgui_ctx *ctx, int32_t x, int32_t y) {
 	if(ctx->ctxmenu_count == 0) {
 		return;
 	}

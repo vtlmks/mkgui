@@ -222,7 +222,7 @@ static uint32_t handle_slider_key(struct mkgui_ctx *ctx, struct mkgui_event *ev,
 }
 
 // [=]===^=[ mkgui_slider_setup ]================================[=]
-static void mkgui_slider_setup(struct mkgui_ctx *ctx, uint32_t id, int32_t min_val, int32_t max_val, int32_t value) {
+MKGUI_API void mkgui_slider_setup(struct mkgui_ctx *ctx, uint32_t id, int32_t min_val, int32_t max_val, int32_t value) {
 	struct mkgui_slider_data *sd = find_slider_data(ctx, id);
 	if(!sd) {
 		return;
@@ -240,13 +240,58 @@ static void mkgui_slider_setup(struct mkgui_ctx *ctx, uint32_t id, int32_t min_v
 }
 
 // [=]===^=[ mkgui_slider_get ]=================================[=]
-static int32_t mkgui_slider_get(struct mkgui_ctx *ctx, uint32_t id) {
+MKGUI_API int32_t mkgui_slider_get(struct mkgui_ctx *ctx, uint32_t id) {
 	struct mkgui_slider_data *sd = find_slider_data(ctx, id);
 	return sd ? sd->value : 0;
 }
 
+// [=]===^=[ mkgui_slider_set ]====================================[=]
+MKGUI_API void mkgui_slider_set(struct mkgui_ctx *ctx, uint32_t id, int32_t value) {
+	struct mkgui_slider_data *sd = find_slider_data(ctx, id);
+	if(!sd) {
+		return;
+	}
+	if(value < sd->min_val) {
+		value = sd->min_val;
+	}
+	if(value > sd->max_val) {
+		value = sd->max_val;
+	}
+	sd->value = value;
+	dirty_all(ctx);
+}
+
+// [=]===^=[ mkgui_slider_get_range ]===============================[=]
+MKGUI_API void mkgui_slider_get_range(struct mkgui_ctx *ctx, uint32_t id, int32_t *min_val, int32_t *max_val) {
+	struct mkgui_slider_data *sd = find_slider_data(ctx, id);
+	if(!sd) {
+		if(min_val) { *min_val = 0; }
+		if(max_val) { *max_val = 0; }
+		return;
+	}
+	if(min_val) { *min_val = sd->min_val; }
+	if(max_val) { *max_val = sd->max_val; }
+}
+
+// [=]===^=[ mkgui_slider_set_range ]===============================[=]
+MKGUI_API void mkgui_slider_set_range(struct mkgui_ctx *ctx, uint32_t id, int32_t min_val, int32_t max_val) {
+	struct mkgui_slider_data *sd = find_slider_data(ctx, id);
+	if(!sd) {
+		return;
+	}
+	sd->min_val = min_val;
+	sd->max_val = max_val;
+	if(sd->value < sd->min_val) {
+		sd->value = sd->min_val;
+	}
+	if(sd->value > sd->max_val) {
+		sd->value = sd->max_val;
+	}
+	dirty_all(ctx);
+}
+
 // [=]===^=[ mkgui_slider_set_meter ]=============================[=]
-static void mkgui_slider_set_meter(struct mkgui_ctx *ctx, uint32_t id, float pre, float post, uint32_t pre_color, uint32_t post_color) {
+MKGUI_API void mkgui_slider_set_meter(struct mkgui_ctx *ctx, uint32_t id, float pre, float post, uint32_t pre_color, uint32_t post_color) {
 	struct mkgui_slider_data *sd = find_slider_data(ctx, id);
 	if(!sd) {
 		return;

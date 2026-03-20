@@ -27,6 +27,28 @@ static void render_split(struct mkgui_ctx *ctx, uint32_t idx) {
 	}
 }
 
+// [=]===^=[ mkgui_split_get_ratio ]================================[=]
+MKGUI_API float mkgui_split_get_ratio(struct mkgui_ctx *ctx, uint32_t id) {
+	struct mkgui_split_data *sd = find_split_data(ctx, id);
+	return sd ? sd->ratio : 0.5f;
+}
+
+// [=]===^=[ mkgui_split_set_ratio ]================================[=]
+MKGUI_API void mkgui_split_set_ratio(struct mkgui_ctx *ctx, uint32_t id, float ratio) {
+	struct mkgui_split_data *sd = find_split_data(ctx, id);
+	if(!sd) {
+		return;
+	}
+	if(ratio < 0.0f) {
+		ratio = 0.0f;
+	}
+	if(ratio > 1.0f) {
+		ratio = 1.0f;
+	}
+	sd->ratio = ratio;
+	dirty_all(ctx);
+}
+
 // [=]===^=[ split_bar_hit ]=====================================[=]
 static uint32_t split_bar_hit(struct mkgui_ctx *ctx, uint32_t idx, int32_t mx, int32_t my) {
 	struct mkgui_widget *w = &ctx->widgets[idx];

@@ -183,3 +183,53 @@ static uint32_t handle_tabs_key(struct mkgui_ctx *ctx, struct mkgui_event *ev, u
 	}
 	return 0;
 }
+
+// [=]===^=[ mkgui_tabs_get_current ]================================[=]
+MKGUI_API uint32_t mkgui_tabs_get_current(struct mkgui_ctx *ctx, uint32_t id) {
+	struct mkgui_tabs_data *td = find_tabs_data(ctx, id);
+	return td ? td->active_tab : 0;
+}
+
+// [=]===^=[ mkgui_tabs_set_current ]================================[=]
+MKGUI_API void mkgui_tabs_set_current(struct mkgui_ctx *ctx, uint32_t id, uint32_t tab_id) {
+	struct mkgui_tabs_data *td = find_tabs_data(ctx, id);
+	if(!td) {
+		return;
+	}
+	td->active_tab = tab_id;
+	dirty_all(ctx);
+}
+
+// [=]===^=[ mkgui_tabs_get_count ]==================================[=]
+MKGUI_API uint32_t mkgui_tabs_get_count(struct mkgui_ctx *ctx, uint32_t id) {
+	int32_t widx = find_widget_idx(ctx, id);
+	if(widx < 0) {
+		return 0;
+	}
+	uint32_t count = 0;
+	for(uint32_t c = layout_first_child[widx]; c < ctx->widget_count; c = layout_next_sibling[c]) {
+		if(ctx->widgets[c].type == MKGUI_TAB) {
+			++count;
+		}
+	}
+	return count;
+}
+
+// [=]===^=[ mkgui_tabs_set_text ]==================================[=]
+MKGUI_API void mkgui_tabs_set_text(struct mkgui_ctx *ctx, uint32_t tabs_id, uint32_t tab_id, const char *text) {
+	(void)tabs_id;
+	struct mkgui_widget *w = find_widget(ctx, tab_id);
+	if(!w || w->type != MKGUI_TAB) {
+		return;
+	}
+	strncpy(w->label, text, MKGUI_MAX_TEXT - 1);
+	w->label[MKGUI_MAX_TEXT - 1] = '\0';
+	dirty_all(ctx);
+}
+
+// [=]===^=[ mkgui_tabs_get_text ]==================================[=]
+MKGUI_API const char *mkgui_tabs_get_text(struct mkgui_ctx *ctx, uint32_t tabs_id, uint32_t tab_id) {
+	(void)tabs_id;
+	struct mkgui_widget *w = find_widget(ctx, tab_id);
+	return (w && w->type == MKGUI_TAB) ? w->label : "";
+}

@@ -301,7 +301,7 @@ static uint32_t dlg_run(struct mkgui_ctx *parent, struct mkgui_widget *widgets, 
 }
 
 // [=]===^=[ mkgui_message_box ]======================================[=]
-static uint32_t mkgui_message_box(struct mkgui_ctx *ctx, const char *title, const char *message, uint32_t icon_type, uint32_t buttons) {
+MKGUI_API uint32_t mkgui_message_box(struct mkgui_ctx *ctx, const char *title, const char *message, uint32_t icon_type, uint32_t buttons) {
 	int32_t icon_idx = dlg_icon_resolve(icon_type);
 	int32_t icon_w = 0;
 	int32_t icon_h = 0;
@@ -381,13 +381,13 @@ static uint32_t mkgui_message_box(struct mkgui_ctx *ctx, const char *title, cons
 }
 
 // [=]===^=[ mkgui_confirm_dialog ]==================================[=]
-static uint32_t mkgui_confirm_dialog(struct mkgui_ctx *ctx, const char *title, const char *message) {
+MKGUI_API uint32_t mkgui_confirm_dialog(struct mkgui_ctx *ctx, const char *title, const char *message) {
 	uint32_t result = mkgui_message_box(ctx, title, message, MKGUI_DLG_ICON_QUESTION, MKGUI_DLG_BUTTONS_YES_NO);
 	return (result == MKGUI_DLG_RESULT_YES) ? 1 : 0;
 }
 
 // [=]===^=[ mkgui_input_dialog ]====================================[=]
-static uint32_t mkgui_input_dialog(struct mkgui_ctx *ctx, const char *title, const char *prompt, const char *default_text, char *out, uint32_t out_size) {
+MKGUI_API uint32_t mkgui_input_dialog(struct mkgui_ctx *ctx, const char *title, const char *prompt, const char *default_text, char *out, uint32_t out_size) {
 	int32_t icon_idx = dlg_icon_resolve(MKGUI_DLG_ICON_QUESTION);
 	int32_t icon_w = 0;
 	int32_t icon_h = 0;

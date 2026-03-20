@@ -939,7 +939,7 @@ static uint32_t handle_itemview_key(struct mkgui_ctx *ctx, struct mkgui_itemview
 }
 
 // [=]===^=[ mkgui_itemview_setup ]================================[=]
-static void mkgui_itemview_setup(struct mkgui_ctx *ctx, uint32_t id, uint32_t item_count, uint32_t view_mode, mkgui_itemview_label_cb label_cb, mkgui_itemview_icon_cb icon_cb, void *userdata) {
+MKGUI_API void mkgui_itemview_setup(struct mkgui_ctx *ctx, uint32_t id, uint32_t item_count, uint32_t view_mode, mkgui_itemview_label_cb label_cb, mkgui_itemview_icon_cb icon_cb, void *userdata) {
 	struct mkgui_itemview_data *iv = find_itemview_data(ctx, id);
 	if(!iv) {
 		MKGUI_AUX_GROW(ctx->itemviews, ctx->itemview_count, ctx->itemview_cap, struct mkgui_itemview_data);
@@ -969,7 +969,7 @@ static void mkgui_itemview_setup(struct mkgui_ctx *ctx, uint32_t id, uint32_t it
 }
 
 // [=]===^=[ mkgui_itemview_set_thumbnail ]========================[=]
-static void mkgui_itemview_set_thumbnail(struct mkgui_ctx *ctx, uint32_t id, mkgui_thumbnail_cb cb, int32_t thumb_size) {
+MKGUI_API void mkgui_itemview_set_thumbnail(struct mkgui_ctx *ctx, uint32_t id, mkgui_thumbnail_cb cb, int32_t thumb_size) {
 	struct mkgui_itemview_data *iv = find_itemview_data(ctx, id);
 	if(!iv) {
 		return;
@@ -984,7 +984,7 @@ static void mkgui_itemview_set_thumbnail(struct mkgui_ctx *ctx, uint32_t id, mkg
 }
 
 // [=]===^=[ mkgui_itemview_set_view ]=============================[=]
-static void mkgui_itemview_set_view(struct mkgui_ctx *ctx, uint32_t id, uint32_t view_mode) {
+MKGUI_API void mkgui_itemview_set_view(struct mkgui_ctx *ctx, uint32_t id, uint32_t view_mode) {
 	struct mkgui_itemview_data *iv = find_itemview_data(ctx, id);
 	if(!iv) {
 		return;
@@ -995,7 +995,7 @@ static void mkgui_itemview_set_view(struct mkgui_ctx *ctx, uint32_t id, uint32_t
 }
 
 // [=]===^=[ mkgui_itemview_set_items ]============================[=]
-static void mkgui_itemview_set_items(struct mkgui_ctx *ctx, uint32_t id, uint32_t count) {
+MKGUI_API void mkgui_itemview_set_items(struct mkgui_ctx *ctx, uint32_t id, uint32_t count) {
 	struct mkgui_itemview_data *iv = find_itemview_data(ctx, id);
 	if(!iv) {
 		return;
@@ -1008,7 +1008,7 @@ static void mkgui_itemview_set_items(struct mkgui_ctx *ctx, uint32_t id, uint32_
 }
 
 // [=]===^=[ mkgui_itemview_set_cell_size ]========================[=]
-static void mkgui_itemview_set_cell_size(struct mkgui_ctx *ctx, uint32_t id, int32_t w, int32_t h) {
+MKGUI_API void mkgui_itemview_set_cell_size(struct mkgui_ctx *ctx, uint32_t id, int32_t w, int32_t h) {
 	struct mkgui_itemview_data *iv = find_itemview_data(ctx, id);
 	if(!iv) {
 		return;
@@ -1019,13 +1019,80 @@ static void mkgui_itemview_set_cell_size(struct mkgui_ctx *ctx, uint32_t id, int
 }
 
 // [=]===^=[ mkgui_itemview_get_selected ]=========================[=]
-static int32_t mkgui_itemview_get_selected(struct mkgui_ctx *ctx, uint32_t id) {
+MKGUI_API int32_t mkgui_itemview_get_selected(struct mkgui_ctx *ctx, uint32_t id) {
 	struct mkgui_itemview_data *iv = find_itemview_data(ctx, id);
 	return iv ? iv->selected : -1;
 }
 
 // [=]===^=[ mkgui_itemview_get_view ]=============================[=]
-static uint32_t mkgui_itemview_get_view(struct mkgui_ctx *ctx, uint32_t id) {
+MKGUI_API uint32_t mkgui_itemview_get_view(struct mkgui_ctx *ctx, uint32_t id) {
 	struct mkgui_itemview_data *iv = find_itemview_data(ctx, id);
 	return iv ? iv->view_mode : MKGUI_VIEW_ICON;
+}
+
+// [=]===^=[ mkgui_itemview_set_selected ]============================[=]
+MKGUI_API void mkgui_itemview_set_selected(struct mkgui_ctx *ctx, uint32_t id, int32_t item) {
+	struct mkgui_itemview_data *iv = find_itemview_data(ctx, id);
+	if(!iv) {
+		return;
+	}
+	iv->selected = item;
+	dirty_all(ctx);
+}
+
+// [=]===^=[ mkgui_itemview_clear_selection ]=========================[=]
+MKGUI_API void mkgui_itemview_clear_selection(struct mkgui_ctx *ctx, uint32_t id) {
+	struct mkgui_itemview_data *iv = find_itemview_data(ctx, id);
+	if(!iv) {
+		return;
+	}
+	iv->selected = -1;
+	dirty_all(ctx);
+}
+
+// [=]===^=[ mkgui_itemview_scroll_to ]===============================[=]
+MKGUI_API void mkgui_itemview_scroll_to(struct mkgui_ctx *ctx, uint32_t id, int32_t item) {
+	struct mkgui_itemview_data *iv = find_itemview_data(ctx, id);
+	if(!iv || item < 0 || (uint32_t)item >= iv->item_count) {
+		return;
+	}
+	int32_t idx = find_widget_idx(ctx, id);
+	if(idx < 0) {
+		return;
+	}
+	int32_t rx = ctx->rects[idx].x;
+	int32_t ry = ctx->rects[idx].y;
+	int32_t rw = ctx->rects[idx].w;
+	int32_t rh = ctx->rects[idx].h;
+	int32_t cx, cy, cw, ch;
+	itemview_content_area(iv, rx, ry, rw, rh, &cx, &cy, &cw, &ch);
+	int32_t cell_w, cell_h;
+	itemview_cell_size(iv, &cell_w, &cell_h);
+	if(iv->view_mode == MKGUI_VIEW_COMPACT || iv->view_mode == MKGUI_VIEW_DETAIL) {
+		int32_t row_y = item * cell_h;
+		if(row_y < iv->scroll_y) {
+			iv->scroll_y = row_y;
+		}
+		if(row_y + cell_h > iv->scroll_y + ch) {
+			iv->scroll_y = row_y + cell_h - ch;
+		}
+
+	} else {
+		int32_t cols = cw / cell_w;
+		if(cols < 1) {
+			cols = 1;
+		}
+		int32_t row = item / cols;
+		int32_t row_y = row * cell_h;
+		if(row_y < iv->scroll_y) {
+			iv->scroll_y = row_y;
+		}
+		if(row_y + cell_h > iv->scroll_y + ch) {
+			iv->scroll_y = row_y + cell_h - ch;
+		}
+	}
+	if(iv->scroll_y < 0) {
+		iv->scroll_y = 0;
+	}
+	dirty_all(ctx);
 }

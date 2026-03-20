@@ -577,7 +577,7 @@ static uint32_t handle_textarea_key(struct mkgui_ctx *ctx, struct mkgui_event *e
 }
 
 // [=]===^=[ mkgui_textarea_set ]=================================[=]
-static void mkgui_textarea_set(struct mkgui_ctx *ctx, uint32_t id, const char *text) {
+MKGUI_API void mkgui_textarea_set(struct mkgui_ctx *ctx, uint32_t id, const char *text) {
 	struct mkgui_textarea_data *ta = find_textarea_data(ctx, id);
 	if(!ta) {
 		return;
@@ -596,7 +596,143 @@ static void mkgui_textarea_set(struct mkgui_ctx *ctx, uint32_t id, const char *t
 }
 
 // [=]===^=[ mkgui_textarea_get ]=================================[=]
-static const char *mkgui_textarea_get(struct mkgui_ctx *ctx, uint32_t id) {
+MKGUI_API const char *mkgui_textarea_get(struct mkgui_ctx *ctx, uint32_t id) {
 	struct mkgui_textarea_data *ta = find_textarea_data(ctx, id);
 	return ta ? ta->text : "";
+}
+
+// [=]===^=[ mkgui_textarea_set_readonly ]============================[=]
+MKGUI_API void mkgui_textarea_set_readonly(struct mkgui_ctx *ctx, uint32_t id, uint32_t readonly) {
+	struct mkgui_widget *w = find_widget(ctx, id);
+	if(!w) {
+		return;
+	}
+	if(readonly) {
+		w->flags |= MKGUI_READONLY;
+
+	} else {
+		w->flags &= ~MKGUI_READONLY;
+	}
+	dirty_all(ctx);
+}
+
+// [=]===^=[ mkgui_textarea_get_readonly ]============================[=]
+MKGUI_API uint32_t mkgui_textarea_get_readonly(struct mkgui_ctx *ctx, uint32_t id) {
+	struct mkgui_widget *w = find_widget(ctx, id);
+	return (w && (w->flags & MKGUI_READONLY)) ? 1 : 0;
+}
+
+// [=]===^=[ mkgui_textarea_get_cursor ]==============================[=]
+MKGUI_API void mkgui_textarea_get_cursor(struct mkgui_ctx *ctx, uint32_t id, uint32_t *line, uint32_t *col) {
+	struct mkgui_textarea_data *ta = find_textarea_data(ctx, id);
+	if(!ta) {
+		if(line) { *line = 0; }
+		if(col) { *col = 0; }
+		return;
+	}
+	if(line) { *line = textarea_cursor_line(ta); }
+	if(col) { *col = ta->cursor - textarea_line_start(ta, ta->cursor); }
+}
+
+// [=]===^=[ mkgui_textarea_set_cursor ]==============================[=]
+MKGUI_API void mkgui_textarea_set_cursor(struct mkgui_ctx *ctx, uint32_t id, uint32_t line, uint32_t col) {
+	struct mkgui_textarea_data *ta = find_textarea_data(ctx, id);
+	if(!ta) {
+		return;
+	}
+	uint32_t cur_line = 0;
+	uint32_t pos = 0;
+	while(pos < ta->text_len && cur_line < line) {
+		if(ta->text[pos] == '\n') {
+			++cur_line;
+		}
+		++pos;
+	}
+	uint32_t line_end = textarea_line_end(ta, pos);
+	uint32_t max_col = line_end - pos;
+	if(col > max_col) {
+		col = max_col;
+	}
+	ta->cursor = pos + col;
+	ta->sel_start = ta->cursor;
+	ta->sel_end = ta->cursor;
+	textarea_scroll_to_cursor(ctx, id);
+	dirty_all(ctx);
+}
+
+// [=]===^=[ mkgui_textarea_get_line_count ]==========================[=]
+MKGUI_API uint32_t mkgui_textarea_get_line_count(struct mkgui_ctx *ctx, uint32_t id) {
+	struct mkgui_textarea_data *ta = find_textarea_data(ctx, id);
+	return ta ? textarea_line_count(ta) : 0;
+}
+
+// [=]===^=[ mkgui_textarea_get_selection ]============================[=]
+MKGUI_API void mkgui_textarea_get_selection(struct mkgui_ctx *ctx, uint32_t id, uint32_t *start, uint32_t *end) {
+	struct mkgui_textarea_data *ta = find_textarea_data(ctx, id);
+	if(!ta) {
+		if(start) { *start = 0; }
+		if(end) { *end = 0; }
+		return;
+	}
+	uint32_t lo, hi;
+	textarea_sel_range(ta, &lo, &hi);
+	if(start) { *start = lo; }
+	if(end) { *end = hi; }
+}
+
+// [=]===^=[ mkgui_textarea_insert ]=================================[=]
+MKGUI_API void mkgui_textarea_insert(struct mkgui_ctx *ctx, uint32_t id, const char *text) {
+	struct mkgui_textarea_data *ta = find_textarea_data(ctx, id);
+	if(!ta || !text) {
+		return;
+	}
+	if(textarea_has_selection(ta)) {
+		textarea_delete_selection(ta);
+	}
+	uint32_t slen = (uint32_t)strlen(text);
+	textarea_ensure_cap(ta, ta->text_len + slen + 1);
+	memmove(&ta->text[ta->cursor + slen], &ta->text[ta->cursor], ta->text_len - ta->cursor);
+	memcpy(&ta->text[ta->cursor], text, slen);
+	ta->text_len += slen;
+	ta->cursor += slen;
+	ta->text[ta->text_len] = '\0';
+	ta->sel_start = ta->cursor;
+	ta->sel_end = ta->cursor;
+	textarea_scroll_to_cursor(ctx, id);
+	dirty_all(ctx);
+}
+
+// [=]===^=[ mkgui_textarea_append ]=================================[=]
+MKGUI_API void mkgui_textarea_append(struct mkgui_ctx *ctx, uint32_t id, const char *text) {
+	struct mkgui_textarea_data *ta = find_textarea_data(ctx, id);
+	if(!ta || !text) {
+		return;
+	}
+	uint32_t slen = (uint32_t)strlen(text);
+	textarea_ensure_cap(ta, ta->text_len + slen + 1);
+	memcpy(&ta->text[ta->text_len], text, slen);
+	ta->text_len += slen;
+	ta->text[ta->text_len] = '\0';
+	dirty_all(ctx);
+}
+
+// [=]===^=[ mkgui_textarea_scroll_to_end ]==========================[=]
+MKGUI_API void mkgui_textarea_scroll_to_end(struct mkgui_ctx *ctx, uint32_t id) {
+	struct mkgui_textarea_data *ta = find_textarea_data(ctx, id);
+	if(!ta) {
+		return;
+	}
+	int32_t idx = find_widget_idx(ctx, id);
+	if(idx < 0) {
+		return;
+	}
+	int32_t rh = ctx->rects[idx].h;
+	int32_t view_h = rh - 2;
+	int32_t content_h = (int32_t)textarea_line_count(ta) * MKGUI_ROW_HEIGHT;
+	int32_t max_scroll = content_h - view_h;
+	if(max_scroll < 0) {
+		max_scroll = 0;
+	}
+	ta->scroll_y = max_scroll;
+	dirty_all(ctx);
 }

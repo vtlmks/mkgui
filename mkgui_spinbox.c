@@ -261,7 +261,7 @@ static uint32_t handle_spinbox_key(struct mkgui_ctx *ctx, struct mkgui_event *ev
 }
 
 // [=]===^=[ mkgui_spinbox_setup ]================================[=]
-static void mkgui_spinbox_setup(struct mkgui_ctx *ctx, uint32_t id, int32_t min_val, int32_t max_val, int32_t value, int32_t step) {
+MKGUI_API void mkgui_spinbox_setup(struct mkgui_ctx *ctx, uint32_t id, int32_t min_val, int32_t max_val, int32_t value, int32_t step) {
 	struct mkgui_spinbox_data *sd = find_spinbox_data(ctx, id);
 	if(sd) {
 		sd->min_val = min_val;
@@ -279,13 +279,13 @@ static void mkgui_spinbox_setup(struct mkgui_ctx *ctx, uint32_t id, int32_t min_
 }
 
 // [=]===^=[ mkgui_spinbox_get ]=================================[=]
-static int32_t mkgui_spinbox_get(struct mkgui_ctx *ctx, uint32_t id) {
+MKGUI_API int32_t mkgui_spinbox_get(struct mkgui_ctx *ctx, uint32_t id) {
 	struct mkgui_spinbox_data *sd = find_spinbox_data(ctx, id);
 	return sd ? sd->value : 0;
 }
 
 // [=]===^=[ mkgui_spinbox_set ]=================================[=]
-static void mkgui_spinbox_set(struct mkgui_ctx *ctx, uint32_t id, int32_t value) {
+MKGUI_API void mkgui_spinbox_set(struct mkgui_ctx *ctx, uint32_t id, int32_t value) {
 	struct mkgui_spinbox_data *sd = find_spinbox_data(ctx, id);
 	if(sd) {
 		sd->value = value;
@@ -297,4 +297,41 @@ static void mkgui_spinbox_set(struct mkgui_ctx *ctx, uint32_t id, int32_t value)
 		}
 		dirty_all(ctx);
 	}
+}
+
+// [=]===^=[ mkgui_spinbox_set_range ]==============================[=]
+MKGUI_API void mkgui_spinbox_set_range(struct mkgui_ctx *ctx, uint32_t id, int32_t min_val, int32_t max_val) {
+	struct mkgui_spinbox_data *sd = find_spinbox_data(ctx, id);
+	if(!sd) {
+		return;
+	}
+	sd->min_val = min_val;
+	sd->max_val = max_val;
+	if(sd->value < sd->min_val) {
+		sd->value = sd->min_val;
+	}
+	if(sd->value > sd->max_val) {
+		sd->value = sd->max_val;
+	}
+	dirty_all(ctx);
+}
+
+// [=]===^=[ mkgui_spinbox_set_step ]===============================[=]
+MKGUI_API void mkgui_spinbox_set_step(struct mkgui_ctx *ctx, uint32_t id, int32_t step) {
+	struct mkgui_spinbox_data *sd = find_spinbox_data(ctx, id);
+	if(sd) {
+		sd->step = step;
+	}
+}
+
+// [=]===^=[ mkgui_spinbox_get_range ]==============================[=]
+MKGUI_API void mkgui_spinbox_get_range(struct mkgui_ctx *ctx, uint32_t id, int32_t *min_val, int32_t *max_val) {
+	struct mkgui_spinbox_data *sd = find_spinbox_data(ctx, id);
+	if(!sd) {
+		if(min_val) { *min_val = 0; }
+		if(max_val) { *max_val = 0; }
+		return;
+	}
+	if(min_val) { *min_val = sd->min_val; }
+	if(max_val) { *max_val = sd->max_val; }
 }

@@ -256,7 +256,7 @@ static void icon_reload_all(void) {
 }
 
 // [=]===^=[ mkgui_icon_add ]=========================================[=]
-static int32_t mkgui_icon_add(const char *name, const uint32_t *pixels, int32_t w, int32_t h) {
+MKGUI_API int32_t mkgui_icon_add(const char *name, const uint32_t *pixels, int32_t w, int32_t h) {
 	if(icon_count >= MKGUI_MAX_ICONS) {
 		return -1;
 	}
@@ -303,7 +303,7 @@ static int32_t mkgui_icon_add(const char *name, const uint32_t *pixels, int32_t 
 }
 
 // [=]===^=[ mkgui_set_icon ]=========================================[=]
-static void mkgui_set_icon(struct mkgui_ctx *ctx, uint32_t widget_id, const char *icon_name) {
+MKGUI_API void mkgui_set_icon(struct mkgui_ctx *ctx, uint32_t widget_id, const char *icon_name) {
 	struct mkgui_widget *w = find_widget(ctx, widget_id);
 	if(!w) {
 		return;
@@ -315,7 +315,7 @@ static void mkgui_set_icon(struct mkgui_ctx *ctx, uint32_t widget_id, const char
 }
 
 // [=]===^=[ mkgui_set_treenode_icon ]================================[=]
-static void mkgui_set_treenode_icon(struct mkgui_ctx *ctx, uint32_t widget_id, uint32_t node_id, const char *icon_name) {
+MKGUI_API void mkgui_set_treenode_icon(struct mkgui_ctx *ctx, uint32_t widget_id, uint32_t node_id, const char *icon_name) {
 	struct mkgui_treeview_data *tv = find_treeview_data(ctx, widget_id);
 	if(!tv) {
 		return;

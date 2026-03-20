@@ -78,7 +78,7 @@ static void render_glview(struct mkgui_ctx *ctx, uint32_t idx) {
 }
 
 // [=]===^=[ mkgui_glview_init ]==================================[=]
-static uint32_t mkgui_glview_init(struct mkgui_ctx *ctx, uint32_t id) {
+MKGUI_API uint32_t mkgui_glview_init(struct mkgui_ctx *ctx, uint32_t id) {
 	struct mkgui_glview_data *gv = find_glview_data(ctx, id);
 	if(gv) {
 		return gv->created;
@@ -142,7 +142,7 @@ static uint32_t mkgui_glview_init(struct mkgui_ctx *ctx, uint32_t id) {
 }
 
 // [=]===^=[ mkgui_glview_destroy ]================================[=]
-static void mkgui_glview_destroy(struct mkgui_ctx *ctx, uint32_t id) {
+MKGUI_API void mkgui_glview_destroy(struct mkgui_ctx *ctx, uint32_t id) {
 	struct mkgui_glview_data *gv = find_glview_data(ctx, id);
 	if(!gv || !gv->created) {
 		return;
@@ -152,7 +152,7 @@ static void mkgui_glview_destroy(struct mkgui_ctx *ctx, uint32_t id) {
 }
 
 // [=]===^=[ mkgui_glview_get_size ]===============================[=]
-static void mkgui_glview_get_size(struct mkgui_ctx *ctx, uint32_t id, int32_t *w, int32_t *h) {
+MKGUI_API void mkgui_glview_get_size(struct mkgui_ctx *ctx, uint32_t id, int32_t *w, int32_t *h) {
 	struct mkgui_glview_data *gv = find_glview_data(ctx, id);
 	if(!gv || !gv->created) {
 		if(w) {
@@ -173,7 +173,7 @@ static void mkgui_glview_get_size(struct mkgui_ctx *ctx, uint32_t id, int32_t *w
 
 // [=]===^=[ mkgui_glview_get_native_window ]======================[=]
 #ifdef _WIN32
-static HWND mkgui_glview_get_hwnd(struct mkgui_ctx *ctx, uint32_t id) {
+MKGUI_API HWND mkgui_glview_get_hwnd(struct mkgui_ctx *ctx, uint32_t id) {
 	struct mkgui_glview_data *gv = find_glview_data(ctx, id);
 	if(!gv || !gv->created) {
 		return NULL;
@@ -181,7 +181,7 @@ static HWND mkgui_glview_get_hwnd(struct mkgui_ctx *ctx, uint32_t id) {
 	return gv->plat.hwnd;
 }
 #else
-static Window mkgui_glview_get_x11_window(struct mkgui_ctx *ctx, uint32_t id) {
+MKGUI_API Window mkgui_glview_get_x11_window(struct mkgui_ctx *ctx, uint32_t id) {
 	struct mkgui_glview_data *gv = find_glview_data(ctx, id);
 	if(!gv || !gv->created) {
 		return 0;
@@ -190,7 +190,7 @@ static Window mkgui_glview_get_x11_window(struct mkgui_ctx *ctx, uint32_t id) {
 }
 
 // [=]===^=[ mkgui_glview_get_x11_display ]========================[=]
-static Display *mkgui_glview_get_x11_display(struct mkgui_ctx *ctx) {
+MKGUI_API Display *mkgui_glview_get_x11_display(struct mkgui_ctx *ctx) {
 	return ctx->plat.dpy;
 }
 #endif

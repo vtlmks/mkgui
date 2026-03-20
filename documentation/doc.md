@@ -378,18 +378,54 @@ ctx->perf_render_us   // widget rendering time in microseconds
 ctx->perf_blit_us     // framebuffer blit time in microseconds
 ```
 
-### Sleep
+### Utilities
 
 ```c
 void mkgui_sleep_ms(uint32_t ms);
+uint32_t mkgui_time_ms(void);
+double mkgui_time_us(void);
 ```
 
-Cross-platform sleep helper. Not needed for normal mainloops (mkgui_poll handles timing internally), but available for custom timing code.
+`mkgui_sleep_ms` -- cross-platform sleep helper. `mkgui_time_ms` -- monotonic clock in milliseconds (wraps at ~49 days). `mkgui_time_us` -- monotonic clock in microseconds (double precision). Not needed for normal mainloops but available for custom timing.
+
+### Base widget properties
+
+These functions work on any widget type:
+
+```c
+void mkgui_set_enabled(struct mkgui_ctx *ctx, uint32_t id, uint32_t enabled);
+uint32_t mkgui_get_enabled(struct mkgui_ctx *ctx, uint32_t id);
+void mkgui_set_visible(struct mkgui_ctx *ctx, uint32_t id, uint32_t visible);
+uint32_t mkgui_get_visible(struct mkgui_ctx *ctx, uint32_t id);
+void mkgui_set_focus(struct mkgui_ctx *ctx, uint32_t id);
+uint32_t mkgui_has_focus(struct mkgui_ctx *ctx, uint32_t id);
+void mkgui_get_geometry(struct mkgui_ctx *ctx, uint32_t id, int32_t *x, int32_t *y, int32_t *w, int32_t *h);
+void mkgui_set_flags(struct mkgui_ctx *ctx, uint32_t id, uint32_t flags);
+uint32_t mkgui_get_flags(struct mkgui_ctx *ctx, uint32_t id);
+void mkgui_set_tooltip(struct mkgui_ctx *ctx, uint32_t id, const char *text);
+const char *mkgui_get_tooltip(struct mkgui_ctx *ctx, uint32_t id);
+void mkgui_set_weight(struct mkgui_ctx *ctx, uint32_t id, uint32_t weight);
+void mkgui_set_icon(struct mkgui_ctx *ctx, uint32_t widget_id, const char *icon_name);
+```
+
+- `set_enabled` / `get_enabled` -- toggle `MKGUI_DISABLED` flag. Disabling clears focus.
+- `set_visible` / `get_visible` -- toggle `MKGUI_HIDDEN` flag. Hiding clears focus.
+- `set_focus` -- programmatic focus. Only works on focusable, enabled widgets.
+- `get_geometry` -- returns the widget's computed layout rect (after layout). Any pointer may be NULL.
+- `set_flags` / `get_flags` -- raw flag access. Use for toggling multiple flags at once.
+
+### Button
+
+```c
+void mkgui_button_set_text(struct mkgui_ctx *ctx, uint32_t id, const char *text);
+const char *mkgui_button_get_text(struct mkgui_ctx *ctx, uint32_t id);
+```
 
 ### Label
 
 ```c
 void mkgui_label_set(struct mkgui_ctx *ctx, uint32_t id, const char *text);
+const char *mkgui_label_get(struct mkgui_ctx *ctx, uint32_t id);
 ```
 
 ### Input
@@ -397,9 +433,19 @@ void mkgui_label_set(struct mkgui_ctx *ctx, uint32_t id, const char *text);
 ```c
 void mkgui_input_set(struct mkgui_ctx *ctx, uint32_t id, const char *text);
 const char *mkgui_input_get(struct mkgui_ctx *ctx, uint32_t id);
+void mkgui_input_clear(struct mkgui_ctx *ctx, uint32_t id);
+void mkgui_input_set_readonly(struct mkgui_ctx *ctx, uint32_t id, uint32_t readonly);
+uint32_t mkgui_input_get_readonly(struct mkgui_ctx *ctx, uint32_t id);
+uint32_t mkgui_input_get_cursor(struct mkgui_ctx *ctx, uint32_t id);
+void mkgui_input_set_cursor(struct mkgui_ctx *ctx, uint32_t id, uint32_t pos);
+void mkgui_input_select_all(struct mkgui_ctx *ctx, uint32_t id);
+void mkgui_input_get_selection(struct mkgui_ctx *ctx, uint32_t id, uint32_t *start, uint32_t *end);
+void mkgui_input_set_selection(struct mkgui_ctx *ctx, uint32_t id, uint32_t start, uint32_t end);
 ```
 
 Supports Ctrl+C (copy) and Ctrl+V (paste). Newlines in pasted text are replaced with spaces. Copy is disabled when `MKGUI_PASSWORD` is set. Paste is disabled when `MKGUI_READONLY` is set.
+
+`input_clear` resets text, cursor, and selection. `input_set_readonly` / `input_get_readonly` toggle the `MKGUI_READONLY` flag at runtime. Cursor and selection positions are byte offsets into the text.
 
 ### Checkbox
 
@@ -412,32 +458,69 @@ void mkgui_checkbox_set(struct mkgui_ctx *ctx, uint32_t id, uint32_t checked);
 
 ```c
 uint32_t mkgui_radio_get(struct mkgui_ctx *ctx, uint32_t id);
-uint32_t mkgui_radio_get_selected(struct mkgui_ctx *ctx, uint32_t group_parent_id);
+void mkgui_radio_set(struct mkgui_ctx *ctx, uint32_t id, uint32_t checked);
 ```
 
-Radio buttons are mutually exclusive within the same parent. Clicking one unchecks siblings.
+Radio buttons are mutually exclusive within the same parent. Clicking one unchecks siblings. `radio_set` with `checked=1` automatically unchecks all other radios in the same parent group.
+
+### Toggle
+
+```c
+void mkgui_toggle_set(struct mkgui_ctx *ctx, uint32_t id, uint32_t state);
+uint32_t mkgui_toggle_get(struct mkgui_ctx *ctx, uint32_t id);
+```
+
+On/off toggle switch. Emits `MKGUI_EVENT_TOGGLE_CHANGED`.
 
 ### Dropdown
 
 ```c
 void mkgui_dropdown_setup(struct mkgui_ctx *ctx, uint32_t id, const char **items, uint32_t count);
 int32_t mkgui_dropdown_get(struct mkgui_ctx *ctx, uint32_t id);
+void mkgui_dropdown_set(struct mkgui_ctx *ctx, uint32_t id, int32_t index);
+const char *mkgui_dropdown_get_text(struct mkgui_ctx *ctx, uint32_t id);
+uint32_t mkgui_dropdown_get_count(struct mkgui_ctx *ctx, uint32_t id);
+const char *mkgui_dropdown_get_item_text(struct mkgui_ctx *ctx, uint32_t id, uint32_t index);
+void mkgui_dropdown_add(struct mkgui_ctx *ctx, uint32_t id, const char *text);
+void mkgui_dropdown_remove(struct mkgui_ctx *ctx, uint32_t id, uint32_t index);
+void mkgui_dropdown_clear(struct mkgui_ctx *ctx, uint32_t id);
 ```
+
+`dropdown_set` selects an item by index (-1 to deselect). `dropdown_add` / `dropdown_remove` / `dropdown_clear` modify items at runtime without a full re-setup. Maximum 64 items.
+
+### ComboBox
+
+```c
+void mkgui_combobox_setup(struct mkgui_ctx *ctx, uint32_t id, const char **items, uint32_t count);
+int32_t mkgui_combobox_get(struct mkgui_ctx *ctx, uint32_t id);
+const char *mkgui_combobox_get_text(struct mkgui_ctx *ctx, uint32_t id);
+void mkgui_combobox_set(struct mkgui_ctx *ctx, uint32_t id, int32_t index);
+void mkgui_combobox_set_text(struct mkgui_ctx *ctx, uint32_t id, const char *text);
+uint32_t mkgui_combobox_get_count(struct mkgui_ctx *ctx, uint32_t id);
+const char *mkgui_combobox_get_item_text(struct mkgui_ctx *ctx, uint32_t id, uint32_t index);
+void mkgui_combobox_add(struct mkgui_ctx *ctx, uint32_t id, const char *text);
+void mkgui_combobox_remove(struct mkgui_ctx *ctx, uint32_t id, uint32_t index);
+void mkgui_combobox_clear(struct mkgui_ctx *ctx, uint32_t id);
+```
+
+Editable dropdown with text input and filtering. The user can type to filter the item list or enter custom text. `combobox_get` returns the selected item index (-1 if custom text). `combobox_get_text` returns the current text (whether from the list or typed). Emits `MKGUI_EVENT_COMBOBOX_CHANGED` on selection and `MKGUI_EVENT_COMBOBOX_SUBMIT` on Enter.
 
 ### Slider
 
 ```c
 void mkgui_slider_setup(struct mkgui_ctx *ctx, uint32_t id, int32_t min_val, int32_t max_val, int32_t value);
 int32_t mkgui_slider_get(struct mkgui_ctx *ctx, uint32_t id);
+void mkgui_slider_set(struct mkgui_ctx *ctx, uint32_t id, int32_t value);
+void mkgui_slider_get_range(struct mkgui_ctx *ctx, uint32_t id, int32_t *min_val, int32_t *max_val);
+void mkgui_slider_set_range(struct mkgui_ctx *ctx, uint32_t id, int32_t min_val, int32_t max_val);
+void mkgui_slider_set_meter(struct mkgui_ctx *ctx, uint32_t id, float pre, float post, uint32_t pre_color, uint32_t post_color);
 ```
 
 The slider renders a horizontal track with a draggable thumb. Set `MKGUI_VERTICAL` for vertical orientation. It does not display any text -- add your own label and/or value display if needed (e.g. using a FORM row or an HBOX with a label widget).
 
-Set `MKGUI_SLIDER_MIXER` for a tapered volume-style slider (like the Windows volume mixer). The track becomes a triangle shape, narrow at the quiet end and wide at the loud end. Use `mkgui_slider_set_meter()` to overlay RMS/peak meter fill colors on the mixer track.
+`slider_set` changes the value without a full re-setup. `slider_set_range` changes min/max at runtime (clamps value). `slider_get_range` reads the current min/max. Any pointer may be NULL.
 
-```c
-void mkgui_slider_set_meter(struct mkgui_ctx *ctx, uint32_t id, float pre, float post, uint32_t pre_color, uint32_t post_color);
-```
+Set `MKGUI_SLIDER_MIXER` for a tapered volume-style slider (like the Windows volume mixer). The track becomes a triangle shape, narrow at the quiet end and wide at the loud end. Use `mkgui_slider_set_meter()` to overlay RMS/peak meter fill colors on the mixer track.
 
 Meter values are 0.0--1.0 (clamped). The `pre` layer is drawn first, then `post` on top. Only active when `MKGUI_SLIDER_MIXER` is set.
 
@@ -447,9 +530,14 @@ Meter values are 0.0--1.0 (clamped). The `pre` layer is drawn first, then `post`
 void mkgui_spinbox_setup(struct mkgui_ctx *ctx, uint32_t id, int32_t min_val, int32_t max_val, int32_t value, int32_t step);
 int32_t mkgui_spinbox_get(struct mkgui_ctx *ctx, uint32_t id);
 void mkgui_spinbox_set(struct mkgui_ctx *ctx, uint32_t id, int32_t value);
+void mkgui_spinbox_set_range(struct mkgui_ctx *ctx, uint32_t id, int32_t min_val, int32_t max_val);
+void mkgui_spinbox_get_range(struct mkgui_ctx *ctx, uint32_t id, int32_t *min_val, int32_t *max_val);
+void mkgui_spinbox_set_step(struct mkgui_ctx *ctx, uint32_t id, int32_t step);
 ```
 
 Click the text area to enter edit mode (cursor appears, existing value is pre-filled). Type a new value and press Enter to confirm (clears focus) or Escape to cancel. Use up/down arrow keys or the +/- buttons to step.
+
+`spinbox_set_range` changes min/max at runtime (clamps value). `spinbox_get_range` reads current min/max (any pointer may be NULL). `spinbox_set_step` changes the step size.
 
 ### Progress
 
@@ -457,9 +545,11 @@ Click the text area to enter edit mode (cursor appears, existing value is pre-fi
 void mkgui_progress_setup(struct mkgui_ctx *ctx, uint32_t id, int32_t max_val);
 void mkgui_progress_set(struct mkgui_ctx *ctx, uint32_t id, int32_t value);
 int32_t mkgui_progress_get(struct mkgui_ctx *ctx, uint32_t id);
+void mkgui_progress_set_range(struct mkgui_ctx *ctx, uint32_t id, int32_t max_val);
+void mkgui_progress_get_range(struct mkgui_ctx *ctx, uint32_t id, int32_t *max_val);
 ```
 
-Renders a filled bar with an animated diagonal shimmer sweep while in progress. The fill color uses `theme.accent`. The percentage text is centered on the bar.
+Renders a filled bar with an animated diagonal shimmer sweep while in progress. The fill color uses `theme.accent`. The percentage text is centered on the bar. `progress_set_range` changes max at runtime (clamps value).
 
 ### Spinner
 
@@ -481,12 +571,19 @@ void mkgui_listview_setup(struct mkgui_ctx *ctx, uint32_t id, uint32_t row_count
                           mkgui_row_cb cb, void *userdata);
 void mkgui_listview_set_rows(struct mkgui_ctx *ctx, uint32_t id, uint32_t row_count);
 int32_t mkgui_listview_get_selected(struct mkgui_ctx *ctx, uint32_t id);
+void mkgui_listview_set_selected(struct mkgui_ctx *ctx, uint32_t id, int32_t row);
+uint32_t mkgui_listview_get_multi_sel(struct mkgui_ctx *ctx, uint32_t id, const int32_t **out);
+uint32_t mkgui_listview_is_selected(struct mkgui_ctx *ctx, uint32_t id, int32_t row);
+void mkgui_listview_clear_selection(struct mkgui_ctx *ctx, uint32_t id);
 const uint32_t *mkgui_listview_get_col_order(struct mkgui_ctx *ctx, uint32_t id);
 void mkgui_listview_set_col_order(struct mkgui_ctx *ctx, uint32_t id, const uint32_t *order, uint32_t count);
 int32_t mkgui_listview_get_col_width(struct mkgui_ctx *ctx, uint32_t id, uint32_t col);
 void mkgui_listview_set_col_width(struct mkgui_ctx *ctx, uint32_t id, uint32_t col, int32_t width);
 void mkgui_listview_set_cell_type(struct mkgui_ctx *ctx, uint32_t id, uint32_t col, uint32_t cell_type);
 void mkgui_listview_visible_range(struct mkgui_ctx *ctx, uint32_t id, int32_t *first, int32_t *last);
+void mkgui_listview_scroll_to(struct mkgui_ctx *ctx, uint32_t id, int32_t row);
+void mkgui_listview_get_sort(struct mkgui_ctx *ctx, uint32_t id, int32_t *col, int32_t *dir);
+void mkgui_listview_set_sort(struct mkgui_ctx *ctx, uint32_t id, int32_t col, int32_t dir);
 ```
 
 The listview is fully virtual -- it never owns data. The row callback is invoked only for visible rows during rendering. For datasets with frequently changing data (e.g. download progress), use `mkgui_listview_visible_range` to check if the changed row is currently visible before dirtying the widget.
@@ -537,8 +634,12 @@ void mkgui_gridview_setup(struct mkgui_ctx *ctx, uint32_t id, uint32_t row_count
     struct mkgui_grid_column *columns, mkgui_grid_cell_cb cell_cb, void *userdata);
 void mkgui_gridview_set_rows(struct mkgui_ctx *ctx, uint32_t id, uint32_t row_count);
 int32_t mkgui_gridview_get_selected(struct mkgui_ctx *ctx, uint32_t id);
+void mkgui_gridview_set_selected(struct mkgui_ctx *ctx, uint32_t id, int32_t row);
 uint32_t mkgui_gridview_get_check(struct mkgui_ctx *ctx, uint32_t id, uint32_t row, uint32_t col);
 void mkgui_gridview_set_check(struct mkgui_ctx *ctx, uint32_t id, uint32_t row, uint32_t col, uint32_t checked);
+int32_t mkgui_gridview_get_col_width(struct mkgui_ctx *ctx, uint32_t id, uint32_t col);
+void mkgui_gridview_set_col_width(struct mkgui_ctx *ctx, uint32_t id, uint32_t col, int32_t width);
+void mkgui_gridview_scroll_to(struct mkgui_ctx *ctx, uint32_t id, int32_t row);
 ```
 
 Column types (set in `struct mkgui_grid_column`):
@@ -579,6 +680,9 @@ void mkgui_itemview_set_view(struct mkgui_ctx *ctx, uint32_t id, uint32_t view_m
 void mkgui_itemview_set_items(struct mkgui_ctx *ctx, uint32_t id, uint32_t count);
 void mkgui_itemview_set_cell_size(struct mkgui_ctx *ctx, uint32_t id, int32_t w, int32_t h);
 int32_t mkgui_itemview_get_selected(struct mkgui_ctx *ctx, uint32_t id);
+void mkgui_itemview_set_selected(struct mkgui_ctx *ctx, uint32_t id, int32_t item);
+void mkgui_itemview_clear_selection(struct mkgui_ctx *ctx, uint32_t id);
+void mkgui_itemview_scroll_to(struct mkgui_ctx *ctx, uint32_t id, int32_t item);
 uint32_t mkgui_itemview_get_view(struct mkgui_ctx *ctx, uint32_t id);
 ```
 
@@ -625,25 +729,52 @@ mkgui_itemview_set_view(ctx, ID_ITEMVIEW, MKGUI_VIEW_COMPACT);
 void mkgui_treeview_setup(struct mkgui_ctx *ctx, uint32_t id);
 uint32_t mkgui_treeview_add(struct mkgui_ctx *ctx, uint32_t widget_id,
                             uint32_t node_id, uint32_t parent_node, const char *label);
+void mkgui_treeview_select(struct mkgui_ctx *ctx, uint32_t widget_id, int32_t node_id);
 int32_t mkgui_treeview_get_selected(struct mkgui_ctx *ctx, uint32_t id);
+void mkgui_treeview_remove(struct mkgui_ctx *ctx, uint32_t widget_id, uint32_t node_id);
+void mkgui_treeview_clear(struct mkgui_ctx *ctx, uint32_t widget_id);
+void mkgui_treeview_set_label(struct mkgui_ctx *ctx, uint32_t widget_id, uint32_t node_id, const char *label);
+const char *mkgui_treeview_get_label(struct mkgui_ctx *ctx, uint32_t widget_id, uint32_t node_id);
+void mkgui_treeview_expand(struct mkgui_ctx *ctx, uint32_t widget_id, uint32_t node_id);
+void mkgui_treeview_collapse(struct mkgui_ctx *ctx, uint32_t widget_id, uint32_t node_id);
+uint32_t mkgui_treeview_is_expanded(struct mkgui_ctx *ctx, uint32_t widget_id, uint32_t node_id);
+void mkgui_treeview_expand_all(struct mkgui_ctx *ctx, uint32_t widget_id);
+void mkgui_treeview_collapse_all(struct mkgui_ctx *ctx, uint32_t widget_id);
+uint32_t mkgui_treeview_get_parent(struct mkgui_ctx *ctx, uint32_t widget_id, uint32_t node_id);
+uint32_t mkgui_treeview_node_count(struct mkgui_ctx *ctx, uint32_t widget_id);
+void mkgui_treeview_scroll_to(struct mkgui_ctx *ctx, uint32_t widget_id, uint32_t node_id);
+void mkgui_set_treenode_icon(struct mkgui_ctx *ctx, uint32_t widget_id, uint32_t node_id, const char *icon_name);
 ```
 
-`parent_node = 0` for root-level nodes.
+`parent_node = 0` for root-level nodes. `treeview_remove` removes a node and all its descendants. `treeview_clear` removes all nodes. `expand` / `collapse` / `expand_all` / `collapse_all` control node visibility. `get_parent` returns the parent node ID (0 for root nodes). `scroll_to` ensures a node is visible in the scrollable area.
 
 ### Textarea
 
 ```c
 void mkgui_textarea_set(struct mkgui_ctx *ctx, uint32_t id, const char *text);
 const char *mkgui_textarea_get(struct mkgui_ctx *ctx, uint32_t id);
+void mkgui_textarea_set_readonly(struct mkgui_ctx *ctx, uint32_t id, uint32_t readonly);
+uint32_t mkgui_textarea_get_readonly(struct mkgui_ctx *ctx, uint32_t id);
+void mkgui_textarea_get_cursor(struct mkgui_ctx *ctx, uint32_t id, uint32_t *line, uint32_t *col);
+void mkgui_textarea_set_cursor(struct mkgui_ctx *ctx, uint32_t id, uint32_t line, uint32_t col);
+uint32_t mkgui_textarea_get_line_count(struct mkgui_ctx *ctx, uint32_t id);
+void mkgui_textarea_get_selection(struct mkgui_ctx *ctx, uint32_t id, uint32_t *start, uint32_t *end);
+void mkgui_textarea_insert(struct mkgui_ctx *ctx, uint32_t id, const char *text);
+void mkgui_textarea_append(struct mkgui_ctx *ctx, uint32_t id, const char *text);
+void mkgui_textarea_scroll_to_end(struct mkgui_ctx *ctx, uint32_t id);
 ```
 
 Supports Ctrl+C (copy) and Ctrl+V (paste). Uses the system clipboard (X11 CLIPBOARD selection / Win32 clipboard).
+
+`textarea_set_readonly` / `textarea_get_readonly` toggle the `MKGUI_READONLY` flag at runtime. Cursor position is returned as line/col (0-based). Selection start/end are byte offsets. `textarea_insert` inserts text at the cursor (replacing any selection). `textarea_append` appends to the end without moving the cursor. `textarea_scroll_to_end` scrolls to the bottom -- useful for log views.
 
 ### Statusbar
 
 ```c
 void mkgui_statusbar_setup(struct mkgui_ctx *ctx, uint32_t id, uint32_t section_count, const int32_t *widths);
 void mkgui_statusbar_set(struct mkgui_ctx *ctx, uint32_t id, uint32_t section, const char *text);
+const char *mkgui_statusbar_get(struct mkgui_ctx *ctx, uint32_t id, uint32_t section);
+void mkgui_statusbar_clear(struct mkgui_ctx *ctx, uint32_t id, uint32_t section);
 ```
 
 Section widths: positive = fixed pixels, negative = fill remaining space.
@@ -747,6 +878,50 @@ This allows larger icons for icon-only toolbars while keeping the standard 18x18
 ./tools/gen_icons ext/materialdesignicons-webfont.ttf 32 mdi_icons_toolbar.dat toolbar_icons.txt
 ```
 
+### DatePicker
+
+```c
+void mkgui_datepicker_set(struct mkgui_ctx *ctx, uint32_t id, int32_t year, int32_t month, int32_t day);
+void mkgui_datepicker_get(struct mkgui_ctx *ctx, uint32_t id, int32_t *year, int32_t *month, int32_t *day);
+const char *mkgui_datepicker_get_text(struct mkgui_ctx *ctx, uint32_t id);
+void mkgui_datepicker_set_readonly(struct mkgui_ctx *ctx, uint32_t id, uint32_t readonly);
+uint32_t mkgui_datepicker_get_readonly(struct mkgui_ctx *ctx, uint32_t id);
+```
+
+Date picker with calendar popup. Click the dropdown arrow to open the calendar. Type directly in the text field to edit the date (YYYY-MM-DD format). Emits `MKGUI_EVENT_DATEPICKER_CHANGED`.
+
+### IP Input
+
+```c
+void mkgui_ipinput_set(struct mkgui_ctx *ctx, uint32_t id, const char *ip_string);
+const char *mkgui_ipinput_get(struct mkgui_ctx *ctx, uint32_t id);
+uint32_t mkgui_ipinput_get_u32(struct mkgui_ctx *ctx, uint32_t id);
+```
+
+Four-field IPv4 address input (like Windows IP input). Each octet is a separate editable field with 0--255 validation. Tab/dot moves to the next field. `ipinput_get` returns a dotted-decimal string. `ipinput_get_u32` returns the address as a 32-bit integer (network byte order). Emits `MKGUI_EVENT_IPINPUT_CHANGED`.
+
+### Pathbar
+
+```c
+void mkgui_pathbar_set(struct mkgui_ctx *ctx, uint32_t id, const char *path);
+const char *mkgui_pathbar_get(struct mkgui_ctx *ctx, uint32_t id);
+void mkgui_pathbar_get_segment_path(struct mkgui_ctx *ctx, uint32_t id, uint32_t seg_idx, char *out, uint32_t out_size);
+```
+
+Breadcrumb-style path bar. Click a segment to navigate to that directory (emits `MKGUI_EVENT_PATHBAR_NAV` with `ev->value` = segment index). Click the background to enter edit mode (type a path directly, Enter emits `MKGUI_EVENT_PATHBAR_SUBMIT`). `pathbar_get_segment_path` builds the full path up to and including segment `seg_idx`.
+
+### Tabs API
+
+```c
+uint32_t mkgui_tabs_get_current(struct mkgui_ctx *ctx, uint32_t id);
+void mkgui_tabs_set_current(struct mkgui_ctx *ctx, uint32_t id, uint32_t tab_id);
+uint32_t mkgui_tabs_get_count(struct mkgui_ctx *ctx, uint32_t id);
+void mkgui_tabs_set_text(struct mkgui_ctx *ctx, uint32_t tabs_id, uint32_t tab_id, const char *text);
+const char *mkgui_tabs_get_text(struct mkgui_ctx *ctx, uint32_t tabs_id, uint32_t tab_id);
+```
+
+`tabs_get_current` returns the active tab's widget ID. `tabs_set_current` switches to a tab by its widget ID. `tabs_get_count` returns the number of MKGUI_TAB children. `tabs_set_text` / `tabs_get_text` change tab labels at runtime.
+
 ## Splitters
 
 ```c
@@ -756,6 +931,13 @@ This allows larger icons for icon-only toolbars while keeping the standard 18x18
 ```
 
 The divider is draggable. Children sized automatically based on their region flag.
+
+```c
+float mkgui_split_get_ratio(struct mkgui_ctx *ctx, uint32_t id);
+void mkgui_split_set_ratio(struct mkgui_ctx *ctx, uint32_t id, float ratio);
+```
+
+`split_get_ratio` returns the current split position as a 0.0--1.0 ratio. `split_set_ratio` sets it programmatically (clamped to 0.0--1.0).
 
 ## Group box
 
@@ -1029,6 +1211,14 @@ mkgui_icon_add("content-save", my_icon, 24, 24);
 ```
 
 If an icon with the same name already exists, it is replaced.
+
+### Icon browser
+
+```c
+uint32_t mkgui_icon_browser(struct mkgui_ctx *ctx, char *out, uint32_t out_size);
+```
+
+Opens a modal icon browser dialog showing all loaded icons in a searchable grid. Returns 1 if the user selected an icon (name written to `out`), 0 if cancelled.
 
 Override the font with the `MKGUI_FONT` environment variable:
 

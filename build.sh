@@ -36,7 +36,7 @@ case "$BUILD_TYPE" in
 		CFLAGS+="-g -O0 "
 		;;
 	"clean")
-		rm -f demo editor demo.exe editor.exe
+		rm -f demo editor benchmark demo.exe editor.exe mkgui.o libmkgui.a
 		exit 0
 		;;
 	*)
@@ -73,6 +73,13 @@ if command -v $WINCC &>/dev/null; then
 		$WINCC $CFLAGS editor.c -o editor.exe $WINDOWS_LIBS
 	) &
 fi
+
+# Build static library (unity-built, but with exported symbols)
+(
+	$CC $CFLAGS -DMKGUI_LIBRARY -c mkgui.c -o mkgui.o $LINUX_LIBS
+	ar rcs libmkgui.a mkgui.o
+	rm -f mkgui.o
+) &
 
 # Build gen_icons tool and generate icon pack
 (

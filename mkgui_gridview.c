@@ -530,7 +530,7 @@ static uint32_t handle_gridview_key(struct mkgui_ctx *ctx, struct mkgui_event *e
 }
 
 // [=]===^=[ mkgui_gridview_setup ]===============================[=]
-static void mkgui_gridview_setup(struct mkgui_ctx *ctx, uint32_t id, uint32_t row_count, uint32_t col_count,
+MKGUI_API void mkgui_gridview_setup(struct mkgui_ctx *ctx, uint32_t id, uint32_t row_count, uint32_t col_count,
 	struct mkgui_grid_column *columns, mkgui_grid_cell_cb cell_cb, void *userdata) {
 	struct mkgui_gridview_data *gv = find_gridv_data(ctx, id);
 	if(!gv) {
@@ -567,7 +567,7 @@ static void mkgui_gridview_setup(struct mkgui_ctx *ctx, uint32_t id, uint32_t ro
 }
 
 // [=]===^=[ mkgui_gridview_set_rows ]============================[=]
-static void mkgui_gridview_set_rows(struct mkgui_ctx *ctx, uint32_t id, uint32_t row_count) {
+MKGUI_API void mkgui_gridview_set_rows(struct mkgui_ctx *ctx, uint32_t id, uint32_t row_count) {
 	struct mkgui_gridview_data *gv = find_gridv_data(ctx, id);
 	if(!gv) {
 		return;
@@ -589,13 +589,13 @@ static void mkgui_gridview_set_rows(struct mkgui_ctx *ctx, uint32_t id, uint32_t
 }
 
 // [=]===^=[ mkgui_gridview_get_selected ]========================[=]
-static int32_t mkgui_gridview_get_selected(struct mkgui_ctx *ctx, uint32_t id) {
+MKGUI_API int32_t mkgui_gridview_get_selected(struct mkgui_ctx *ctx, uint32_t id) {
 	struct mkgui_gridview_data *gv = find_gridv_data(ctx, id);
 	return gv ? gv->selected_row : -1;
 }
 
 // [=]===^=[ mkgui_gridview_set_selected ]=========================[=]
-static void mkgui_gridview_set_selected(struct mkgui_ctx *ctx, uint32_t id, int32_t row) {
+MKGUI_API void mkgui_gridview_set_selected(struct mkgui_ctx *ctx, uint32_t id, int32_t row) {
 	struct mkgui_gridview_data *gv = find_gridv_data(ctx, id);
 	if(gv) {
 		gv->selected_row = row;
@@ -603,7 +603,7 @@ static void mkgui_gridview_set_selected(struct mkgui_ctx *ctx, uint32_t id, int3
 }
 
 // [=]===^=[ mkgui_gridview_get_check ]============================[=]
-static uint32_t mkgui_gridview_get_check(struct mkgui_ctx *ctx, uint32_t id, uint32_t row, uint32_t col) {
+MKGUI_API uint32_t mkgui_gridview_get_check(struct mkgui_ctx *ctx, uint32_t id, uint32_t row, uint32_t col) {
 	struct mkgui_gridview_data *gv = find_gridv_data(ctx, id);
 	if(!gv) {
 		return 0;
@@ -612,11 +612,56 @@ static uint32_t mkgui_gridview_get_check(struct mkgui_ctx *ctx, uint32_t id, uin
 }
 
 // [=]===^=[ mkgui_gridview_set_check ]============================[=]
-static void mkgui_gridview_set_check(struct mkgui_ctx *ctx, uint32_t id, uint32_t row, uint32_t col, uint32_t checked) {
+MKGUI_API void mkgui_gridview_set_check(struct mkgui_ctx *ctx, uint32_t id, uint32_t row, uint32_t col, uint32_t checked) {
 	struct mkgui_gridview_data *gv = find_gridv_data(ctx, id);
 	if(!gv) {
 		return;
 	}
 	gridview_set_bit(gv, row, col, checked);
+	dirty_all(ctx);
+}
+
+// [=]===^=[ mkgui_gridview_get_col_width ]==========================[=]
+MKGUI_API int32_t mkgui_gridview_get_col_width(struct mkgui_ctx *ctx, uint32_t id, uint32_t col) {
+	struct mkgui_gridview_data *gv = find_gridv_data(ctx, id);
+	if(!gv || col >= gv->col_count) {
+		return 0;
+	}
+	return gv->columns[col].width;
+}
+
+// [=]===^=[ mkgui_gridview_set_col_width ]==========================[=]
+MKGUI_API void mkgui_gridview_set_col_width(struct mkgui_ctx *ctx, uint32_t id, uint32_t col, int32_t width) {
+	struct mkgui_gridview_data *gv = find_gridv_data(ctx, id);
+	if(!gv || col >= gv->col_count) {
+		return;
+	}
+	gv->columns[col].width = width;
+	dirty_all(ctx);
+}
+
+// [=]===^=[ mkgui_gridview_scroll_to ]==============================[=]
+MKGUI_API void mkgui_gridview_scroll_to(struct mkgui_ctx *ctx, uint32_t id, int32_t row) {
+	struct mkgui_gridview_data *gv = find_gridv_data(ctx, id);
+	if(!gv) {
+		return;
+	}
+	int32_t idx = find_widget_idx(ctx, id);
+	if(idx < 0) {
+		return;
+	}
+	int32_t rh = ctx->rects[idx].h;
+	int32_t hh = gv->header_height > 0 ? gv->header_height : MKGUI_ROW_HEIGHT;
+	int32_t content_h = rh - hh - 2;
+	int32_t row_y = row * MKGUI_ROW_HEIGHT;
+	if(row_y < gv->scroll_y) {
+		gv->scroll_y = row_y;
+	}
+	if(row_y + MKGUI_ROW_HEIGHT > gv->scroll_y + content_h) {
+		gv->scroll_y = row_y + MKGUI_ROW_HEIGHT - content_h;
+	}
+	if(gv->scroll_y < 0) {
+		gv->scroll_y = 0;
+	}
 	dirty_all(ctx);
 }

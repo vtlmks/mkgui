@@ -970,7 +970,7 @@ static uint32_t handle_listview_key(struct mkgui_ctx *ctx, struct mkgui_event *e
 }
 
 // [=]===^=[ mkgui_listview_setup ]==============================[=]
-static void mkgui_listview_setup(struct mkgui_ctx *ctx, uint32_t id, uint32_t row_count, uint32_t col_count, struct mkgui_column *columns, mkgui_row_cb cb, void *userdata) {
+MKGUI_API void mkgui_listview_setup(struct mkgui_ctx *ctx, uint32_t id, uint32_t row_count, uint32_t col_count, struct mkgui_column *columns, mkgui_row_cb cb, void *userdata) {
 	struct mkgui_listview_data *lv = find_listv_data(ctx, id);
 	if(!lv) {
 		MKGUI_AUX_GROW(ctx->listvs, ctx->listv_count, ctx->listv_cap, struct mkgui_listview_data);
@@ -1002,7 +1002,7 @@ static void mkgui_listview_setup(struct mkgui_ctx *ctx, uint32_t id, uint32_t ro
 }
 
 // [=]===^=[ mkgui_listview_set_rows ]===========================[=]
-static void mkgui_listview_set_rows(struct mkgui_ctx *ctx, uint32_t id, uint32_t row_count) {
+MKGUI_API void mkgui_listview_set_rows(struct mkgui_ctx *ctx, uint32_t id, uint32_t row_count) {
 	struct mkgui_listview_data *lv = find_listv_data(ctx, id);
 	if(lv) {
 		lv->row_count = row_count;
@@ -1011,13 +1011,13 @@ static void mkgui_listview_set_rows(struct mkgui_ctx *ctx, uint32_t id, uint32_t
 }
 
 // [=]===^=[ mkgui_listview_get_selected ]=======================[=]
-static int32_t mkgui_listview_get_selected(struct mkgui_ctx *ctx, uint32_t id) {
+MKGUI_API int32_t mkgui_listview_get_selected(struct mkgui_ctx *ctx, uint32_t id) {
 	struct mkgui_listview_data *lv = find_listv_data(ctx, id);
 	return lv ? lv->selected_row : -1;
 }
 
 // [=]===^=[ mkgui_listview_get_multi_sel ]======================[=]
-static uint32_t mkgui_listview_get_multi_sel(struct mkgui_ctx *ctx, uint32_t id, const int32_t **out) {
+MKGUI_API uint32_t mkgui_listview_get_multi_sel(struct mkgui_ctx *ctx, uint32_t id, const int32_t **out) {
 	struct mkgui_listview_data *lv = find_listv_data(ctx, id);
 	if(!lv) {
 		if(out) {
@@ -1032,7 +1032,7 @@ static uint32_t mkgui_listview_get_multi_sel(struct mkgui_ctx *ctx, uint32_t id,
 }
 
 // [=]===^=[ mkgui_listview_is_selected ]========================[=]
-static uint32_t mkgui_listview_is_selected(struct mkgui_ctx *ctx, uint32_t id, int32_t row) {
+MKGUI_API uint32_t mkgui_listview_is_selected(struct mkgui_ctx *ctx, uint32_t id, int32_t row) {
 	struct mkgui_listview_data *lv = find_listv_data(ctx, id);
 	if(!lv) {
 		return 0;
@@ -1041,7 +1041,7 @@ static uint32_t mkgui_listview_is_selected(struct mkgui_ctx *ctx, uint32_t id, i
 }
 
 // [=]===^=[ mkgui_listview_clear_selection ]=====================[=]
-static void mkgui_listview_clear_selection(struct mkgui_ctx *ctx, uint32_t id) {
+MKGUI_API void mkgui_listview_clear_selection(struct mkgui_ctx *ctx, uint32_t id) {
 	struct mkgui_listview_data *lv = find_listv_data(ctx, id);
 	if(lv) {
 		lv->multi_sel_count = 0;
@@ -1056,7 +1056,7 @@ static const uint32_t *mkgui_listview_get_col_order(struct mkgui_ctx *ctx, uint3
 }
 
 // [=]===^=[ mkgui_listview_set_col_order ]======================[=]
-static void mkgui_listview_set_col_order(struct mkgui_ctx *ctx, uint32_t id, const uint32_t *order, uint32_t count) {
+MKGUI_API void mkgui_listview_set_col_order(struct mkgui_ctx *ctx, uint32_t id, const uint32_t *order, uint32_t count) {
 	struct mkgui_listview_data *lv = find_listv_data(ctx, id);
 	if(!lv) {
 		return;
@@ -1069,7 +1069,7 @@ static void mkgui_listview_set_col_order(struct mkgui_ctx *ctx, uint32_t id, con
 }
 
 // [=]===^=[ mkgui_listview_get_col_width ]======================[=]
-static int32_t mkgui_listview_get_col_width(struct mkgui_ctx *ctx, uint32_t id, uint32_t col) {
+MKGUI_API int32_t mkgui_listview_get_col_width(struct mkgui_ctx *ctx, uint32_t id, uint32_t col) {
 	struct mkgui_listview_data *lv = find_listv_data(ctx, id);
 	if(!lv || col >= lv->col_count) {
 		return 0;
@@ -1078,7 +1078,7 @@ static int32_t mkgui_listview_get_col_width(struct mkgui_ctx *ctx, uint32_t id, 
 }
 
 // [=]===^=[ mkgui_listview_set_col_width ]======================[=]
-static void mkgui_listview_set_col_width(struct mkgui_ctx *ctx, uint32_t id, uint32_t col, int32_t width) {
+MKGUI_API void mkgui_listview_set_col_width(struct mkgui_ctx *ctx, uint32_t id, uint32_t col, int32_t width) {
 	struct mkgui_listview_data *lv = find_listv_data(ctx, id);
 	if(!lv || col >= lv->col_count) {
 		return;
@@ -1091,7 +1091,7 @@ static void mkgui_listview_set_col_width(struct mkgui_ctx *ctx, uint32_t id, uin
 }
 
 // [=]===^=[ mkgui_listview_set_cell_type ]======================[=]
-static void mkgui_listview_set_cell_type(struct mkgui_ctx *ctx, uint32_t id, uint32_t col, uint32_t cell_type) {
+MKGUI_API void mkgui_listview_set_cell_type(struct mkgui_ctx *ctx, uint32_t id, uint32_t col, uint32_t cell_type) {
 	struct mkgui_listview_data *lv = find_listv_data(ctx, id);
 	if(!lv || col >= lv->col_count) {
 		return;
@@ -1101,7 +1101,7 @@ static void mkgui_listview_set_cell_type(struct mkgui_ctx *ctx, uint32_t id, uin
 }
 
 // [=]===^=[ mkgui_listview_visible_range ]======================[=]
-static void mkgui_listview_visible_range(struct mkgui_ctx *ctx, uint32_t id, int32_t *first, int32_t *last) {
+MKGUI_API void mkgui_listview_visible_range(struct mkgui_ctx *ctx, uint32_t id, int32_t *first, int32_t *last) {
 	struct mkgui_listview_data *lv = find_listv_data(ctx, id);
 	if(!lv) {
 		*first = -1;
@@ -1122,4 +1122,68 @@ static void mkgui_listview_visible_range(struct mkgui_ctx *ctx, uint32_t id, int
 	if(*last >= (int32_t)lv->row_count) {
 		*last = (int32_t)lv->row_count - 1;
 	}
+}
+
+// [=]===^=[ mkgui_listview_set_selected ]============================[=]
+MKGUI_API void mkgui_listview_set_selected(struct mkgui_ctx *ctx, uint32_t id, int32_t row) {
+	struct mkgui_listview_data *lv = find_listv_data(ctx, id);
+	if(!lv) {
+		return;
+	}
+	lv->selected_row = row;
+	lv->multi_sel_count = 0;
+	if(row >= 0 && (uint32_t)row < lv->row_count) {
+		lv->multi_sel[0] = row;
+		lv->multi_sel_count = 1;
+	}
+	dirty_all(ctx);
+}
+
+// [=]===^=[ mkgui_listview_scroll_to ]===============================[=]
+MKGUI_API void mkgui_listview_scroll_to(struct mkgui_ctx *ctx, uint32_t id, int32_t row) {
+	struct mkgui_listview_data *lv = find_listv_data(ctx, id);
+	if(!lv) {
+		return;
+	}
+	int32_t idx = find_widget_idx(ctx, id);
+	if(idx < 0) {
+		return;
+	}
+	int32_t rh = ctx->rects[idx].h;
+	int32_t hh = lv->header_height > 0 ? lv->header_height : MKGUI_ROW_HEIGHT;
+	int32_t content_h = rh - hh - 2;
+	int32_t row_y = row * MKGUI_ROW_HEIGHT;
+	if(row_y < lv->scroll_y) {
+		lv->scroll_y = row_y;
+	}
+	if(row_y + MKGUI_ROW_HEIGHT > lv->scroll_y + content_h) {
+		lv->scroll_y = row_y + MKGUI_ROW_HEIGHT - content_h;
+	}
+	if(lv->scroll_y < 0) {
+		lv->scroll_y = 0;
+	}
+	dirty_all(ctx);
+}
+
+// [=]===^=[ mkgui_listview_get_sort ]================================[=]
+MKGUI_API void mkgui_listview_get_sort(struct mkgui_ctx *ctx, uint32_t id, int32_t *col, int32_t *dir) {
+	struct mkgui_listview_data *lv = find_listv_data(ctx, id);
+	if(!lv) {
+		if(col) { *col = -1; }
+		if(dir) { *dir = 0; }
+		return;
+	}
+	if(col) { *col = lv->sort_col; }
+	if(dir) { *dir = lv->sort_dir; }
+}
+
+// [=]===^=[ mkgui_listview_set_sort ]================================[=]
+MKGUI_API void mkgui_listview_set_sort(struct mkgui_ctx *ctx, uint32_t id, int32_t col, int32_t dir) {
+	struct mkgui_listview_data *lv = find_listv_data(ctx, id);
+	if(!lv) {
+		return;
+	}
+	lv->sort_col = col;
+	lv->sort_dir = dir;
+	dirty_all(ctx);
 }

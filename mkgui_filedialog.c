@@ -1370,17 +1370,17 @@ static uint32_t fd_run_dialog(struct mkgui_ctx *ctx, uint32_t mode, const struct
 // ---------------------------------------------------------------------------
 
 // [=]===^=[ mkgui_open_dialog ]==================================[=]
-static uint32_t mkgui_open_dialog(struct mkgui_ctx *ctx, const struct mkgui_file_dialog_opts *opts) {
+MKGUI_API uint32_t mkgui_open_dialog(struct mkgui_ctx *ctx, const struct mkgui_file_dialog_opts *opts) {
 	return fd_run_dialog(ctx, 0, opts);
 }
 
 // [=]===^=[ mkgui_save_dialog ]==================================[=]
-static uint32_t mkgui_save_dialog(struct mkgui_ctx *ctx, const struct mkgui_file_dialog_opts *opts) {
+MKGUI_API uint32_t mkgui_save_dialog(struct mkgui_ctx *ctx, const struct mkgui_file_dialog_opts *opts) {
 	return fd_run_dialog(ctx, 1, opts);
 }
 
 // [=]===^=[ mkgui_dialog_path ]==================================[=]
-static const char *mkgui_dialog_path(struct mkgui_ctx *ctx, uint32_t index) {
+MKGUI_API const char *mkgui_dialog_path(struct mkgui_ctx *ctx, uint32_t index) {
 	(void)ctx;
 	if(index >= fd_result_count) {
 		return "";

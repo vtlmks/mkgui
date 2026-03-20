@@ -503,7 +503,7 @@ static uint32_t handle_datepicker_key(struct mkgui_ctx *ctx, struct mkgui_event 
 }
 
 // [=]===^=[ mkgui_datepicker_set ]================================[=]
-static void mkgui_datepicker_set(struct mkgui_ctx *ctx, uint32_t id, int32_t year, int32_t month, int32_t day) {
+MKGUI_API void mkgui_datepicker_set(struct mkgui_ctx *ctx, uint32_t id, int32_t year, int32_t month, int32_t day) {
 	struct mkgui_datepicker_data *dp = find_datepicker_data(ctx, id);
 	if(!dp) {
 		return;
@@ -516,7 +516,7 @@ static void mkgui_datepicker_set(struct mkgui_ctx *ctx, uint32_t id, int32_t yea
 }
 
 // [=]===^=[ mkgui_datepicker_get ]================================[=]
-static void mkgui_datepicker_get(struct mkgui_ctx *ctx, uint32_t id, int32_t *year, int32_t *month, int32_t *day) {
+MKGUI_API void mkgui_datepicker_get(struct mkgui_ctx *ctx, uint32_t id, int32_t *year, int32_t *month, int32_t *day) {
 	struct mkgui_datepicker_data *dp = find_datepicker_data(ctx, id);
 	if(!dp) {
 		*year = 2026;
@@ -530,7 +530,7 @@ static void mkgui_datepicker_get(struct mkgui_ctx *ctx, uint32_t id, int32_t *ye
 }
 
 // [=]===^=[ mkgui_datepicker_get_text ]===========================[=]
-static const char *mkgui_datepicker_get_text(struct mkgui_ctx *ctx, uint32_t id) {
+MKGUI_API const char *mkgui_datepicker_get_text(struct mkgui_ctx *ctx, uint32_t id) {
 	static char datepicker_buf[16];
 	struct mkgui_datepicker_data *dp = find_datepicker_data(ctx, id);
 	if(!dp) {
@@ -539,4 +539,25 @@ static const char *mkgui_datepicker_get_text(struct mkgui_ctx *ctx, uint32_t id)
 	}
 	datepicker_format(dp, datepicker_buf, sizeof(datepicker_buf));
 	return datepicker_buf;
+}
+
+// [=]===^=[ mkgui_datepicker_set_readonly ]=========================[=]
+MKGUI_API void mkgui_datepicker_set_readonly(struct mkgui_ctx *ctx, uint32_t id, uint32_t readonly) {
+	struct mkgui_widget *w = find_widget(ctx, id);
+	if(!w) {
+		return;
+	}
+	if(readonly) {
+		w->flags |= MKGUI_READONLY;
+
+	} else {
+		w->flags &= ~MKGUI_READONLY;
+	}
+	dirty_all(ctx);
+}
+
+// [=]===^=[ mkgui_datepicker_get_readonly ]=========================[=]
+MKGUI_API uint32_t mkgui_datepicker_get_readonly(struct mkgui_ctx *ctx, uint32_t id) {
+	struct mkgui_widget *w = find_widget(ctx, id);
+	return (w && (w->flags & MKGUI_READONLY)) ? 1 : 0;
 }

@@ -182,7 +182,7 @@ static uint32_t handle_dropdown_key(struct mkgui_ctx *ctx, struct mkgui_event *e
 }
 
 // [=]===^=[ mkgui_dropdown_setup ]==============================[=]
-static void mkgui_dropdown_setup(struct mkgui_ctx *ctx, uint32_t id, const char **items, uint32_t count) {
+MKGUI_API void mkgui_dropdown_setup(struct mkgui_ctx *ctx, uint32_t id, const char **items, uint32_t count) {
 	struct mkgui_dropdown_data *dd = find_dropdown_data(ctx, id);
 	if(!dd) {
 		return;
@@ -198,7 +198,86 @@ static void mkgui_dropdown_setup(struct mkgui_ctx *ctx, uint32_t id, const char 
 }
 
 // [=]===^=[ mkgui_dropdown_get ]================================[=]
-static int32_t mkgui_dropdown_get(struct mkgui_ctx *ctx, uint32_t id) {
+MKGUI_API int32_t mkgui_dropdown_get(struct mkgui_ctx *ctx, uint32_t id) {
 	struct mkgui_dropdown_data *dd = find_dropdown_data(ctx, id);
 	return dd ? dd->selected : -1;
+}
+
+// [=]===^=[ mkgui_dropdown_set ]================================[=]
+MKGUI_API void mkgui_dropdown_set(struct mkgui_ctx *ctx, uint32_t id, int32_t index) {
+	struct mkgui_dropdown_data *dd = find_dropdown_data(ctx, id);
+	if(!dd) {
+		return;
+	}
+	if(index < 0 || (uint32_t)index >= dd->item_count) {
+		dd->selected = -1;
+
+	} else {
+		dd->selected = index;
+	}
+	dirty_all(ctx);
+}
+
+// [=]===^=[ mkgui_dropdown_get_text ]==============================[=]
+MKGUI_API const char *mkgui_dropdown_get_text(struct mkgui_ctx *ctx, uint32_t id) {
+	struct mkgui_dropdown_data *dd = find_dropdown_data(ctx, id);
+	if(!dd || dd->selected < 0 || (uint32_t)dd->selected >= dd->item_count) {
+		return "";
+	}
+	return dd->items[dd->selected];
+}
+
+// [=]===^=[ mkgui_dropdown_get_count ]=============================[=]
+MKGUI_API uint32_t mkgui_dropdown_get_count(struct mkgui_ctx *ctx, uint32_t id) {
+	struct mkgui_dropdown_data *dd = find_dropdown_data(ctx, id);
+	return dd ? dd->item_count : 0;
+}
+
+// [=]===^=[ mkgui_dropdown_get_item_text ]=========================[=]
+MKGUI_API const char *mkgui_dropdown_get_item_text(struct mkgui_ctx *ctx, uint32_t id, uint32_t index) {
+	struct mkgui_dropdown_data *dd = find_dropdown_data(ctx, id);
+	if(!dd || index >= dd->item_count) {
+		return "";
+	}
+	return dd->items[index];
+}
+
+// [=]===^=[ mkgui_dropdown_add ]=================================[=]
+MKGUI_API void mkgui_dropdown_add(struct mkgui_ctx *ctx, uint32_t id, const char *text) {
+	struct mkgui_dropdown_data *dd = find_dropdown_data(ctx, id);
+	if(!dd || dd->item_count >= MKGUI_MAX_DROPDOWN) {
+		return;
+	}
+	strncpy(dd->items[dd->item_count], text, MKGUI_MAX_TEXT - 1);
+	dd->items[dd->item_count][MKGUI_MAX_TEXT - 1] = '\0';
+	++dd->item_count;
+	dirty_all(ctx);
+}
+
+// [=]===^=[ mkgui_dropdown_remove ]===============================[=]
+MKGUI_API void mkgui_dropdown_remove(struct mkgui_ctx *ctx, uint32_t id, uint32_t index) {
+	struct mkgui_dropdown_data *dd = find_dropdown_data(ctx, id);
+	if(!dd || index >= dd->item_count) {
+		return;
+	}
+	for(uint32_t i = index; i < dd->item_count - 1; ++i) {
+		memcpy(dd->items[i], dd->items[i + 1], MKGUI_MAX_TEXT);
+	}
+	--dd->item_count;
+	if(dd->selected >= (int32_t)dd->item_count) {
+		dd->selected = (int32_t)dd->item_count - 1;
+	}
+	dirty_all(ctx);
+}
+
+// [=]===^=[ mkgui_dropdown_clear ]================================[=]
+MKGUI_API void mkgui_dropdown_clear(struct mkgui_ctx *ctx, uint32_t id) {
+	struct mkgui_dropdown_data *dd = find_dropdown_data(ctx, id);
+	if(!dd) {
+		return;
+	}
+	dd->item_count = 0;
+	dd->selected = -1;
+	dd->scroll_y = 0;
+	dirty_all(ctx);
 }

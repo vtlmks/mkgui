@@ -24,6 +24,12 @@
 #include <windows.h>
 #endif
 
+#ifdef MKGUI_LIBRARY
+#define MKGUI_API
+#else
+#define MKGUI_API static
+#endif
+
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
@@ -123,7 +129,7 @@ struct mkgui_plat_event {
 #endif
 
 // [=]===^=[ mkgui_sleep_ms ]======================================[=]
-static void mkgui_sleep_ms(uint32_t ms) {
+MKGUI_API void mkgui_sleep_ms(uint32_t ms) {
 #ifdef _WIN32
 	Sleep(ms);
 #else
@@ -133,7 +139,7 @@ static void mkgui_sleep_ms(uint32_t ms) {
 }
 
 // [=]===^=[ mkgui_time_ms ]=======================================[=]
-static uint32_t mkgui_time_ms(void) {
+MKGUI_API uint32_t mkgui_time_ms(void) {
 #ifdef _WIN32
 	return (uint32_t)GetTickCount();
 #else
@@ -144,7 +150,7 @@ static uint32_t mkgui_time_ms(void) {
 }
 
 // [=]===^=[ mkgui_time_us ]=======================================[=]
-static double mkgui_time_us(void) {
+MKGUI_API double mkgui_time_us(void) {
 #ifdef _WIN32
 	LARGE_INTEGER freq, now;
 	QueryPerformanceFrequency(&freq);
@@ -2734,7 +2740,7 @@ static uint32_t mkgui_grow_widgets(struct mkgui_ctx *ctx) {
 }
 
 // [=]===^=[ mkgui_add_widget ]===================================[=]
-static uint32_t mkgui_add_widget(struct mkgui_ctx *ctx, struct mkgui_widget w, uint32_t after_id) {
+MKGUI_API uint32_t mkgui_add_widget(struct mkgui_ctx *ctx, struct mkgui_widget w, uint32_t after_id) {
 	if(ctx->widget_count >= ctx->widget_cap) {
 		if(!mkgui_grow_widgets(ctx)) {
 			return 0;
@@ -3075,7 +3081,7 @@ static void mkgui_remove_aux_(struct mkgui_ctx *ctx, uint32_t id, uint32_t type)
 }
 
 // [=]===^=[ mkgui_remove_widget ]================================[=]
-static uint32_t mkgui_remove_widget(struct mkgui_ctx *ctx, uint32_t id) {
+MKGUI_API uint32_t mkgui_remove_widget(struct mkgui_ctx *ctx, uint32_t id) {
 	int32_t idx = find_widget_idx(ctx, id);
 	if(idx < 0) {
 		return 0;
@@ -3276,7 +3282,7 @@ static void mkgui_free_arrays(struct mkgui_ctx *ctx) {
 }
 
 // [=]===^=[ mkgui_create ]======================================[=]
-static struct mkgui_ctx *mkgui_create(struct mkgui_widget *widgets, uint32_t count) {
+MKGUI_API struct mkgui_ctx *mkgui_create(struct mkgui_widget *widgets, uint32_t count) {
 	struct mkgui_ctx *ctx = (struct mkgui_ctx *)calloc(1, sizeof(struct mkgui_ctx));
 
 	uint32_t cap = (count + MKGUI_GROW_WIDGETS - 1) & ~(uint32_t)(MKGUI_GROW_WIDGETS - 1);
@@ -3340,7 +3346,7 @@ static struct mkgui_ctx *mkgui_create(struct mkgui_widget *widgets, uint32_t cou
 }
 
 // [=]===^=[ mkgui_set_theme ]====================================[=]
-static void mkgui_set_theme(struct mkgui_ctx *ctx, struct mkgui_theme theme) {
+MKGUI_API void mkgui_set_theme(struct mkgui_ctx *ctx, struct mkgui_theme theme) {
 	ctx->theme = theme;
 	icon_text_color = theme.text & 0x00ffffff;
 	icon_reload_all();
@@ -3348,7 +3354,7 @@ static void mkgui_set_theme(struct mkgui_ctx *ctx, struct mkgui_theme theme) {
 }
 
 // [=]===^=[ mkgui_set_weight ]===================================[=]
-static void mkgui_set_weight(struct mkgui_ctx *ctx, uint32_t id, uint32_t weight) {
+MKGUI_API void mkgui_set_weight(struct mkgui_ctx *ctx, uint32_t id, uint32_t weight) {
 	struct mkgui_widget *w = find_widget(ctx, id);
 	if(w) {
 		w->weight = weight;
@@ -3357,7 +3363,7 @@ static void mkgui_set_weight(struct mkgui_ctx *ctx, uint32_t id, uint32_t weight
 }
 
 // [=]===^=[ mkgui_toolbar_set_mode ]==============================[=]
-static void mkgui_toolbar_set_mode(struct mkgui_ctx *ctx, uint32_t toolbar_id, uint32_t mode) {
+MKGUI_API void mkgui_toolbar_set_mode(struct mkgui_ctx *ctx, uint32_t toolbar_id, uint32_t mode) {
 	struct mkgui_widget *w = find_widget(ctx, toolbar_id);
 	if(w && w->type == MKGUI_TOOLBAR) {
 		w->flags = (w->flags & ~MKGUI_TOOLBAR_MODE_MASK) | (mode & MKGUI_TOOLBAR_MODE_MASK);
@@ -3365,8 +3371,118 @@ static void mkgui_toolbar_set_mode(struct mkgui_ctx *ctx, uint32_t toolbar_id, u
 	}
 }
 
+// [=]===^=[ mkgui_set_enabled ]====================================[=]
+MKGUI_API void mkgui_set_enabled(struct mkgui_ctx *ctx, uint32_t id, uint32_t enabled) {
+	struct mkgui_widget *w = find_widget(ctx, id);
+	if(!w) {
+		return;
+	}
+	if(enabled) {
+		w->flags &= ~MKGUI_DISABLED;
+
+	} else {
+		w->flags |= MKGUI_DISABLED;
+		if(ctx->focus_id == id) {
+			ctx->focus_id = 0;
+		}
+	}
+	dirty_all(ctx);
+}
+
+// [=]===^=[ mkgui_get_enabled ]====================================[=]
+MKGUI_API uint32_t mkgui_get_enabled(struct mkgui_ctx *ctx, uint32_t id) {
+	struct mkgui_widget *w = find_widget(ctx, id);
+	if(!w) {
+		return 0;
+	}
+	return (w->flags & MKGUI_DISABLED) ? 0 : 1;
+}
+
+// [=]===^=[ mkgui_set_visible ]====================================[=]
+MKGUI_API void mkgui_set_visible(struct mkgui_ctx *ctx, uint32_t id, uint32_t visible) {
+	struct mkgui_widget *w = find_widget(ctx, id);
+	if(!w) {
+		return;
+	}
+	if(visible) {
+		w->flags &= ~MKGUI_HIDDEN;
+
+	} else {
+		w->flags |= MKGUI_HIDDEN;
+		if(ctx->focus_id == id) {
+			ctx->focus_id = 0;
+		}
+	}
+	dirty_all(ctx);
+}
+
+// [=]===^=[ mkgui_get_visible ]====================================[=]
+MKGUI_API uint32_t mkgui_get_visible(struct mkgui_ctx *ctx, uint32_t id) {
+	struct mkgui_widget *w = find_widget(ctx, id);
+	if(!w) {
+		return 0;
+	}
+	return (w->flags & MKGUI_HIDDEN) ? 0 : 1;
+}
+
+// [=]===^=[ mkgui_set_focus ]======================================[=]
+MKGUI_API void mkgui_set_focus(struct mkgui_ctx *ctx, uint32_t id) {
+	struct mkgui_widget *w = find_widget(ctx, id);
+	if(!w || !is_focusable(w)) {
+		return;
+	}
+	ctx->focus_id = id;
+	dirty_all(ctx);
+}
+
+// [=]===^=[ mkgui_has_focus ]======================================[=]
+MKGUI_API uint32_t mkgui_has_focus(struct mkgui_ctx *ctx, uint32_t id) {
+	return ctx->focus_id == id ? 1 : 0;
+}
+
+// [=]===^=[ mkgui_get_tooltip ]====================================[=]
+MKGUI_API const char *mkgui_get_tooltip(struct mkgui_ctx *ctx, uint32_t id) {
+	int32_t idx = find_widget_idx(ctx, id);
+	if(idx < 0) {
+		return "";
+	}
+	return ctx->tooltip_texts[idx];
+}
+
+// [=]===^=[ mkgui_get_geometry ]====================================[=]
+MKGUI_API void mkgui_get_geometry(struct mkgui_ctx *ctx, uint32_t id, int32_t *x, int32_t *y, int32_t *w, int32_t *h) {
+	int32_t idx = find_widget_idx(ctx, id);
+	if(idx < 0) {
+		if(x) { *x = 0; }
+		if(y) { *y = 0; }
+		if(w) { *w = 0; }
+		if(h) { *h = 0; }
+		return;
+	}
+	if(x) { *x = ctx->rects[idx].x; }
+	if(y) { *y = ctx->rects[idx].y; }
+	if(w) { *w = ctx->rects[idx].w; }
+	if(h) { *h = ctx->rects[idx].h; }
+}
+
+// [=]===^=[ mkgui_set_flags ]======================================[=]
+MKGUI_API void mkgui_set_flags(struct mkgui_ctx *ctx, uint32_t id, uint32_t flags) {
+	struct mkgui_widget *w = find_widget(ctx, id);
+	if(!w) {
+		return;
+	}
+	w->flags = flags;
+	dirty_all(ctx);
+}
+
+// [=]===^=[ mkgui_get_flags ]======================================[=]
+MKGUI_API uint32_t mkgui_get_flags(struct mkgui_ctx *ctx, uint32_t id) {
+	struct mkgui_widget *w = find_widget(ctx, id);
+	return w ? w->flags : 0;
+}
+
 // [=]===^=[ mkgui_destroy ]=====================================[=]
-static void mkgui_destroy(struct mkgui_ctx *ctx) {
+MKGUI_API void mkgui_destroy(struct mkgui_ctx *ctx) {
 	if(!ctx) {
 		return;
 	}
@@ -3397,7 +3513,7 @@ static void mkgui_destroy(struct mkgui_ctx *ctx) {
 }
 
 // [=]===^=[ mkgui_create_child ]=================================[=]
-static struct mkgui_ctx *mkgui_create_child(struct mkgui_ctx *parent, struct mkgui_widget *widgets, uint32_t count, const char *title, int32_t w, int32_t h) {
+MKGUI_API struct mkgui_ctx *mkgui_create_child(struct mkgui_ctx *parent, struct mkgui_widget *widgets, uint32_t count, const char *title, int32_t w, int32_t h) {
 	struct mkgui_ctx *ctx = (struct mkgui_ctx *)calloc(1, sizeof(struct mkgui_ctx));
 
 	uint32_t cap = (count + MKGUI_GROW_WIDGETS - 1) & ~(uint32_t)(MKGUI_GROW_WIDGETS - 1);
@@ -3448,7 +3564,7 @@ static struct mkgui_ctx *mkgui_create_child(struct mkgui_ctx *parent, struct mkg
 }
 
 // [=]===^=[ mkgui_destroy_child ]================================[=]
-static void mkgui_destroy_child(struct mkgui_ctx *ctx) {
+MKGUI_API void mkgui_destroy_child(struct mkgui_ctx *ctx) {
 	if(!ctx) {
 		return;
 	}
@@ -3473,7 +3589,7 @@ static void mkgui_destroy_child(struct mkgui_ctx *ctx) {
 // ---------------------------------------------------------------------------
 
 // [=]===^=[ mkgui_poll ]========================================[=]
-static uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
+MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 	ev->type = MKGUI_EVENT_NONE;
 	ev->id = 0;
 	ev->value = 0;
@@ -5813,7 +5929,7 @@ static uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 }
 
 // [=]===^=[ mkgui_wait ]=========================================[=]
-static void mkgui_wait(struct mkgui_ctx *ctx) {
+MKGUI_API void mkgui_wait(struct mkgui_ctx *ctx) {
 	if(platform_pending(ctx) || ctx->close_requested || ctx->dirty) {
 		return;
 	}
@@ -5838,7 +5954,7 @@ static void mkgui_wait(struct mkgui_ctx *ctx) {
 }
 
 // [=]===^=[ mkgui_set_poll_timeout ]==============================[=]
-static void mkgui_set_poll_timeout(struct mkgui_ctx *ctx, int32_t ms) {
+MKGUI_API void mkgui_set_poll_timeout(struct mkgui_ctx *ctx, int32_t ms) {
 	ctx->poll_timeout_ms = ms;
 }
 
