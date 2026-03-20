@@ -258,7 +258,10 @@ struct mkgui_event {
 | `MKGUI_EVENT_ITEMVIEW_SELECT` | Item selected | item index | -- |
 | `MKGUI_EVENT_ITEMVIEW_DBLCLICK` | Item double-clicked | item index | -- |
 | `MKGUI_EVENT_SCROLL` | Scrollbar value changed | scroll position | -- |
-| `MKGUI_EVENT_CONTEXT` | Right-click on widget | mouse x | mouse y |
+| `MKGUI_EVENT_CONTEXT` | Right-click on widget | row/node/item (-1 if empty) for views, mouse x otherwise | column for views, mouse y otherwise |
+| `MKGUI_EVENT_CONTEXT_HEADER` | Right-click on column header | mouse x | column index |
+| `MKGUI_EVENT_CONTEXT_MENU` | Context menu item selected | item id | checked state (0/1) |
+| `MKGUI_EVENT_GRIDVIEW_SELECT` | Grid cell selected | row | column |
 | `MKGUI_EVENT_INPUT_SUBMIT` | Enter pressed in input | -- | -- |
 | `MKGUI_EVENT_FOCUS` | Widget gained focus | -- | -- |
 | `MKGUI_EVENT_UNFOCUS` | Widget lost focus | -- | -- |
@@ -1051,6 +1054,80 @@ mkgui_set_tooltip(ctx, ID_CANVAS, "Click to draw, right-click to erase");
 Toolbar buttons automatically get their `label` set as tooltip text (since toolbars only show icons). For other widgets, tooltips must be set explicitly -- no tooltip is shown by default.
 
 Maximum tooltip text length is 127 characters.
+
+## Context menus
+
+Build and show context menus in response to right-click events. Context menus are Breeze-styled popup menus that support icons, separators, checkable and radio items, and keyboard navigation.
+
+### API reference
+
+```c
+void mkgui_context_menu_clear(struct mkgui_ctx *ctx);
+void mkgui_context_menu_add(struct mkgui_ctx *ctx, uint32_t id, const char *label, const char *icon, uint32_t flags);
+void mkgui_context_menu_add_separator(struct mkgui_ctx *ctx);
+void mkgui_context_menu_show(struct mkgui_ctx *ctx);
+void mkgui_context_menu_show_at(struct mkgui_ctx *ctx, int32_t x, int32_t y);
+```
+
+- `mkgui_context_menu_clear()` -- Clear all items from the context menu
+- `mkgui_context_menu_add()` -- Add an item. `id` is returned in `MKGUI_EVENT_CONTEXT_MENU`. `icon` is an MDI icon name (or NULL). `flags` can include `MKGUI_DISABLED`, `MKGUI_SEPARATOR`, `MKGUI_MENU_CHECK`, `MKGUI_MENU_RADIO`, `MKGUI_CHECKED`
+- `mkgui_context_menu_add_separator()` -- Shorthand for adding a separator line
+- `mkgui_context_menu_show()` -- Show the menu at the last right-click position
+- `mkgui_context_menu_show_at()` -- Show the menu at a specific window position
+
+Maximum 64 items per context menu.
+
+### Usage pattern
+
+Context menus are built and shown in response to `MKGUI_EVENT_CONTEXT` or `MKGUI_EVENT_CONTEXT_HEADER` events:
+
+```c
+case MKGUI_EVENT_CONTEXT: {
+    if(ev.id == ID_LISTVIEW1) {
+        mkgui_context_menu_clear(ctx);
+        mkgui_context_menu_add(ctx, 100, "Cut", "content-cut", 0);
+        mkgui_context_menu_add(ctx, 101, "Copy", "content-copy", 0);
+        mkgui_context_menu_add(ctx, 102, "Paste", "content-paste", 0);
+        mkgui_context_menu_add_separator(ctx);
+        mkgui_context_menu_add(ctx, 103, "Delete", "delete", (ev.value < 0) ? MKGUI_DISABLED : 0);
+        mkgui_context_menu_show(ctx);
+    }
+} break;
+
+case MKGUI_EVENT_CONTEXT_HEADER: {
+    // Right-click on column header -- ev.col has the column index
+    mkgui_context_menu_clear(ctx);
+    mkgui_context_menu_add(ctx, 200, "Name", NULL, MKGUI_MENU_CHECK | MKGUI_CHECKED);
+    mkgui_context_menu_add(ctx, 201, "Size", NULL, MKGUI_MENU_CHECK | MKGUI_CHECKED);
+    mkgui_context_menu_show(ctx);
+} break;
+
+case MKGUI_EVENT_CONTEXT_MENU: {
+    // ev.id is the item id passed to mkgui_context_menu_add()
+    printf("Selected context menu item: %u\n", ev.id);
+} break;
+```
+
+### Enhanced CONTEXT event for views
+
+For `MKGUI_LISTVIEW`, `MKGUI_GRIDVIEW`, `MKGUI_TREEVIEW`, and `MKGUI_ITEMVIEW`, the `MKGUI_EVENT_CONTEXT` event provides additional information:
+
+| Widget type | `ev.value` | `ev.col` |
+|---|---|---|
+| `MKGUI_LISTVIEW` | row index (-1 if empty area) | column index |
+| `MKGUI_GRIDVIEW` | row index (-1 if empty area) | column index |
+| `MKGUI_TREEVIEW` | node id (-1 if empty area) | 0 |
+| `MKGUI_ITEMVIEW` | item index (-1 if empty area) | 0 |
+| Other widgets | mouse x | mouse y |
+
+For listview and gridview, right-clicking on an unselected item selects it (matching Qt/KDE behavior). Right-clicking on an already-selected item preserves the selection.
+
+### Keyboard navigation
+
+When a context menu is open:
+- **Up/Down** arrows move between items (skipping separators and disabled items)
+- **Enter/Space** activates the highlighted item
+- **Escape** closes the menu
 
 ## Simple dialogs
 

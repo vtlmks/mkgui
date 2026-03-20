@@ -63,6 +63,12 @@ enum {
 	ID_LAY_FORM, ID_FORM_LBL1, ID_FORM_INP1, ID_FORM_LBL2, ID_FORM_INP2,
 	ID_FORM_LBL3, ID_FORM_DRP1, ID_FORM_LBL4, ID_FORM_CHK1,
 
+	/* Context menu item IDs (not widget IDs) */
+	ID_CTX_CUT = 900, ID_CTX_COPY, ID_CTX_PASTE, ID_CTX_DELETE,
+	ID_CTX_SELECT_ALL, ID_CTX_PROPERTIES,
+	ID_CTX_COL_NAME, ID_CTX_COL_VALUE, ID_CTX_COL_DESC,
+	ID_CTX_COL_AUTOSIZE,
+
 	/* Media tab */
 	ID_MEDIA_HBOX,
 	ID_MEDIA_LVBOX,
@@ -682,6 +688,53 @@ int main(void) {
 
 				case MKGUI_EVENT_PATHBAR_NAV: {
 					snprintf(buf, sizeof(buf), "Pathbar navigate: segment %d", ev.value);
+					mkgui_statusbar_set(ctx, ID_STATUSBAR, 0, buf);
+				} break;
+
+				case MKGUI_EVENT_CONTEXT: {
+					if(ev.id == ID_LISTVIEW1 || ev.id == ID_GRIDVIEW1 || ev.id == ID_TREEVIEW1 || ev.id == ID_ITEMVIEW1) {
+						mkgui_context_menu_clear(ctx);
+						mkgui_context_menu_add(ctx, ID_CTX_CUT, "Cut", "content-cut", 0);
+						mkgui_context_menu_add(ctx, ID_CTX_COPY, "Copy", "content-copy", 0);
+						mkgui_context_menu_add(ctx, ID_CTX_PASTE, "Paste", "content-paste", 0);
+						mkgui_context_menu_add_separator(ctx);
+						mkgui_context_menu_add(ctx, ID_CTX_DELETE, "Delete", "delete", (ev.value < 0) ? MKGUI_DISABLED : 0);
+						mkgui_context_menu_add(ctx, ID_CTX_SELECT_ALL, "Select All", "select-all", 0);
+						mkgui_context_menu_add_separator(ctx);
+						mkgui_context_menu_add(ctx, ID_CTX_PROPERTIES, "Properties", "information-outline", (ev.value < 0) ? MKGUI_DISABLED : 0);
+						mkgui_context_menu_show(ctx);
+					}
+				} break;
+
+				case MKGUI_EVENT_CONTEXT_HEADER: {
+					if(ev.id == ID_LISTVIEW1) {
+						struct mkgui_listview_data *lv = find_listv_data(ctx, ID_LISTVIEW1);
+						if(lv) {
+							mkgui_context_menu_clear(ctx);
+							for(uint32_t c = 0; c < lv->col_count; ++c) {
+								mkgui_context_menu_add(ctx, ID_CTX_COL_NAME + c, lv->columns[c].label, NULL, MKGUI_MENU_CHECK | MKGUI_CHECKED);
+							}
+							mkgui_context_menu_add_separator(ctx);
+							mkgui_context_menu_add(ctx, ID_CTX_COL_AUTOSIZE, "Auto-size Column", "arrow-expand-horizontal", 0);
+							mkgui_context_menu_show(ctx);
+						}
+
+					} else if(ev.id == ID_GRIDVIEW1) {
+						struct mkgui_gridview_data *gv = find_gridv_data(ctx, ID_GRIDVIEW1);
+						if(gv) {
+							mkgui_context_menu_clear(ctx);
+							for(uint32_t c = 0; c < gv->col_count; ++c) {
+								mkgui_context_menu_add(ctx, ID_CTX_COL_NAME + c, gv->columns[c].label, NULL, MKGUI_MENU_CHECK | MKGUI_CHECKED);
+							}
+							mkgui_context_menu_add_separator(ctx);
+							mkgui_context_menu_add(ctx, ID_CTX_COL_AUTOSIZE, "Auto-size Column", "arrow-expand-horizontal", 0);
+							mkgui_context_menu_show(ctx);
+						}
+					}
+				} break;
+
+				case MKGUI_EVENT_CONTEXT_MENU: {
+					snprintf(buf, sizeof(buf), "Context menu item: %u", ev.id);
 					mkgui_statusbar_set(ctx, ID_STATUSBAR, 0, buf);
 				} break;
 

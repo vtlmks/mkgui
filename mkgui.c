@@ -290,6 +290,9 @@ enum {
 	MKGUI_EVENT_DATEPICKER_CHANGED,
 	MKGUI_EVENT_GRID_CLICK,
 	MKGUI_EVENT_GRID_CHECK,
+	MKGUI_EVENT_GRIDVIEW_SELECT,
+	MKGUI_EVENT_CONTEXT_HEADER,
+	MKGUI_EVENT_CONTEXT_MENU,
 };
 
 // ---------------------------------------------------------------------------
@@ -634,6 +637,16 @@ struct mkgui_pathbar_data {
 	uint32_t edit_sel_end;
 };
 
+#define MKGUI_MAX_CTXMENU        64
+#define MKGUI_CTXMENU_POPUP_ID   UINT32_MAX
+
+struct mkgui_ctxmenu_item {
+	uint32_t id;
+	char label[MKGUI_MAX_TEXT];
+	char icon[MKGUI_ICON_NAME_LEN];
+	uint32_t flags;
+};
+
 struct mkgui_glyph {
 	int32_t width;
 	int32_t height;
@@ -845,6 +858,10 @@ struct mkgui_ctx {
 
 	char clip_text[MKGUI_CLIP_MAX];
 	uint32_t clip_len;
+
+	struct mkgui_ctxmenu_item ctxmenu_items[MKGUI_MAX_CTXMENU];
+	uint32_t ctxmenu_count;
+	int32_t ctxmenu_x, ctxmenu_y;
 };
 
 // ---------------------------------------------------------------------------
@@ -2563,6 +2580,7 @@ static void draw_icon_popup(struct mkgui_popup *p, struct mkgui_icon *icon, int3
 #include "mkgui_tabs.c"
 #include "mkgui_radio.c"
 #include "mkgui_menu.c"
+#include "mkgui_ctxmenu.c"
 #include "mkgui_split.c"
 #include "mkgui_treeview.c"
 #include "mkgui_statusbar.c"
@@ -3920,7 +3938,14 @@ static uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 					struct mkgui_popup *mp = &ctx->popups[popup_idx];
 					struct mkgui_widget *mpw = find_widget(ctx, mp->widget_id);
 
-					if(mpw && mpw->type == MKGUI_MENUITEM) {
+					if(mp->widget_id == MKGUI_CTXMENU_POPUP_ID) {
+						int32_t new_hover = ctxmenu_hit_item(ctx, pev.y);
+						if(new_hover != mp->hover_item) {
+							mp->hover_item = new_hover;
+							mp->dirty = 1;
+						}
+
+					} else if(mpw && mpw->type == MKGUI_MENUITEM) {
 						int32_t hit_idx;
 						struct mkgui_widget *hovered = menu_popup_hit_item(ctx, mpw->id, pev.y, &hit_idx);
 						if(hit_idx != mp->hover_item) {
@@ -4323,6 +4348,32 @@ static uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 					struct mkgui_popup *p = &ctx->popups[popup_idx];
 					struct mkgui_widget *pw = find_widget(ctx, p->widget_id);
 
+					if(p->widget_id == MKGUI_CTXMENU_POPUP_ID && pev.button == 1) {
+						int32_t hit = ctxmenu_hit_item(ctx, pev.y);
+						if(hit >= 0) {
+							struct mkgui_ctxmenu_item *it = ctxmenu_item_at(ctx, hit);
+							if(it && !(it->flags & MKGUI_DISABLED)) {
+								if(it->flags & MKGUI_MENU_CHECK) {
+									it->flags ^= MKGUI_CHECKED;
+								} else if(it->flags & MKGUI_MENU_RADIO) {
+									for(uint32_t ri = 0; ri < ctx->ctxmenu_count; ++ri) {
+										ctx->ctxmenu_items[ri].flags &= ~MKGUI_CHECKED;
+									}
+									it->flags |= MKGUI_CHECKED;
+								}
+								ev->type = MKGUI_EVENT_CONTEXT_MENU;
+								ev->id = it->id;
+								ev->value = (it->flags & MKGUI_CHECKED) ? 1 : 0;
+								popup_destroy_all(ctx);
+								dirty_all(ctx);
+								return 1;
+							}
+						}
+						popup_destroy_all(ctx);
+						dirty_all(ctx);
+						break;
+					}
+
 					if((pev.button == 4 || pev.button == 5) && pw && pw->type == MKGUI_DATEPICKER) {
 						struct mkgui_datepicker_data *dp = find_datepicker_data(ctx, pw->id);
 						if(dp) {
@@ -4508,8 +4559,134 @@ static uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 				if(pev.button == 3) {
 					int32_t hi = hit_test(ctx, ctx->mouse_x, ctx->mouse_y);
 					if(hi >= 0) {
+						struct mkgui_widget *hw = &ctx->widgets[hi];
+						ctx->ctxmenu_x = ctx->mouse_x;
+						ctx->ctxmenu_y = ctx->mouse_y;
+
+						if(hw->type == MKGUI_LISTVIEW) {
+							struct mkgui_listview_data *lv = find_listv_data(ctx, hw->id);
+							if(lv) {
+								int32_t hdr = listview_header_hit(ctx, (uint32_t)hi, ctx->mouse_x, ctx->mouse_y);
+								if(hdr >= 0) {
+									ev->type = MKGUI_EVENT_CONTEXT_HEADER;
+									ev->id = hw->id;
+									ev->col = (int32_t)lv->col_order[hdr];
+									ev->value = ctx->mouse_x;
+									return 1;
+								}
+								int32_t hh = lv->header_height > 0 ? lv->header_height : MKGUI_ROW_HEIGHT;
+								int32_t body_y = ctx->rects[hi].y + hh + 1;
+								int32_t row = (ctx->mouse_y - body_y + lv->scroll_y) / MKGUI_ROW_HEIGHT;
+								int32_t col = -1;
+								int32_t cx = ctx->rects[hi].x - lv->scroll_x;
+								for(uint32_t d = 0; d < lv->col_count; ++d) {
+									uint32_t c = lv->col_order[d];
+									if(ctx->mouse_x >= cx && ctx->mouse_x < cx + lv->columns[c].width) {
+										col = (int32_t)c;
+										break;
+									}
+									cx += lv->columns[c].width;
+								}
+								if(row < 0 || row >= (int32_t)lv->row_count) {
+									row = -1;
+								} else {
+									if(hw->flags & MKGUI_MULTI_SELECT) {
+										if(lv_multi_sel_find(lv, row) < 0) {
+											lv->multi_sel_count = 0;
+											lv->multi_sel[0] = row;
+											lv->multi_sel_count = 1;
+											lv->selected_row = row;
+											dirty_all(ctx);
+										}
+									} else {
+										if(lv->selected_row != row) {
+											lv->selected_row = row;
+											dirty_all(ctx);
+										}
+									}
+								}
+								ev->type = MKGUI_EVENT_CONTEXT;
+								ev->id = hw->id;
+								ev->value = row;
+								ev->col = col;
+								return 1;
+							}
+
+						} else if(hw->type == MKGUI_GRIDVIEW) {
+							struct mkgui_gridview_data *gv = find_gridv_data(ctx, hw->id);
+							if(gv) {
+								int32_t ghh = gv->header_height > 0 ? gv->header_height : MKGUI_ROW_HEIGHT;
+								if(ctx->mouse_y < ctx->rects[hi].y + ghh) {
+									int32_t col = gridview_col_at_x(gv, ctx->mouse_x, ctx->rects[hi].x + 1);
+									ev->type = MKGUI_EVENT_CONTEXT_HEADER;
+									ev->id = hw->id;
+									ev->col = col;
+									ev->value = ctx->mouse_x;
+									return 1;
+								}
+								int32_t body_y = ctx->rects[hi].y + ghh + 1;
+								int32_t row = (ctx->mouse_y - body_y + gv->scroll_y) / MKGUI_ROW_HEIGHT;
+								int32_t col = gridview_col_at_x(gv, ctx->mouse_x, ctx->rects[hi].x + 1);
+								if(row < 0 || row >= (int32_t)gv->row_count) {
+									row = -1;
+								} else if(gv->selected_row != row) {
+									gv->selected_row = row;
+									gv->selected_col = col;
+									dirty_all(ctx);
+								}
+								ev->type = MKGUI_EVENT_CONTEXT;
+								ev->id = hw->id;
+								ev->value = row;
+								ev->col = col;
+								return 1;
+							}
+
+						} else if(hw->type == MKGUI_TREEVIEW) {
+							struct mkgui_treeview_data *tv = find_treeview_data(ctx, hw->id);
+							if(tv) {
+								int32_t body_y = ctx->rects[hi].y + 1;
+								int32_t vis_row = (ctx->mouse_y - body_y + tv->scroll_y) / MKGUI_ROW_HEIGHT;
+								int32_t node_id = -1;
+								int32_t vis = 0;
+								for(uint32_t n = 0; n < tv->node_count; ++n) {
+									if(!treeview_node_visible(tv, n)) {
+										continue;
+									}
+									if(vis == vis_row) {
+										node_id = (int32_t)tv->nodes[n].id;
+										break;
+									}
+									++vis;
+								}
+								if(node_id >= 0 && tv->selected_node != node_id) {
+									tv->selected_node = node_id;
+									dirty_all(ctx);
+								}
+								ev->type = MKGUI_EVENT_CONTEXT;
+								ev->id = hw->id;
+								ev->value = node_id;
+								ev->col = 0;
+								return 1;
+							}
+
+						} else if(hw->type == MKGUI_ITEMVIEW) {
+							struct mkgui_itemview_data *iv = find_itemview_data(ctx, hw->id);
+							if(iv) {
+								int32_t item = itemview_hit_item(ctx, (uint32_t)hi, iv, ctx->mouse_x, ctx->mouse_y);
+								if(item >= 0 && iv->selected != item) {
+									iv->selected = item;
+									dirty_all(ctx);
+								}
+								ev->type = MKGUI_EVENT_CONTEXT;
+								ev->id = hw->id;
+								ev->value = item;
+								ev->col = 0;
+								return 1;
+							}
+						}
+
 						ev->type = MKGUI_EVENT_CONTEXT;
-						ev->id = ctx->widgets[hi].id;
+						ev->id = hw->id;
 						ev->value = ctx->mouse_x;
 						ev->col = ctx->mouse_y;
 						return 1;
@@ -5385,6 +5562,56 @@ static uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 			case MKGUI_PLAT_KEY: {
 				uint32_t ks = pev.keysym;
 
+				if(ctx->popup_count > 0 && ctx->popups[ctx->popup_count - 1].widget_id == MKGUI_CTXMENU_POPUP_ID) {
+					struct mkgui_popup *cp = &ctx->popups[ctx->popup_count - 1];
+					if(ks == MKGUI_KEY_ESCAPE) {
+						popup_destroy_all(ctx);
+						dirty_all(ctx);
+						break;
+					}
+					if(ks == MKGUI_KEY_UP) {
+						int32_t next = ctxmenu_next_item(ctx, cp->hover_item >= 0 ? cp->hover_item : (int32_t)ctx->ctxmenu_count, -1);
+						if(next != cp->hover_item) {
+							cp->hover_item = next;
+							cp->dirty = 1;
+							dirty_all(ctx);
+						}
+						break;
+					}
+					if(ks == MKGUI_KEY_DOWN) {
+						int32_t next = ctxmenu_next_item(ctx, cp->hover_item, 1);
+						if(next != cp->hover_item) {
+							cp->hover_item = next;
+							cp->dirty = 1;
+							dirty_all(ctx);
+						}
+						break;
+					}
+					if(ks == MKGUI_KEY_RETURN || ks == MKGUI_KEY_SPACE) {
+						if(cp->hover_item >= 0) {
+							struct mkgui_ctxmenu_item *it = ctxmenu_item_at(ctx, cp->hover_item);
+							if(it && !(it->flags & MKGUI_DISABLED)) {
+								if(it->flags & MKGUI_MENU_CHECK) {
+									it->flags ^= MKGUI_CHECKED;
+								} else if(it->flags & MKGUI_MENU_RADIO) {
+									for(uint32_t ri = 0; ri < ctx->ctxmenu_count; ++ri) {
+										ctx->ctxmenu_items[ri].flags &= ~MKGUI_CHECKED;
+									}
+									it->flags |= MKGUI_CHECKED;
+								}
+								ev->type = MKGUI_EVENT_CONTEXT_MENU;
+								ev->id = it->id;
+								ev->value = (it->flags & MKGUI_CHECKED) ? 1 : 0;
+								popup_destroy_all(ctx);
+								dirty_all(ctx);
+								return 1;
+							}
+						}
+						break;
+					}
+					break;
+				}
+
 				if(ks == MKGUI_KEY_ESCAPE && ctx->popup_count > 0) {
 					popup_destroy(ctx, ctx->popup_count - 1);
 					dirty_all(ctx);
@@ -5768,36 +5995,43 @@ static uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 			if(!p->active || !p->dirty) {
 				continue;
 			}
-			struct mkgui_widget *pw = find_widget(ctx, p->widget_id);
-			if(pw && pw->type == MKGUI_DROPDOWN) {
-				struct mkgui_dropdown_data *dd = find_dropdown_data(ctx, pw->id);
-				if(dd) {
-					render_dropdown_popup(ctx, p, dd, p->hover_item);
-					flush_text_popup(ctx, p);
-					platform_popup_blit(ctx, p);
-				}
-
-			} else if(pw && pw->type == MKGUI_COMBOBOX) {
-				struct mkgui_combobox_data *cb = find_combobox_data(ctx, pw->id);
-				if(cb) {
-					render_combobox_popup(ctx, p, cb, p->hover_item);
-					flush_text_popup(ctx, p);
-					platform_popup_blit(ctx, p);
-				}
-
-			} else if(pw && pw->type == MKGUI_DATEPICKER) {
-				struct mkgui_datepicker_data *dp = find_datepicker_data(ctx, pw->id);
-				if(dp) {
-					int32_t hover_day = dp->cal_hover > 0 ? dp->cal_hover : -1;
-					render_datepicker_popup(ctx, p, dp, hover_day);
-					flush_text_popup(ctx, p);
-					platform_popup_blit(ctx, p);
-				}
-
-			} else if(pw && pw->type == MKGUI_MENUITEM) {
-				render_menu_popup(ctx, p, pw->id, p->hover_item);
+			if(p->widget_id == MKGUI_CTXMENU_POPUP_ID) {
+				render_ctxmenu_popup(ctx, p, p->hover_item);
 				flush_text_popup(ctx, p);
 				platform_popup_blit(ctx, p);
+
+			} else {
+				struct mkgui_widget *pw = find_widget(ctx, p->widget_id);
+				if(pw && pw->type == MKGUI_DROPDOWN) {
+					struct mkgui_dropdown_data *dd = find_dropdown_data(ctx, pw->id);
+					if(dd) {
+						render_dropdown_popup(ctx, p, dd, p->hover_item);
+						flush_text_popup(ctx, p);
+						platform_popup_blit(ctx, p);
+					}
+
+				} else if(pw && pw->type == MKGUI_COMBOBOX) {
+					struct mkgui_combobox_data *cb = find_combobox_data(ctx, pw->id);
+					if(cb) {
+						render_combobox_popup(ctx, p, cb, p->hover_item);
+						flush_text_popup(ctx, p);
+						platform_popup_blit(ctx, p);
+					}
+
+				} else if(pw && pw->type == MKGUI_DATEPICKER) {
+					struct mkgui_datepicker_data *dp = find_datepicker_data(ctx, pw->id);
+					if(dp) {
+						int32_t hover_day = dp->cal_hover > 0 ? dp->cal_hover : -1;
+						render_datepicker_popup(ctx, p, dp, hover_day);
+						flush_text_popup(ctx, p);
+						platform_popup_blit(ctx, p);
+					}
+
+				} else if(pw && pw->type == MKGUI_MENUITEM) {
+					render_menu_popup(ctx, p, pw->id, p->hover_item);
+					flush_text_popup(ctx, p);
+					platform_popup_blit(ctx, p);
+				}
 			}
 			p->dirty = 0;
 		}
