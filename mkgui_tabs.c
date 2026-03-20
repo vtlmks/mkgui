@@ -16,7 +16,6 @@ static int32_t tab_calc_width(struct mkgui_ctx *ctx, struct mkgui_widget *child)
 
 // [=]===^=[ tab_close_hit_test ]=================================[=]
 static uint32_t tab_close_hit_test(struct mkgui_ctx *ctx, uint32_t tabs_idx, int32_t mx, int32_t my) {
-	struct mkgui_widget *w = &ctx->widgets[tabs_idx];
 	int32_t rx = ctx->rects[tabs_idx].x;
 	int32_t ry = ctx->rects[tabs_idx].y;
 
@@ -25,9 +24,9 @@ static uint32_t tab_close_hit_test(struct mkgui_ctx *ctx, uint32_t tabs_idx, int
 	}
 
 	int32_t tx = rx;
-	for(uint32_t i = 0; i < ctx->widget_count; ++i) {
-		struct mkgui_widget *child = &ctx->widgets[i];
-		if(child->type != MKGUI_TAB || child->parent_id != w->id) {
+	for(uint32_t c = layout_first_child[tabs_idx]; c < ctx->widget_count; c = layout_next_sibling[c]) {
+		struct mkgui_widget *child = &ctx->widgets[c];
+		if(child->type != MKGUI_TAB) {
 			continue;
 		}
 		int32_t tw = tab_calc_width(ctx, child);
@@ -45,7 +44,6 @@ static uint32_t tab_close_hit_test(struct mkgui_ctx *ctx, uint32_t tabs_idx, int
 
 // [=]===^=[ tab_hit_test ]======================================[=]
 static uint32_t tab_hit_test(struct mkgui_ctx *ctx, uint32_t tabs_idx, int32_t mx, int32_t my) {
-	struct mkgui_widget *w = &ctx->widgets[tabs_idx];
 	int32_t rx = ctx->rects[tabs_idx].x;
 	int32_t ry = ctx->rects[tabs_idx].y;
 
@@ -54,9 +52,9 @@ static uint32_t tab_hit_test(struct mkgui_ctx *ctx, uint32_t tabs_idx, int32_t m
 	}
 
 	int32_t tx = rx;
-	for(uint32_t i = 0; i < ctx->widget_count; ++i) {
-		struct mkgui_widget *child = &ctx->widgets[i];
-		if(child->type != MKGUI_TAB || child->parent_id != w->id) {
+	for(uint32_t c = layout_first_child[tabs_idx]; c < ctx->widget_count; c = layout_next_sibling[c]) {
+		struct mkgui_widget *child = &ctx->widgets[c];
+		if(child->type != MKGUI_TAB) {
 			continue;
 		}
 		int32_t tw = tab_calc_width(ctx, child);
@@ -82,9 +80,9 @@ static void render_tabs(struct mkgui_ctx *ctx, uint32_t idx) {
 	uint32_t hover_tab = (td && ctx->hover_id == w->id) ? td->hover_tab : 0;
 
 	int32_t tx = rx;
-	for(uint32_t i = 0; i < ctx->widget_count; ++i) {
-		struct mkgui_widget *child = &ctx->widgets[i];
-		if(child->type != MKGUI_TAB || child->parent_id != w->id) {
+	for(uint32_t c = layout_first_child[idx]; c < ctx->widget_count; c = layout_next_sibling[c]) {
+		struct mkgui_widget *child = &ctx->widgets[c];
+		if(child->type != MKGUI_TAB) {
 			continue;
 		}
 		int32_t tw = tab_calc_width(ctx, child);
@@ -134,11 +132,16 @@ static uint32_t handle_tabs_key(struct mkgui_ctx *ctx, struct mkgui_event *ev, u
 		return 0;
 	}
 
+	int32_t widx = find_widget_idx(ctx, w->id);
+	if(widx < 0) {
+		return 0;
+	}
+
 	int32_t cur = -1;
 	int32_t count = 0;
-	for(uint32_t i = 0; i < ctx->widget_count; ++i) {
-		struct mkgui_widget *child = &ctx->widgets[i];
-		if(child->type != MKGUI_TAB || child->parent_id != w->id) {
+	for(uint32_t c = layout_first_child[widx]; c < ctx->widget_count; c = layout_next_sibling[c]) {
+		struct mkgui_widget *child = &ctx->widgets[c];
+		if(child->type != MKGUI_TAB) {
 			continue;
 		}
 		if(child->id == td->active_tab) {
@@ -160,9 +163,9 @@ static uint32_t handle_tabs_key(struct mkgui_ctx *ctx, struct mkgui_event *ev, u
 
 	struct mkgui_widget *tab = NULL;
 	int32_t n = 0;
-	for(uint32_t i = 0; i < ctx->widget_count; ++i) {
-		struct mkgui_widget *child = &ctx->widgets[i];
-		if(child->type == MKGUI_TAB && child->parent_id == w->id) {
+	for(uint32_t c = layout_first_child[widx]; c < ctx->widget_count; c = layout_next_sibling[c]) {
+		struct mkgui_widget *child = &ctx->widgets[c];
+		if(child->type == MKGUI_TAB) {
 			if(n == next) {
 				tab = child;
 				break;

@@ -140,6 +140,7 @@ static int32_t icon_load_from_pack(struct mdi_pack *pack, const char *name, cons
 	ic->w = (int32_t)sz;
 	ic->h = (int32_t)sz;
 	ic->custom = 0;
+	icon_hash_insert((uint32_t)idx);
 
 	return idx;
 }
@@ -149,12 +150,7 @@ static int32_t icon_find_idx(const char *name) {
 	if(name[0] == '\0') {
 		return -1;
 	}
-	for(uint32_t i = 0; i < icon_count; ++i) {
-		if(strcmp(icons[i].name, name) == 0) {
-			return (int32_t)i;
-		}
-	}
-	return -1;
+	return icon_hash_lookup(name);
 }
 
 // [=]===^=[ icon_resolve ]===========================================[=]
@@ -197,6 +193,7 @@ static int32_t toolbar_icon_idx(struct mkgui_widget *w) {
 static void mkgui_icon_init(void) {
 	icon_count = 0;
 	icon_pixels_used = 0;
+	icon_hash_clear();
 
 	const char *paths[] = {
 		"mdi_icons.dat",
@@ -300,6 +297,7 @@ static int32_t mkgui_icon_add(const char *name, const uint32_t *pixels, int32_t 
 	ic->w = w;
 	ic->h = h;
 	ic->custom = 1;
+	icon_hash_insert((uint32_t)idx);
 
 	return idx;
 }

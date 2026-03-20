@@ -90,16 +90,38 @@ static void render_spinner(struct mkgui_ctx *ctx, uint32_t idx) {
 	int32_t or_inner_sq = or_inner * or_inner;
 	int32_t ir_outer_sq = ir_outer * ir_outer;
 
-	for(int32_t dy = -outer_r; dy <= outer_r; ++dy) {
+	int32_t dy0 = -outer_r;
+	int32_t dy1 = outer_r;
+	int32_t dx0 = -outer_r;
+	int32_t dx1 = outer_r;
+	if(cy + dy0 < 0) {
+		dy0 = -cy;
+	}
+	if(cy + dy1 >= ctx->win_h) {
+		dy1 = ctx->win_h - 1 - cy;
+	}
+	if(cx + dx0 < 0) {
+		dx0 = -cx;
+	}
+	if(cx + dx1 >= ctx->win_w) {
+		dx1 = ctx->win_w - 1 - cx;
+	}
+	if(cy + dy0 < render_clip_y1) {
+		dy0 = render_clip_y1 - cy;
+	}
+	if(cy + dy1 >= render_clip_y2) {
+		dy1 = render_clip_y2 - 1 - cy;
+	}
+	if(cx + dx0 < render_clip_x1) {
+		dx0 = render_clip_x1 - cx;
+	}
+	if(cx + dx1 >= render_clip_x2) {
+		dx1 = render_clip_x2 - 1 - cx;
+	}
+	for(int32_t dy = dy0; dy <= dy1; ++dy) {
 		int32_t py = cy + dy;
-		if(py < 0 || py >= ctx->win_h) {
-			continue;
-		}
-		for(int32_t dx = -outer_r; dx <= outer_r; ++dx) {
+		for(int32_t dx = dx0; dx <= dx1; ++dx) {
 			int32_t px = cx + dx;
-			if(px < 0 || px >= ctx->win_w) {
-				continue;
-			}
 			int32_t d2 = dx * dx + dy * dy;
 			if(d2 > (outer_r + 1) * (outer_r + 1) || d2 < (inner_r - 1) * (inner_r - 1)) {
 				continue;

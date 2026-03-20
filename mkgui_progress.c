@@ -48,11 +48,38 @@ static void render_progress(struct mkgui_ctx *ctx, uint32_t idx) {
 				sx_max = fill_w;
 			}
 
-			for(uint32_t sy = 0; sy < (uint32_t)fh; ++sy) {
-				int32_t py = fy + (int32_t)sy;
-				if(py < 0 || py >= ctx->win_h) {
-					continue;
-				}
+			int32_t clip_y0 = fy;
+			int32_t clip_y1_s = fy + fh;
+			if(clip_y0 < 0) {
+				clip_y0 = 0;
+			}
+			if(clip_y0 < render_clip_y1) {
+				clip_y0 = render_clip_y1;
+			}
+			if(clip_y1_s > ctx->win_h) {
+				clip_y1_s = ctx->win_h;
+			}
+			if(clip_y1_s > render_clip_y2) {
+				clip_y1_s = render_clip_y2;
+			}
+
+			int32_t lx_min = render_clip_x1 - fx;
+			int32_t lx_max = render_clip_x2 - fx;
+			if(lx_min < 0) {
+				lx_min = 0;
+			}
+			if(lx_max > fill_w) {
+				lx_max = fill_w;
+			}
+			if(sx_min < lx_min) {
+				sx_min = lx_min;
+			}
+			if(sx_max > lx_max) {
+				sx_max = lx_max;
+			}
+
+			for(int32_t py = clip_y0; py < clip_y1_s; ++py) {
+				uint32_t sy = (uint32_t)(py - fy);
 				int32_t row_min = shimmer_x + (int32_t)sy;
 				int32_t row_max = row_min + shimmer_w;
 				if(row_min < sx_min) {
@@ -63,9 +90,6 @@ static void render_progress(struct mkgui_ctx *ctx, uint32_t idx) {
 				}
 				for(int32_t sx = row_min; sx < row_max; ++sx) {
 					int32_t px = fx + sx;
-					if(px < 0 || px >= ctx->win_w) {
-						continue;
-					}
 					int32_t dist = sx - (int32_t)sy - shimmer_x;
 					int32_t from_center = dist - half;
 					if(from_center < 0) {

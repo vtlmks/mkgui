@@ -12,6 +12,13 @@
 #include <stdio.h>
 #include <time.h>
 
+#if defined(__SSE2__)
+#include <emmintrin.h>
+#endif
+#if defined(__SSE4_1__)
+#include <smmintrin.h>
+#endif
+
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -710,6 +717,52 @@ static uint32_t icon_count;
 
 static uint32_t icon_text_color;
 
+#define MKGUI_ICON_HASH_SIZE 4096
+#define MKGUI_ICON_HASH_MASK (MKGUI_ICON_HASH_SIZE - 1)
+
+static uint32_t icon_hash[MKGUI_ICON_HASH_SIZE];
+
+// [=]===^=[ icon_hash_fn ]===========================================[=]
+static uint32_t icon_hash_fn(const char *name) {
+	uint32_t h = 2166136261u;
+	for(const char *p = name; *p; ++p) {
+		h ^= (uint32_t)(uint8_t)*p;
+		h *= 16777619u;
+	}
+	return h & MKGUI_ICON_HASH_MASK;
+}
+
+// [=]===^=[ icon_hash_clear ]========================================[=]
+static void icon_hash_clear(void) {
+	for(uint32_t i = 0; i < MKGUI_ICON_HASH_SIZE; ++i) {
+		icon_hash[i] = UINT32_MAX;
+	}
+}
+
+// [=]===^=[ icon_hash_insert ]=======================================[=]
+static void icon_hash_insert(uint32_t idx) {
+	uint32_t h = icon_hash_fn(icons[idx].name);
+	while(icon_hash[h] != UINT32_MAX) {
+		h = (h + 1) & MKGUI_ICON_HASH_MASK;
+	}
+	icon_hash[h] = idx;
+}
+
+// [=]===^=[ icon_hash_lookup ]=======================================[=]
+static int32_t icon_hash_lookup(const char *name) {
+	uint32_t h = icon_hash_fn(name);
+	for(;;) {
+		uint32_t idx = icon_hash[h];
+		if(idx == UINT32_MAX) {
+			return -1;
+		}
+		if(strcmp(icons[idx].name, name) == 0) {
+			return (int32_t)idx;
+		}
+		h = (h + 1) & MKGUI_ICON_HASH_MASK;
+	}
+}
+
 struct mdi_pack {
 	uint8_t *dat;
 	uint32_t dat_size;
@@ -945,445 +998,7 @@ static struct mkgui_theme light_theme(void) {
 	return t;
 }
 
-// ---------------------------------------------------------------------------
-// Drawing primitives
-// ---------------------------------------------------------------------------
-
-// [=]===^=[ blend_pixel ]========================================[=]
-static inline uint32_t blend_pixel(uint32_t dst, uint32_t color, uint8_t alpha) {
-	if(alpha == 255) {
-		return color;
-	}
-	uint32_t a = alpha;
-	uint32_t ia = 255 - a;
-	uint32_t rb_src = color & 0x00ff00ff;
-	uint32_t g_src = color & 0x0000ff00;
-	uint32_t rb_dst = dst & 0x00ff00ff;
-	uint32_t g_dst = dst & 0x0000ff00;
-	uint32_t rb = (rb_src * a + rb_dst * ia + 0x00800080);
-	rb = ((rb + ((rb >> 8) & 0x00ff00ff)) >> 8) & 0x00ff00ff;
-	uint32_t g = (g_src * a + g_dst * ia + 0x00008000);
-	g = ((g + ((g >> 8) & 0x0000ff00)) >> 8) & 0x0000ff00;
-	return 0xff000000 | rb | g;
-}
-
-static int32_t render_clip_x1, render_clip_y1, render_clip_x2, render_clip_y2;
-static int32_t render_base_clip_x1, render_base_clip_y1, render_base_clip_x2, render_base_clip_y2;
-
-// [=]===^=[ draw_pixel ]========================================[=]
-static void draw_pixel(uint32_t *buf, int32_t bw, int32_t bh, int32_t x, int32_t y, uint32_t color) {
-	if(x >= 0 && x < bw && y >= 0 && y < bh && x >= render_clip_x1 && x < render_clip_x2 && y >= render_clip_y1 && y < render_clip_y2) {
-		buf[y * bw + x] = color;
-	}
-}
-
-// [=]===^=[ draw_rect_fill ]====================================[=]
-static void draw_rect_fill(uint32_t *buf, int32_t bw, int32_t bh, int32_t x, int32_t y, int32_t w, int32_t h, uint32_t color) {
-	int32_t x0 = x < 0 ? 0 : x;
-	int32_t y0 = y < 0 ? 0 : y;
-	int32_t x1 = (x + w) > bw ? bw : (x + w);
-	int32_t y1 = (y + h) > bh ? bh : (y + h);
-	if(x0 < render_clip_x1) { x0 = render_clip_x1; }
-	if(y0 < render_clip_y1) { y0 = render_clip_y1; }
-	if(x1 > render_clip_x2) { x1 = render_clip_x2; }
-	if(y1 > render_clip_y2) { y1 = render_clip_y2; }
-	int32_t span = x1 - x0;
-	if(span <= 0) {
-		return;
-	}
-	for(int32_t row = y0; row < y1; ++row) {
-		uint32_t *dst = &buf[row * bw + x0];
-		for(uint32_t i = 0; i < (uint32_t)span; ++i) {
-			dst[i] = color;
-		}
-	}
-}
-
-#define MKGUI_MAX_CORNER_RADIUS 16
-
-// [=]===^=[ rounded_rect_insets ]=================================[=]
-static void rounded_rect_insets(int32_t radius, int32_t *out) {
-	for(uint32_t row = 0; row < (uint32_t)radius; ++row) {
-		int32_t dy = 2 * (radius - (int32_t)row) - 1;
-		int32_t r2x4 = 4 * radius * radius;
-		int32_t inset = 0;
-		for(uint32_t col = 0; col < (uint32_t)radius; ++col) {
-			int32_t dx = 2 * (radius - (int32_t)col) - 1;
-			if(dx * dx + dy * dy > r2x4) {
-				inset = (int32_t)(col + 1);
-			}
-		}
-		out[row] = inset;
-	}
-}
-
-// [=]===^=[ corner_coverage ]=====================================[=]
-static uint32_t corner_coverage(int32_t col, int32_t crow, int32_t radius) {
-	int32_t r8 = 8 * radius;
-	int32_t r8sq = r8 * r8;
-	int32_t base_dx8 = 8 * radius - 8 * col;
-	int32_t base_dy8 = 8 * radius - 8 * crow;
-	uint32_t count = 0;
-	for(uint32_t sy = 0; sy < 4; ++sy) {
-		int32_t dy8 = base_dy8 - 2 * (int32_t)sy - 1;
-		int32_t remain = r8sq - dy8 * dy8;
-		if(remain < 0) {
-			continue;
-		}
-		for(uint32_t sx = 0; sx < 4; ++sx) {
-			int32_t dx8 = base_dx8 - 2 * (int32_t)sx - 1;
-			if(dx8 * dx8 <= remain) {
-				++count;
-			}
-		}
-	}
-	return count;
-}
-
-// [=]===^=[ fill_span_clipped ]===================================[=]
-static void fill_span_clipped(uint32_t *buf, int32_t bw, int32_t py, int32_t left, int32_t right, uint32_t color) {
-	if(left < 0) { left = 0; }
-	if(left < render_clip_x1) { left = render_clip_x1; }
-	if(right > bw) { right = bw; }
-	if(right > render_clip_x2) { right = render_clip_x2; }
-	if(left < right) {
-		uint32_t *dst = &buf[py * bw + left];
-		int32_t cnt = right - left;
-		for(uint32_t i = 0; i < (uint32_t)cnt; ++i) {
-			dst[i] = color;
-		}
-	}
-}
-
-// [=]===^=[ draw_rounded_rect_fill ]==============================[=]
-static void draw_rounded_rect_fill(uint32_t *buf, int32_t bw, int32_t bh, int32_t x, int32_t y, int32_t w, int32_t h, uint32_t color, int32_t radius) {
-	if(w <= 0 || h <= 0) {
-		return;
-	}
-	if(radius > w / 2) {
-		radius = w / 2;
-	}
-	if(radius > h / 2) {
-		radius = h / 2;
-	}
-	if(radius > MKGUI_MAX_CORNER_RADIUS) {
-		radius = MKGUI_MAX_CORNER_RADIUS;
-	}
-
-	for(uint32_t row = 0; row < (uint32_t)h; ++row) {
-		int32_t py = y + (int32_t)row;
-		if(py < 0 || py >= bh || py < render_clip_y1 || py >= render_clip_y2) {
-			continue;
-		}
-
-		int32_t crow = -1;
-		if((int32_t)row < radius) {
-			crow = (int32_t)row;
-		} else if((int32_t)row >= h - radius) {
-			crow = h - 1 - (int32_t)row;
-		}
-
-		if(crow >= 0 && radius > 0) {
-			uint32_t *rowp = &buf[py * bw];
-			for(uint32_t col = 0; col < (uint32_t)radius; ++col) {
-				uint32_t cov = corner_coverage((int32_t)col, crow, radius);
-				if(cov == 0) {
-					continue;
-				}
-				int32_t pl = x + (int32_t)col;
-				int32_t pr = x + w - 1 - (int32_t)col;
-				if(cov >= 16) {
-					if(pl >= 0 && pl < bw && pl >= render_clip_x1 && pl < render_clip_x2) {
-						rowp[pl] = color;
-					}
-					if(pr >= 0 && pr < bw && pr != pl && pr >= render_clip_x1 && pr < render_clip_x2) {
-						rowp[pr] = color;
-					}
-				} else {
-					uint8_t alpha = (uint8_t)(cov * 255 / 16);
-					if(pl >= 0 && pl < bw && pl >= render_clip_x1 && pl < render_clip_x2) {
-						rowp[pl] = blend_pixel(rowp[pl], color, alpha);
-					}
-					if(pr >= 0 && pr < bw && pr != pl && pr >= render_clip_x1 && pr < render_clip_x2) {
-						rowp[pr] = blend_pixel(rowp[pr], color, alpha);
-					}
-				}
-			}
-			fill_span_clipped(buf, bw, py, x + radius, x + w - radius, color);
-		} else {
-			fill_span_clipped(buf, bw, py, x, x + w, color);
-		}
-	}
-}
-
-// [=]===^=[ draw_rounded_rect ]===================================[=]
-static void draw_rounded_rect(uint32_t *buf, int32_t bw, int32_t bh, int32_t x, int32_t y, int32_t w, int32_t h, uint32_t fill, uint32_t border, int32_t radius) {
-	draw_rounded_rect_fill(buf, bw, bh, x, y, w, h, border, radius);
-	if(w > 2 && h > 2) {
-		int32_t inner_r = radius > 1 ? radius - 1 : 0;
-		draw_rounded_rect_fill(buf, bw, bh, x + 1, y + 1, w - 2, h - 2, fill, inner_r);
-	}
-}
-
-// [=]===^=[ shade_color ]=========================================[=]
-static inline uint32_t shade_color(uint32_t color, int32_t amount) {
-	int32_t r = (int32_t)((color >> 16) & 0xff) + amount;
-	int32_t g = (int32_t)((color >> 8) & 0xff) + amount;
-	int32_t b = (int32_t)(color & 0xff) + amount;
-	if(r < 0) { r = 0; } else if(r > 255) { r = 255; }
-	if(g < 0) { g = 0; } else if(g > 255) { g = 255; }
-	if(b < 0) { b = 0; } else if(b > 255) { b = 255; }
-	return 0xff000000 | ((uint32_t)r << 16) | ((uint32_t)g << 8) | (uint32_t)b;
-}
-
-// [=]===^=[ draw_hline ]========================================[=]
-static inline void draw_hline(uint32_t *buf, int32_t bw, int32_t bh, int32_t x, int32_t y, int32_t w, uint32_t color) {
-	if(y < 0 || y >= bh || y < render_clip_y1 || y >= render_clip_y2) {
-		return;
-	}
-	int32_t x0 = x < 0 ? 0 : x;
-	int32_t x1 = (x + w) > bw ? bw : (x + w);
-	if(x0 < render_clip_x1) { x0 = render_clip_x1; }
-	if(x1 > render_clip_x2) { x1 = render_clip_x2; }
-	for(int32_t i = x0; i < x1; ++i) {
-		buf[y * bw + i] = color;
-	}
-}
-
-// [=]===^=[ draw_vline ]========================================[=]
-static inline void draw_vline(uint32_t *buf, int32_t bw, int32_t bh, int32_t x, int32_t y, int32_t h, uint32_t color) {
-	if(x < 0 || x >= bw || x < render_clip_x1 || x >= render_clip_x2) {
-		return;
-	}
-	int32_t y0 = y < 0 ? 0 : y;
-	int32_t y1 = (y + h) > bh ? bh : (y + h);
-	if(y0 < render_clip_y1) { y0 = render_clip_y1; }
-	if(y1 > render_clip_y2) { y1 = render_clip_y2; }
-	for(int32_t i = y0; i < y1; ++i) {
-		buf[i * bw + x] = color;
-	}
-}
-
-// [=]===^=[ draw_rect_border ]==================================[=]
-static void draw_rect_border(uint32_t *buf, int32_t bw, int32_t bh, int32_t x, int32_t y, int32_t w, int32_t h, uint32_t color) {
-	draw_hline(buf, bw, bh, x, y, w, color);
-	draw_hline(buf, bw, bh, x, y + h - 1, w, color);
-	draw_vline(buf, bw, bh, x, y, h, color);
-	draw_vline(buf, bw, bh, x + w - 1, y, h, color);
-}
-
-// [=]===^=[ draw_rect_dashed ]===================================[=]
-static void draw_rect_dashed(uint32_t *buf, int32_t bw, int32_t bh, int32_t x, int32_t y, int32_t w, int32_t h, uint32_t color, int32_t dash) {
-	for(uint32_t i = 0; i < (uint32_t)w; ++i) {
-		if(((int32_t)i / dash) & 1) { continue; }
-		int32_t px = x + (int32_t)i;
-		if(px >= 0 && px < bw && px >= render_clip_x1 && px < render_clip_x2) {
-			if(y >= 0 && y < bh && y >= render_clip_y1 && y < render_clip_y2) {
-				buf[y * bw + px] = color;
-			}
-			int32_t by = y + h - 1;
-			if(by >= 0 && by < bh && by >= render_clip_y1 && by < render_clip_y2) {
-				buf[by * bw + px] = color;
-			}
-		}
-	}
-	for(uint32_t i = 0; i < (uint32_t)h; ++i) {
-		if(((int32_t)i / dash) & 1) { continue; }
-		int32_t py = y + (int32_t)i;
-		if(py >= 0 && py < bh && py >= render_clip_y1 && py < render_clip_y2) {
-			if(x >= 0 && x < bw && x >= render_clip_x1 && x < render_clip_x2) {
-				buf[py * bw + x] = color;
-			}
-			int32_t rx = x + w - 1;
-			if(rx >= 0 && rx < bw && rx >= render_clip_x1 && rx < render_clip_x2) {
-				buf[py * bw + rx] = color;
-			}
-		}
-	}
-}
-
-enum {
-	MKGUI_STYLE_RAISED,
-	MKGUI_STYLE_SUNKEN,
-};
-
-// [=]===^=[ draw_patch ]==========================================[=]
-static void draw_patch(struct mkgui_ctx *ctx, uint32_t style, int32_t x, int32_t y, int32_t w, int32_t h, uint32_t fill, uint32_t border) {
-	int32_t r = ctx->theme.corner_radius;
-	draw_rounded_rect(ctx->pixels, ctx->win_w, ctx->win_h, x, y, w, h, fill, border, r);
-
-	if(w > 2 && h > 2) {
-		int32_t inner_r = r > 1 ? r - 1 : 0;
-		int32_t insets[MKGUI_MAX_CORNER_RADIUS];
-		int32_t hl_inset = 0;
-		if(inner_r > 0) {
-			rounded_rect_insets(inner_r, insets);
-			hl_inset = insets[0];
-		}
-		int32_t hl_y = y + 1;
-		if(hl_y >= 0 && hl_y < ctx->win_h && hl_y >= render_clip_y1 && hl_y < render_clip_y2) {
-			uint32_t hl;
-			if(style == MKGUI_STYLE_SUNKEN) {
-				hl = shade_color(fill, -6);
-			} else {
-				hl = shade_color(fill, 8);
-			}
-			fill_span_clipped(ctx->pixels, ctx->win_w, hl_y, x + 1 + hl_inset, x + w - 1 - hl_inset, hl);
-		}
-	}
-}
-
-// ---------------------------------------------------------------------------
-// Font init (platform-specific, see platform_linux.c / platform_win32.c)
-// ---------------------------------------------------------------------------
-
-// [=]===^=[ draw_text_sw ]=======================================[=]
-static void draw_text_sw(struct mkgui_ctx *ctx, uint32_t *buf, int32_t bw, int32_t x, int32_t y, const char *text, uint32_t color, int32_t cx1, int32_t cy1, int32_t cx2, int32_t cy2) {
-	int32_t cx = x;
-	for(const char *p = text; *p; ++p) {
-		uint32_t ch = (uint8_t)*p;
-		if(ch < MKGUI_GLYPH_FIRST || ch > MKGUI_GLYPH_LAST) {
-			cx += ctx->char_width;
-			continue;
-		}
-		struct mkgui_glyph *g = &ctx->glyphs[ch - MKGUI_GLYPH_FIRST];
-
-		int32_t gx = cx + g->bearing_x;
-		if(gx >= cx2) {
-			break;
-		}
-		if(gx + g->width <= cx1) {
-			cx += g->advance;
-			continue;
-		}
-
-		int32_t gy = y + ctx->font_ascent - g->bearing_y;
-		int32_t col0 = cx1 - gx;
-		int32_t col1 = cx2 - gx;
-		if(col0 < 0) { col0 = 0; }
-		if(col1 > g->width) { col1 = g->width; }
-		int32_t row0 = cy1 - gy;
-		int32_t row1 = cy2 - gy;
-		if(row0 < 0) { row0 = 0; }
-		if(row1 > g->height) { row1 = g->height; }
-
-		for(int32_t row = row0; row < row1; ++row) {
-			int32_t py = gy + row;
-			uint32_t *rowp = &buf[py * bw];
-			uint8_t *bmp = &g->bitmap[row * g->width];
-			for(int32_t col = col0; col < col1; ++col) {
-				uint8_t alpha = bmp[col];
-				if(alpha == 0) {
-					continue;
-				}
-				int32_t px = gx + col;
-				rowp[px] = blend_pixel(rowp[px], color, alpha);
-			}
-		}
-
-		cx += g->advance;
-	}
-}
-
-// ---------------------------------------------------------------------------
-// Text command buffer
-// ---------------------------------------------------------------------------
-
-struct mkgui_text_cmd {
-	int32_t x, y;
-	int32_t clip_x1, clip_y1, clip_x2, clip_y2;
-	char text[MKGUI_MAX_TEXT];
-	uint32_t color;
-};
-
-static struct mkgui_text_cmd *text_cmds;
-static uint32_t text_cmd_count;
-static uint32_t text_cmd_cap;
-
-#define MKGUI_TEXT_CMD_GROW 512
-
-// [=]===^=[ push_text_clip ]=====================================[=]
-static void push_text_clip(int32_t x, int32_t y, const char *text, uint32_t color, int32_t cx1, int32_t cy1, int32_t cx2, int32_t cy2) {
-	if(text_cmd_count >= text_cmd_cap) {
-		uint32_t nc = text_cmd_cap + MKGUI_TEXT_CMD_GROW;
-		struct mkgui_text_cmd *nt = (struct mkgui_text_cmd *)realloc(text_cmds, (size_t)nc * sizeof(struct mkgui_text_cmd));
-		if(!nt) {
-			return;
-		}
-		text_cmds = nt;
-		text_cmd_cap = nc;
-	}
-	if(cx1 < render_clip_x1) { cx1 = render_clip_x1; }
-	if(cy1 < render_clip_y1) { cy1 = render_clip_y1; }
-	if(cx2 > render_clip_x2) { cx2 = render_clip_x2; }
-	if(cy2 > render_clip_y2) { cy2 = render_clip_y2; }
-	struct mkgui_text_cmd *cmd = &text_cmds[text_cmd_count++];
-	cmd->x = x;
-	cmd->y = y;
-	cmd->clip_x1 = cx1;
-	cmd->clip_y1 = cy1;
-	cmd->clip_x2 = cx2;
-	cmd->clip_y2 = cy2;
-	cmd->color = color;
-	size_t slen = strlen(text);
-	if(slen >= MKGUI_MAX_TEXT) {
-		slen = MKGUI_MAX_TEXT - 1;
-	}
-	memcpy(cmd->text, text, slen);
-	cmd->text[slen] = '\0';
-}
-
-// [=]===^=[ push_text ]=========================================[=]
-static void push_text(int32_t x, int32_t y, const char *text, uint32_t color) {
-	push_text_clip(x, y, text, color, render_clip_x1, render_clip_y1, render_clip_x2, render_clip_y2);
-}
-
-// [=]===^=[ clip_intersect ]=====================================[=]
-static void clip_intersect(int32_t *x1, int32_t *y1, int32_t *x2, int32_t *y2, int32_t bx1, int32_t by1, int32_t bx2, int32_t by2) {
-	if(*x1 < bx1) { *x1 = bx1; }
-	if(*y1 < by1) { *y1 = by1; }
-	if(*x2 > bx2) { *x2 = bx2; }
-	if(*y2 > by2) { *y2 = by2; }
-}
-
-// [=]===^=[ flush_text_to ]======================================[=]
-static void flush_text_to(struct mkgui_ctx *ctx, uint32_t *buf, int32_t bw, int32_t bh, int32_t ox, int32_t oy) {
-	for(uint32_t i = 0; i < text_cmd_count; ++i) {
-		struct mkgui_text_cmd *cmd = &text_cmds[i];
-		int32_t cx1 = cmd->clip_x1 - ox, cy1 = cmd->clip_y1 - oy;
-		int32_t cx2 = cmd->clip_x2 - ox, cy2 = cmd->clip_y2 - oy;
-		clip_intersect(&cx1, &cy1, &cx2, &cy2, 0, 0, bw, bh);
-		if(cx1 >= cx2 || cy1 >= cy2) {
-			continue;
-		}
-		draw_text_sw(ctx, buf, bw, cmd->x - ox, cmd->y - oy, cmd->text, cmd->color, cx1, cy1, cx2, cy2);
-	}
-	text_cmd_count = 0;
-}
-
-// [=]===^=[ flush_text ]========================================[=]
-static void flush_text(struct mkgui_ctx *ctx) {
-	flush_text_to(ctx, ctx->pixels, ctx->win_w, ctx->win_h, 0, 0);
-}
-
-// [=]===^=[ flush_text_popup ]==================================[=]
-static void flush_text_popup(struct mkgui_ctx *ctx, struct mkgui_popup *p) {
-	flush_text_to(ctx, p->pixels, p->w, p->h, p->x, p->y);
-}
-
-// [=]===^=[ text_width ]========================================[=]
-static int32_t text_width(struct mkgui_ctx *ctx, const char *text) {
-	int32_t w = 0;
-	for(const char *p = text; *p; ++p) {
-		uint32_t ch = (uint8_t)*p;
-		if(ch >= MKGUI_GLYPH_FIRST && ch <= MKGUI_GLYPH_LAST) {
-			w += ctx->glyphs[ch - MKGUI_GLYPH_FIRST].advance;
-		} else {
-			w += ctx->char_width;
-		}
-	}
-	return w;
-}
+#include "mkgui_render.c"
 
 // ---------------------------------------------------------------------------
 // Widget lookup helpers
@@ -1409,195 +1024,35 @@ static int32_t find_widget_idx(struct mkgui_ctx *ctx, uint32_t id) {
 	return -1;
 }
 
-// [=]===^=[ find_tabs_data ]====================================[=]
-static struct mkgui_tabs_data *find_tabs_data(struct mkgui_ctx *ctx, uint32_t widget_id) {
-	for(uint32_t i = 0; i < ctx->tab_count; ++i) {
-		if(ctx->tabs[i].widget_id == widget_id) {
-			return &ctx->tabs[i];
-		}
-	}
-	return NULL;
+#define MKGUI_FIND_AUX(name, type, arr, cnt) \
+static struct type *name(struct mkgui_ctx *ctx, uint32_t widget_id) { \
+	for(uint32_t i = 0; i < ctx->cnt; ++i) { \
+		if(ctx->arr[i].widget_id == widget_id) { \
+			return &ctx->arr[i]; \
+		} \
+	} \
+	return NULL; \
 }
 
-// [=]===^=[ find_listv_data ]==================================[=]
-static struct mkgui_listview_data *find_listv_data(struct mkgui_ctx *ctx, uint32_t widget_id) {
-	for(uint32_t i = 0; i < ctx->listv_count; ++i) {
-		if(ctx->listvs[i].widget_id == widget_id) {
-			return &ctx->listvs[i];
-		}
-	}
-	return NULL;
-}
-
-// [=]===^=[ find_gridv_data ]==================================[=]
-static struct mkgui_gridview_data *find_gridv_data(struct mkgui_ctx *ctx, uint32_t widget_id) {
-	for(uint32_t i = 0; i < ctx->gridview_count; ++i) {
-		if(ctx->gridviews[i].widget_id == widget_id) {
-			return &ctx->gridviews[i];
-		}
-	}
-	return NULL;
-}
-
-// [=]===^=[ find_input_data ]===================================[=]
-static struct mkgui_input_data *find_input_data(struct mkgui_ctx *ctx, uint32_t widget_id) {
-	for(uint32_t i = 0; i < ctx->input_count; ++i) {
-		if(ctx->inputs[i].widget_id == widget_id) {
-			return &ctx->inputs[i];
-		}
-	}
-	return NULL;
-}
-
-// [=]===^=[ find_ipinput_data ]=================================[=]
-static struct mkgui_ipinput_data *find_ipinput_data(struct mkgui_ctx *ctx, uint32_t widget_id) {
-	for(uint32_t i = 0; i < ctx->ipinput_count; ++i) {
-		if(ctx->ipinputs[i].widget_id == widget_id) {
-			return &ctx->ipinputs[i];
-		}
-	}
-	return NULL;
-}
-
-// [=]===^=[ find_toggle_data ]==================================[=]
-static struct mkgui_toggle_data *find_toggle_data(struct mkgui_ctx *ctx, uint32_t widget_id) {
-	for(uint32_t i = 0; i < ctx->toggle_count; ++i) {
-		if(ctx->toggles[i].widget_id == widget_id) {
-			return &ctx->toggles[i];
-		}
-	}
-	return NULL;
-}
-
-// [=]===^=[ find_combobox_data ]=================================[=]
-static struct mkgui_combobox_data *find_combobox_data(struct mkgui_ctx *ctx, uint32_t widget_id) {
-	for(uint32_t i = 0; i < ctx->combobox_count; ++i) {
-		if(ctx->comboboxes[i].widget_id == widget_id) {
-			return &ctx->comboboxes[i];
-		}
-	}
-	return NULL;
-}
-
-// [=]===^=[ find_datepicker_data ]===============================[=]
-static struct mkgui_datepicker_data *find_datepicker_data(struct mkgui_ctx *ctx, uint32_t widget_id) {
-	for(uint32_t i = 0; i < ctx->datepicker_count; ++i) {
-		if(ctx->datepickers[i].widget_id == widget_id) {
-			return &ctx->datepickers[i];
-		}
-	}
-	return NULL;
-}
-
-// [=]===^=[ find_dropdown_data ]================================[=]
-static struct mkgui_dropdown_data *find_dropdown_data(struct mkgui_ctx *ctx, uint32_t widget_id) {
-	for(uint32_t i = 0; i < ctx->dropdown_count; ++i) {
-		if(ctx->dropdowns[i].widget_id == widget_id) {
-			return &ctx->dropdowns[i];
-		}
-	}
-	return NULL;
-}
-
-// [=]===^=[ find_slider_data ]=================================[=]
-static struct mkgui_slider_data *find_slider_data(struct mkgui_ctx *ctx, uint32_t widget_id) {
-	for(uint32_t i = 0; i < ctx->slider_count; ++i) {
-		if(ctx->sliders[i].widget_id == widget_id) {
-			return &ctx->sliders[i];
-		}
-	}
-	return NULL;
-}
-
-// [=]===^=[ find_split_data ]================================[=]
-static struct mkgui_split_data *find_split_data(struct mkgui_ctx *ctx, uint32_t widget_id) {
-	for(uint32_t i = 0; i < ctx->split_count; ++i) {
-		if(ctx->splits[i].widget_id == widget_id) {
-			return &ctx->splits[i];
-		}
-	}
-	return NULL;
-}
-
-// [=]===^=[ find_treeview_data ]=================================[=]
-static struct mkgui_treeview_data *find_treeview_data(struct mkgui_ctx *ctx, uint32_t widget_id) {
-	for(uint32_t i = 0; i < ctx->treeview_count; ++i) {
-		if(ctx->treeviews[i].widget_id == widget_id) {
-			return &ctx->treeviews[i];
-		}
-	}
-	return NULL;
-}
-
-// [=]===^=[ find_statusbar_data ]================================[=]
-static struct mkgui_statusbar_data *find_statusbar_data(struct mkgui_ctx *ctx, uint32_t widget_id) {
-	for(uint32_t i = 0; i < ctx->statusbar_count; ++i) {
-		if(ctx->statusbars[i].widget_id == widget_id) {
-			return &ctx->statusbars[i];
-		}
-	}
-	return NULL;
-}
-
-// [=]===^=[ find_spinbox_data ]=================================[=]
-static struct mkgui_spinbox_data *find_spinbox_data(struct mkgui_ctx *ctx, uint32_t widget_id) {
-	for(uint32_t i = 0; i < ctx->spinbox_count; ++i) {
-		if(ctx->spinboxes[i].widget_id == widget_id) {
-			return &ctx->spinboxes[i];
-		}
-	}
-	return NULL;
-}
-
-// [=]===^=[ find_progress_data ]=================================[=]
-static struct mkgui_progress_data *find_progress_data(struct mkgui_ctx *ctx, uint32_t widget_id) {
-	for(uint32_t i = 0; i < ctx->progress_count; ++i) {
-		if(ctx->progress[i].widget_id == widget_id) {
-			return &ctx->progress[i];
-		}
-	}
-	return NULL;
-}
-
-// [=]===^=[ find_textarea_data ]=================================[=]
-static struct mkgui_textarea_data *find_textarea_data(struct mkgui_ctx *ctx, uint32_t widget_id) {
-	for(uint32_t i = 0; i < ctx->textarea_count; ++i) {
-		if(ctx->textareas[i].widget_id == widget_id) {
-			return &ctx->textareas[i];
-		}
-	}
-	return NULL;
-}
-
-// [=]===^=[ find_itemview_data ]=================================[=]
-static struct mkgui_itemview_data *find_itemview_data(struct mkgui_ctx *ctx, uint32_t widget_id) {
-	for(uint32_t i = 0; i < ctx->itemview_count; ++i) {
-		if(ctx->itemviews[i].widget_id == widget_id) {
-			return &ctx->itemviews[i];
-		}
-	}
-	return NULL;
-}
-
-// [=]===^=[ find_canvas_data ]===================================[=]
-static struct mkgui_canvas_data *find_canvas_data(struct mkgui_ctx *ctx, uint32_t widget_id) {
-	for(uint32_t i = 0; i < ctx->canvas_count; ++i) {
-		if(ctx->canvases[i].widget_id == widget_id) {
-			return &ctx->canvases[i];
-		}
-	}
-	return NULL;
-}
-
-// [=]===^=[ find_pathbar_data ]=================================[=]
-static struct mkgui_pathbar_data *find_pathbar_data(struct mkgui_ctx *ctx, uint32_t widget_id) {
-	for(uint32_t i = 0; i < ctx->pathbar_count; ++i) {
-		if(ctx->pathbars[i].widget_id == widget_id) {
-			return &ctx->pathbars[i];
-		}
-	}
-	return NULL;
-}
+MKGUI_FIND_AUX(find_tabs_data,       mkgui_tabs_data,       tabs,        tab_count)
+MKGUI_FIND_AUX(find_listv_data,      mkgui_listview_data,   listvs,      listv_count)
+MKGUI_FIND_AUX(find_gridv_data,      mkgui_gridview_data,   gridviews,   gridview_count)
+MKGUI_FIND_AUX(find_input_data,      mkgui_input_data,      inputs,      input_count)
+MKGUI_FIND_AUX(find_ipinput_data,    mkgui_ipinput_data,    ipinputs,    ipinput_count)
+MKGUI_FIND_AUX(find_toggle_data,     mkgui_toggle_data,     toggles,     toggle_count)
+MKGUI_FIND_AUX(find_combobox_data,   mkgui_combobox_data,   comboboxes,  combobox_count)
+MKGUI_FIND_AUX(find_datepicker_data, mkgui_datepicker_data, datepickers, datepicker_count)
+MKGUI_FIND_AUX(find_dropdown_data,   mkgui_dropdown_data,   dropdowns,   dropdown_count)
+MKGUI_FIND_AUX(find_slider_data,     mkgui_slider_data,     sliders,     slider_count)
+MKGUI_FIND_AUX(find_split_data,      mkgui_split_data,      splits,      split_count)
+MKGUI_FIND_AUX(find_treeview_data,   mkgui_treeview_data,   treeviews,   treeview_count)
+MKGUI_FIND_AUX(find_statusbar_data,  mkgui_statusbar_data,  statusbars,  statusbar_count)
+MKGUI_FIND_AUX(find_spinbox_data,    mkgui_spinbox_data,    spinboxes,   spinbox_count)
+MKGUI_FIND_AUX(find_progress_data,   mkgui_progress_data,   progress,    progress_count)
+MKGUI_FIND_AUX(find_textarea_data,   mkgui_textarea_data,   textareas,   textarea_count)
+MKGUI_FIND_AUX(find_itemview_data,   mkgui_itemview_data,   itemviews,   itemview_count)
+MKGUI_FIND_AUX(find_canvas_data,     mkgui_canvas_data,     canvases,    canvas_count)
+MKGUI_FIND_AUX(find_pathbar_data,    mkgui_pathbar_data,    pathbars,    pathbar_count)
 
 // ---------------------------------------------------------------------------
 // Layout parent index (declared early for widget_visible)
@@ -1805,17 +1260,33 @@ static void dirty_bounds(struct mkgui_ctx *ctx, int32_t *bx, int32_t *by, int32_
 	for(uint32_t i = 1; i < ctx->dirty_count; ++i) {
 		int32_t dx = ctx->dirty_rects[i].x;
 		int32_t dy = ctx->dirty_rects[i].y;
-		if(dx < x0) { x0 = dx; }
-		if(dy < y0) { y0 = dy; }
+		if(dx < x0) {
+			x0 = dx;
+		}
+		if(dy < y0) {
+			y0 = dy;
+		}
 		int32_t dr = dx + ctx->dirty_rects[i].w;
 		int32_t db = dy + ctx->dirty_rects[i].h;
-		if(dr > x1) { x1 = dr; }
-		if(db > y1) { y1 = db; }
+		if(dr > x1) {
+			x1 = dr;
+		}
+		if(db > y1) {
+			y1 = db;
+		}
 	}
-	if(x0 < 0) { x0 = 0; }
-	if(y0 < 0) { y0 = 0; }
-	if(x1 > ctx->win_w) { x1 = ctx->win_w; }
-	if(y1 > ctx->win_h) { y1 = ctx->win_h; }
+	if(x0 < 0) {
+		x0 = 0;
+	}
+	if(y0 < 0) {
+		y0 = 0;
+	}
+	if(x1 > ctx->win_w) {
+		x1 = ctx->win_w;
+	}
+	if(y1 > ctx->win_h) {
+		y1 = ctx->win_h;
+	}
 	*bx = x0;
 	*by = y0;
 	*bw = x1 - x0;
@@ -1868,9 +1339,15 @@ static void layout_build_index(struct mkgui_ctx *ctx) {
 		uint32_t *np = (uint32_t *)realloc(layout_parent, (size_t)nc * sizeof(uint32_t));
 		uint32_t *nf = (uint32_t *)realloc(layout_first_child, (size_t)nc * sizeof(uint32_t));
 		uint32_t *ns = (uint32_t *)realloc(layout_next_sibling, (size_t)nc * sizeof(uint32_t));
-		if(np) { layout_parent = np; }
-		if(nf) { layout_first_child = nf; }
-		if(ns) { layout_next_sibling = ns; }
+		if(np) {
+			layout_parent = np;
+		}
+		if(nf) {
+			layout_first_child = nf;
+		}
+		if(ns) {
+			layout_next_sibling = ns;
+		}
 		if(np && nf && ns) {
 			layout_arr_cap = nc;
 		}
@@ -2582,28 +2059,84 @@ static void draw_icon(uint32_t *buf, int32_t bw, int32_t bh, struct mkgui_icon *
 	int32_t row1 = icon->h;
 	int32_t col0 = 0;
 	int32_t col1 = icon->w;
-	if(y + row0 < cy1) { row0 = cy1 - y; }
-	if(y + row0 < 0) { row0 = -y; }
-	if(y + row1 > cy2) { row1 = cy2 - y; }
-	if(y + row1 > bh) { row1 = bh - y; }
-	if(x + col0 < cx1) { col0 = cx1 - x; }
-	if(x + col0 < 0) { col0 = -x; }
-	if(x + col1 > cx2) { col1 = cx2 - x; }
-	if(x + col1 > bw) { col1 = bw - x; }
+	if(y + row0 < cy1) {
+		row0 = cy1 - y;
+	}
+	if(y + row0 < 0) {
+		row0 = -y;
+	}
+	if(y + row1 > cy2) {
+		row1 = cy2 - y;
+	}
+	if(y + row1 > bh) {
+		row1 = bh - y;
+	}
+	if(x + col0 < cx1) {
+		col0 = cx1 - x;
+	}
+	if(x + col0 < 0) {
+		col0 = -x;
+	}
+	if(x + col1 > cx2) {
+		col1 = cx2 - x;
+	}
+	if(x + col1 > bw) {
+		col1 = bw - x;
+	}
 	for(int32_t row = row0; row < row1; ++row) {
 		uint32_t *rowp = &buf[(y + row) * bw];
 		uint32_t *src = &icon->pixels[row * icon->w];
-		for(int32_t col = col0; col < col1; ++col) {
-			uint32_t spx = src[col];
-			uint32_t alpha = spx >> 24;
-			if(alpha == 0) {
+		int32_t col = col0;
+#if defined(__SSE2__)
+		__m128i round_rb = _mm_set1_epi32(0x00800080);
+		__m128i round_g = _mm_set1_epi32(0x00000080);
+		__m128i mask_rb = _mm_set1_epi32(0x00ff00ff);
+		__m128i mask_byte = _mm_set1_epi32(0x000000ff);
+		__m128i mask_a = _mm_set1_epi32((int32_t)0xff000000u);
+		__m128i val_255 = _mm_set1_epi32(255);
+		__m128i zero = _mm_setzero_si128();
+		for(; col + 4 <= col1; col += 4) {
+			__m128i spx = _mm_loadu_si128((__m128i *)&src[col]);
+			__m128i alphas = _mm_srli_epi32(spx, 24);
+			__m128i any_zero = _mm_cmpeq_epi32(alphas, zero);
+			if(_mm_movemask_epi8(any_zero) == 0xffff) {
 				continue;
 			}
 			int32_t px = x + col;
-			if(alpha == 255) {
+			__m128i dst = _mm_loadu_si128((__m128i *)&rowp[px]);
+			__m128i ia = _mm_sub_epi32(val_255, alphas);
+			__m128i a16 = _mm_or_si128(alphas, _mm_slli_epi32(alphas, 16));
+			__m128i ia16 = _mm_or_si128(ia, _mm_slli_epi32(ia, 16));
+			__m128i src_rb = _mm_and_si128(spx, mask_rb);
+			__m128i src_g8 = _mm_and_si128(_mm_srli_epi32(spx, 8), mask_byte);
+			__m128i dst_rb = _mm_and_si128(dst, mask_rb);
+			__m128i dst_g8 = _mm_and_si128(_mm_srli_epi32(dst, 8), mask_byte);
+			__m128i rb = _mm_add_epi32(_mm_add_epi32(_mm_mullo_epi16(src_rb, a16), _mm_mullo_epi16(dst_rb, ia16)), round_rb);
+			rb = _mm_and_si128(_mm_srli_epi32(_mm_add_epi32(rb, _mm_and_si128(_mm_srli_epi32(rb, 8), mask_rb)), 8), mask_rb);
+			__m128i gv = _mm_add_epi32(_mm_add_epi32(_mm_mullo_epi16(src_g8, alphas), _mm_mullo_epi16(dst_g8, ia)), round_g);
+			gv = _mm_slli_epi32(_mm_and_si128(_mm_srli_epi32(_mm_add_epi32(gv, _mm_and_si128(_mm_srli_epi32(gv, 8), mask_byte)), 8), mask_byte), 8);
+			__m128i result = _mm_or_si128(_mm_or_si128(rb, gv), mask_a);
+			__m128i full = _mm_cmpeq_epi32(alphas, val_255);
+			result = _mm_or_si128(_mm_and_si128(full, spx), _mm_andnot_si128(full, result));
+			__m128i skip = _mm_cmpeq_epi32(alphas, zero);
+			result = _mm_or_si128(_mm_andnot_si128(skip, result), _mm_and_si128(skip, dst));
+			_mm_storeu_si128((__m128i *)&rowp[px], result);
+		}
+#endif
+		for(; col < col1; ++col) {
+			uint32_t spx = src[col];
+			uint32_t a = spx >> 24;
+			int32_t px = x + col;
+			if(a == 255) {
 				rowp[px] = spx;
-			} else {
-				rowp[px] = blend_pixel(rowp[px], spx, (uint8_t)alpha);
+			} else if(a > 0) {
+				uint32_t ia = 255 - a;
+				uint32_t d = rowp[px];
+				uint32_t rb = ((spx & 0x00ff00ff) * a + (d & 0x00ff00ff) * ia + 0x00800080);
+				rb = ((rb + ((rb >> 8) & 0x00ff00ff)) >> 8) & 0x00ff00ff;
+				uint32_t gv = ((spx & 0x0000ff00) * a + (d & 0x0000ff00) * ia + 0x00008000);
+				gv = ((gv + ((gv >> 8) & 0x0000ff00)) >> 8) & 0x0000ff00;
+				rowp[px] = 0xff000000 | rb | gv;
 			}
 		}
 	}
@@ -2808,15 +2341,27 @@ static void render_widget(struct mkgui_ctx *ctx, uint32_t idx) {
 					draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, sx, ry, MKGUI_SCROLLBAR_W, rh, ctx->theme.scrollbar_bg);
 					int32_t track = rh;
 					int32_t total = bs->content_h;
-					if(total < 1) { total = 1; }
+					if(total < 1) {
+						total = 1;
+					}
 					int32_t thumb = track * rh / total;
-					if(thumb < 20) { thumb = 20; }
-					if(thumb > track) { thumb = track; }
+					if(thumb < 20) {
+						thumb = 20;
+					}
+					if(thumb > track) {
+						thumb = track;
+					}
 					int32_t max_scroll = bs->content_h - rh;
-					if(max_scroll < 1) { max_scroll = 1; }
+					if(max_scroll < 1) {
+						max_scroll = 1;
+					}
 					int32_t pos = (int32_t)((int64_t)bs->scroll_y * (track - thumb) / max_scroll);
-					if(pos < 0) { pos = 0; }
-					if(pos > track - thumb) { pos = track - thumb; }
+					if(pos < 0) {
+						pos = 0;
+					}
+					if(pos > track - thumb) {
+						pos = track - thumb;
+					}
 					draw_rounded_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, sx + 2, ry + pos, MKGUI_SCROLLBAR_W - 4, thumb, ctx->theme.scrollbar_thumb, r);
 				}
 				if(bs && bs->content_w > rw) {
@@ -2824,15 +2369,27 @@ static void render_widget(struct mkgui_ctx *ctx, uint32_t idx) {
 					draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, rx, sy, rw, MKGUI_SCROLLBAR_W, ctx->theme.scrollbar_bg);
 					int32_t track = rw;
 					int32_t total = bs->content_w;
-					if(total < 1) { total = 1; }
+					if(total < 1) {
+						total = 1;
+					}
 					int32_t thumb = track * rw / total;
-					if(thumb < 20) { thumb = 20; }
-					if(thumb > track) { thumb = track; }
+					if(thumb < 20) {
+						thumb = 20;
+					}
+					if(thumb > track) {
+						thumb = track;
+					}
 					int32_t max_scroll = bs->content_w - rw;
-					if(max_scroll < 1) { max_scroll = 1; }
+					if(max_scroll < 1) {
+						max_scroll = 1;
+					}
 					int32_t pos = (int32_t)((int64_t)bs->scroll_x * (track - thumb) / max_scroll);
-					if(pos < 0) { pos = 0; }
-					if(pos > track - thumb) { pos = track - thumb; }
+					if(pos < 0) {
+						pos = 0;
+					}
+					if(pos > track - thumb) {
+						pos = track - thumb;
+					}
 					draw_rounded_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, rx + pos, sy + 2, thumb, MKGUI_SCROLLBAR_W - 4, ctx->theme.scrollbar_thumb, r);
 				}
 			}
@@ -2855,10 +2412,18 @@ static void set_parent_clip(struct mkgui_ctx *ctx, uint32_t idx) {
 		int32_t py = ctx->rects[pidx].y;
 		int32_t px2 = px + ctx->rects[pidx].w;
 		int32_t py2 = py + ctx->rects[pidx].h;
-		if(px > render_clip_x1) { render_clip_x1 = px; }
-		if(py > render_clip_y1) { render_clip_y1 = py; }
-		if(px2 < render_clip_x2) { render_clip_x2 = px2; }
-		if(py2 < render_clip_y2) { render_clip_y2 = py2; }
+		if(px > render_clip_x1) {
+			render_clip_x1 = px;
+		}
+		if(py > render_clip_y1) {
+			render_clip_y1 = py;
+		}
+		if(px2 < render_clip_x2) {
+			render_clip_x2 = px2;
+		}
+		if(py2 < render_clip_y2) {
+			render_clip_y2 = py2;
+		}
 		pidx = layout_parent[pidx];
 	}
 }
@@ -3147,9 +2712,15 @@ static uint32_t mkgui_grow_widgets(struct mkgui_ctx *ctx) {
 	struct mkgui_rect *nr = (struct mkgui_rect *)realloc(ctx->rects, (size_t)new_cap * sizeof(struct mkgui_rect));
 	char (*nt)[MKGUI_MAX_TEXT] = (char (*)[MKGUI_MAX_TEXT])realloc(ctx->tooltip_texts, (size_t)new_cap * MKGUI_MAX_TEXT);
 	if(!nw || !nr || !nt) {
-		if(nw) { ctx->widgets = nw; }
-		if(nr) { ctx->rects = nr; }
-		if(nt) { ctx->tooltip_texts = nt; }
+		if(nw) {
+			ctx->widgets = nw;
+		}
+		if(nr) {
+			ctx->rects = nr;
+		}
+		if(nt) {
+			ctx->tooltip_texts = nt;
+		}
 		return 0;
 	}
 	memset(&nw[ctx->widget_cap], 0, (size_t)MKGUI_GROW_WIDGETS * sizeof(struct mkgui_widget));
@@ -3535,18 +3106,42 @@ static uint32_t mkgui_remove_widget(struct mkgui_ctx *ctx, uint32_t id) {
 	for(uint32_t i = 0; i < ctx->widget_count; ++i) {
 		if(marked[i]) {
 			uint32_t wid = ctx->widgets[i].id;
-			if(ctx->hover_id == wid) { ctx->hover_id = 0; }
-			if(ctx->prev_hover_id == wid) { ctx->prev_hover_id = 0; }
-			if(ctx->press_id == wid) { ctx->press_id = 0; }
-			if(ctx->focus_id == wid) { ctx->focus_id = 0; }
-			if(ctx->prev_focus_id == wid) { ctx->prev_focus_id = 0; }
-			if(ctx->drag_scrollbar_id == wid) { ctx->drag_scrollbar_id = 0; }
-			if(ctx->drag_col_id == wid) { ctx->drag_col_id = 0; }
-			if(ctx->drag_col_resize_id == wid) { ctx->drag_col_resize_id = 0; }
-			if(ctx->drag_select_id == wid) { ctx->drag_select_id = 0; }
-			if(ctx->dblclick_id == wid) { ctx->dblclick_id = 0; }
-			if(ctx->divider_dblclick_id == wid) { ctx->divider_dblclick_id = 0; }
-			if(ctx->tooltip_id == wid) { ctx->tooltip_id = 0; }
+			if(ctx->hover_id == wid) {
+				ctx->hover_id = 0;
+			}
+			if(ctx->prev_hover_id == wid) {
+				ctx->prev_hover_id = 0;
+			}
+			if(ctx->press_id == wid) {
+				ctx->press_id = 0;
+			}
+			if(ctx->focus_id == wid) {
+				ctx->focus_id = 0;
+			}
+			if(ctx->prev_focus_id == wid) {
+				ctx->prev_focus_id = 0;
+			}
+			if(ctx->drag_scrollbar_id == wid) {
+				ctx->drag_scrollbar_id = 0;
+			}
+			if(ctx->drag_col_id == wid) {
+				ctx->drag_col_id = 0;
+			}
+			if(ctx->drag_col_resize_id == wid) {
+				ctx->drag_col_resize_id = 0;
+			}
+			if(ctx->drag_select_id == wid) {
+				ctx->drag_select_id = 0;
+			}
+			if(ctx->dblclick_id == wid) {
+				ctx->dblclick_id = 0;
+			}
+			if(ctx->divider_dblclick_id == wid) {
+				ctx->divider_dblclick_id = 0;
+			}
+			if(ctx->tooltip_id == wid) {
+				ctx->tooltip_id = 0;
+			}
 
 			for(uint32_t p = 0; p < ctx->popup_count; ++p) {
 				if(ctx->popups[p].widget_id == wid) {
@@ -4122,35 +3717,63 @@ static uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 								int32_t sx = ctx->rects[dsi].x;
 								int32_t track = sw;
 								int32_t total = bs->content_w;
-								if(total < 1) { total = 1; }
+								if(total < 1) {
+									total = 1;
+								}
 								int32_t thumb = track * sw / total;
-								if(thumb < 20) { thumb = 20; }
-								if(thumb > track) { thumb = track; }
+								if(thumb < 20) {
+									thumb = 20;
+								}
+								if(thumb > track) {
+									thumb = track;
+								}
 								int32_t max_scroll = bs->content_w - sw;
-								if(max_scroll < 1) { max_scroll = 1; }
+								if(max_scroll < 1) {
+									max_scroll = 1;
+								}
 								int32_t new_pos = ctx->mouse_x - sx - ctx->drag_scrollbar_offset;
 								int32_t scrollable_range = track - thumb;
-								if(scrollable_range < 1) { scrollable_range = 1; }
+								if(scrollable_range < 1) {
+									scrollable_range = 1;
+								}
 								bs->scroll_x = (int32_t)((int64_t)new_pos * max_scroll / scrollable_range);
-								if(bs->scroll_x < 0) { bs->scroll_x = 0; }
-								if(bs->scroll_x > max_scroll) { bs->scroll_x = max_scroll; }
+								if(bs->scroll_x < 0) {
+									bs->scroll_x = 0;
+								}
+								if(bs->scroll_x > max_scroll) {
+									bs->scroll_x = max_scroll;
+								}
 							} else {
 								int32_t sh = ctx->rects[dsi].h;
 								int32_t sy = ctx->rects[dsi].y;
 								int32_t track = sh;
 								int32_t total = bs->content_h;
-								if(total < 1) { total = 1; }
+								if(total < 1) {
+									total = 1;
+								}
 								int32_t thumb = track * sh / total;
-								if(thumb < 20) { thumb = 20; }
-								if(thumb > track) { thumb = track; }
+								if(thumb < 20) {
+									thumb = 20;
+								}
+								if(thumb > track) {
+									thumb = track;
+								}
 								int32_t max_scroll = bs->content_h - sh;
-								if(max_scroll < 1) { max_scroll = 1; }
+								if(max_scroll < 1) {
+									max_scroll = 1;
+								}
 								int32_t new_pos = ctx->mouse_y - sy - ctx->drag_scrollbar_offset;
 								int32_t scrollable_range = track - thumb;
-								if(scrollable_range < 1) { scrollable_range = 1; }
+								if(scrollable_range < 1) {
+									scrollable_range = 1;
+								}
 								bs->scroll_y = (int32_t)((int64_t)new_pos * max_scroll / scrollable_range);
-								if(bs->scroll_y < 0) { bs->scroll_y = 0; }
-								if(bs->scroll_y > max_scroll) { bs->scroll_y = max_scroll; }
+								if(bs->scroll_y < 0) {
+									bs->scroll_y = 0;
+								}
+								if(bs->scroll_y > max_scroll) {
+									bs->scroll_y = max_scroll;
+								}
 							}
 							dirty_all(ctx);
 						}
@@ -4432,10 +4055,14 @@ static uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 							} else {
 								if(pev.button == 4) {
 									--dp->view_month;
-									if(dp->view_month < 1) { dp->view_month = 12; --dp->view_year; }
+									if(dp->view_month < 1) {
+										dp->view_month = 12; --dp->view_year;
+									}
 								} else {
 									++dp->view_month;
-									if(dp->view_month > 12) { dp->view_month = 1; ++dp->view_year; }
+									if(dp->view_month > 12) {
+										dp->view_month = 1; ++dp->view_year;
+									}
 								}
 							}
 							p->dirty = 1;
@@ -4694,6 +4321,7 @@ static uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 							struct mkgui_treeview_data *tv = find_treeview_data(ctx, hw->id);
 							if(tv) {
 								int32_t body_y = ctx->rects[hi].y + 1;
+								tv_idx_build(tv);
 								int32_t vis_row = (ctx->mouse_y - body_y + tv->scroll_y) / MKGUI_ROW_HEIGHT;
 								int32_t node_id = -1;
 								int32_t vis = 0;
@@ -4909,17 +4537,29 @@ static uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 									if(ctx->widgets[si].type == MKGUI_HBOX && bs->content_w > ctx->rects[si].w) {
 										int32_t view_w = ctx->rects[si].w;
 										int32_t max_scroll = bs->content_w - view_w;
-										if(max_scroll < 0) { max_scroll = 0; }
+										if(max_scroll < 0) {
+											max_scroll = 0;
+										}
 										bs->scroll_x += delta;
-										if(bs->scroll_x < 0) { bs->scroll_x = 0; }
-										if(bs->scroll_x > max_scroll) { bs->scroll_x = max_scroll; }
+										if(bs->scroll_x < 0) {
+											bs->scroll_x = 0;
+										}
+										if(bs->scroll_x > max_scroll) {
+											bs->scroll_x = max_scroll;
+										}
 									} else {
 										int32_t view_h = ctx->rects[si].h;
 										int32_t max_scroll = bs->content_h - view_h;
-										if(max_scroll < 0) { max_scroll = 0; }
+										if(max_scroll < 0) {
+											max_scroll = 0;
+										}
 										bs->scroll_y += delta;
-										if(bs->scroll_y < 0) { bs->scroll_y = 0; }
-										if(bs->scroll_y > max_scroll) { bs->scroll_y = max_scroll; }
+										if(bs->scroll_y < 0) {
+											bs->scroll_y = 0;
+										}
+										if(bs->scroll_y > max_scroll) {
+											bs->scroll_y = max_scroll;
+										}
 									}
 									dirty_all(ctx);
 								}
@@ -4945,12 +4585,20 @@ static uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 							if(ctx->mouse_x >= sx && ctx->mouse_x < sx + sw && ctx->mouse_y >= sy && ctx->mouse_y < sy + MKGUI_SCROLLBAR_W) {
 								int32_t track = sw;
 								int32_t total = bs->content_w;
-								if(total < 1) { total = 1; }
+								if(total < 1) {
+									total = 1;
+								}
 								int32_t thumb = track * sw / total;
-								if(thumb < 20) { thumb = 20; }
-								if(thumb > track) { thumb = track; }
+								if(thumb < 20) {
+									thumb = 20;
+								}
+								if(thumb > track) {
+									thumb = track;
+								}
 								int32_t max_scroll = bs->content_w - sw;
-								if(max_scroll < 1) { max_scroll = 1; }
+								if(max_scroll < 1) {
+									max_scroll = 1;
+								}
 								int32_t pos = (int32_t)((int64_t)bs->scroll_x * (track - thumb) / max_scroll);
 								if(ctx->mouse_x >= sx + pos && ctx->mouse_x < sx + pos + thumb) {
 									ctx->drag_scrollbar_id = bw->id;
@@ -4968,15 +4616,27 @@ static uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 						if(ctx->mouse_x >= sx && ctx->mouse_x < sx + MKGUI_SCROLLBAR_W && ctx->mouse_y >= sy && ctx->mouse_y < sy + sh) {
 							int32_t track = sh;
 							int32_t total = bs->content_h;
-							if(total < 1) { total = 1; }
+							if(total < 1) {
+								total = 1;
+							}
 							int32_t thumb = track * sh / total;
-							if(thumb < 20) { thumb = 20; }
-							if(thumb > track) { thumb = track; }
+							if(thumb < 20) {
+								thumb = 20;
+							}
+							if(thumb > track) {
+								thumb = track;
+							}
 							int32_t max_scroll = bs->content_h - sh;
-							if(max_scroll < 1) { max_scroll = 1; }
+							if(max_scroll < 1) {
+								max_scroll = 1;
+							}
 							int32_t pos = (int32_t)((int64_t)bs->scroll_y * (track - thumb) / max_scroll);
-							if(pos < 0) { pos = 0; }
-							if(pos > track - thumb) { pos = track - thumb; }
+							if(pos < 0) {
+								pos = 0;
+							}
+							if(pos > track - thumb) {
+								pos = track - thumb;
+							}
 							int32_t thumb_y = sy + pos;
 							if(ctx->mouse_y >= thumb_y && ctx->mouse_y < thumb_y + thumb) {
 								ctx->drag_scrollbar_id = bw->id;
@@ -4985,8 +4645,12 @@ static uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 								int32_t dir = ctx->mouse_y < thumb_y ? -1 : 1;
 								int32_t step = sh / 2;
 								bs->scroll_y += dir * step;
-								if(bs->scroll_y < 0) { bs->scroll_y = 0; }
-								if(bs->scroll_y > max_scroll) { bs->scroll_y = max_scroll; }
+								if(bs->scroll_y < 0) {
+									bs->scroll_y = 0;
+								}
+								if(bs->scroll_y > max_scroll) {
+									bs->scroll_y = max_scroll;
+								}
 							}
 							dirty_all(ctx);
 							break;

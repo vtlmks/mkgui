@@ -20,11 +20,19 @@ static void combobox_filter(struct mkgui_combobox_data *cb) {
 			for(uint32_t t = 0; cb->text[t] && match; ++t) {
 				char a = cb->items[i][s + t];
 				char b = cb->text[t];
-				if(a >= 'A' && a <= 'Z') { a += 32; }
-				if(b >= 'A' && b <= 'Z') { b += 32; }
-				if(a != b) { match = 0; }
+				if(a >= 'A' && a <= 'Z') {
+					a += 32;
+				}
+				if(b >= 'A' && b <= 'Z') {
+					b += 32;
+				}
+				if(a != b) {
+					match = 0;
+				}
 			}
-			if(match) { found = 1; }
+			if(match) {
+				found = 1;
+			}
 		}
 		if(found && cb->filter_count < MKGUI_MAX_DROPDOWN) {
 			cb->filter_map[cb->filter_count++] = i;

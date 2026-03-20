@@ -14,12 +14,17 @@ static void slider_draw_wedge_v(uint32_t *buf, int32_t bw, int32_t bh,
 	if(h <= 1 || row_count <= 0 || max_w <= 0) {
 		return;
 	}
-	for(int32_t i = 0; i < row_count; ++i) {
+	int32_t i_start = 0;
+	int32_t i_end = row_count;
+	if(y + row_start < 0) {
+		i_start = -(y + row_start);
+	}
+	if(y + row_start + row_count > bh) {
+		i_end = bh - y - row_start;
+	}
+	for(int32_t i = i_start; i < i_end; ++i) {
 		int32_t row = row_start + i;
 		int32_t py = y + row;
-		if(py < 0 || py >= bh) {
-			continue;
-		}
 		float t = (float)(h - 1 - row) / (float)(h - 1);
 		float w_f = t * (float)max_w;
 		int32_t w_full = (int32_t)w_f;
@@ -48,12 +53,17 @@ static void slider_draw_wedge_h(uint32_t *buf, int32_t bw, int32_t bh,
 	if(w <= 1 || col_count <= 0 || max_h <= 0) {
 		return;
 	}
-	for(int32_t i = 0; i < col_count; ++i) {
+	int32_t ci_start = 0;
+	int32_t ci_end = col_count;
+	if(x + col_start < 0) {
+		ci_start = -(x + col_start);
+	}
+	if(x + col_start + col_count > bw) {
+		ci_end = bw - x - col_start;
+	}
+	for(int32_t i = ci_start; i < ci_end; ++i) {
 		int32_t col = col_start + i;
 		int32_t px = x + col;
-		if(px < 0 || px >= bw) {
-			continue;
-		}
 		float t = (float)col / (float)(w - 1);
 		float h_f = t * (float)max_h;
 		int32_t h_full = (int32_t)h_f;

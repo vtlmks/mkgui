@@ -8,6 +8,21 @@ static uint32_t circle_coverage(int32_t dx, int32_t dy, int32_t radius) {
 	int32_t base_dx8 = 8 * dx;
 	int32_t base_dy8 = 8 * dy;
 	uint32_t count = 0;
+#if defined(__SSE2__)
+	__m128i dx_vals = _mm_set_epi32(base_dx8 + 7, base_dx8 + 5, base_dx8 + 3, base_dx8 + 1);
+	for(uint32_t sy = 0; sy < 4; ++sy) {
+		int32_t sdy = base_dy8 + 2 * (int32_t)sy + 1;
+		int32_t remain = r8sq - sdy * sdy;
+		if(remain < 0) {
+			continue;
+		}
+		__m128i rem = _mm_set1_epi32(remain);
+		__m128i dx_lo = _mm_and_si128(dx_vals, _mm_set1_epi32(0x0000ffff));
+		__m128i dx2 = _mm_mullo_epi16(dx_lo, dx_lo);
+		__m128i cmp = _mm_or_si128(_mm_cmplt_epi32(dx2, rem), _mm_cmpeq_epi32(dx2, rem));
+		count += (uint32_t)__builtin_popcount((uint32_t)_mm_movemask_epi8(cmp)) / 4;
+	}
+#else
 	for(uint32_t sy = 0; sy < 4; ++sy) {
 		int32_t sdy = base_dy8 + 2 * (int32_t)sy + 1;
 		int32_t remain = r8sq - sdy * sdy;
@@ -21,21 +36,32 @@ static uint32_t circle_coverage(int32_t dx, int32_t dy, int32_t radius) {
 			}
 		}
 	}
+#endif
 	return count;
 }
 
 // [=]===^=[ draw_aa_circle_fill ]=================================[=]
 static void draw_aa_circle_fill(uint32_t *buf, int32_t bw, int32_t bh, int32_t cx, int32_t cy, int32_t radius, uint32_t color) {
-	for(int32_t dy = -radius; dy <= radius; ++dy) {
+	int32_t dy0 = -radius;
+	int32_t dy1 = radius;
+	int32_t dx0 = -radius;
+	int32_t dx1 = radius;
+	if(cy + dy0 < 0) {
+		dy0 = -cy;
+	}
+	if(cy + dy1 >= bh) {
+		dy1 = bh - 1 - cy;
+	}
+	if(cx + dx0 < 0) {
+		dx0 = -cx;
+	}
+	if(cx + dx1 >= bw) {
+		dx1 = bw - 1 - cx;
+	}
+	for(int32_t dy = dy0; dy <= dy1; ++dy) {
 		int32_t py = cy + dy;
-		if(py < 0 || py >= bh) {
-			continue;
-		}
-		for(int32_t dx = -radius; dx <= radius; ++dx) {
+		for(int32_t dx = dx0; dx <= dx1; ++dx) {
 			int32_t px = cx + dx;
-			if(px < 0 || px >= bw) {
-				continue;
-			}
 			int32_t ri = radius - 1;
 			if(dx * dx + dy * dy <= ri * ri) {
 				buf[py * bw + px] = color;
@@ -52,16 +78,26 @@ static void draw_aa_circle_fill(uint32_t *buf, int32_t bw, int32_t bh, int32_t c
 
 // [=]===^=[ draw_aa_circle_ring ]=================================[=]
 static void draw_aa_circle_ring(uint32_t *buf, int32_t bw, int32_t bh, int32_t cx, int32_t cy, int32_t outer_r, int32_t inner_r, uint32_t fill, uint32_t border) {
-	for(int32_t dy = -outer_r; dy <= outer_r; ++dy) {
+	int32_t dy0 = -outer_r;
+	int32_t dy1 = outer_r;
+	int32_t dx0 = -outer_r;
+	int32_t dx1 = outer_r;
+	if(cy + dy0 < 0) {
+		dy0 = -cy;
+	}
+	if(cy + dy1 >= bh) {
+		dy1 = bh - 1 - cy;
+	}
+	if(cx + dx0 < 0) {
+		dx0 = -cx;
+	}
+	if(cx + dx1 >= bw) {
+		dx1 = bw - 1 - cx;
+	}
+	for(int32_t dy = dy0; dy <= dy1; ++dy) {
 		int32_t py = cy + dy;
-		if(py < 0 || py >= bh) {
-			continue;
-		}
-		for(int32_t dx = -outer_r; dx <= outer_r; ++dx) {
+		for(int32_t dx = dx0; dx <= dx1; ++dx) {
 			int32_t px = cx + dx;
-			if(px < 0 || px >= bw) {
-				continue;
-			}
 			uint32_t outer_cov = circle_coverage(dx, dy, outer_r);
 			if(outer_cov == 0) {
 				continue;

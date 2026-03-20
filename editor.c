@@ -343,8 +343,12 @@ static const char *ed_type_name(uint32_t type) {
 			return ed_containers[i].name;
 		}
 	}
-	if(type == MKGUI_TAB) { return "Tab"; }
-	if(type == MKGUI_MENUITEM) { return "MenuItem"; }
+	if(type == MKGUI_TAB) {
+		return "Tab";
+	}
+	if(type == MKGUI_MENUITEM) {
+		return "MenuItem";
+	}
 	return "Unknown";
 }
 

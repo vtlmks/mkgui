@@ -1,0 +1,592 @@
+// Copyright (c) 2026, Peter Fors
+// SPDX-License-Identifier: MIT
+
+// ---------------------------------------------------------------------------
+// Drawing primitives
+// ---------------------------------------------------------------------------
+
+// [=]===^=[ blend_pixel ]========================================[=]
+static inline uint32_t blend_pixel(uint32_t dst, uint32_t color, uint8_t alpha) {
+	if(alpha == 255) {
+		return color;
+	}
+	uint32_t a = alpha;
+	uint32_t ia = 255 - a;
+	uint32_t rb_src = color & 0x00ff00ff;
+	uint32_t g_src = color & 0x0000ff00;
+	uint32_t rb_dst = dst & 0x00ff00ff;
+	uint32_t g_dst = dst & 0x0000ff00;
+	uint32_t rb = (rb_src * a + rb_dst * ia + 0x00800080);
+	rb = ((rb + ((rb >> 8) & 0x00ff00ff)) >> 8) & 0x00ff00ff;
+	uint32_t g = (g_src * a + g_dst * ia + 0x00008000);
+	g = ((g + ((g >> 8) & 0x0000ff00)) >> 8) & 0x0000ff00;
+	return 0xff000000 | rb | g;
+}
+
+static int32_t render_clip_x1, render_clip_y1, render_clip_x2, render_clip_y2;
+static int32_t render_base_clip_x1, render_base_clip_y1, render_base_clip_x2, render_base_clip_y2;
+
+// [=]===^=[ draw_pixel ]========================================[=]
+static void draw_pixel(uint32_t *buf, int32_t bw, int32_t bh, int32_t x, int32_t y, uint32_t color) {
+	if(x >= 0 && x < bw && y >= 0 && y < bh && x >= render_clip_x1 && x < render_clip_x2 && y >= render_clip_y1 && y < render_clip_y2) {
+		buf[y * bw + x] = color;
+	}
+}
+
+// [=]===^=[ draw_rect_fill ]====================================[=]
+static void draw_rect_fill(uint32_t *buf, int32_t bw, int32_t bh, int32_t x, int32_t y, int32_t w, int32_t h, uint32_t color) {
+	int32_t x0 = x < 0 ? 0 : x;
+	int32_t y0 = y < 0 ? 0 : y;
+	int32_t x1 = (x + w) > bw ? bw : (x + w);
+	int32_t y1 = (y + h) > bh ? bh : (y + h);
+	if(x0 < render_clip_x1) {
+		x0 = render_clip_x1;
+	}
+	if(y0 < render_clip_y1) {
+		y0 = render_clip_y1;
+	}
+	if(x1 > render_clip_x2) {
+		x1 = render_clip_x2;
+	}
+	if(y1 > render_clip_y2) {
+		y1 = render_clip_y2;
+	}
+	int32_t span = x1 - x0;
+	if(span <= 0) {
+		return;
+	}
+	for(int32_t row = y0; row < y1; ++row) {
+		uint32_t *dst = &buf[row * bw + x0];
+		uint32_t i = 0;
+#if defined(__SSE2__)
+		__m128i cv = _mm_set1_epi32((int32_t)color);
+		for(; i + 4 <= (uint32_t)span; i += 4) {
+			_mm_storeu_si128((__m128i *)&dst[i], cv);
+		}
+#endif
+		for(; i < (uint32_t)span; ++i) {
+			dst[i] = color;
+		}
+	}
+}
+
+#define MKGUI_MAX_CORNER_RADIUS 16
+
+// [=]===^=[ rounded_rect_insets ]=================================[=]
+static void rounded_rect_insets(int32_t radius, int32_t *out) {
+	for(uint32_t row = 0; row < (uint32_t)radius; ++row) {
+		int32_t dy = 2 * (radius - (int32_t)row) - 1;
+		int32_t r2x4 = 4 * radius * radius;
+		int32_t inset = 0;
+		for(uint32_t col = 0; col < (uint32_t)radius; ++col) {
+			int32_t dx = 2 * (radius - (int32_t)col) - 1;
+			if(dx * dx + dy * dy > r2x4) {
+				inset = (int32_t)(col + 1);
+			}
+		}
+		out[row] = inset;
+	}
+}
+
+// [=]===^=[ corner_coverage ]=====================================[=]
+static uint32_t corner_coverage(int32_t col, int32_t crow, int32_t radius) {
+	int32_t r8 = 8 * radius;
+	int32_t r8sq = r8 * r8;
+	int32_t base_dx8 = 8 * radius - 8 * col;
+	int32_t base_dy8 = 8 * radius - 8 * crow;
+	uint32_t count = 0;
+#if defined(__SSE2__)
+	__m128i dx_base = _mm_set_epi32(base_dx8 - 7, base_dx8 - 5, base_dx8 - 3, base_dx8 - 1);
+	for(uint32_t sy = 0; sy < 4; ++sy) {
+		int32_t dy8 = base_dy8 - 2 * (int32_t)sy - 1;
+		int32_t remain = r8sq - dy8 * dy8;
+		if(remain < 0) {
+			continue;
+		}
+		__m128i rem = _mm_set1_epi32(remain);
+		__m128i dx_lo = _mm_and_si128(dx_base, _mm_set1_epi32(0x0000ffff));
+		__m128i dx2 = _mm_mullo_epi16(dx_lo, dx_lo);
+		__m128i cmp = _mm_or_si128(_mm_cmplt_epi32(dx2, rem), _mm_cmpeq_epi32(dx2, rem));
+		count += (uint32_t)__builtin_popcount((uint32_t)_mm_movemask_epi8(cmp)) / 4;
+	}
+#else
+	for(uint32_t sy = 0; sy < 4; ++sy) {
+		int32_t dy8 = base_dy8 - 2 * (int32_t)sy - 1;
+		int32_t remain = r8sq - dy8 * dy8;
+		if(remain < 0) {
+			continue;
+		}
+		for(uint32_t sx = 0; sx < 4; ++sx) {
+			int32_t dx8 = base_dx8 - 2 * (int32_t)sx - 1;
+			if(dx8 * dx8 <= remain) {
+				++count;
+			}
+		}
+	}
+#endif
+	return count;
+}
+
+// [=]===^=[ fill_span_clipped ]===================================[=]
+static void fill_span_clipped(uint32_t *buf, int32_t bw, int32_t py, int32_t left, int32_t right, uint32_t color) {
+	if(left < 0) {
+		left = 0;
+	}
+	if(left < render_clip_x1) {
+		left = render_clip_x1;
+	}
+	if(right > bw) {
+		right = bw;
+	}
+	if(right > render_clip_x2) {
+		right = render_clip_x2;
+	}
+	if(left < right) {
+		uint32_t *dst = &buf[py * bw + left];
+		int32_t cnt = right - left;
+		uint32_t i = 0;
+#if defined(__SSE2__)
+		__m128i cv = _mm_set1_epi32((int32_t)color);
+		for(; i + 4 <= (uint32_t)cnt; i += 4) {
+			_mm_storeu_si128((__m128i *)&dst[i], cv);
+		}
+#endif
+		for(; i < (uint32_t)cnt; ++i) {
+			dst[i] = color;
+		}
+	}
+}
+
+// [=]===^=[ draw_rounded_rect_fill ]==============================[=]
+static void draw_rounded_rect_fill(uint32_t *buf, int32_t bw, int32_t bh, int32_t x, int32_t y, int32_t w, int32_t h, uint32_t color, int32_t radius) {
+	if(w <= 0 || h <= 0) {
+		return;
+	}
+	if(radius > w / 2) {
+		radius = w / 2;
+	}
+	if(radius > h / 2) {
+		radius = h / 2;
+	}
+	if(radius > MKGUI_MAX_CORNER_RADIUS) {
+		radius = MKGUI_MAX_CORNER_RADIUS;
+	}
+
+	for(uint32_t row = 0; row < (uint32_t)h; ++row) {
+		int32_t py = y + (int32_t)row;
+		if(py < 0 || py >= bh || py < render_clip_y1 || py >= render_clip_y2) {
+			continue;
+		}
+
+		int32_t crow = -1;
+		if((int32_t)row < radius) {
+			crow = (int32_t)row;
+		} else if((int32_t)row >= h - radius) {
+			crow = h - 1 - (int32_t)row;
+		}
+
+		if(crow >= 0 && radius > 0) {
+			uint32_t *rowp = &buf[py * bw];
+			for(uint32_t col = 0; col < (uint32_t)radius; ++col) {
+				uint32_t cov = corner_coverage((int32_t)col, crow, radius);
+				if(cov == 0) {
+					continue;
+				}
+				int32_t pl = x + (int32_t)col;
+				int32_t pr = x + w - 1 - (int32_t)col;
+				if(cov >= 16) {
+					if(pl >= 0 && pl < bw && pl >= render_clip_x1 && pl < render_clip_x2) {
+						rowp[pl] = color;
+					}
+					if(pr >= 0 && pr < bw && pr != pl && pr >= render_clip_x1 && pr < render_clip_x2) {
+						rowp[pr] = color;
+					}
+				} else {
+					uint8_t alpha = (uint8_t)(cov * 255 / 16);
+					if(pl >= 0 && pl < bw && pl >= render_clip_x1 && pl < render_clip_x2) {
+						rowp[pl] = blend_pixel(rowp[pl], color, alpha);
+					}
+					if(pr >= 0 && pr < bw && pr != pl && pr >= render_clip_x1 && pr < render_clip_x2) {
+						rowp[pr] = blend_pixel(rowp[pr], color, alpha);
+					}
+				}
+			}
+			fill_span_clipped(buf, bw, py, x + radius, x + w - radius, color);
+		} else {
+			fill_span_clipped(buf, bw, py, x, x + w, color);
+		}
+	}
+}
+
+// [=]===^=[ draw_rounded_rect ]===================================[=]
+static void draw_rounded_rect(uint32_t *buf, int32_t bw, int32_t bh, int32_t x, int32_t y, int32_t w, int32_t h, uint32_t fill, uint32_t border, int32_t radius) {
+	draw_rounded_rect_fill(buf, bw, bh, x, y, w, h, border, radius);
+	if(w > 2 && h > 2) {
+		int32_t inner_r = radius > 1 ? radius - 1 : 0;
+		draw_rounded_rect_fill(buf, bw, bh, x + 1, y + 1, w - 2, h - 2, fill, inner_r);
+	}
+}
+
+// [=]===^=[ shade_color ]=========================================[=]
+static inline uint32_t shade_color(uint32_t color, int32_t amount) {
+	int32_t r = (int32_t)((color >> 16) & 0xff) + amount;
+	int32_t g = (int32_t)((color >> 8) & 0xff) + amount;
+	int32_t b = (int32_t)(color & 0xff) + amount;
+	if(r < 0) {
+		r = 0;
+
+	} else if(r > 255) {
+		r = 255;
+	}
+	if(g < 0) {
+		g = 0;
+
+	} else if(g > 255) {
+		g = 255;
+	}
+	if(b < 0) {
+		b = 0;
+
+	} else if(b > 255) {
+		b = 255;
+	}
+	return 0xff000000 | ((uint32_t)r << 16) | ((uint32_t)g << 8) | (uint32_t)b;
+}
+
+// [=]===^=[ draw_hline ]========================================[=]
+static inline void draw_hline(uint32_t *buf, int32_t bw, int32_t bh, int32_t x, int32_t y, int32_t w, uint32_t color) {
+	if(y < 0 || y >= bh || y < render_clip_y1 || y >= render_clip_y2) {
+		return;
+	}
+	int32_t x0 = x < 0 ? 0 : x;
+	int32_t x1 = (x + w) > bw ? bw : (x + w);
+	if(x0 < render_clip_x1) {
+		x0 = render_clip_x1;
+	}
+	if(x1 > render_clip_x2) {
+		x1 = render_clip_x2;
+	}
+	uint32_t *dst = &buf[y * bw + x0];
+	int32_t cnt = x1 - x0;
+	int32_t i = 0;
+#if defined(__SSE2__)
+	__m128i cv = _mm_set1_epi32((int32_t)color);
+	for(; i + 4 <= cnt; i += 4) {
+		_mm_storeu_si128((__m128i *)&dst[i], cv);
+	}
+#endif
+	for(; i < cnt; ++i) {
+		dst[i] = color;
+	}
+}
+
+// [=]===^=[ draw_vline ]========================================[=]
+static inline void draw_vline(uint32_t *buf, int32_t bw, int32_t bh, int32_t x, int32_t y, int32_t h, uint32_t color) {
+	if(x < 0 || x >= bw || x < render_clip_x1 || x >= render_clip_x2) {
+		return;
+	}
+	int32_t y0 = y < 0 ? 0 : y;
+	int32_t y1 = (y + h) > bh ? bh : (y + h);
+	if(y0 < render_clip_y1) {
+		y0 = render_clip_y1;
+	}
+	if(y1 > render_clip_y2) {
+		y1 = render_clip_y2;
+	}
+	for(int32_t i = y0; i < y1; ++i) {
+		buf[i * bw + x] = color;
+	}
+}
+
+// [=]===^=[ draw_rect_border ]==================================[=]
+static void draw_rect_border(uint32_t *buf, int32_t bw, int32_t bh, int32_t x, int32_t y, int32_t w, int32_t h, uint32_t color) {
+	draw_hline(buf, bw, bh, x, y, w, color);
+	draw_hline(buf, bw, bh, x, y + h - 1, w, color);
+	draw_vline(buf, bw, bh, x, y, h, color);
+	draw_vline(buf, bw, bh, x + w - 1, y, h, color);
+}
+
+// [=]===^=[ draw_rect_dashed ]===================================[=]
+static void draw_rect_dashed(uint32_t *buf, int32_t bw, int32_t bh, int32_t x, int32_t y, int32_t w, int32_t h, uint32_t color, int32_t dash) {
+	for(uint32_t i = 0; i < (uint32_t)w; ++i) {
+		if(((int32_t)i / dash) & 1) {
+			continue;
+		}
+		int32_t px = x + (int32_t)i;
+		if(px >= 0 && px < bw && px >= render_clip_x1 && px < render_clip_x2) {
+			if(y >= 0 && y < bh && y >= render_clip_y1 && y < render_clip_y2) {
+				buf[y * bw + px] = color;
+			}
+			int32_t by = y + h - 1;
+			if(by >= 0 && by < bh && by >= render_clip_y1 && by < render_clip_y2) {
+				buf[by * bw + px] = color;
+			}
+		}
+	}
+	for(uint32_t i = 0; i < (uint32_t)h; ++i) {
+		if(((int32_t)i / dash) & 1) {
+			continue;
+		}
+		int32_t py = y + (int32_t)i;
+		if(py >= 0 && py < bh && py >= render_clip_y1 && py < render_clip_y2) {
+			if(x >= 0 && x < bw && x >= render_clip_x1 && x < render_clip_x2) {
+				buf[py * bw + x] = color;
+			}
+			int32_t rx = x + w - 1;
+			if(rx >= 0 && rx < bw && rx >= render_clip_x1 && rx < render_clip_x2) {
+				buf[py * bw + rx] = color;
+			}
+		}
+	}
+}
+
+enum {
+	MKGUI_STYLE_RAISED,
+	MKGUI_STYLE_SUNKEN,
+};
+
+// [=]===^=[ draw_patch ]==========================================[=]
+static void draw_patch(struct mkgui_ctx *ctx, uint32_t style, int32_t x, int32_t y, int32_t w, int32_t h, uint32_t fill, uint32_t border) {
+	int32_t r = ctx->theme.corner_radius;
+	draw_rounded_rect(ctx->pixels, ctx->win_w, ctx->win_h, x, y, w, h, fill, border, r);
+
+	if(w > 2 && h > 2) {
+		int32_t inner_r = r > 1 ? r - 1 : 0;
+		int32_t insets[MKGUI_MAX_CORNER_RADIUS];
+		int32_t hl_inset = 0;
+		if(inner_r > 0) {
+			rounded_rect_insets(inner_r, insets);
+			hl_inset = insets[0];
+		}
+		int32_t hl_y = y + 1;
+		if(hl_y >= 0 && hl_y < ctx->win_h && hl_y >= render_clip_y1 && hl_y < render_clip_y2) {
+			uint32_t hl;
+			if(style == MKGUI_STYLE_SUNKEN) {
+				hl = shade_color(fill, -6);
+			} else {
+				hl = shade_color(fill, 8);
+			}
+			fill_span_clipped(ctx->pixels, ctx->win_w, hl_y, x + 1 + hl_inset, x + w - 1 - hl_inset, hl);
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Software text renderer
+// ---------------------------------------------------------------------------
+
+// [=]===^=[ draw_text_sw ]=======================================[=]
+static void draw_text_sw(struct mkgui_ctx *ctx, uint32_t *buf, int32_t bw, int32_t x, int32_t y, const char *text, uint32_t color, int32_t cx1, int32_t cy1, int32_t cx2, int32_t cy2) {
+	int32_t cx = x;
+	for(const char *p = text; *p; ++p) {
+		uint32_t ch = (uint8_t)*p;
+		if(ch < MKGUI_GLYPH_FIRST || ch > MKGUI_GLYPH_LAST) {
+			cx += ctx->char_width;
+			continue;
+		}
+		struct mkgui_glyph *g = &ctx->glyphs[ch - MKGUI_GLYPH_FIRST];
+
+		int32_t gx = cx + g->bearing_x;
+		if(gx >= cx2) {
+			break;
+		}
+		if(gx + g->width <= cx1) {
+			cx += g->advance;
+			continue;
+		}
+
+		int32_t gy = y + ctx->font_ascent - g->bearing_y;
+		int32_t col0 = cx1 - gx;
+		int32_t col1 = cx2 - gx;
+		if(col0 < 0) {
+			col0 = 0;
+		}
+		if(col1 > g->width) {
+			col1 = g->width;
+		}
+		int32_t row0 = cy1 - gy;
+		int32_t row1 = cy2 - gy;
+		if(row0 < 0) {
+			row0 = 0;
+		}
+		if(row1 > g->height) {
+			row1 = g->height;
+		}
+
+		uint32_t rb_src = color & 0x00ff00ff;
+		uint32_t g_src = color & 0x0000ff00;
+		for(int32_t row = row0; row < row1; ++row) {
+			int32_t py = gy + row;
+			uint32_t *rowp = &buf[py * bw];
+			uint8_t *bmp = &g->bitmap[row * g->width];
+			int32_t col = col0;
+#if defined(__SSE2__)
+			__m128i src_rb = _mm_set1_epi32((int32_t)rb_src);
+			__m128i src_g8 = _mm_set1_epi32((int32_t)(g_src >> 8));
+			__m128i round_rb = _mm_set1_epi32(0x00800080);
+			__m128i round_g = _mm_set1_epi32(0x00000080);
+			__m128i mask_rb = _mm_set1_epi32(0x00ff00ff);
+			__m128i mask_byte = _mm_set1_epi32(0x000000ff);
+			__m128i mask_a = _mm_set1_epi32((int32_t)0xff000000u);
+			__m128i val_255 = _mm_set1_epi32(255);
+			__m128i zero = _mm_setzero_si128();
+			for(; col + 4 <= col1; col += 4) {
+				__m128i alphas = _mm_cvtsi32_si128(*(int32_t *)&bmp[col]);
+				alphas = _mm_unpacklo_epi8(alphas, zero);
+				alphas = _mm_unpacklo_epi16(alphas, zero);
+				__m128i any = _mm_cmpeq_epi32(alphas, zero);
+				if(_mm_movemask_epi8(any) == 0xffff) {
+					continue;
+				}
+				int32_t px = gx + col;
+				__m128i dst = _mm_loadu_si128((__m128i *)&rowp[px]);
+				__m128i ia = _mm_sub_epi32(val_255, alphas);
+				__m128i a16 = _mm_or_si128(alphas, _mm_slli_epi32(alphas, 16));
+				__m128i ia16 = _mm_or_si128(ia, _mm_slli_epi32(ia, 16));
+				__m128i dst_rb = _mm_and_si128(dst, mask_rb);
+				__m128i dst_g8 = _mm_and_si128(_mm_srli_epi32(dst, 8), mask_byte);
+				__m128i rb = _mm_add_epi32(_mm_add_epi32(_mm_mullo_epi16(src_rb, a16), _mm_mullo_epi16(dst_rb, ia16)), round_rb);
+				rb = _mm_and_si128(_mm_srli_epi32(_mm_add_epi32(rb, _mm_and_si128(_mm_srli_epi32(rb, 8), mask_rb)), 8), mask_rb);
+				__m128i gv = _mm_add_epi32(_mm_add_epi32(_mm_mullo_epi16(src_g8, alphas), _mm_mullo_epi16(dst_g8, ia)), round_g);
+				gv = _mm_slli_epi32(_mm_and_si128(_mm_srli_epi32(_mm_add_epi32(gv, _mm_and_si128(_mm_srli_epi32(gv, 8), mask_byte)), 8), mask_byte), 8);
+				__m128i result = _mm_or_si128(_mm_or_si128(rb, gv), mask_a);
+				__m128i skip = _mm_cmpeq_epi32(alphas, zero);
+				result = _mm_or_si128(_mm_andnot_si128(skip, result), _mm_and_si128(skip, dst));
+				_mm_storeu_si128((__m128i *)&rowp[px], result);
+			}
+#endif
+			for(; col < col1; ++col) {
+				uint32_t a = bmp[col];
+				if(a == 0) {
+					continue;
+				}
+				int32_t px = gx + col;
+				uint32_t ia = 255 - a;
+				uint32_t dst = rowp[px];
+				uint32_t rb = (rb_src * a + (dst & 0x00ff00ff) * ia + 0x00800080);
+				rb = ((rb + ((rb >> 8) & 0x00ff00ff)) >> 8) & 0x00ff00ff;
+				uint32_t gv = (g_src * a + (dst & 0x0000ff00) * ia + 0x00008000);
+				gv = ((gv + ((gv >> 8) & 0x0000ff00)) >> 8) & 0x0000ff00;
+				rowp[px] = 0xff000000 | rb | gv;
+			}
+		}
+
+		cx += g->advance;
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Text command buffer
+// ---------------------------------------------------------------------------
+
+struct mkgui_text_cmd {
+	int32_t x, y;
+	int32_t clip_x1, clip_y1, clip_x2, clip_y2;
+	char text[MKGUI_MAX_TEXT];
+	uint32_t color;
+};
+
+static struct mkgui_text_cmd *text_cmds;
+static uint32_t text_cmd_count;
+static uint32_t text_cmd_cap;
+
+#define MKGUI_TEXT_CMD_GROW 512
+
+// [=]===^=[ push_text_clip ]=====================================[=]
+static void push_text_clip(int32_t x, int32_t y, const char *text, uint32_t color, int32_t cx1, int32_t cy1, int32_t cx2, int32_t cy2) {
+	if(text_cmd_count >= text_cmd_cap) {
+		uint32_t nc = text_cmd_cap + MKGUI_TEXT_CMD_GROW;
+		struct mkgui_text_cmd *nt = (struct mkgui_text_cmd *)realloc(text_cmds, (size_t)nc * sizeof(struct mkgui_text_cmd));
+		if(!nt) {
+			return;
+		}
+		text_cmds = nt;
+		text_cmd_cap = nc;
+	}
+	if(cx1 < render_clip_x1) {
+		cx1 = render_clip_x1;
+	}
+	if(cy1 < render_clip_y1) {
+		cy1 = render_clip_y1;
+	}
+	if(cx2 > render_clip_x2) {
+		cx2 = render_clip_x2;
+	}
+	if(cy2 > render_clip_y2) {
+		cy2 = render_clip_y2;
+	}
+	struct mkgui_text_cmd *cmd = &text_cmds[text_cmd_count++];
+	cmd->x = x;
+	cmd->y = y;
+	cmd->clip_x1 = cx1;
+	cmd->clip_y1 = cy1;
+	cmd->clip_x2 = cx2;
+	cmd->clip_y2 = cy2;
+	cmd->color = color;
+	size_t slen = strlen(text);
+	if(slen >= MKGUI_MAX_TEXT) {
+		slen = MKGUI_MAX_TEXT - 1;
+	}
+	memcpy(cmd->text, text, slen);
+	cmd->text[slen] = '\0';
+}
+
+// [=]===^=[ push_text ]=========================================[=]
+static void push_text(int32_t x, int32_t y, const char *text, uint32_t color) {
+	push_text_clip(x, y, text, color, render_clip_x1, render_clip_y1, render_clip_x2, render_clip_y2);
+}
+
+// [=]===^=[ clip_intersect ]=====================================[=]
+static void clip_intersect(int32_t *x1, int32_t *y1, int32_t *x2, int32_t *y2, int32_t bx1, int32_t by1, int32_t bx2, int32_t by2) {
+	if(*x1 < bx1) {
+		*x1 = bx1;
+	}
+	if(*y1 < by1) {
+		*y1 = by1;
+	}
+	if(*x2 > bx2) {
+		*x2 = bx2;
+	}
+	if(*y2 > by2) {
+		*y2 = by2;
+	}
+}
+
+// [=]===^=[ flush_text_to ]======================================[=]
+static void flush_text_to(struct mkgui_ctx *ctx, uint32_t *buf, int32_t bw, int32_t bh, int32_t ox, int32_t oy) {
+	for(uint32_t i = 0; i < text_cmd_count; ++i) {
+		struct mkgui_text_cmd *cmd = &text_cmds[i];
+		int32_t cx1 = cmd->clip_x1 - ox, cy1 = cmd->clip_y1 - oy;
+		int32_t cx2 = cmd->clip_x2 - ox, cy2 = cmd->clip_y2 - oy;
+		clip_intersect(&cx1, &cy1, &cx2, &cy2, 0, 0, bw, bh);
+		if(cx1 >= cx2 || cy1 >= cy2) {
+			continue;
+		}
+		draw_text_sw(ctx, buf, bw, cmd->x - ox, cmd->y - oy, cmd->text, cmd->color, cx1, cy1, cx2, cy2);
+	}
+	text_cmd_count = 0;
+}
+
+// [=]===^=[ flush_text ]========================================[=]
+static void flush_text(struct mkgui_ctx *ctx) {
+	flush_text_to(ctx, ctx->pixels, ctx->win_w, ctx->win_h, 0, 0);
+}
+
+// [=]===^=[ flush_text_popup ]==================================[=]
+static void flush_text_popup(struct mkgui_ctx *ctx, struct mkgui_popup *p) {
+	flush_text_to(ctx, p->pixels, p->w, p->h, p->x, p->y);
+}
+
+// [=]===^=[ text_width ]========================================[=]
+static int32_t text_width(struct mkgui_ctx *ctx, const char *text) {
+	int32_t w = 0;
+	for(const char *p = text; *p; ++p) {
+		uint32_t ch = (uint8_t)*p;
+		if(ch >= MKGUI_GLYPH_FIRST && ch <= MKGUI_GLYPH_LAST) {
+			w += ctx->glyphs[ch - MKGUI_GLYPH_FIRST].advance;
+		} else {
+			w += ctx->char_width;
+		}
+	}
+	return w;
+}

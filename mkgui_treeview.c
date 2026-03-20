@@ -4,18 +4,54 @@
 #define MKGUI_TREE_INDENT 18
 #define MKGUI_TREE_ARROW_SIZE 6
 
+#define TV_IDX_HASH_SIZE 1024
+#define TV_IDX_HASH_MASK (TV_IDX_HASH_SIZE - 1)
+
+static struct {
+	uint32_t id;
+	uint32_t idx;
+} tv_idx_map[TV_IDX_HASH_SIZE];
+
+// [=]===^=[ tv_idx_build ]=======================================[=]
+static void tv_idx_build(struct mkgui_treeview_data *tv) {
+	for(uint32_t i = 0; i < TV_IDX_HASH_SIZE; ++i) {
+		tv_idx_map[i].idx = UINT32_MAX;
+	}
+	for(uint32_t i = 0; i < tv->node_count; ++i) {
+		uint32_t h = (tv->nodes[i].id * 2654435761u) & TV_IDX_HASH_MASK;
+		while(tv_idx_map[h].idx != UINT32_MAX) {
+			h = (h + 1) & TV_IDX_HASH_MASK;
+		}
+		tv_idx_map[h].id = tv->nodes[i].id;
+		tv_idx_map[h].idx = i;
+	}
+}
+
+// [=]===^=[ tv_idx_find ]========================================[=]
+static uint32_t tv_idx_find(uint32_t id) {
+	uint32_t h = (id * 2654435761u) & TV_IDX_HASH_MASK;
+	for(;;) {
+		if(tv_idx_map[h].idx == UINT32_MAX) {
+			return UINT32_MAX;
+		}
+		if(tv_idx_map[h].id == id) {
+			return tv_idx_map[h].idx;
+		}
+		h = (h + 1) & TV_IDX_HASH_MASK;
+	}
+}
+
 // [=]===^=[ treeview_node_depth ]================================[=]
 static uint32_t treeview_node_depth(struct mkgui_treeview_data *tv, uint32_t node_idx) {
 	uint32_t depth = 0;
 	uint32_t parent = tv->nodes[node_idx].parent_node;
 	while(parent != 0) {
-		for(uint32_t i = 0; i < tv->node_count; ++i) {
-			if(tv->nodes[i].id == parent) {
-				parent = tv->nodes[i].parent_node;
-				++depth;
-				break;
-			}
+		uint32_t pi = tv_idx_find(parent);
+		if(pi == UINT32_MAX) {
+			break;
 		}
+		parent = tv->nodes[pi].parent_node;
+		++depth;
 	}
 	return depth;
 }
@@ -24,15 +60,14 @@ static uint32_t treeview_node_depth(struct mkgui_treeview_data *tv, uint32_t nod
 static uint32_t treeview_node_visible(struct mkgui_treeview_data *tv, uint32_t node_idx) {
 	uint32_t parent = tv->nodes[node_idx].parent_node;
 	while(parent != 0) {
-		for(uint32_t i = 0; i < tv->node_count; ++i) {
-			if(tv->nodes[i].id == parent) {
-				if(!tv->nodes[i].expanded) {
-					return 0;
-				}
-				parent = tv->nodes[i].parent_node;
-				break;
-			}
+		uint32_t pi = tv_idx_find(parent);
+		if(pi == UINT32_MAX) {
+			break;
 		}
+		if(!tv->nodes[pi].expanded) {
+			return 0;
+		}
+		parent = tv->nodes[pi].parent_node;
 	}
 	return 1;
 }
@@ -63,6 +98,7 @@ static void render_treeview(struct mkgui_ctx *ctx, uint32_t idx) {
 	if(!tv) {
 		return;
 	}
+	tv_idx_build(tv);
 
 	int32_t clip_top = ry + 1;
 	int32_t clip_bottom = ry + rh - 1;
@@ -187,6 +223,7 @@ static void render_treeview(struct mkgui_ctx *ctx, uint32_t idx) {
 
 // [=]===^=[ treeview_visible_count ]=============================[=]
 static uint32_t treeview_visible_count(struct mkgui_treeview_data *tv) {
+	tv_idx_build(tv);
 	uint32_t count = 0;
 	for(uint32_t i = 0; i < tv->node_count; ++i) {
 		if(treeview_node_visible(tv, i)) {
@@ -228,6 +265,7 @@ static int32_t treeview_row_hit(struct mkgui_ctx *ctx, uint32_t widget_idx, int3
 		return -1;
 	}
 
+	tv_idx_build(tv);
 	int32_t ry = ctx->rects[widget_idx].y;
 	int32_t local_y = my - ry - 1 + tv->scroll_y;
 	int32_t vis_row = local_y / MKGUI_ROW_HEIGHT;
@@ -255,6 +293,7 @@ static uint32_t treeview_arrow_hit(struct mkgui_ctx *ctx, uint32_t widget_idx, i
 	if(!tv->nodes[node_idx].has_children) {
 		return 0;
 	}
+	tv_idx_build(tv);
 	uint32_t depth = treeview_node_depth(tv, (uint32_t)node_idx);
 	int32_t rx = ctx->rects[widget_idx].x;
 	int32_t arrow_x = rx + 4 + (int32_t)(depth * MKGUI_TREE_INDENT);
@@ -267,6 +306,7 @@ static uint32_t handle_treeview_key(struct mkgui_ctx *ctx, struct mkgui_event *e
 	if(!tv || tv->node_count == 0) {
 		return 0;
 	}
+	tv_idx_build(tv);
 
 	if(ks == MKGUI_KEY_UP) {
 		int32_t prev = -1;

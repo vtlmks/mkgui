@@ -605,8 +605,12 @@ static uint32_t fd_strcasestr(const char *haystack, const char *needle, uint32_t
 		for(uint32_t j = 0; j < needle_len; ++j) {
 			int32_t ca = haystack[i + j];
 			int32_t cb = needle[j];
-			if(ca >= 'A' && ca <= 'Z') { ca += 32; }
-			if(cb >= 'A' && cb <= 'Z') { cb += 32; }
+			if(ca >= 'A' && ca <= 'Z') {
+				ca += 32;
+			}
+			if(cb >= 'A' && cb <= 'Z') {
+				cb += 32;
+			}
 			if(ca != cb) {
 				match = 0;
 				break;

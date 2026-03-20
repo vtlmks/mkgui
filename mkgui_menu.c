@@ -5,8 +5,12 @@
 
 // [=]===^=[ menu_item_has_children ]=============================[=]
 static uint32_t menu_item_has_children(struct mkgui_ctx *ctx, uint32_t item_id) {
-	for(uint32_t i = 0; i < ctx->widget_count; ++i) {
-		if(ctx->widgets[i].type == MKGUI_MENUITEM && ctx->widgets[i].parent_id == item_id) {
+	uint32_t pidx = layout_find_idx(item_id);
+	if(pidx == UINT32_MAX) {
+		return 0;
+	}
+	for(uint32_t c = layout_first_child[pidx]; c < ctx->widget_count; c = layout_next_sibling[c]) {
+		if(ctx->widgets[c].type == MKGUI_MENUITEM) {
 			return 1;
 		}
 	}
@@ -15,10 +19,14 @@ static uint32_t menu_item_has_children(struct mkgui_ctx *ctx, uint32_t item_id) 
 
 // [=]===^=[ menu_popup_nth_item ]================================[=]
 static struct mkgui_widget *menu_popup_nth_item(struct mkgui_ctx *ctx, uint32_t parent_id, int32_t n) {
+	uint32_t pidx = layout_find_idx(parent_id);
+	if(pidx == UINT32_MAX) {
+		return NULL;
+	}
 	int32_t count = 0;
-	for(uint32_t i = 0; i < ctx->widget_count; ++i) {
-		struct mkgui_widget *mi = &ctx->widgets[i];
-		if(mi->type != MKGUI_MENUITEM || mi->parent_id != parent_id) {
+	for(uint32_t c = layout_first_child[pidx]; c < ctx->widget_count; c = layout_next_sibling[c]) {
+		struct mkgui_widget *mi = &ctx->widgets[c];
+		if(mi->type != MKGUI_MENUITEM) {
 			continue;
 		}
 		if(count == n) {
@@ -31,11 +39,16 @@ static struct mkgui_widget *menu_popup_nth_item(struct mkgui_ctx *ctx, uint32_t 
 
 // [=]===^=[ menu_popup_hit_item ]================================[=]
 static struct mkgui_widget *menu_popup_hit_item(struct mkgui_ctx *ctx, uint32_t parent_id, int32_t local_y, int32_t *out_idx) {
+	uint32_t pidx = layout_find_idx(parent_id);
+	if(pidx == UINT32_MAX) {
+		*out_idx = -1;
+		return NULL;
+	}
 	int32_t iy = 1;
 	int32_t idx = 0;
-	for(uint32_t i = 0; i < ctx->widget_count; ++i) {
-		struct mkgui_widget *mi = &ctx->widgets[i];
-		if(mi->type != MKGUI_MENUITEM || mi->parent_id != parent_id) {
+	for(uint32_t c = layout_first_child[pidx]; c < ctx->widget_count; c = layout_next_sibling[c]) {
+		struct mkgui_widget *mi = &ctx->widgets[c];
+		if(mi->type != MKGUI_MENUITEM) {
 			continue;
 		}
 		int32_t rh = (mi->flags & MKGUI_SEPARATOR) ? MKGUI_MENU_SEP_HEIGHT : MKGUI_ROW_HEIGHT;
@@ -52,24 +65,31 @@ static struct mkgui_widget *menu_popup_hit_item(struct mkgui_ctx *ctx, uint32_t 
 
 // [=]===^=[ menu_popup_child_metrics ]============================[=]
 static int32_t menu_popup_child_metrics(struct mkgui_ctx *ctx, uint32_t parent_id, int32_t *max_w, int32_t *content_h) {
+	uint32_t pidx = layout_find_idx(parent_id);
+	if(pidx == UINT32_MAX) {
+		*max_w = 120;
+		*content_h = 0;
+		return 0;
+	}
 	int32_t count = 0;
 	*max_w = 120;
 	*content_h = 0;
-	for(uint32_t i = 0; i < ctx->widget_count; ++i) {
-		struct mkgui_widget *sub = &ctx->widgets[i];
-		if(sub->type == MKGUI_MENUITEM && sub->parent_id == parent_id) {
-			++count;
-			if(sub->flags & MKGUI_SEPARATOR) {
-				*content_h += MKGUI_MENU_SEP_HEIGHT;
-			} else {
-				*content_h += MKGUI_ROW_HEIGHT;
-				int32_t tw = text_width(ctx, sub->label) + 40;
-				if(menu_item_has_children(ctx, sub->id)) {
-					tw += 12;
-				}
-				if(tw > *max_w) {
-					*max_w = tw;
-				}
+	for(uint32_t c = layout_first_child[pidx]; c < ctx->widget_count; c = layout_next_sibling[c]) {
+		struct mkgui_widget *sub = &ctx->widgets[c];
+		if(sub->type != MKGUI_MENUITEM) {
+			continue;
+		}
+		++count;
+		if(sub->flags & MKGUI_SEPARATOR) {
+			*content_h += MKGUI_MENU_SEP_HEIGHT;
+		} else {
+			*content_h += MKGUI_ROW_HEIGHT;
+			int32_t tw = text_width(ctx, sub->label) + 40;
+			if(menu_item_has_children(ctx, sub->id)) {
+				tw += 12;
+			}
+			if(tw > *max_w) {
+				*max_w = tw;
 			}
 		}
 	}
@@ -78,11 +98,15 @@ static int32_t menu_popup_child_metrics(struct mkgui_ctx *ctx, uint32_t parent_i
 
 // [=]===^=[ menu_popup_item_y ]===================================[=]
 static int32_t menu_popup_item_y(struct mkgui_ctx *ctx, uint32_t parent_id, int32_t target_idx) {
+	uint32_t pidx = layout_find_idx(parent_id);
+	if(pidx == UINT32_MAX) {
+		return 1;
+	}
 	int32_t iy = 1;
 	int32_t idx = 0;
-	for(uint32_t i = 0; i < ctx->widget_count; ++i) {
-		struct mkgui_widget *mi = &ctx->widgets[i];
-		if(mi->type != MKGUI_MENUITEM || mi->parent_id != parent_id) {
+	for(uint32_t c = layout_first_child[pidx]; c < ctx->widget_count; c = layout_next_sibling[c]) {
+		struct mkgui_widget *mi = &ctx->widgets[c];
+		if(mi->type != MKGUI_MENUITEM) {
 			continue;
 		}
 		if(idx == target_idx) {
@@ -96,7 +120,6 @@ static int32_t menu_popup_item_y(struct mkgui_ctx *ctx, uint32_t parent_id, int3
 
 // [=]===^=[ render_menu_bar ]===================================[=]
 static void render_menu_bar(struct mkgui_ctx *ctx, uint32_t idx) {
-	struct mkgui_widget *w = &ctx->widgets[idx];
 	int32_t rx = ctx->rects[idx].x;
 	int32_t ry = ctx->rects[idx].y;
 	int32_t rw = ctx->rects[idx].w;
@@ -105,9 +128,9 @@ static void render_menu_bar(struct mkgui_ctx *ctx, uint32_t idx) {
 	draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, rx, ry, rw, rh, ctx->theme.menu_bg);
 
 	int32_t mx = rx;
-	for(uint32_t i = 0; i < ctx->widget_count; ++i) {
-		struct mkgui_widget *mi = &ctx->widgets[i];
-		if(mi->type != MKGUI_MENUITEM || mi->parent_id != w->id) {
+	for(uint32_t c = layout_first_child[idx]; c < ctx->widget_count; c = layout_next_sibling[c]) {
+		struct mkgui_widget *mi = &ctx->widgets[c];
+		if(mi->type != MKGUI_MENUITEM) {
 			continue;
 		}
 		int32_t iw = text_width(ctx, mi->label) + 16;
@@ -116,13 +139,10 @@ static void render_menu_bar(struct mkgui_ctx *ctx, uint32_t idx) {
 		int32_t ty = ry + (rh - ctx->font_height) / 2;
 		push_text_clip(mx + 8, ty, mi->label, ctx->theme.text, mx, ry, mx + iw, ry + rh);
 
-		int32_t mi_idx = find_widget_idx(ctx, mi->id);
-		if(mi_idx >= 0) {
-			ctx->rects[mi_idx].x = mx;
-			ctx->rects[mi_idx].y = ry;
-			ctx->rects[mi_idx].w = iw;
-			ctx->rects[mi_idx].h = rh;
-		}
+		ctx->rects[c].x = mx;
+		ctx->rects[c].y = ry;
+		ctx->rects[c].w = iw;
+		ctx->rects[c].h = rh;
 
 		mx += iw;
 	}
@@ -141,11 +161,15 @@ static void render_menu_popup(struct mkgui_ctx *ctx, struct mkgui_popup *p, uint
 
 	draw_rounded_rect(p->pixels, p->w, p->h, 0, 0, p->w, p->h, ctx->theme.menu_bg, ctx->theme.widget_border, ctx->theme.corner_radius);
 
+	uint32_t pidx = layout_find_idx(menu_id);
 	int32_t iy = 1;
 	int32_t item_idx = 0;
-	for(uint32_t i = 0; i < ctx->widget_count; ++i) {
-		struct mkgui_widget *mi = &ctx->widgets[i];
-		if(mi->type != MKGUI_MENUITEM || mi->parent_id != menu_id) {
+	if(pidx == UINT32_MAX) {
+		goto menu_popup_done;
+	}
+	for(uint32_t c = layout_first_child[pidx]; c < ctx->widget_count; c = layout_next_sibling[c]) {
+		struct mkgui_widget *mi = &ctx->widgets[c];
+		if(mi->type != MKGUI_MENUITEM) {
 			continue;
 		}
 
@@ -205,6 +229,7 @@ static void render_menu_popup(struct mkgui_ctx *ctx, struct mkgui_popup *p, uint
 		++item_idx;
 	}
 
+menu_popup_done:
 	render_clip_x1 = saved_clip_x1;
 	render_clip_y1 = saved_clip_y1;
 	render_clip_x2 = saved_clip_x2;

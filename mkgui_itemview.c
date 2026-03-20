@@ -525,10 +525,18 @@ static void render_itemview(struct mkgui_ctx *ctx, uint32_t idx) {
 
 	int32_t ca_x, ca_y, ca_w, ca_h;
 	itemview_content_area(iv, rx, ry, rw, rh, &ca_x, &ca_y, &ca_w, &ca_h);
-	if(ca_x > render_clip_x1) { render_clip_x1 = ca_x; }
-	if(ca_y > render_clip_y1) { render_clip_y1 = ca_y; }
-	if(ca_x + ca_w < render_clip_x2) { render_clip_x2 = ca_x + ca_w; }
-	if(ca_y + ca_h < render_clip_y2) { render_clip_y2 = ca_y + ca_h; }
+	if(ca_x > render_clip_x1) {
+		render_clip_x1 = ca_x;
+	}
+	if(ca_y > render_clip_y1) {
+		render_clip_y1 = ca_y;
+	}
+	if(ca_x + ca_w < render_clip_x2) {
+		render_clip_x2 = ca_x + ca_w;
+	}
+	if(ca_y + ca_h < render_clip_y2) {
+		render_clip_y2 = ca_y + ca_h;
+	}
 
 	switch(iv->view_mode) {
 		case MKGUI_VIEW_ICON: {
@@ -721,8 +729,12 @@ static void itemview_scroll_to_mouse(struct mkgui_ctx *ctx, uint32_t widget_id, 
 			return;
 		}
 		float frac = (float)(mouse_x - ca_x - ctx->drag_scrollbar_offset) / (float)track;
-		if(frac < 0.0f) { frac = 0.0f; }
-		if(frac > 1.0f) { frac = 1.0f; }
+		if(frac < 0.0f) {
+			frac = 0.0f;
+		}
+		if(frac > 1.0f) {
+			frac = 1.0f;
+		}
 		iv->scroll_y = (int32_t)(frac * (float)max_scroll);
 	} else {
 		int32_t total = itemview_total_height(iv, ca_w);
@@ -739,8 +751,12 @@ static void itemview_scroll_to_mouse(struct mkgui_ctx *ctx, uint32_t widget_id, 
 			return;
 		}
 		float frac = (float)(mouse_y - ca_y - ctx->drag_scrollbar_offset) / (float)track;
-		if(frac < 0.0f) { frac = 0.0f; }
-		if(frac > 1.0f) { frac = 1.0f; }
+		if(frac < 0.0f) {
+			frac = 0.0f;
+		}
+		if(frac > 1.0f) {
+			frac = 1.0f;
+		}
 		iv->scroll_y = (int32_t)(frac * (float)max_scroll);
 	}
 

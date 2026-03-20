@@ -138,10 +138,18 @@ static void render_gridview(struct mkgui_ctx *ctx, uint32_t idx) {
 	int32_t saved_clip_y1 = render_clip_y1;
 	int32_t saved_clip_x2 = render_clip_x2;
 	int32_t saved_clip_y2 = render_clip_y2;
-	if(clip_left > render_clip_x1) { render_clip_x1 = clip_left; }
-	if(clip_top > render_clip_y1) { render_clip_y1 = clip_top; }
-	if(clip_right < render_clip_x2) { render_clip_x2 = clip_right; }
-	if(clip_bottom < render_clip_y2) { render_clip_y2 = clip_bottom; }
+	if(clip_left > render_clip_x1) {
+		render_clip_x1 = clip_left;
+	}
+	if(clip_top > render_clip_y1) {
+		render_clip_y1 = clip_top;
+	}
+	if(clip_right < render_clip_x2) {
+		render_clip_x2 = clip_right;
+	}
+	if(clip_bottom < render_clip_y2) {
+		render_clip_y2 = clip_bottom;
+	}
 
 	char cell_buf[MKGUI_MAX_TEXT];
 	for(uint32_t r = 0; r <= (uint32_t)(visible_rows + 1) && (first_row + (int32_t)r) < (int32_t)gv->row_count; ++r) {

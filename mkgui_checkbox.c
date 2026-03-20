@@ -21,14 +21,20 @@ static void draw_aa_line(uint32_t *buf, int32_t bw, int32_t bh, int32_t x0, int3
 		int32_t px_hi = (cx8 + half) >> 3;
 		int32_t py_lo = (cy8 - half) >> 3;
 		int32_t py_hi = (cy8 + half) >> 3;
+		if(py_lo < 0) {
+			py_lo = 0;
+		}
+		if(py_hi >= bh) {
+			py_hi = bh - 1;
+		}
+		if(px_lo < 0) {
+			px_lo = 0;
+		}
+		if(px_hi >= bw) {
+			px_hi = bw - 1;
+		}
 		for(int32_t py = py_lo; py <= py_hi; ++py) {
-			if(py < 0 || py >= bh) {
-				continue;
-			}
 			for(int32_t px = px_lo; px <= px_hi; ++px) {
-				if(px < 0 || px >= bw) {
-					continue;
-				}
 				int32_t ddx = px * 8 + 4 - cx8;
 				int32_t ddy = py * 8 + 4 - cy8;
 				int32_t dist2 = ddx * ddx + ddy * ddy;
