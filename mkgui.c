@@ -1296,15 +1296,22 @@ struct mkgui_text_cmd {
 	uint32_t color;
 };
 
-#define MKGUI_MAX_TEXT_CMDS 2048
-
-static struct mkgui_text_cmd text_cmds[MKGUI_MAX_TEXT_CMDS];
+static struct mkgui_text_cmd *text_cmds;
 static uint32_t text_cmd_count;
+static uint32_t text_cmd_cap;
+
+#define MKGUI_TEXT_CMD_GROW 512
 
 // [=]===^=[ push_text_clip ]=====================================[=]
 static void push_text_clip(int32_t x, int32_t y, const char *text, uint32_t color, int32_t cx1, int32_t cy1, int32_t cx2, int32_t cy2) {
-	if(text_cmd_count >= MKGUI_MAX_TEXT_CMDS) {
-		return;
+	if(text_cmd_count >= text_cmd_cap) {
+		uint32_t nc = text_cmd_cap + MKGUI_TEXT_CMD_GROW;
+		struct mkgui_text_cmd *nt = (struct mkgui_text_cmd *)realloc(text_cmds, (size_t)nc * sizeof(struct mkgui_text_cmd));
+		if(!nt) {
+			return;
+		}
+		text_cmds = nt;
+		text_cmd_cap = nc;
 	}
 	if(cx1 < render_clip_x1) { cx1 = render_clip_x1; }
 	if(cy1 < render_clip_y1) { cy1 = render_clip_y1; }
@@ -1593,6 +1600,15 @@ static struct mkgui_pathbar_data *find_pathbar_data(struct mkgui_ctx *ctx, uint3
 }
 
 // ---------------------------------------------------------------------------
+// Layout parent index (declared early for widget_visible)
+// ---------------------------------------------------------------------------
+
+static uint32_t *layout_parent;
+static uint32_t *layout_first_child;
+static uint32_t *layout_next_sibling;
+static uint32_t layout_arr_cap;
+
+// ---------------------------------------------------------------------------
 // Widget visibility
 // ---------------------------------------------------------------------------
 
@@ -1605,25 +1621,48 @@ static uint32_t widget_visible(struct mkgui_ctx *ctx, uint32_t idx) {
 	if(w->type == MKGUI_WINDOW) {
 		return 1;
 	}
-	uint32_t pid = w->parent_id;
-	while(pid != 0) {
-		struct mkgui_widget *parent = find_widget(ctx, pid);
-		if(!parent) {
-			break;
-		}
-		if(parent->flags & MKGUI_HIDDEN) {
-			return 0;
-		}
-		if(parent->type == MKGUI_TAB) {
-			struct mkgui_widget *tabs_container = find_widget(ctx, parent->parent_id);
-			if(tabs_container && tabs_container->type == MKGUI_TABS) {
-				struct mkgui_tabs_data *td = find_tabs_data(ctx, tabs_container->id);
-				if(td && td->active_tab != parent->id) {
-					return 0;
+	if(layout_arr_cap > 0 && idx < layout_arr_cap) {
+		uint32_t pidx = layout_parent[idx];
+		while(pidx < ctx->widget_count) {
+			struct mkgui_widget *parent = &ctx->widgets[pidx];
+			if(parent->flags & MKGUI_HIDDEN) {
+				return 0;
+			}
+			if(parent->type == MKGUI_TAB) {
+				uint32_t tabs_idx = layout_parent[pidx];
+				if(tabs_idx < ctx->widget_count && ctx->widgets[tabs_idx].type == MKGUI_TABS) {
+					struct mkgui_tabs_data *td = find_tabs_data(ctx, ctx->widgets[tabs_idx].id);
+					if(td && td->active_tab != parent->id) {
+						return 0;
+					}
 				}
 			}
+			if(parent->type == MKGUI_WINDOW) {
+				break;
+			}
+			pidx = layout_parent[pidx];
 		}
-		pid = parent->parent_id;
+	} else {
+		uint32_t pid = w->parent_id;
+		while(pid != 0) {
+			struct mkgui_widget *parent = find_widget(ctx, pid);
+			if(!parent) {
+				break;
+			}
+			if(parent->flags & MKGUI_HIDDEN) {
+				return 0;
+			}
+			if(parent->type == MKGUI_TAB) {
+				struct mkgui_widget *tabs_container = find_widget(ctx, parent->parent_id);
+				if(tabs_container && tabs_container->type == MKGUI_TABS) {
+					struct mkgui_tabs_data *td = find_tabs_data(ctx, tabs_container->id);
+					if(td && td->active_tab != parent->id) {
+						return 0;
+					}
+				}
+			}
+			pid = parent->parent_id;
+		}
 	}
 	return 1;
 }
@@ -1801,22 +1840,16 @@ static struct mkgui_box_scroll *find_box_scroll(struct mkgui_ctx *ctx, uint32_t 
 // Layout index (pre-built per layout pass for O(1) lookups)
 // ---------------------------------------------------------------------------
 
-#define LAYOUT_HASH_SIZE 2048
-#define LAYOUT_HASH_MASK (LAYOUT_HASH_SIZE - 1)
-
-static struct {
+static struct mkgui_layout_hash_entry {
 	uint32_t id;
 	uint32_t idx;
-} layout_id_map[LAYOUT_HASH_SIZE];
-
-static uint32_t *layout_parent;
-static uint32_t *layout_first_child;
-static uint32_t *layout_next_sibling;
-static uint32_t layout_arr_cap;
+} *layout_id_map;
+static uint32_t layout_hash_size;
+static uint32_t layout_hash_mask;
 
 // [=]===^=[ layout_find_idx ]====================================[=]
 static uint32_t layout_find_idx(uint32_t id) {
-	uint32_t h = (id * 2654435761u) & LAYOUT_HASH_MASK;
+	uint32_t h = (id * 2654435761u) & layout_hash_mask;
 	for(;;) {
 		if(layout_id_map[h].idx == UINT32_MAX) {
 			return UINT32_MAX;
@@ -1824,7 +1857,7 @@ static uint32_t layout_find_idx(uint32_t id) {
 		if(layout_id_map[h].id == id) {
 			return layout_id_map[h].idx;
 		}
-		h = (h + 1) & LAYOUT_HASH_MASK;
+		h = (h + 1) & layout_hash_mask;
 	}
 }
 
@@ -1842,13 +1875,29 @@ static void layout_build_index(struct mkgui_ctx *ctx) {
 			layout_arr_cap = nc;
 		}
 	}
-	for(uint32_t i = 0; i < LAYOUT_HASH_SIZE; ++i) {
+	uint32_t need = ctx->widget_count * 2;
+	if(need < 256) {
+		need = 256;
+	}
+	uint32_t hs = 256;
+	while(hs < need) {
+		hs <<= 1;
+	}
+	if(hs > layout_hash_size) {
+		struct mkgui_layout_hash_entry *nh = (struct mkgui_layout_hash_entry *)realloc(layout_id_map, (size_t)hs * sizeof(*layout_id_map));
+		if(nh) {
+			layout_id_map = nh;
+			layout_hash_size = hs;
+			layout_hash_mask = hs - 1;
+		}
+	}
+	for(uint32_t i = 0; i < layout_hash_size; ++i) {
 		layout_id_map[i].idx = UINT32_MAX;
 	}
 	for(uint32_t i = 0; i < ctx->widget_count; ++i) {
-		uint32_t h = (ctx->widgets[i].id * 2654435761u) & LAYOUT_HASH_MASK;
+		uint32_t h = (ctx->widgets[i].id * 2654435761u) & layout_hash_mask;
 		while(layout_id_map[h].idx != UINT32_MAX) {
-			h = (h + 1) & LAYOUT_HASH_MASK;
+			h = (h + 1) & layout_hash_mask;
 		}
 		layout_id_map[h].id = ctx->widgets[i].id;
 		layout_id_map[h].idx = i;
@@ -2800,8 +2849,8 @@ static void set_parent_clip(struct mkgui_ctx *ctx, uint32_t idx) {
 	render_clip_y1 = render_base_clip_y1;
 	render_clip_x2 = render_base_clip_x2;
 	render_clip_y2 = render_base_clip_y2;
-	int32_t pidx = find_widget_idx(ctx, ctx->widgets[idx].parent_id);
-	while(pidx >= 0 && ctx->widgets[pidx].type != MKGUI_WINDOW) {
+	uint32_t pidx = layout_parent[idx];
+	while(pidx < ctx->widget_count && ctx->widgets[pidx].type != MKGUI_WINDOW) {
 		int32_t px = ctx->rects[pidx].x;
 		int32_t py = ctx->rects[pidx].y;
 		int32_t px2 = px + ctx->rects[pidx].w;
@@ -2810,7 +2859,7 @@ static void set_parent_clip(struct mkgui_ctx *ctx, uint32_t idx) {
 		if(py > render_clip_y1) { render_clip_y1 = py; }
 		if(px2 < render_clip_x2) { render_clip_x2 = px2; }
 		if(py2 < render_clip_y2) { render_clip_y2 = py2; }
-		pidx = find_widget_idx(ctx, ctx->widgets[pidx].parent_id);
+		pidx = layout_parent[pidx];
 	}
 }
 
