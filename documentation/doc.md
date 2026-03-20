@@ -95,9 +95,9 @@ struct mkgui_widget {
 | `MKGUI_PROGRESS` | Progress bar with animated shimmer effect. No events. |
 | `MKGUI_SPINNER` | Animated spinning arc indicator. No events, no setup needed. |
 | `MKGUI_LISTVIEW` | Scrollable multi-column list with virtual rows and per-column cell types. Emits `MKGUI_EVENT_LISTVIEW_SELECT`, `_DBLCLICK`, `_SORT`, `_COL_REORDER`, `_REORDER`. |
-| `MKGUI_GRIDVIEW` | Multi-column grid with per-cell checkboxes. Virtual data via callback. Emits `MKGUI_EVENT_GRID_CLICK`, `MKGUI_EVENT_GRID_CHECK`. |
+| `MKGUI_GRIDVIEW` | Multi-column grid with per-cell checkboxes and resizable columns. Virtual data via callback. Emits `MKGUI_EVENT_GRID_CLICK`, `MKGUI_EVENT_GRID_CHECK`. |
 | `MKGUI_ITEMVIEW` | Multi-mode item view (icon, thumbnail, compact, detail). Emits `MKGUI_EVENT_ITEMVIEW_SELECT`, `_DBLCLICK`. |
-| `MKGUI_TREEVIEW` | Hierarchical tree. Emits `MKGUI_EVENT_TREEVIEW_SELECT`, `_DBLCLICK`, `_EXPAND`, `_COLLAPSE`. |
+| `MKGUI_TREEVIEW` | Hierarchical tree. Emits `MKGUI_EVENT_TREEVIEW_SELECT`, `_DBLCLICK`, `_EXPAND`, `_COLLAPSE`, `_MOVE`. |
 | `MKGUI_TABS` | Tab container. Children must be `MKGUI_TAB`. Emits `MKGUI_EVENT_TAB_CHANGED`. |
 | `MKGUI_TAB` | Individual tab page (parent must be `MKGUI_TABS`). |
 | `MKGUI_MENU` | Menu bar. Children are top-level `MKGUI_MENUITEM`. |
@@ -270,6 +270,7 @@ struct mkgui_event {
 | `MKGUI_EVENT_TEXTAREA_CURSOR` | Textarea cursor moved | cursor position | -- |
 | `MKGUI_EVENT_DRAG_START` | DnD drag started | source id/row | -- |
 | `MKGUI_EVENT_DRAG_END` | DnD drag cancelled | -- | -- |
+| `MKGUI_EVENT_TREEVIEW_MOVE` | Tree node moved via DnD | source node id | target node id |
 | `MKGUI_EVENT_TAB_CLOSE` | Tab close button clicked | tab id | -- |
 
 ## API reference
@@ -518,7 +519,7 @@ Rows can be reordered by dragging. Click and drag a row 4+ pixels vertically to 
 
 #### Column interaction
 
-Column headers support drag-and-drop reordering and resize. Drag a header to a new position to rearrange columns. A short click (< 4px movement) sorts by that column instead. Drag the divider between columns to resize (minimum 20px, cursor changes to a resize arrow on hover). The column order maps display positions to logical column indices -- the row callback always receives the logical column index regardless of display order. Use `mkgui_listview_get_col_order` / `mkgui_listview_set_col_order` and `mkgui_listview_get_col_width` / `mkgui_listview_set_col_width` to save and restore layouts.
+Column headers support drag-and-drop reordering and resize. Drag a header to a new position to rearrange columns. A short click (< 4px movement) sorts by that column instead. Drag the divider between columns to resize (minimum 40px, cursor changes to a resize arrow on hover). Double-click a column divider to auto-fit the column width to its contents (measures the header label and all rows via the row callback). The column order maps display positions to logical column indices -- the row callback always receives the logical column index regardless of display order. Use `mkgui_listview_get_col_order` / `mkgui_listview_set_col_order` and `mkgui_listview_get_col_width` / `mkgui_listview_set_col_width` to save and restore layouts.
 
 Sorting is application-side. When a header is clicked, `MKGUI_EVENT_LISTVIEW_SORT` is emitted with `ev->col` set to the column and `ev->value` set to the sort direction (1 ascending, -1 descending). The listview tracks the sort arrow visual internally but the application must sort its data and call `dirty_all`.
 
@@ -553,6 +554,10 @@ Events:
 - `MKGUI_EVENT_GRID_CHECK` -- checkbox toggled. `ev->value` = row, `ev->col` = column. Read new state with `mkgui_gridview_get_check()`.
 
 Grid lines are drawn between cells. Keyboard navigation: arrow keys to move selection, Space to toggle checkbox in the selected cell.
+
+#### Column resize
+
+Column headers support manual resize and auto-fit. Drag the divider between column headers to resize (minimum 40px, cursor changes to a resize arrow on hover). Double-click a column divider to auto-fit the column width to its contents (measures the header label and all rows via the cell callback).
 
 ### Itemview
 
