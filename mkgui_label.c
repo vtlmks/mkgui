@@ -11,7 +11,16 @@ static void render_label(struct mkgui_ctx *ctx, uint32_t idx) {
 
 	uint32_t tc = (w->flags & MKGUI_DISABLED) ? ctx->theme.text_disabled : ctx->theme.text;
 	int32_t ty = ry + (rh - ctx->font_height) / 2;
-	push_text_clip(rx, ty, w->label, tc, rx, ry, rx + rw, ry + rh);
+	int32_t tx = rx;
+	uint32_t align = w->flags & MKGUI_ALIGN_MASK;
+	if(align == MKGUI_ALIGN_CENTER) {
+		int32_t tw = text_width(ctx, w->label);
+		tx = rx + (rw - tw) / 2;
+	} else if(align == MKGUI_ALIGN_END) {
+		int32_t tw = text_width(ctx, w->label);
+		tx = rx + rw - tw;
+	}
+	push_text_clip(tx, ty, w->label, tc, rx, ry, rx + rw, ry + rh);
 }
 
 // [=]===^=[ mkgui_label_set ]===================================[=]
