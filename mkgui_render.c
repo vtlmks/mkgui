@@ -105,7 +105,7 @@ static uint32_t corner_coverage(int32_t col, int32_t crow, int32_t radius) {
 		}
 		__m128i rem = _mm_set1_epi32(remain);
 		__m128i dx_lo = _mm_and_si128(dx_base, _mm_set1_epi32(0x0000ffff));
-		__m128i dx2 = _mm_mullo_epi16(dx_lo, dx_lo);
+		__m128i dx2 = _mm_madd_epi16(dx_lo, dx_lo);
 		__m128i cmp = _mm_or_si128(_mm_cmplt_epi32(dx2, rem), _mm_cmpeq_epi32(dx2, rem));
 		count += (uint32_t)__builtin_popcount((uint32_t)_mm_movemask_epi8(cmp)) / 4;
 	}

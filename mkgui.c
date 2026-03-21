@@ -31,64 +31,21 @@
 #endif
 
 // ---------------------------------------------------------------------------
-// Constants
+// Public API (single source of truth for all public types, constants, enums)
 // ---------------------------------------------------------------------------
 
-#define MKGUI_MAX_COLS       32
-#define MKGUI_MAX_TEXT       256
-#define MKGUI_MAX_DROPDOWN   64
-#define MKGUI_MAX_POPUPS     8
-#define MKGUI_ROW_HEIGHT     20
-#define MKGUI_TAB_HEIGHT     26
-#define MKGUI_MENU_HEIGHT    22
-#define MKGUI_SCROLLBAR_W    14
-#define MKGUI_SPLIT_THICK    5
-#define MKGUI_BOX_GAP        6
-#define MKGUI_BOX_PAD        6
-#define MKGUI_MARGIN         3
-#define MKGUI_GLYPH_FIRST    32
-#define MKGUI_GLYPH_LAST     126
-#define MKGUI_GLYPH_COUNT    (MKGUI_GLYPH_LAST - MKGUI_GLYPH_FIRST + 1)
-#define MKGUI_GLYPH_MAX_BMP  1024
+#include "mkgui.h"
 
-#define MKGUI_TOOLBAR_HEIGHT_DEFAULT  28
-#define MKGUI_TOOLBAR_BTN_W   28
-#define MKGUI_TOOLBAR_SEP_W   8
-#define MKGUI_STATUSBAR_HEIGHT 22
+// ---------------------------------------------------------------------------
+// Internal constants (not in public header)
+// ---------------------------------------------------------------------------
 
-#define MKGUI_ICON_SIZE       18
+#define MKGUI_GLYPH_FIRST     32
+#define MKGUI_GLYPH_LAST      126
+#define MKGUI_GLYPH_COUNT     (MKGUI_GLYPH_LAST - MKGUI_GLYPH_FIRST + 1)
+#define MKGUI_GLYPH_MAX_BMP   1024
 #define MKGUI_ICON_PIXELS     (MKGUI_ICON_SIZE * MKGUI_ICON_SIZE)
-#define MKGUI_MAX_ICONS       2048
-#define MKGUI_ICON_NAME_LEN   64
 #define MKGUI_ICON_PIXEL_POOL (MKGUI_ICON_PIXELS * MKGUI_MAX_ICONS)
-
-// ---------------------------------------------------------------------------
-// Platform-neutral key constants (values match X11 keysyms for convenience)
-// ---------------------------------------------------------------------------
-
-#define MKGUI_KEY_BACKSPACE  0xff08
-#define MKGUI_KEY_TAB        0xff09
-#define MKGUI_KEY_ISO_LEFT_TAB 0xfe20
-#define MKGUI_KEY_RETURN     0xff0d
-#define MKGUI_KEY_ESCAPE     0xff1b
-#define MKGUI_KEY_SPACE      0x0020
-#define MKGUI_KEY_DELETE     0xffff
-#define MKGUI_KEY_HOME       0xff50
-#define MKGUI_KEY_LEFT       0xff51
-#define MKGUI_KEY_UP         0xff52
-#define MKGUI_KEY_RIGHT      0xff53
-#define MKGUI_KEY_DOWN       0xff54
-#define MKGUI_KEY_PAGE_UP    0xff55
-#define MKGUI_KEY_PAGE_DOWN  0xff56
-#define MKGUI_KEY_END        0xff57
-#define MKGUI_KEY_F1         0xffbe
-
-// ---------------------------------------------------------------------------
-// Platform-neutral modifier masks
-// ---------------------------------------------------------------------------
-
-#define MKGUI_MOD_SHIFT      (1 << 0)
-#define MKGUI_MOD_CONTROL    (1 << 2)
 
 // ---------------------------------------------------------------------------
 // Platform event types
@@ -164,219 +121,8 @@ MKGUI_API double mkgui_time_us(void) {
 }
 
 // ---------------------------------------------------------------------------
-// Widget types
+// Internal data structures
 // ---------------------------------------------------------------------------
-
-enum {
-	MKGUI_WINDOW,
-	MKGUI_BUTTON,
-	MKGUI_LABEL,
-	MKGUI_INPUT,
-	MKGUI_CHECKBOX,
-	MKGUI_DROPDOWN,
-	MKGUI_SLIDER,
-	MKGUI_LISTVIEW,
-	MKGUI_MENU,
-	MKGUI_MENUITEM,
-	MKGUI_TABS,
-	MKGUI_TAB,
-	MKGUI_HSPLIT,
-	MKGUI_VSPLIT,
-	MKGUI_TREEVIEW,
-	MKGUI_STATUSBAR,
-	MKGUI_TOOLBAR,
-	MKGUI_SPINBOX,
-	MKGUI_RADIO,
-	MKGUI_PROGRESS,
-	MKGUI_TEXTAREA,
-	MKGUI_GROUP,
-	MKGUI_SPINNER,
-	MKGUI_ITEMVIEW,
-	MKGUI_PANEL,
-	MKGUI_SCROLLBAR,
-	MKGUI_IMAGE,
-	MKGUI_GLVIEW,
-	MKGUI_CANVAS,
-	MKGUI_VBOX,
-	MKGUI_HBOX,
-	MKGUI_FORM,
-	MKGUI_SPACER,
-	MKGUI_PATHBAR,
-	MKGUI_IPINPUT,
-	MKGUI_TOGGLE,
-	MKGUI_COMBOBOX,
-	MKGUI_DATEPICKER,
-	MKGUI_GRIDVIEW,
-};
-
-// ---------------------------------------------------------------------------
-// Anchor / layout flags
-// ---------------------------------------------------------------------------
-
-#define MKGUI_ANCHOR_LEFT     (1u << 0)
-#define MKGUI_ANCHOR_TOP      (1u << 1)
-#define MKGUI_ANCHOR_RIGHT    (1u << 2)
-#define MKGUI_ANCHOR_BOTTOM   (1u << 3)
-#define MKGUI_REGION_TOP      (1u << 4)
-#define MKGUI_REGION_BOTTOM   (1u << 5)
-#define MKGUI_REGION_LEFT     (1u << 6)
-#define MKGUI_REGION_RIGHT    (1u << 7)
-#define MKGUI_HIDDEN          (1u << 8)
-#define MKGUI_DISABLED        (1u << 9)
-#define MKGUI_CHECKED         (1u << 10)
-#define MKGUI_PASSWORD        (1u << 11)
-#define MKGUI_READONLY        (1u << 12)
-#define MKGUI_SEPARATOR       (1u << 13)
-#define MKGUI_TOOLBAR_SEP     (1u << 14)
-#define MKGUI_MENU_CHECK      (1u << 15)
-#define MKGUI_MENU_RADIO      (1u << 16)
-#define MKGUI_PANEL_BORDER    (1u << 17)
-#define MKGUI_PANEL_SUNKEN    (1u << 18)
-#define MKGUI_SLIDER_MIXER    (1u << 19)
-#define MKGUI_IMAGE_STRETCH   (1u << 20)
-#define MKGUI_SCROLL          (1u << 21)
-#define MKGUI_NO_PAD          (1u << 22)
-#define MKGUI_TAB_CLOSABLE    (1u << 23)
-#define MKGUI_MULTI_SELECT    (1u << 24)
-#define MKGUI_ALIGN_START     (1u << 25)
-#define MKGUI_ALIGN_CENTER    (2u << 25)
-#define MKGUI_ALIGN_END       (3u << 25)
-#define MKGUI_ALIGN_MASK      (3u << 25)
-#define MKGUI_FIXED           (1u << 27)
-#define MKGUI_TOOLBAR_ICONS_TEXT  0
-#define MKGUI_TOOLBAR_ICONS_ONLY  (1u << 28)
-#define MKGUI_TOOLBAR_TEXT_ONLY   (2u << 28)
-#define MKGUI_TOOLBAR_MODE_MASK   (3u << 28)
-#define MKGUI_VERTICAL            (1u << 30)
-
-// ---------------------------------------------------------------------------
-// Event types
-// ---------------------------------------------------------------------------
-
-enum {
-	MKGUI_EVENT_NONE,
-	MKGUI_EVENT_CLICK,
-	MKGUI_EVENT_MENU,
-	MKGUI_EVENT_TAB_CHANGED,
-	MKGUI_EVENT_LISTVIEW_SORT,
-	MKGUI_EVENT_LISTVIEW_COL_REORDER,
-	MKGUI_EVENT_LISTVIEW_SELECT,
-	MKGUI_EVENT_LISTVIEW_DBLCLICK,
-	MKGUI_EVENT_LISTVIEW_REORDER,
-	MKGUI_EVENT_INPUT_CHANGED,
-	MKGUI_EVENT_CHECKBOX_CHANGED,
-	MKGUI_EVENT_DROPDOWN_CHANGED,
-	MKGUI_EVENT_SLIDER_CHANGED,
-	MKGUI_EVENT_SPLIT_MOVED,
-	MKGUI_EVENT_TREEVIEW_SELECT,
-	MKGUI_EVENT_TREEVIEW_EXPAND,
-	MKGUI_EVENT_TREEVIEW_COLLAPSE,
-	MKGUI_EVENT_TREEVIEW_MOVE,
-	MKGUI_EVENT_SPINBOX_CHANGED,
-	MKGUI_EVENT_RADIO_CHANGED,
-	MKGUI_EVENT_TEXTAREA_CHANGED,
-	MKGUI_EVENT_KEY,
-	MKGUI_EVENT_CLOSE,
-	MKGUI_EVENT_RESIZE,
-	MKGUI_EVENT_ITEMVIEW_SELECT,
-	MKGUI_EVENT_ITEMVIEW_DBLCLICK,
-	MKGUI_EVENT_SCROLL,
-	MKGUI_EVENT_CONTEXT,
-	MKGUI_EVENT_INPUT_SUBMIT,
-	MKGUI_EVENT_FOCUS,
-	MKGUI_EVENT_UNFOCUS,
-	MKGUI_EVENT_HOVER_ENTER,
-	MKGUI_EVENT_HOVER_LEAVE,
-	MKGUI_EVENT_SLIDER_START,
-	MKGUI_EVENT_SLIDER_END,
-	MKGUI_EVENT_TREEVIEW_DBLCLICK,
-	MKGUI_EVENT_TEXTAREA_CURSOR,
-	MKGUI_EVENT_DRAG_START,
-	MKGUI_EVENT_DRAG_END,
-	MKGUI_EVENT_TAB_CLOSE,
-	MKGUI_EVENT_PATHBAR_NAV,
-	MKGUI_EVENT_PATHBAR_SUBMIT,
-	MKGUI_EVENT_IPINPUT_CHANGED,
-	MKGUI_EVENT_TOGGLE_CHANGED,
-	MKGUI_EVENT_COMBOBOX_CHANGED,
-	MKGUI_EVENT_COMBOBOX_SUBMIT,
-	MKGUI_EVENT_DATEPICKER_CHANGED,
-	MKGUI_EVENT_GRID_CLICK,
-	MKGUI_EVENT_GRID_CHECK,
-	MKGUI_EVENT_GRIDVIEW_SELECT,
-	MKGUI_EVENT_CONTEXT_HEADER,
-	MKGUI_EVENT_CONTEXT_MENU,
-};
-
-// ---------------------------------------------------------------------------
-// Itemview modes
-// ---------------------------------------------------------------------------
-
-enum {
-	MKGUI_VIEW_ICON,
-	MKGUI_VIEW_THUMBNAIL,
-	MKGUI_VIEW_COMPACT,
-	MKGUI_VIEW_DETAIL,
-};
-
-// ---------------------------------------------------------------------------
-// Structs
-// ---------------------------------------------------------------------------
-
-struct mkgui_widget {
-	uint32_t type;
-	uint32_t id;
-	char label[MKGUI_MAX_TEXT];
-	char icon[MKGUI_ICON_NAME_LEN];
-	uint32_t parent_id;
-	int32_t x, y, w, h;
-	uint32_t flags;
-	uint32_t weight;
-};
-
-struct mkgui_ctx;
-typedef void (*mkgui_render_cb)(struct mkgui_ctx *ctx, void *userdata);
-
-struct mkgui_event {
-	uint32_t type;
-	uint32_t id;
-	int32_t value;
-	int32_t col;
-	uint32_t keysym;
-	uint32_t keymod;
-};
-
-enum {
-	MKGUI_CELL_TEXT,
-	MKGUI_CELL_PROGRESS,
-	MKGUI_CELL_ICON_TEXT,
-	MKGUI_CELL_SIZE,
-	MKGUI_CELL_DATE,
-	MKGUI_CELL_CHECKBOX,
-};
-
-struct mkgui_column {
-	char label[MKGUI_MAX_TEXT];
-	int32_t width;
-	uint32_t cell_type;
-};
-
-typedef void (*mkgui_row_cb)(uint32_t row, uint32_t col, char *buf, uint32_t buf_size, void *userdata);
-typedef void (*mkgui_grid_cell_cb)(uint32_t row, uint32_t col, char *buf, uint32_t buf_size, void *userdata);
-
-enum {
-	MKGUI_GRID_TEXT,
-	MKGUI_GRID_CHECK,
-	MKGUI_GRID_CHECK_TEXT,
-};
-
-struct mkgui_grid_column {
-	char label[MKGUI_MAX_TEXT];
-	int32_t width;
-	uint32_t col_type;
-};
-
-#define MKGUI_MAX_MULTI_SEL 4096
 
 struct mkgui_listview_data {
 	uint32_t widget_id;
@@ -413,6 +159,10 @@ struct mkgui_gridview_data {
 	int32_t header_height;
 	uint8_t *checks;
 	uint32_t checks_cap;
+	int32_t drag_source;
+	int32_t drag_target;
+	int32_t drag_start_y;
+	uint32_t drag_active;
 };
 
 struct mkgui_input_data {
@@ -499,7 +249,6 @@ struct mkgui_split_data {
 	float ratio;
 };
 
-#define MKGUI_MAX_STATUSBAR_SECTIONS 8
 #define MKGUI_MAX_TEXTAREA_LINES 4096
 #define MKGUI_MAX_TEXTAREA_LINE  1024
 #define MKGUI_CLIP_MAX           4096
@@ -572,10 +321,6 @@ struct mkgui_textarea_data {
 };
 
 
-typedef void (*mkgui_itemview_label_cb)(uint32_t item, char *buf, uint32_t buf_size, void *userdata);
-typedef void (*mkgui_itemview_icon_cb)(uint32_t item, char *buf, uint32_t buf_size, void *userdata);
-typedef void (*mkgui_thumbnail_cb)(uint32_t item, uint32_t *pixels, int32_t w, int32_t h, void *userdata);
-
 struct mkgui_itemview_data {
 	uint32_t widget_id;
 	uint32_t item_count;
@@ -621,15 +366,11 @@ struct mkgui_glview_data {
 	struct mkgui_glview_platform plat;
 };
 
-typedef void (*mkgui_canvas_cb)(struct mkgui_ctx *ctx, uint32_t id, uint32_t *pixels, int32_t x, int32_t y, int32_t w, int32_t h, void *userdata);
-
 struct mkgui_canvas_data {
 	uint32_t widget_id;
 	mkgui_canvas_cb callback;
 	void *userdata;
 };
-
-#define MKGUI_PATHBAR_MAX_SEGS 64
 
 struct mkgui_pathbar_data {
 	uint32_t widget_id;
@@ -650,7 +391,6 @@ struct mkgui_pathbar_data {
 	uint32_t edit_sel_end;
 };
 
-#define MKGUI_MAX_CTXMENU        64
 #define MKGUI_CTXMENU_POPUP_ID   UINT32_MAX
 
 struct mkgui_ctxmenu_item {
@@ -677,32 +417,6 @@ struct mkgui_popup {
 	uint32_t active;
 	uint32_t dirty;
 	int32_t hover_item;
-};
-
-struct mkgui_theme {
-	uint32_t bg;
-	uint32_t widget_bg;
-	uint32_t widget_border;
-	uint32_t widget_hover;
-	uint32_t widget_press;
-	uint32_t text;
-	uint32_t text_disabled;
-	uint32_t selection;
-	uint32_t sel_text;
-	uint32_t input_bg;
-	uint32_t tab_active;
-	uint32_t tab_inactive;
-	uint32_t tab_hover;
-	uint32_t menu_bg;
-	uint32_t menu_hover;
-	uint32_t scrollbar_bg;
-	uint32_t scrollbar_thumb;
-	uint32_t scrollbar_thumb_hover;
-	uint32_t splitter;
-	uint32_t header_bg;
-	uint32_t listview_alt;
-	uint32_t accent;
-	int32_t corner_radius;
 };
 
 // ---------------------------------------------------------------------------
@@ -947,7 +661,7 @@ struct mkgui_ctx {
 // ---------------------------------------------------------------------------
 
 // [=]===^=[ default_theme ]=====================================[=]
-static struct mkgui_theme default_theme(void) {
+MKGUI_API struct mkgui_theme default_theme(void) {
 	struct mkgui_theme t;
 	t.bg                  = 0xff232629;
 	t.widget_bg           = 0xff31363b;
@@ -976,7 +690,7 @@ static struct mkgui_theme default_theme(void) {
 }
 
 // [=]===^=[ light_theme ]========================================[=]
-static struct mkgui_theme light_theme(void) {
+MKGUI_API struct mkgui_theme light_theme(void) {
 	struct mkgui_theme t;
 	t.bg                    = 0xfff0f0f0;
 	t.widget_bg             = 0xffffffff;
@@ -4095,6 +3809,35 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 						}
 					}
 				}
+				for(uint32_t gvi = 0; gvi < ctx->gridview_count; ++gvi) {
+					struct mkgui_gridview_data *gv = &ctx->gridviews[gvi];
+					if(gv->drag_source >= 0 && ctx->press_id == gv->widget_id) {
+						int32_t dy = ctx->mouse_y - gv->drag_start_y;
+						if(dy < 0) {
+							dy = -dy;
+						}
+						if(!gv->drag_active && dy > 4) {
+							gv->drag_active = 1;
+							ev->type = MKGUI_EVENT_DRAG_START;
+							ev->id = gv->widget_id;
+							ev->value = gv->drag_source;
+							dirty_all(ctx);
+							return 1;
+						}
+						if(gv->drag_active) {
+							int32_t gidx = find_widget_idx(ctx, gv->widget_id);
+							if(gidx >= 0) {
+								int32_t tgt = gridview_row_hit(ctx, (uint32_t)gidx, ctx->mouse_y);
+								if(tgt >= 0 && tgt != gv->drag_source) {
+									gv->drag_target = tgt;
+								} else {
+									gv->drag_target = -1;
+								}
+								dirty_all(ctx);
+							}
+						}
+					}
+				}
 
 				if(hi >= 0 && ctx->widgets[hi].type == MKGUI_SPINBOX) {
 					struct mkgui_spinbox_data *sd = find_spinbox_data(ctx, ctx->widgets[hi].id);
@@ -5023,6 +4766,10 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 									if(grow >= 0 && grow < (int32_t)gv->row_count) {
 										gv->selected_row = grow;
 										gv->selected_col = gcol;
+										gv->drag_source = grow;
+										gv->drag_target = -1;
+										gv->drag_start_y = ctx->mouse_y;
+										gv->drag_active = 0;
 										if(gcol >= 0 && gcol < (int32_t)gv->col_count) {
 											uint32_t ct = gv->columns[gcol].col_type;
 											if(ct == MKGUI_GRID_CHECK || ct == MKGUI_GRID_CHECK_TEXT) {
@@ -5271,6 +5018,30 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 					lv->drag_active = 0;
 					lv->drag_source = -1;
 					lv->drag_target = -1;
+				}
+				for(uint32_t gvi = 0; gvi < ctx->gridview_count; ++gvi) {
+					struct mkgui_gridview_data *gv = &ctx->gridviews[gvi];
+					if(gv->drag_active && gv->drag_target >= 0) {
+						int32_t src = gv->drag_source;
+						int32_t tgt = gv->drag_target;
+						gv->drag_active = 0;
+						gv->drag_source = -1;
+						gv->drag_target = -1;
+						dirty_all(ctx);
+						ev->type = MKGUI_EVENT_GRIDVIEW_REORDER;
+						ev->id = gv->widget_id;
+						ev->value = src;
+						ev->col = tgt;
+						return 1;
+					}
+					if(gv->drag_active) {
+						ev->type = MKGUI_EVENT_DRAG_END;
+						ev->id = gv->widget_id;
+						dirty_all(ctx);
+					}
+					gv->drag_active = 0;
+					gv->drag_source = -1;
+					gv->drag_target = -1;
 				}
 
 				ctx->drag_select_id = 0;

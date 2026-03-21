@@ -1,13 +1,21 @@
 // Copyright (c) 2026, Peter Fors
 // SPDX-License-Identifier: MIT
 //
-// mkgui public API header
-// Include this when linking against libmkgui.a instead of #include "mkgui.c"
+// mkgui public API header -- single source of truth for all public types,
+// constants, enums, and function declarations.
+//
+// Unity build: mkgui.c defines MKGUI_API as static before including this.
+// Library build: mkgui.c defines MKGUI_API as empty (extern linkage).
+// Consumer: MKGUI_API defaults to empty below.
 
 #ifndef MKGUI_H
 #define MKGUI_H
 
 #include <stdint.h>
+
+#ifndef MKGUI_API
+#define MKGUI_API
+#endif
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -202,6 +210,7 @@ enum {
 	MKGUI_EVENT_GRID_CLICK,
 	MKGUI_EVENT_GRID_CHECK,
 	MKGUI_EVENT_GRIDVIEW_SELECT,
+	MKGUI_EVENT_GRIDVIEW_REORDER,
 	MKGUI_EVENT_CONTEXT_HEADER,
 	MKGUI_EVENT_CONTEXT_MENU,
 };
@@ -349,367 +358,367 @@ typedef void (*mkgui_canvas_cb)(struct mkgui_ctx *ctx, uint32_t id, uint32_t *pi
 // Lifecycle
 // ---------------------------------------------------------------------------
 
-struct mkgui_ctx *mkgui_create(struct mkgui_widget *widgets, uint32_t count);
-void mkgui_destroy(struct mkgui_ctx *ctx);
-struct mkgui_ctx *mkgui_create_child(struct mkgui_ctx *parent, struct mkgui_widget *widgets, uint32_t count, const char *title, int32_t w, int32_t h);
-void mkgui_destroy_child(struct mkgui_ctx *ctx);
-uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev);
-void mkgui_wait(struct mkgui_ctx *ctx);
-void mkgui_set_poll_timeout(struct mkgui_ctx *ctx, int32_t ms);
+MKGUI_API struct mkgui_ctx *mkgui_create(struct mkgui_widget *widgets, uint32_t count);
+MKGUI_API void mkgui_destroy(struct mkgui_ctx *ctx);
+MKGUI_API struct mkgui_ctx *mkgui_create_child(struct mkgui_ctx *parent, struct mkgui_widget *widgets, uint32_t count, const char *title, int32_t w, int32_t h);
+MKGUI_API void mkgui_destroy_child(struct mkgui_ctx *ctx);
+MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev);
+MKGUI_API void mkgui_wait(struct mkgui_ctx *ctx);
+MKGUI_API void mkgui_set_poll_timeout(struct mkgui_ctx *ctx, int32_t ms);
 
 // ---------------------------------------------------------------------------
 // Widget management
 // ---------------------------------------------------------------------------
 
-uint32_t mkgui_add_widget(struct mkgui_ctx *ctx, struct mkgui_widget w, uint32_t after_id);
-uint32_t mkgui_remove_widget(struct mkgui_ctx *ctx, uint32_t id);
+MKGUI_API uint32_t mkgui_add_widget(struct mkgui_ctx *ctx, struct mkgui_widget w, uint32_t after_id);
+MKGUI_API uint32_t mkgui_remove_widget(struct mkgui_ctx *ctx, uint32_t id);
 
 // ---------------------------------------------------------------------------
 // Base widget properties
 // ---------------------------------------------------------------------------
 
-void mkgui_set_enabled(struct mkgui_ctx *ctx, uint32_t id, uint32_t enabled);
-uint32_t mkgui_get_enabled(struct mkgui_ctx *ctx, uint32_t id);
-void mkgui_set_visible(struct mkgui_ctx *ctx, uint32_t id, uint32_t visible);
-uint32_t mkgui_get_visible(struct mkgui_ctx *ctx, uint32_t id);
-void mkgui_set_focus(struct mkgui_ctx *ctx, uint32_t id);
-uint32_t mkgui_has_focus(struct mkgui_ctx *ctx, uint32_t id);
-void mkgui_get_geometry(struct mkgui_ctx *ctx, uint32_t id, int32_t *x, int32_t *y, int32_t *w, int32_t *h);
-void mkgui_set_flags(struct mkgui_ctx *ctx, uint32_t id, uint32_t flags);
-uint32_t mkgui_get_flags(struct mkgui_ctx *ctx, uint32_t id);
+MKGUI_API void mkgui_set_enabled(struct mkgui_ctx *ctx, uint32_t id, uint32_t enabled);
+MKGUI_API uint32_t mkgui_get_enabled(struct mkgui_ctx *ctx, uint32_t id);
+MKGUI_API void mkgui_set_visible(struct mkgui_ctx *ctx, uint32_t id, uint32_t visible);
+MKGUI_API uint32_t mkgui_get_visible(struct mkgui_ctx *ctx, uint32_t id);
+MKGUI_API void mkgui_set_focus(struct mkgui_ctx *ctx, uint32_t id);
+MKGUI_API uint32_t mkgui_has_focus(struct mkgui_ctx *ctx, uint32_t id);
+MKGUI_API void mkgui_get_geometry(struct mkgui_ctx *ctx, uint32_t id, int32_t *x, int32_t *y, int32_t *w, int32_t *h);
+MKGUI_API void mkgui_set_flags(struct mkgui_ctx *ctx, uint32_t id, uint32_t flags);
+MKGUI_API uint32_t mkgui_get_flags(struct mkgui_ctx *ctx, uint32_t id);
 
 // ---------------------------------------------------------------------------
 // Theme
 // ---------------------------------------------------------------------------
 
-struct mkgui_theme default_theme(void);
-struct mkgui_theme light_theme(void);
-void mkgui_set_theme(struct mkgui_ctx *ctx, struct mkgui_theme theme);
-void mkgui_set_weight(struct mkgui_ctx *ctx, uint32_t id, uint32_t weight);
-void mkgui_toolbar_set_mode(struct mkgui_ctx *ctx, uint32_t toolbar_id, uint32_t mode);
+MKGUI_API struct mkgui_theme default_theme(void);
+MKGUI_API struct mkgui_theme light_theme(void);
+MKGUI_API void mkgui_set_theme(struct mkgui_ctx *ctx, struct mkgui_theme theme);
+MKGUI_API void mkgui_set_weight(struct mkgui_ctx *ctx, uint32_t id, uint32_t weight);
+MKGUI_API void mkgui_toolbar_set_mode(struct mkgui_ctx *ctx, uint32_t toolbar_id, uint32_t mode);
 
 // ---------------------------------------------------------------------------
 // Tooltip
 // ---------------------------------------------------------------------------
 
-void mkgui_set_tooltip(struct mkgui_ctx *ctx, uint32_t id, const char *text);
-const char *mkgui_get_tooltip(struct mkgui_ctx *ctx, uint32_t id);
+MKGUI_API void mkgui_set_tooltip(struct mkgui_ctx *ctx, uint32_t id, const char *text);
+MKGUI_API const char *mkgui_get_tooltip(struct mkgui_ctx *ctx, uint32_t id);
 
 // ---------------------------------------------------------------------------
 // Icon
 // ---------------------------------------------------------------------------
 
-int32_t mkgui_icon_add(const char *name, const uint32_t *pixels, int32_t w, int32_t h);
-void mkgui_set_icon(struct mkgui_ctx *ctx, uint32_t widget_id, const char *icon_name);
-void mkgui_set_treenode_icon(struct mkgui_ctx *ctx, uint32_t widget_id, uint32_t node_id, const char *icon_name);
-uint32_t mkgui_icon_browser(struct mkgui_ctx *ctx, char *out, uint32_t out_size);
+MKGUI_API int32_t mkgui_icon_add(const char *name, const uint32_t *pixels, int32_t w, int32_t h);
+MKGUI_API void mkgui_set_icon(struct mkgui_ctx *ctx, uint32_t widget_id, const char *icon_name);
+MKGUI_API void mkgui_set_treenode_icon(struct mkgui_ctx *ctx, uint32_t widget_id, uint32_t node_id, const char *icon_name);
+MKGUI_API uint32_t mkgui_icon_browser(struct mkgui_ctx *ctx, char *out, uint32_t out_size);
 
 // ---------------------------------------------------------------------------
 // Button
 // ---------------------------------------------------------------------------
 
-void mkgui_button_set_text(struct mkgui_ctx *ctx, uint32_t id, const char *text);
-const char *mkgui_button_get_text(struct mkgui_ctx *ctx, uint32_t id);
+MKGUI_API void mkgui_button_set_text(struct mkgui_ctx *ctx, uint32_t id, const char *text);
+MKGUI_API const char *mkgui_button_get_text(struct mkgui_ctx *ctx, uint32_t id);
 
 // ---------------------------------------------------------------------------
 // Label
 // ---------------------------------------------------------------------------
 
-void mkgui_label_set(struct mkgui_ctx *ctx, uint32_t id, const char *text);
-const char *mkgui_label_get(struct mkgui_ctx *ctx, uint32_t id);
+MKGUI_API void mkgui_label_set(struct mkgui_ctx *ctx, uint32_t id, const char *text);
+MKGUI_API const char *mkgui_label_get(struct mkgui_ctx *ctx, uint32_t id);
 
 // ---------------------------------------------------------------------------
 // Input
 // ---------------------------------------------------------------------------
 
-void mkgui_input_set(struct mkgui_ctx *ctx, uint32_t id, const char *text);
-const char *mkgui_input_get(struct mkgui_ctx *ctx, uint32_t id);
-void mkgui_input_clear(struct mkgui_ctx *ctx, uint32_t id);
-void mkgui_input_set_readonly(struct mkgui_ctx *ctx, uint32_t id, uint32_t readonly);
-uint32_t mkgui_input_get_readonly(struct mkgui_ctx *ctx, uint32_t id);
-uint32_t mkgui_input_get_cursor(struct mkgui_ctx *ctx, uint32_t id);
-void mkgui_input_set_cursor(struct mkgui_ctx *ctx, uint32_t id, uint32_t pos);
-void mkgui_input_select_all(struct mkgui_ctx *ctx, uint32_t id);
-void mkgui_input_get_selection(struct mkgui_ctx *ctx, uint32_t id, uint32_t *start, uint32_t *end);
-void mkgui_input_set_selection(struct mkgui_ctx *ctx, uint32_t id, uint32_t start, uint32_t end);
+MKGUI_API void mkgui_input_set(struct mkgui_ctx *ctx, uint32_t id, const char *text);
+MKGUI_API const char *mkgui_input_get(struct mkgui_ctx *ctx, uint32_t id);
+MKGUI_API void mkgui_input_clear(struct mkgui_ctx *ctx, uint32_t id);
+MKGUI_API void mkgui_input_set_readonly(struct mkgui_ctx *ctx, uint32_t id, uint32_t readonly);
+MKGUI_API uint32_t mkgui_input_get_readonly(struct mkgui_ctx *ctx, uint32_t id);
+MKGUI_API uint32_t mkgui_input_get_cursor(struct mkgui_ctx *ctx, uint32_t id);
+MKGUI_API void mkgui_input_set_cursor(struct mkgui_ctx *ctx, uint32_t id, uint32_t pos);
+MKGUI_API void mkgui_input_select_all(struct mkgui_ctx *ctx, uint32_t id);
+MKGUI_API void mkgui_input_get_selection(struct mkgui_ctx *ctx, uint32_t id, uint32_t *start, uint32_t *end);
+MKGUI_API void mkgui_input_set_selection(struct mkgui_ctx *ctx, uint32_t id, uint32_t start, uint32_t end);
 
 // ---------------------------------------------------------------------------
 // Checkbox
 // ---------------------------------------------------------------------------
 
-void mkgui_checkbox_set(struct mkgui_ctx *ctx, uint32_t id, uint32_t checked);
-uint32_t mkgui_checkbox_get(struct mkgui_ctx *ctx, uint32_t id);
+MKGUI_API void mkgui_checkbox_set(struct mkgui_ctx *ctx, uint32_t id, uint32_t checked);
+MKGUI_API uint32_t mkgui_checkbox_get(struct mkgui_ctx *ctx, uint32_t id);
 
 // ---------------------------------------------------------------------------
 // Radio
 // ---------------------------------------------------------------------------
 
-uint32_t mkgui_radio_get(struct mkgui_ctx *ctx, uint32_t id);
-void mkgui_radio_set(struct mkgui_ctx *ctx, uint32_t id, uint32_t checked);
+MKGUI_API uint32_t mkgui_radio_get(struct mkgui_ctx *ctx, uint32_t id);
+MKGUI_API void mkgui_radio_set(struct mkgui_ctx *ctx, uint32_t id, uint32_t checked);
 
 // ---------------------------------------------------------------------------
 // Dropdown
 // ---------------------------------------------------------------------------
 
-void mkgui_dropdown_setup(struct mkgui_ctx *ctx, uint32_t id, const char **items, uint32_t count);
-int32_t mkgui_dropdown_get(struct mkgui_ctx *ctx, uint32_t id);
-void mkgui_dropdown_set(struct mkgui_ctx *ctx, uint32_t id, int32_t index);
-const char *mkgui_dropdown_get_text(struct mkgui_ctx *ctx, uint32_t id);
-uint32_t mkgui_dropdown_get_count(struct mkgui_ctx *ctx, uint32_t id);
-const char *mkgui_dropdown_get_item_text(struct mkgui_ctx *ctx, uint32_t id, uint32_t index);
-void mkgui_dropdown_add(struct mkgui_ctx *ctx, uint32_t id, const char *text);
-void mkgui_dropdown_remove(struct mkgui_ctx *ctx, uint32_t id, uint32_t index);
-void mkgui_dropdown_clear(struct mkgui_ctx *ctx, uint32_t id);
+MKGUI_API void mkgui_dropdown_setup(struct mkgui_ctx *ctx, uint32_t id, const char **items, uint32_t count);
+MKGUI_API int32_t mkgui_dropdown_get(struct mkgui_ctx *ctx, uint32_t id);
+MKGUI_API void mkgui_dropdown_set(struct mkgui_ctx *ctx, uint32_t id, int32_t index);
+MKGUI_API const char *mkgui_dropdown_get_text(struct mkgui_ctx *ctx, uint32_t id);
+MKGUI_API uint32_t mkgui_dropdown_get_count(struct mkgui_ctx *ctx, uint32_t id);
+MKGUI_API const char *mkgui_dropdown_get_item_text(struct mkgui_ctx *ctx, uint32_t id, uint32_t index);
+MKGUI_API void mkgui_dropdown_add(struct mkgui_ctx *ctx, uint32_t id, const char *text);
+MKGUI_API void mkgui_dropdown_remove(struct mkgui_ctx *ctx, uint32_t id, uint32_t index);
+MKGUI_API void mkgui_dropdown_clear(struct mkgui_ctx *ctx, uint32_t id);
 
 // ---------------------------------------------------------------------------
 // ComboBox
 // ---------------------------------------------------------------------------
 
-void mkgui_combobox_setup(struct mkgui_ctx *ctx, uint32_t id, const char **items, uint32_t count);
-int32_t mkgui_combobox_get(struct mkgui_ctx *ctx, uint32_t id);
-const char *mkgui_combobox_get_text(struct mkgui_ctx *ctx, uint32_t id);
-void mkgui_combobox_set(struct mkgui_ctx *ctx, uint32_t id, int32_t index);
-void mkgui_combobox_set_text(struct mkgui_ctx *ctx, uint32_t id, const char *text);
-uint32_t mkgui_combobox_get_count(struct mkgui_ctx *ctx, uint32_t id);
-const char *mkgui_combobox_get_item_text(struct mkgui_ctx *ctx, uint32_t id, uint32_t index);
-void mkgui_combobox_add(struct mkgui_ctx *ctx, uint32_t id, const char *text);
-void mkgui_combobox_remove(struct mkgui_ctx *ctx, uint32_t id, uint32_t index);
-void mkgui_combobox_clear(struct mkgui_ctx *ctx, uint32_t id);
+MKGUI_API void mkgui_combobox_setup(struct mkgui_ctx *ctx, uint32_t id, const char **items, uint32_t count);
+MKGUI_API int32_t mkgui_combobox_get(struct mkgui_ctx *ctx, uint32_t id);
+MKGUI_API const char *mkgui_combobox_get_text(struct mkgui_ctx *ctx, uint32_t id);
+MKGUI_API void mkgui_combobox_set(struct mkgui_ctx *ctx, uint32_t id, int32_t index);
+MKGUI_API void mkgui_combobox_set_text(struct mkgui_ctx *ctx, uint32_t id, const char *text);
+MKGUI_API uint32_t mkgui_combobox_get_count(struct mkgui_ctx *ctx, uint32_t id);
+MKGUI_API const char *mkgui_combobox_get_item_text(struct mkgui_ctx *ctx, uint32_t id, uint32_t index);
+MKGUI_API void mkgui_combobox_add(struct mkgui_ctx *ctx, uint32_t id, const char *text);
+MKGUI_API void mkgui_combobox_remove(struct mkgui_ctx *ctx, uint32_t id, uint32_t index);
+MKGUI_API void mkgui_combobox_clear(struct mkgui_ctx *ctx, uint32_t id);
 
 // ---------------------------------------------------------------------------
 // Slider
 // ---------------------------------------------------------------------------
 
-void mkgui_slider_setup(struct mkgui_ctx *ctx, uint32_t id, int32_t min_val, int32_t max_val, int32_t value);
-int32_t mkgui_slider_get(struct mkgui_ctx *ctx, uint32_t id);
-void mkgui_slider_set(struct mkgui_ctx *ctx, uint32_t id, int32_t value);
-void mkgui_slider_get_range(struct mkgui_ctx *ctx, uint32_t id, int32_t *min_val, int32_t *max_val);
-void mkgui_slider_set_range(struct mkgui_ctx *ctx, uint32_t id, int32_t min_val, int32_t max_val);
-void mkgui_slider_set_meter(struct mkgui_ctx *ctx, uint32_t id, float pre, float post, uint32_t pre_color, uint32_t post_color);
+MKGUI_API void mkgui_slider_setup(struct mkgui_ctx *ctx, uint32_t id, int32_t min_val, int32_t max_val, int32_t value);
+MKGUI_API int32_t mkgui_slider_get(struct mkgui_ctx *ctx, uint32_t id);
+MKGUI_API void mkgui_slider_set(struct mkgui_ctx *ctx, uint32_t id, int32_t value);
+MKGUI_API void mkgui_slider_get_range(struct mkgui_ctx *ctx, uint32_t id, int32_t *min_val, int32_t *max_val);
+MKGUI_API void mkgui_slider_set_range(struct mkgui_ctx *ctx, uint32_t id, int32_t min_val, int32_t max_val);
+MKGUI_API void mkgui_slider_set_meter(struct mkgui_ctx *ctx, uint32_t id, float pre, float post, uint32_t pre_color, uint32_t post_color);
 
 // ---------------------------------------------------------------------------
 // Spinbox
 // ---------------------------------------------------------------------------
 
-void mkgui_spinbox_setup(struct mkgui_ctx *ctx, uint32_t id, int32_t min_val, int32_t max_val, int32_t value, int32_t step);
-void mkgui_spinbox_set(struct mkgui_ctx *ctx, uint32_t id, int32_t value);
-int32_t mkgui_spinbox_get(struct mkgui_ctx *ctx, uint32_t id);
-void mkgui_spinbox_set_range(struct mkgui_ctx *ctx, uint32_t id, int32_t min_val, int32_t max_val);
-void mkgui_spinbox_get_range(struct mkgui_ctx *ctx, uint32_t id, int32_t *min_val, int32_t *max_val);
-void mkgui_spinbox_set_step(struct mkgui_ctx *ctx, uint32_t id, int32_t step);
+MKGUI_API void mkgui_spinbox_setup(struct mkgui_ctx *ctx, uint32_t id, int32_t min_val, int32_t max_val, int32_t value, int32_t step);
+MKGUI_API void mkgui_spinbox_set(struct mkgui_ctx *ctx, uint32_t id, int32_t value);
+MKGUI_API int32_t mkgui_spinbox_get(struct mkgui_ctx *ctx, uint32_t id);
+MKGUI_API void mkgui_spinbox_set_range(struct mkgui_ctx *ctx, uint32_t id, int32_t min_val, int32_t max_val);
+MKGUI_API void mkgui_spinbox_get_range(struct mkgui_ctx *ctx, uint32_t id, int32_t *min_val, int32_t *max_val);
+MKGUI_API void mkgui_spinbox_set_step(struct mkgui_ctx *ctx, uint32_t id, int32_t step);
 
 // ---------------------------------------------------------------------------
 // Scrollbar
 // ---------------------------------------------------------------------------
 
-void mkgui_scrollbar_setup(struct mkgui_ctx *ctx, uint32_t id, int32_t max_value, int32_t page_size);
-void mkgui_scrollbar_set(struct mkgui_ctx *ctx, uint32_t id, int32_t value);
-int32_t mkgui_scrollbar_get(struct mkgui_ctx *ctx, uint32_t id);
+MKGUI_API void mkgui_scrollbar_setup(struct mkgui_ctx *ctx, uint32_t id, int32_t max_value, int32_t page_size);
+MKGUI_API void mkgui_scrollbar_set(struct mkgui_ctx *ctx, uint32_t id, int32_t value);
+MKGUI_API int32_t mkgui_scrollbar_get(struct mkgui_ctx *ctx, uint32_t id);
 
 // ---------------------------------------------------------------------------
 // Progress
 // ---------------------------------------------------------------------------
 
-void mkgui_progress_setup(struct mkgui_ctx *ctx, uint32_t id, int32_t max_val);
-void mkgui_progress_set(struct mkgui_ctx *ctx, uint32_t id, int32_t value);
-int32_t mkgui_progress_get(struct mkgui_ctx *ctx, uint32_t id);
-void mkgui_progress_set_range(struct mkgui_ctx *ctx, uint32_t id, int32_t max_val);
-void mkgui_progress_get_range(struct mkgui_ctx *ctx, uint32_t id, int32_t *max_val);
+MKGUI_API void mkgui_progress_setup(struct mkgui_ctx *ctx, uint32_t id, int32_t max_val);
+MKGUI_API void mkgui_progress_set(struct mkgui_ctx *ctx, uint32_t id, int32_t value);
+MKGUI_API int32_t mkgui_progress_get(struct mkgui_ctx *ctx, uint32_t id);
+MKGUI_API void mkgui_progress_set_range(struct mkgui_ctx *ctx, uint32_t id, int32_t max_val);
+MKGUI_API void mkgui_progress_get_range(struct mkgui_ctx *ctx, uint32_t id, int32_t *max_val);
 
 // ---------------------------------------------------------------------------
 // Toggle
 // ---------------------------------------------------------------------------
 
-void mkgui_toggle_set(struct mkgui_ctx *ctx, uint32_t id, uint32_t state);
-uint32_t mkgui_toggle_get(struct mkgui_ctx *ctx, uint32_t id);
+MKGUI_API void mkgui_toggle_set(struct mkgui_ctx *ctx, uint32_t id, uint32_t state);
+MKGUI_API uint32_t mkgui_toggle_get(struct mkgui_ctx *ctx, uint32_t id);
 
 // ---------------------------------------------------------------------------
 // Textarea
 // ---------------------------------------------------------------------------
 
-void mkgui_textarea_set(struct mkgui_ctx *ctx, uint32_t id, const char *text);
-const char *mkgui_textarea_get(struct mkgui_ctx *ctx, uint32_t id);
-void mkgui_textarea_set_readonly(struct mkgui_ctx *ctx, uint32_t id, uint32_t readonly);
-uint32_t mkgui_textarea_get_readonly(struct mkgui_ctx *ctx, uint32_t id);
-void mkgui_textarea_get_cursor(struct mkgui_ctx *ctx, uint32_t id, uint32_t *line, uint32_t *col);
-void mkgui_textarea_set_cursor(struct mkgui_ctx *ctx, uint32_t id, uint32_t line, uint32_t col);
-uint32_t mkgui_textarea_get_line_count(struct mkgui_ctx *ctx, uint32_t id);
-void mkgui_textarea_get_selection(struct mkgui_ctx *ctx, uint32_t id, uint32_t *start, uint32_t *end);
-void mkgui_textarea_insert(struct mkgui_ctx *ctx, uint32_t id, const char *text);
-void mkgui_textarea_append(struct mkgui_ctx *ctx, uint32_t id, const char *text);
-void mkgui_textarea_scroll_to_end(struct mkgui_ctx *ctx, uint32_t id);
+MKGUI_API void mkgui_textarea_set(struct mkgui_ctx *ctx, uint32_t id, const char *text);
+MKGUI_API const char *mkgui_textarea_get(struct mkgui_ctx *ctx, uint32_t id);
+MKGUI_API void mkgui_textarea_set_readonly(struct mkgui_ctx *ctx, uint32_t id, uint32_t readonly);
+MKGUI_API uint32_t mkgui_textarea_get_readonly(struct mkgui_ctx *ctx, uint32_t id);
+MKGUI_API void mkgui_textarea_get_cursor(struct mkgui_ctx *ctx, uint32_t id, uint32_t *line, uint32_t *col);
+MKGUI_API void mkgui_textarea_set_cursor(struct mkgui_ctx *ctx, uint32_t id, uint32_t line, uint32_t col);
+MKGUI_API uint32_t mkgui_textarea_get_line_count(struct mkgui_ctx *ctx, uint32_t id);
+MKGUI_API void mkgui_textarea_get_selection(struct mkgui_ctx *ctx, uint32_t id, uint32_t *start, uint32_t *end);
+MKGUI_API void mkgui_textarea_insert(struct mkgui_ctx *ctx, uint32_t id, const char *text);
+MKGUI_API void mkgui_textarea_append(struct mkgui_ctx *ctx, uint32_t id, const char *text);
+MKGUI_API void mkgui_textarea_scroll_to_end(struct mkgui_ctx *ctx, uint32_t id);
 
 // ---------------------------------------------------------------------------
 // DatePicker
 // ---------------------------------------------------------------------------
 
-void mkgui_datepicker_set(struct mkgui_ctx *ctx, uint32_t id, int32_t year, int32_t month, int32_t day);
-void mkgui_datepicker_get(struct mkgui_ctx *ctx, uint32_t id, int32_t *year, int32_t *month, int32_t *day);
-const char *mkgui_datepicker_get_text(struct mkgui_ctx *ctx, uint32_t id);
-void mkgui_datepicker_set_readonly(struct mkgui_ctx *ctx, uint32_t id, uint32_t readonly);
-uint32_t mkgui_datepicker_get_readonly(struct mkgui_ctx *ctx, uint32_t id);
+MKGUI_API void mkgui_datepicker_set(struct mkgui_ctx *ctx, uint32_t id, int32_t year, int32_t month, int32_t day);
+MKGUI_API void mkgui_datepicker_get(struct mkgui_ctx *ctx, uint32_t id, int32_t *year, int32_t *month, int32_t *day);
+MKGUI_API const char *mkgui_datepicker_get_text(struct mkgui_ctx *ctx, uint32_t id);
+MKGUI_API void mkgui_datepicker_set_readonly(struct mkgui_ctx *ctx, uint32_t id, uint32_t readonly);
+MKGUI_API uint32_t mkgui_datepicker_get_readonly(struct mkgui_ctx *ctx, uint32_t id);
 
 // ---------------------------------------------------------------------------
 // IP Input
 // ---------------------------------------------------------------------------
 
-void mkgui_ipinput_set(struct mkgui_ctx *ctx, uint32_t id, const char *ip_string);
-const char *mkgui_ipinput_get(struct mkgui_ctx *ctx, uint32_t id);
-uint32_t mkgui_ipinput_get_u32(struct mkgui_ctx *ctx, uint32_t id);
+MKGUI_API void mkgui_ipinput_set(struct mkgui_ctx *ctx, uint32_t id, const char *ip_string);
+MKGUI_API const char *mkgui_ipinput_get(struct mkgui_ctx *ctx, uint32_t id);
+MKGUI_API uint32_t mkgui_ipinput_get_u32(struct mkgui_ctx *ctx, uint32_t id);
 
 // ---------------------------------------------------------------------------
 // Tabs
 // ---------------------------------------------------------------------------
 
-uint32_t mkgui_tabs_get_current(struct mkgui_ctx *ctx, uint32_t id);
-void mkgui_tabs_set_current(struct mkgui_ctx *ctx, uint32_t id, uint32_t tab_id);
-uint32_t mkgui_tabs_get_count(struct mkgui_ctx *ctx, uint32_t id);
-void mkgui_tabs_set_text(struct mkgui_ctx *ctx, uint32_t tabs_id, uint32_t tab_id, const char *text);
-const char *mkgui_tabs_get_text(struct mkgui_ctx *ctx, uint32_t tabs_id, uint32_t tab_id);
+MKGUI_API uint32_t mkgui_tabs_get_current(struct mkgui_ctx *ctx, uint32_t id);
+MKGUI_API void mkgui_tabs_set_current(struct mkgui_ctx *ctx, uint32_t id, uint32_t tab_id);
+MKGUI_API uint32_t mkgui_tabs_get_count(struct mkgui_ctx *ctx, uint32_t id);
+MKGUI_API void mkgui_tabs_set_text(struct mkgui_ctx *ctx, uint32_t tabs_id, uint32_t tab_id, const char *text);
+MKGUI_API const char *mkgui_tabs_get_text(struct mkgui_ctx *ctx, uint32_t tabs_id, uint32_t tab_id);
 
 // ---------------------------------------------------------------------------
 // Split
 // ---------------------------------------------------------------------------
 
-float mkgui_split_get_ratio(struct mkgui_ctx *ctx, uint32_t id);
-void mkgui_split_set_ratio(struct mkgui_ctx *ctx, uint32_t id, float ratio);
+MKGUI_API float mkgui_split_get_ratio(struct mkgui_ctx *ctx, uint32_t id);
+MKGUI_API void mkgui_split_set_ratio(struct mkgui_ctx *ctx, uint32_t id, float ratio);
 
 // ---------------------------------------------------------------------------
 // ListView
 // ---------------------------------------------------------------------------
 
-void mkgui_listview_setup(struct mkgui_ctx *ctx, uint32_t id, uint32_t row_count, uint32_t col_count, struct mkgui_column *columns, mkgui_row_cb cb, void *userdata);
-void mkgui_listview_set_rows(struct mkgui_ctx *ctx, uint32_t id, uint32_t row_count);
-int32_t mkgui_listview_get_selected(struct mkgui_ctx *ctx, uint32_t id);
-void mkgui_listview_set_selected(struct mkgui_ctx *ctx, uint32_t id, int32_t row);
-uint32_t mkgui_listview_get_multi_sel(struct mkgui_ctx *ctx, uint32_t id, const int32_t **out);
-uint32_t mkgui_listview_is_selected(struct mkgui_ctx *ctx, uint32_t id, int32_t row);
-void mkgui_listview_clear_selection(struct mkgui_ctx *ctx, uint32_t id);
-const uint32_t *mkgui_listview_get_col_order(struct mkgui_ctx *ctx, uint32_t id);
-void mkgui_listview_set_col_order(struct mkgui_ctx *ctx, uint32_t id, const uint32_t *order, uint32_t count);
-int32_t mkgui_listview_get_col_width(struct mkgui_ctx *ctx, uint32_t id, uint32_t col);
-void mkgui_listview_set_col_width(struct mkgui_ctx *ctx, uint32_t id, uint32_t col, int32_t width);
-void mkgui_listview_set_cell_type(struct mkgui_ctx *ctx, uint32_t id, uint32_t col, uint32_t cell_type);
-void mkgui_listview_visible_range(struct mkgui_ctx *ctx, uint32_t id, int32_t *first, int32_t *last);
-void mkgui_listview_scroll_to(struct mkgui_ctx *ctx, uint32_t id, int32_t row);
-void mkgui_listview_get_sort(struct mkgui_ctx *ctx, uint32_t id, int32_t *col, int32_t *dir);
-void mkgui_listview_set_sort(struct mkgui_ctx *ctx, uint32_t id, int32_t col, int32_t dir);
+MKGUI_API void mkgui_listview_setup(struct mkgui_ctx *ctx, uint32_t id, uint32_t row_count, uint32_t col_count, struct mkgui_column *columns, mkgui_row_cb cb, void *userdata);
+MKGUI_API void mkgui_listview_set_rows(struct mkgui_ctx *ctx, uint32_t id, uint32_t row_count);
+MKGUI_API int32_t mkgui_listview_get_selected(struct mkgui_ctx *ctx, uint32_t id);
+MKGUI_API void mkgui_listview_set_selected(struct mkgui_ctx *ctx, uint32_t id, int32_t row);
+MKGUI_API uint32_t mkgui_listview_get_multi_sel(struct mkgui_ctx *ctx, uint32_t id, const int32_t **out);
+MKGUI_API uint32_t mkgui_listview_is_selected(struct mkgui_ctx *ctx, uint32_t id, int32_t row);
+MKGUI_API void mkgui_listview_clear_selection(struct mkgui_ctx *ctx, uint32_t id);
+MKGUI_API const uint32_t *mkgui_listview_get_col_order(struct mkgui_ctx *ctx, uint32_t id);
+MKGUI_API void mkgui_listview_set_col_order(struct mkgui_ctx *ctx, uint32_t id, const uint32_t *order, uint32_t count);
+MKGUI_API int32_t mkgui_listview_get_col_width(struct mkgui_ctx *ctx, uint32_t id, uint32_t col);
+MKGUI_API void mkgui_listview_set_col_width(struct mkgui_ctx *ctx, uint32_t id, uint32_t col, int32_t width);
+MKGUI_API void mkgui_listview_set_cell_type(struct mkgui_ctx *ctx, uint32_t id, uint32_t col, uint32_t cell_type);
+MKGUI_API void mkgui_listview_visible_range(struct mkgui_ctx *ctx, uint32_t id, int32_t *first, int32_t *last);
+MKGUI_API void mkgui_listview_scroll_to(struct mkgui_ctx *ctx, uint32_t id, int32_t row);
+MKGUI_API void mkgui_listview_get_sort(struct mkgui_ctx *ctx, uint32_t id, int32_t *col, int32_t *dir);
+MKGUI_API void mkgui_listview_set_sort(struct mkgui_ctx *ctx, uint32_t id, int32_t col, int32_t dir);
 
 // ---------------------------------------------------------------------------
 // GridView
 // ---------------------------------------------------------------------------
 
-void mkgui_gridview_setup(struct mkgui_ctx *ctx, uint32_t id, uint32_t row_count, uint32_t col_count, struct mkgui_grid_column *columns, mkgui_grid_cell_cb cb, void *userdata);
-void mkgui_gridview_set_rows(struct mkgui_ctx *ctx, uint32_t id, uint32_t row_count);
-int32_t mkgui_gridview_get_selected(struct mkgui_ctx *ctx, uint32_t id);
-void mkgui_gridview_set_selected(struct mkgui_ctx *ctx, uint32_t id, int32_t row);
-uint32_t mkgui_gridview_get_check(struct mkgui_ctx *ctx, uint32_t id, uint32_t row, uint32_t col);
-void mkgui_gridview_set_check(struct mkgui_ctx *ctx, uint32_t id, uint32_t row, uint32_t col, uint32_t checked);
-int32_t mkgui_gridview_get_col_width(struct mkgui_ctx *ctx, uint32_t id, uint32_t col);
-void mkgui_gridview_set_col_width(struct mkgui_ctx *ctx, uint32_t id, uint32_t col, int32_t width);
-void mkgui_gridview_scroll_to(struct mkgui_ctx *ctx, uint32_t id, int32_t row);
+MKGUI_API void mkgui_gridview_setup(struct mkgui_ctx *ctx, uint32_t id, uint32_t row_count, uint32_t col_count, struct mkgui_grid_column *columns, mkgui_grid_cell_cb cb, void *userdata);
+MKGUI_API void mkgui_gridview_set_rows(struct mkgui_ctx *ctx, uint32_t id, uint32_t row_count);
+MKGUI_API int32_t mkgui_gridview_get_selected(struct mkgui_ctx *ctx, uint32_t id);
+MKGUI_API void mkgui_gridview_set_selected(struct mkgui_ctx *ctx, uint32_t id, int32_t row);
+MKGUI_API uint32_t mkgui_gridview_get_check(struct mkgui_ctx *ctx, uint32_t id, uint32_t row, uint32_t col);
+MKGUI_API void mkgui_gridview_set_check(struct mkgui_ctx *ctx, uint32_t id, uint32_t row, uint32_t col, uint32_t checked);
+MKGUI_API int32_t mkgui_gridview_get_col_width(struct mkgui_ctx *ctx, uint32_t id, uint32_t col);
+MKGUI_API void mkgui_gridview_set_col_width(struct mkgui_ctx *ctx, uint32_t id, uint32_t col, int32_t width);
+MKGUI_API void mkgui_gridview_scroll_to(struct mkgui_ctx *ctx, uint32_t id, int32_t row);
 
 // ---------------------------------------------------------------------------
 // TreeView
 // ---------------------------------------------------------------------------
 
-void mkgui_treeview_setup(struct mkgui_ctx *ctx, uint32_t id);
-uint32_t mkgui_treeview_add(struct mkgui_ctx *ctx, uint32_t widget_id, uint32_t node_id, uint32_t parent_node, const char *label);
-void mkgui_treeview_select(struct mkgui_ctx *ctx, uint32_t widget_id, int32_t node_id);
-int32_t mkgui_treeview_get_selected(struct mkgui_ctx *ctx, uint32_t id);
-void mkgui_treeview_remove(struct mkgui_ctx *ctx, uint32_t widget_id, uint32_t node_id);
-void mkgui_treeview_clear(struct mkgui_ctx *ctx, uint32_t widget_id);
-void mkgui_treeview_set_label(struct mkgui_ctx *ctx, uint32_t widget_id, uint32_t node_id, const char *label);
-const char *mkgui_treeview_get_label(struct mkgui_ctx *ctx, uint32_t widget_id, uint32_t node_id);
-void mkgui_treeview_expand(struct mkgui_ctx *ctx, uint32_t widget_id, uint32_t node_id);
-void mkgui_treeview_collapse(struct mkgui_ctx *ctx, uint32_t widget_id, uint32_t node_id);
-uint32_t mkgui_treeview_is_expanded(struct mkgui_ctx *ctx, uint32_t widget_id, uint32_t node_id);
-void mkgui_treeview_expand_all(struct mkgui_ctx *ctx, uint32_t widget_id);
-void mkgui_treeview_collapse_all(struct mkgui_ctx *ctx, uint32_t widget_id);
-uint32_t mkgui_treeview_get_parent(struct mkgui_ctx *ctx, uint32_t widget_id, uint32_t node_id);
-uint32_t mkgui_treeview_node_count(struct mkgui_ctx *ctx, uint32_t widget_id);
-void mkgui_treeview_scroll_to(struct mkgui_ctx *ctx, uint32_t widget_id, uint32_t node_id);
+MKGUI_API void mkgui_treeview_setup(struct mkgui_ctx *ctx, uint32_t id);
+MKGUI_API uint32_t mkgui_treeview_add(struct mkgui_ctx *ctx, uint32_t widget_id, uint32_t node_id, uint32_t parent_node, const char *label);
+MKGUI_API void mkgui_treeview_select(struct mkgui_ctx *ctx, uint32_t widget_id, int32_t node_id);
+MKGUI_API int32_t mkgui_treeview_get_selected(struct mkgui_ctx *ctx, uint32_t id);
+MKGUI_API void mkgui_treeview_remove(struct mkgui_ctx *ctx, uint32_t widget_id, uint32_t node_id);
+MKGUI_API void mkgui_treeview_clear(struct mkgui_ctx *ctx, uint32_t widget_id);
+MKGUI_API void mkgui_treeview_set_label(struct mkgui_ctx *ctx, uint32_t widget_id, uint32_t node_id, const char *label);
+MKGUI_API const char *mkgui_treeview_get_label(struct mkgui_ctx *ctx, uint32_t widget_id, uint32_t node_id);
+MKGUI_API void mkgui_treeview_expand(struct mkgui_ctx *ctx, uint32_t widget_id, uint32_t node_id);
+MKGUI_API void mkgui_treeview_collapse(struct mkgui_ctx *ctx, uint32_t widget_id, uint32_t node_id);
+MKGUI_API uint32_t mkgui_treeview_is_expanded(struct mkgui_ctx *ctx, uint32_t widget_id, uint32_t node_id);
+MKGUI_API void mkgui_treeview_expand_all(struct mkgui_ctx *ctx, uint32_t widget_id);
+MKGUI_API void mkgui_treeview_collapse_all(struct mkgui_ctx *ctx, uint32_t widget_id);
+MKGUI_API uint32_t mkgui_treeview_get_parent(struct mkgui_ctx *ctx, uint32_t widget_id, uint32_t node_id);
+MKGUI_API uint32_t mkgui_treeview_node_count(struct mkgui_ctx *ctx, uint32_t widget_id);
+MKGUI_API void mkgui_treeview_scroll_to(struct mkgui_ctx *ctx, uint32_t widget_id, uint32_t node_id);
 
 // ---------------------------------------------------------------------------
 // ItemView
 // ---------------------------------------------------------------------------
 
-void mkgui_itemview_setup(struct mkgui_ctx *ctx, uint32_t id, uint32_t item_count, uint32_t view_mode, mkgui_itemview_label_cb label_cb, mkgui_itemview_icon_cb icon_cb, void *userdata);
-void mkgui_itemview_set_items(struct mkgui_ctx *ctx, uint32_t id, uint32_t count);
-void mkgui_itemview_set_view(struct mkgui_ctx *ctx, uint32_t id, uint32_t view_mode);
-uint32_t mkgui_itemview_get_view(struct mkgui_ctx *ctx, uint32_t id);
-void mkgui_itemview_set_cell_size(struct mkgui_ctx *ctx, uint32_t id, int32_t w, int32_t h);
-int32_t mkgui_itemview_get_selected(struct mkgui_ctx *ctx, uint32_t id);
-void mkgui_itemview_set_selected(struct mkgui_ctx *ctx, uint32_t id, int32_t item);
-void mkgui_itemview_clear_selection(struct mkgui_ctx *ctx, uint32_t id);
-void mkgui_itemview_scroll_to(struct mkgui_ctx *ctx, uint32_t id, int32_t item);
-void mkgui_itemview_set_thumbnail(struct mkgui_ctx *ctx, uint32_t id, mkgui_thumbnail_cb cb, int32_t thumb_size);
+MKGUI_API void mkgui_itemview_setup(struct mkgui_ctx *ctx, uint32_t id, uint32_t item_count, uint32_t view_mode, mkgui_itemview_label_cb label_cb, mkgui_itemview_icon_cb icon_cb, void *userdata);
+MKGUI_API void mkgui_itemview_set_items(struct mkgui_ctx *ctx, uint32_t id, uint32_t count);
+MKGUI_API void mkgui_itemview_set_view(struct mkgui_ctx *ctx, uint32_t id, uint32_t view_mode);
+MKGUI_API uint32_t mkgui_itemview_get_view(struct mkgui_ctx *ctx, uint32_t id);
+MKGUI_API void mkgui_itemview_set_cell_size(struct mkgui_ctx *ctx, uint32_t id, int32_t w, int32_t h);
+MKGUI_API int32_t mkgui_itemview_get_selected(struct mkgui_ctx *ctx, uint32_t id);
+MKGUI_API void mkgui_itemview_set_selected(struct mkgui_ctx *ctx, uint32_t id, int32_t item);
+MKGUI_API void mkgui_itemview_clear_selection(struct mkgui_ctx *ctx, uint32_t id);
+MKGUI_API void mkgui_itemview_scroll_to(struct mkgui_ctx *ctx, uint32_t id, int32_t item);
+MKGUI_API void mkgui_itemview_set_thumbnail(struct mkgui_ctx *ctx, uint32_t id, mkgui_thumbnail_cb cb, int32_t thumb_size);
 
 // ---------------------------------------------------------------------------
 // Pathbar
 // ---------------------------------------------------------------------------
 
-void mkgui_pathbar_set(struct mkgui_ctx *ctx, uint32_t id, const char *path);
-const char *mkgui_pathbar_get(struct mkgui_ctx *ctx, uint32_t id);
-void mkgui_pathbar_get_segment_path(struct mkgui_ctx *ctx, uint32_t id, uint32_t seg_idx, char *out, uint32_t out_size);
+MKGUI_API void mkgui_pathbar_set(struct mkgui_ctx *ctx, uint32_t id, const char *path);
+MKGUI_API const char *mkgui_pathbar_get(struct mkgui_ctx *ctx, uint32_t id);
+MKGUI_API void mkgui_pathbar_get_segment_path(struct mkgui_ctx *ctx, uint32_t id, uint32_t seg_idx, char *out, uint32_t out_size);
 
 // ---------------------------------------------------------------------------
 // Statusbar
 // ---------------------------------------------------------------------------
 
-void mkgui_statusbar_setup(struct mkgui_ctx *ctx, uint32_t id, uint32_t section_count, const int32_t *widths);
-void mkgui_statusbar_set(struct mkgui_ctx *ctx, uint32_t id, uint32_t section, const char *text);
-const char *mkgui_statusbar_get(struct mkgui_ctx *ctx, uint32_t id, uint32_t section);
-void mkgui_statusbar_clear(struct mkgui_ctx *ctx, uint32_t id, uint32_t section);
+MKGUI_API void mkgui_statusbar_setup(struct mkgui_ctx *ctx, uint32_t id, uint32_t section_count, const int32_t *widths);
+MKGUI_API void mkgui_statusbar_set(struct mkgui_ctx *ctx, uint32_t id, uint32_t section, const char *text);
+MKGUI_API const char *mkgui_statusbar_get(struct mkgui_ctx *ctx, uint32_t id, uint32_t section);
+MKGUI_API void mkgui_statusbar_clear(struct mkgui_ctx *ctx, uint32_t id, uint32_t section);
 
 // ---------------------------------------------------------------------------
 // Canvas
 // ---------------------------------------------------------------------------
 
-void mkgui_canvas_set_callback(struct mkgui_ctx *ctx, uint32_t id, mkgui_canvas_cb callback, void *userdata);
+MKGUI_API void mkgui_canvas_set_callback(struct mkgui_ctx *ctx, uint32_t id, mkgui_canvas_cb callback, void *userdata);
 
 // ---------------------------------------------------------------------------
 // Image
 // ---------------------------------------------------------------------------
 
-void mkgui_image_set(struct mkgui_ctx *ctx, uint32_t id, const uint32_t *pixels, int32_t w, int32_t h);
-void mkgui_image_clear(struct mkgui_ctx *ctx, uint32_t id);
+MKGUI_API void mkgui_image_set(struct mkgui_ctx *ctx, uint32_t id, const uint32_t *pixels, int32_t w, int32_t h);
+MKGUI_API void mkgui_image_clear(struct mkgui_ctx *ctx, uint32_t id);
 
 // ---------------------------------------------------------------------------
 // GLView
 // ---------------------------------------------------------------------------
 
-uint32_t mkgui_glview_init(struct mkgui_ctx *ctx, uint32_t id);
-void mkgui_glview_destroy(struct mkgui_ctx *ctx, uint32_t id);
-void mkgui_glview_get_size(struct mkgui_ctx *ctx, uint32_t id, int32_t *w, int32_t *h);
+MKGUI_API uint32_t mkgui_glview_init(struct mkgui_ctx *ctx, uint32_t id);
+MKGUI_API void mkgui_glview_destroy(struct mkgui_ctx *ctx, uint32_t id);
+MKGUI_API void mkgui_glview_get_size(struct mkgui_ctx *ctx, uint32_t id, int32_t *w, int32_t *h);
 
 // ---------------------------------------------------------------------------
 // Context menu
 // ---------------------------------------------------------------------------
 
-void mkgui_context_menu_clear(struct mkgui_ctx *ctx);
-void mkgui_context_menu_add(struct mkgui_ctx *ctx, uint32_t id, const char *label, const char *icon, uint32_t flags);
-void mkgui_context_menu_add_separator(struct mkgui_ctx *ctx);
-void mkgui_context_menu_show(struct mkgui_ctx *ctx);
-void mkgui_context_menu_show_at(struct mkgui_ctx *ctx, int32_t x, int32_t y);
+MKGUI_API void mkgui_context_menu_clear(struct mkgui_ctx *ctx);
+MKGUI_API void mkgui_context_menu_add(struct mkgui_ctx *ctx, uint32_t id, const char *label, const char *icon, uint32_t flags);
+MKGUI_API void mkgui_context_menu_add_separator(struct mkgui_ctx *ctx);
+MKGUI_API void mkgui_context_menu_show(struct mkgui_ctx *ctx);
+MKGUI_API void mkgui_context_menu_show_at(struct mkgui_ctx *ctx, int32_t x, int32_t y);
 
 // ---------------------------------------------------------------------------
 // Dialogs
 // ---------------------------------------------------------------------------
 
-uint32_t mkgui_message_box(struct mkgui_ctx *ctx, const char *title, const char *message, uint32_t icon_type, uint32_t buttons);
-uint32_t mkgui_confirm_dialog(struct mkgui_ctx *ctx, const char *title, const char *message);
-uint32_t mkgui_input_dialog(struct mkgui_ctx *ctx, const char *title, const char *prompt, const char *default_text, char *out, uint32_t out_size);
-uint32_t mkgui_open_dialog(struct mkgui_ctx *ctx, const struct mkgui_file_dialog_opts *opts);
-uint32_t mkgui_save_dialog(struct mkgui_ctx *ctx, const struct mkgui_file_dialog_opts *opts);
-const char *mkgui_dialog_path(struct mkgui_ctx *ctx, uint32_t index);
+MKGUI_API uint32_t mkgui_message_box(struct mkgui_ctx *ctx, const char *title, const char *message, uint32_t icon_type, uint32_t buttons);
+MKGUI_API uint32_t mkgui_confirm_dialog(struct mkgui_ctx *ctx, const char *title, const char *message);
+MKGUI_API uint32_t mkgui_input_dialog(struct mkgui_ctx *ctx, const char *title, const char *prompt, const char *default_text, char *out, uint32_t out_size);
+MKGUI_API uint32_t mkgui_open_dialog(struct mkgui_ctx *ctx, const struct mkgui_file_dialog_opts *opts);
+MKGUI_API uint32_t mkgui_save_dialog(struct mkgui_ctx *ctx, const struct mkgui_file_dialog_opts *opts);
+MKGUI_API const char *mkgui_dialog_path(struct mkgui_ctx *ctx, uint32_t index);
 
 // ---------------------------------------------------------------------------
 // Utilities
 // ---------------------------------------------------------------------------
 
-void mkgui_sleep_ms(uint32_t ms);
-uint32_t mkgui_time_ms(void);
-double mkgui_time_us(void);
+MKGUI_API void mkgui_sleep_ms(uint32_t ms);
+MKGUI_API uint32_t mkgui_time_ms(void);
+MKGUI_API double mkgui_time_us(void);
 
 #endif // MKGUI_H

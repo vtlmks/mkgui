@@ -95,7 +95,7 @@ struct mkgui_widget {
 | `MKGUI_PROGRESS` | Progress bar with animated shimmer effect. No events. |
 | `MKGUI_SPINNER` | Animated spinning arc indicator. No events, no setup needed. |
 | `MKGUI_LISTVIEW` | Scrollable multi-column list with virtual rows and per-column cell types. Emits `MKGUI_EVENT_LISTVIEW_SELECT`, `_DBLCLICK`, `_SORT`, `_COL_REORDER`, `_REORDER`. |
-| `MKGUI_GRIDVIEW` | Multi-column grid with per-cell checkboxes and resizable columns. Virtual data via callback. Emits `MKGUI_EVENT_GRID_CLICK`, `MKGUI_EVENT_GRID_CHECK`. |
+| `MKGUI_GRIDVIEW` | Multi-column grid with per-cell checkboxes and resizable columns. Virtual data via callback. Emits `MKGUI_EVENT_GRID_CLICK`, `MKGUI_EVENT_GRID_CHECK`, `_GRIDVIEW_REORDER`. |
 | `MKGUI_ITEMVIEW` | Multi-mode item view (icon, thumbnail, compact, detail). Emits `MKGUI_EVENT_ITEMVIEW_SELECT`, `_DBLCLICK`. |
 | `MKGUI_TREEVIEW` | Hierarchical tree. Emits `MKGUI_EVENT_TREEVIEW_SELECT`, `_DBLCLICK`, `_EXPAND`, `_COLLAPSE`, `_MOVE`. |
 | `MKGUI_TABS` | Tab container. Children must be `MKGUI_TAB`. Emits `MKGUI_EVENT_TAB_CHANGED`. |
@@ -262,6 +262,7 @@ struct mkgui_event {
 | `MKGUI_EVENT_CONTEXT_HEADER` | Right-click on column header | mouse x | column index |
 | `MKGUI_EVENT_CONTEXT_MENU` | Context menu item selected | item id | checked state (0/1) |
 | `MKGUI_EVENT_GRIDVIEW_SELECT` | Grid cell selected | row | column |
+| `MKGUI_EVENT_GRIDVIEW_REORDER` | Row drag-and-drop reorder | source row | target row |
 | `MKGUI_EVENT_INPUT_SUBMIT` | Enter pressed in input | -- | -- |
 | `MKGUI_EVENT_FOCUS` | Widget gained focus | -- | -- |
 | `MKGUI_EVENT_UNFOCUS` | Widget lost focus | -- | -- |
@@ -656,6 +657,9 @@ Events:
 
 - `MKGUI_EVENT_GRID_CLICK` -- cell selected. `ev->value` = row, `ev->col` = column.
 - `MKGUI_EVENT_GRID_CHECK` -- checkbox toggled. `ev->value` = row, `ev->col` = column. Read new state with `mkgui_gridview_get_check()`.
+- `MKGUI_EVENT_GRIDVIEW_REORDER` -- row drag-and-drop reorder. `ev->value` = source row, `ev->col` = target row. Drag activates after 4px vertical mouse movement. A drop indicator line is drawn at the target position during drag.
+- `MKGUI_EVENT_DRAG_START` -- drag started. `ev->value` = source row.
+- `MKGUI_EVENT_DRAG_END` -- drag cancelled (no valid drop target).
 
 Grid lines are drawn between cells. Keyboard navigation: arrow keys to move selection, Space to toggle checkbox in the selected cell.
 

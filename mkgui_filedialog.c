@@ -53,23 +53,6 @@ enum {
 };
 
 // ---------------------------------------------------------------------------
-// Public API types
-// ---------------------------------------------------------------------------
-
-struct mkgui_file_filter {
-	const char *label;
-	const char *pattern;
-};
-
-struct mkgui_file_dialog_opts {
-	const char *start_path;
-	const struct mkgui_file_filter *filters;
-	uint32_t filter_count;
-	const char *default_name;
-	uint32_t multi_select;
-};
-
-// ---------------------------------------------------------------------------
 // Internal types
 // ---------------------------------------------------------------------------
 

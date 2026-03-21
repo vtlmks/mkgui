@@ -260,6 +260,46 @@ static void render_gridview(struct mkgui_ctx *ctx, uint32_t idx) {
 			draw_rounded_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, sb_x + 2, thumb_y, MKGUI_SCROLLBAR_W - 4, thumb_h, thumb_color, ctx->theme.corner_radius);
 		}
 	}
+
+	if(gv->drag_active && gv->drag_target >= 0) {
+		int32_t dhh = gv->header_height > 0 ? gv->header_height : MKGUI_ROW_HEIGHT;
+		int32_t dcy = ry + dhh + 1;
+		int32_t tgt_y;
+		if(gv->drag_target > gv->drag_source) {
+			tgt_y = dcy + (gv->drag_target + 1) * MKGUI_ROW_HEIGHT - gv->scroll_y;
+		} else {
+			tgt_y = dcy + gv->drag_target * MKGUI_ROW_HEIGHT - gv->scroll_y;
+		}
+		if(tgt_y >= dcy && tgt_y <= ry + rh) {
+			draw_hline(ctx->pixels, ctx->win_w, ctx->win_h, rx + 1, tgt_y - 1, content_w, ctx->theme.accent);
+			draw_hline(ctx->pixels, ctx->win_w, ctx->win_h, rx + 1, tgt_y, content_w, ctx->theme.accent);
+		}
+	}
+}
+
+// [=]===^=[ gridview_row_hit ]====================================[=]
+static int32_t gridview_row_hit(struct mkgui_ctx *ctx, uint32_t idx, int32_t my) {
+	int32_t ry = ctx->rects[idx].y;
+	int32_t rh = ctx->rects[idx].h;
+
+	struct mkgui_gridview_data *gv = find_gridv_data(ctx, ctx->widgets[idx].id);
+	if(!gv) {
+		return -1;
+	}
+
+	int32_t hh = gv->header_height > 0 ? gv->header_height : MKGUI_ROW_HEIGHT;
+	int32_t content_y = ry + hh + 1;
+	int32_t content_bottom = ry + rh;
+
+	if(my < content_y || my >= content_bottom) {
+		return -1;
+	}
+
+	int32_t row = (my - content_y + gv->scroll_y) / MKGUI_ROW_HEIGHT;
+	if(row < 0 || row >= (int32_t)gv->row_count) {
+		return -1;
+	}
+	return row;
 }
 
 // [=]===^=[ gridview_autosize_col ]===============================[=]
@@ -543,6 +583,8 @@ MKGUI_API void mkgui_gridview_setup(struct mkgui_ctx *ctx, uint32_t id, uint32_t
 		gv->widget_id = id;
 		gv->selected_row = -1;
 		gv->selected_col = -1;
+		gv->drag_source = -1;
+		gv->drag_target = -1;
 	}
 	gv->row_count = row_count;
 	gv->col_count = col_count > MKGUI_MAX_COLS ? MKGUI_MAX_COLS : col_count;

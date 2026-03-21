@@ -1050,7 +1050,7 @@ MKGUI_API void mkgui_listview_clear_selection(struct mkgui_ctx *ctx, uint32_t id
 }
 
 // [=]===^=[ mkgui_listview_get_col_order ]======================[=]
-static const uint32_t *mkgui_listview_get_col_order(struct mkgui_ctx *ctx, uint32_t id) {
+MKGUI_API const uint32_t *mkgui_listview_get_col_order(struct mkgui_ctx *ctx, uint32_t id) {
 	struct mkgui_listview_data *lv = find_listv_data(ctx, id);
 	return lv ? lv->col_order : NULL;
 }

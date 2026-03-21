@@ -81,11 +81,15 @@ enum {
 	ID_GL_LBL, ID_GLVIEW1,
 };
 
+#define DEMO_GRID_ROWS 8
+static uint32_t demo_grid_order[DEMO_GRID_ROWS];
+
 // [=]===^=[ demo_grid_cb ]======================================[=]
 static void demo_grid_cb(uint32_t row, uint32_t col, char *buf, uint32_t buf_size, void *userdata) {
 	(void)userdata;
+	uint32_t logical = demo_grid_order[row];
 	if(col == 0) {
-		snprintf(buf, buf_size, "Input %u", row + 1);
+		snprintf(buf, buf_size, "Input %u", logical + 1);
 	} else {
 		snprintf(buf, buf_size, "Out %u", col);
 	}
@@ -451,7 +455,10 @@ int main(void) {
 		{ "Out 3", 50, MKGUI_GRID_CHECK },
 		{ "Out 4", 50, MKGUI_GRID_CHECK },
 	};
-	mkgui_gridview_setup(ctx, ID_GRIDVIEW1, 8, 5, gcols, demo_grid_cb, NULL);
+	for(uint32_t i = 0; i < DEMO_GRID_ROWS; ++i) {
+		demo_grid_order[i] = i;
+	}
+	mkgui_gridview_setup(ctx, ID_GRIDVIEW1, DEMO_GRID_ROWS, 5, gcols, demo_grid_cb, NULL);
 
 	mkgui_itemview_setup(ctx, ID_ITEMVIEW1, 200, MKGUI_VIEW_ICON, demo_itemview_label, demo_itemview_icon, NULL);
 
@@ -736,6 +743,26 @@ int main(void) {
 				case MKGUI_EVENT_CONTEXT_MENU: {
 					snprintf(buf, sizeof(buf), "Context menu item: %u", ev.id);
 					mkgui_statusbar_set(ctx, ID_STATUSBAR, 0, buf);
+				} break;
+
+				case MKGUI_EVENT_GRIDVIEW_REORDER: {
+					if(ev.id == ID_GRIDVIEW1) {
+						int32_t src = ev.value;
+						int32_t tgt = ev.col;
+						if(src >= 0 && src < DEMO_GRID_ROWS && tgt >= 0 && tgt < DEMO_GRID_ROWS) {
+							uint32_t tmp = demo_grid_order[src];
+							if(src < tgt) {
+								for(int32_t i = src; i < tgt; ++i) {
+									demo_grid_order[i] = demo_grid_order[i + 1];
+								}
+							} else {
+								for(int32_t i = src; i > tgt; --i) {
+									demo_grid_order[i] = demo_grid_order[i - 1];
+								}
+							}
+							demo_grid_order[tgt] = tmp;
+						}
+					}
 				} break;
 
 				default: {
