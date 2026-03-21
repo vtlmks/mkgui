@@ -9,7 +9,9 @@ static void render_button(struct mkgui_ctx *ctx, uint32_t idx) {
 	int32_t rw = ctx->rects[idx].w;
 	int32_t rh = ctx->rects[idx].h;
 
-	uint32_t bg = ctx->theme.widget_bg;
+	uint32_t checked = (w->flags & MKGUI_CHECKED);
+	uint32_t bg = checked ? ctx->theme.widget_press : ctx->theme.widget_bg;
+	uint32_t style = checked ? MKGUI_STYLE_SUNKEN : MKGUI_STYLE_RAISED;
 	if(ctx->press_id == w->id) {
 		bg = ctx->theme.widget_press;
 
@@ -17,13 +19,13 @@ static void render_button(struct mkgui_ctx *ctx, uint32_t idx) {
 		bg = ctx->theme.widget_hover;
 	}
 	uint32_t border = (ctx->focus_id == w->id) ? ctx->theme.splitter : ctx->theme.widget_border;
-	draw_patch(ctx, MKGUI_STYLE_RAISED, rx, ry, rw, rh, bg, border);
+	draw_patch(ctx, style, rx, ry, rw, rh, bg, border);
 
 	uint32_t tc = (w->flags & MKGUI_DISABLED) ? ctx->theme.text_disabled : ctx->theme.text;
 	int32_t ii = widget_icon_idx(w);
 	uint32_t has_icon = (ii >= 0);
 	int32_t tw = text_width(ctx, w->label);
-	int32_t icon_w = has_icon ? icons[ii].w + 4 : 0;
+	int32_t icon_w = has_icon ? (icons[ii].w + (w->label[0] ? 4 : 0)) : 0;
 	int32_t content_w = icon_w + (w->label[0] ? tw : 0);
 	int32_t cx = rx + (rw - content_w) / 2;
 	if(has_icon) {

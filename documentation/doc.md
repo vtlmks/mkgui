@@ -83,7 +83,7 @@ struct mkgui_widget {
 | Type | Description |
 |------|-------------|
 | `MKGUI_WINDOW` | Root window. Must be first widget. |
-| `MKGUI_BUTTON` | Push button. Emits `MKGUI_EVENT_CLICK` on every click. |
+| `MKGUI_BUTTON` | Push button. Emits `MKGUI_EVENT_CLICK`. Set `MKGUI_CHECKED` for toggle button (renders sunken when checked). |
 | `MKGUI_LABEL` | Static text. |
 | `MKGUI_INPUT` | Single-line text input. Emits `MKGUI_EVENT_INPUT_CHANGED`, `MKGUI_EVENT_INPUT_SUBMIT` on Enter. |
 | `MKGUI_TEXTAREA` | Multi-line text editor. Emits `MKGUI_EVENT_TEXTAREA_CHANGED`, `MKGUI_EVENT_TEXTAREA_CURSOR` on cursor movement. |
@@ -422,6 +422,23 @@ void mkgui_button_set_text(struct mkgui_ctx *ctx, uint32_t id, const char *text)
 const char *mkgui_button_get_text(struct mkgui_ctx *ctx, uint32_t id);
 ```
 
+**Toggle button**: Set `MKGUI_CHECKED` on a button to render it sunken (pressed state). Toggle the flag in your click handler to create an on/off button:
+
+```c
+// Icon-only buttons center the icon automatically when label is empty
+{ MKGUI_BUTTON, ID_MUTE, "", "volume-high", ID_VBOX, 0, 0, 28, 28, MKGUI_FIXED | MKGUI_ALIGN_CENTER, 0 },
+
+// In event loop:
+case MKGUI_EVENT_CLICK: {
+    if(ev.id == ID_MUTE) {
+        uint32_t f = mkgui_get_flags(ctx, ID_MUTE);
+        f ^= MKGUI_CHECKED;
+        mkgui_set_flags(ctx, ID_MUTE, f);
+        mkgui_set_icon(ctx, ID_MUTE, (f & MKGUI_CHECKED) ? "volume-off" : "volume-high");
+    }
+} break;
+```
+
 ### Label
 
 ```c
@@ -443,6 +460,8 @@ void mkgui_input_select_all(struct mkgui_ctx *ctx, uint32_t id);
 void mkgui_input_get_selection(struct mkgui_ctx *ctx, uint32_t id, uint32_t *start, uint32_t *end);
 void mkgui_input_set_selection(struct mkgui_ctx *ctx, uint32_t id, uint32_t start, uint32_t end);
 ```
+
+Double-click on an input widget selects all text. Single click positions the cursor. Click-drag selects a range.
 
 Supports Ctrl+C (copy) and Ctrl+V (paste). Newlines in pasted text are replaced with spaces. Copy is disabled when `MKGUI_PASSWORD` is set. Paste is disabled when `MKGUI_READONLY` is set.
 

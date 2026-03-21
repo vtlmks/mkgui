@@ -1572,6 +1572,25 @@ static uint32_t ed_is_descendant(uint32_t widget_idx, uint32_t ancestor_id) {
 	return 0;
 }
 
+// [=]===^=[ ed_is_layout_managed ]================================[=]
+static uint32_t ed_is_layout_managed(uint32_t widget_idx) {
+	struct ed_widget *w = &ed.widgets[widget_idx];
+	uint32_t anchors = w->flags & (MKGUI_ANCHOR_LEFT | MKGUI_ANCHOR_TOP | MKGUI_ANCHOR_RIGHT | MKGUI_ANCHOR_BOTTOM);
+	if(anchors) {
+		return 1;
+	}
+	for(uint32_t j = 0; j < ed.widget_count; ++j) {
+		if(ed.widgets[j].id == w->parent_id) {
+			uint32_t pt = ed.widgets[j].type;
+			if(pt == MKGUI_VBOX || pt == MKGUI_HBOX || pt == MKGUI_FORM) {
+				return 1;
+			}
+			break;
+		}
+	}
+	return 0;
+}
+
 // [=]===^=[ ed_delete_widget_tree ]===============================[=]
 static void ed_delete_widget_tree(uint32_t id) {
 	for(uint32_t i = ed.widget_count; i > 0; --i) {
@@ -1681,15 +1700,13 @@ static void ed_convert_to_layout(uint32_t idx, int32_t *lx, int32_t *ly, int32_t
 		}
 	}
 
-	int32_t rel_x = ew->x - px;
-	int32_t rel_y = ew->y - py;
 	int32_t w = ew->w;
 	int32_t h = ew->h;
 	uint32_t flags = ew->flags;
 
 	if(parent_type == MKGUI_VBOX || parent_type == MKGUI_HBOX || parent_type == MKGUI_FORM) {
-		*lx = rel_x;
-		*ly = rel_y;
+		*lx = 0;
+		*ly = 0;
 		*lw = w;
 		*lh = h;
 		return;
@@ -1702,6 +1719,17 @@ static void ed_convert_to_layout(uint32_t idx, int32_t *lx, int32_t *ly, int32_t
 		*lh = 0;
 		return;
 	}
+
+	if(ew->type == MKGUI_VBOX || ew->type == MKGUI_HBOX || ew->type == MKGUI_FORM || ew->type == MKGUI_TAB) {
+		*lx = ew->x;
+		*ly = ew->y;
+		*lw = w;
+		*lh = h;
+		return;
+	}
+
+	int32_t rel_x = ew->x - px;
+	int32_t rel_y = ew->y - py;
 
 	if(flags & MKGUI_ANCHOR_RIGHT) {
 		if(!(flags & MKGUI_ANCHOR_LEFT)) {
@@ -3840,6 +3868,10 @@ static const char *ed_flags_to_str(uint32_t flags, char *buf, uint32_t buf_size)
 	}
 
 	static const struct { uint32_t bit; const char *name; } single_bits[] = {
+		{ MKGUI_ANCHOR_LEFT,     "MKGUI_ANCHOR_LEFT" },
+		{ MKGUI_ANCHOR_TOP,      "MKGUI_ANCHOR_TOP" },
+		{ MKGUI_ANCHOR_RIGHT,    "MKGUI_ANCHOR_RIGHT" },
+		{ MKGUI_ANCHOR_BOTTOM,   "MKGUI_ANCHOR_BOTTOM" },
 		{ MKGUI_REGION_TOP,      "MKGUI_REGION_TOP" },
 		{ MKGUI_REGION_BOTTOM,   "MKGUI_REGION_BOTTOM" },
 		{ MKGUI_REGION_LEFT,     "MKGUI_REGION_LEFT" },
@@ -5412,7 +5444,7 @@ int main(void) {
 					ed.widgets[ed.selected].y = new_y;
 					uint32_t sel_id = ed.widgets[ed.selected].id;
 					for(uint32_t mi = 0; mi < ed.widget_count; ++mi) {
-						if((int32_t)mi != ed.selected && ed_is_descendant(mi, sel_id)) {
+						if((int32_t)mi != ed.selected && ed_is_descendant(mi, sel_id) && !ed_is_layout_managed(mi)) {
 							ed.widgets[mi].x += dx;
 							ed.widgets[mi].y += dy;
 						}
@@ -5489,7 +5521,7 @@ int main(void) {
 					if(child_dx || child_dy) {
 						uint32_t sel_id = w->id;
 						for(uint32_t mi = 0; mi < ed.widget_count; ++mi) {
-							if((int32_t)mi != ed.selected && ed_is_descendant(mi, sel_id)) {
+							if((int32_t)mi != ed.selected && ed_is_descendant(mi, sel_id) && !ed_is_layout_managed(mi)) {
 								ed.widgets[mi].x += child_dx;
 								ed.widgets[mi].y += child_dy;
 							}

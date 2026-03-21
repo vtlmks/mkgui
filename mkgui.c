@@ -3393,10 +3393,12 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 		int32_t popup_idx = pev.popup_idx;
 
 		switch(pev.type) {
+			// -=[ EXPOSE ]=-
 			case MKGUI_PLAT_EXPOSE: {
 				dirty_all(ctx);
 			} break;
 
+			// -=[ RESIZE ]=-
 			case MKGUI_PLAT_RESIZE: {
 				if(pev.width != ctx->win_w || pev.height != ctx->win_h) {
 					ctx->win_w = pev.width;
@@ -3407,6 +3409,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 				}
 			} break;
 
+			// -=[ MOUSE MOVE ]=-
 			case MKGUI_PLAT_MOTION: {
 				if(popup_idx >= 0) {
 					struct mkgui_popup *mp = &ctx->popups[popup_idx];
@@ -3874,6 +3877,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 				tooltip_update(ctx, new_hover, ctx->mouse_x, ctx->mouse_y);
 			} break;
 
+			// -=[ BUTTON PRESS ]=-
 			case MKGUI_PLAT_BUTTON_PRESS: {
 				if(popup_idx >= 0) {
 					struct mkgui_popup *p = &ctx->popups[popup_idx];
@@ -4546,19 +4550,31 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 					if(hw->type == MKGUI_INPUT) {
 						struct mkgui_input_data *inp = find_input_data(ctx, hw->id);
 						if(inp) {
-							const char *display = inp->text;
-							char masked_buf[MKGUI_MAX_TEXT];
-							if(hw->flags & MKGUI_PASSWORD) {
-								uint32_t mlen = (uint32_t)strlen(inp->text);
-								for(uint32_t mi = 0; mi < mlen && mi < MKGUI_MAX_TEXT - 1; ++mi) {
-									masked_buf[mi] = '*';
+							uint32_t now = mkgui_time_ms();
+							uint32_t is_dblclick = (ctx->dblclick_id == hw->id && (now - ctx->dblclick_time) < 400);
+							ctx->dblclick_id = hw->id;
+							ctx->dblclick_time = now;
+							if(is_dblclick) {
+								uint32_t len = (uint32_t)strlen(inp->text);
+								inp->sel_start = 0;
+								inp->sel_end = len;
+								inp->cursor = len;
+								ctx->dblclick_id = 0;
+							} else {
+								const char *display = inp->text;
+								char masked_buf[MKGUI_MAX_TEXT];
+								if(hw->flags & MKGUI_PASSWORD) {
+									uint32_t mlen = (uint32_t)strlen(inp->text);
+									for(uint32_t mi = 0; mi < mlen && mi < MKGUI_MAX_TEXT - 1; ++mi) {
+										masked_buf[mi] = '*';
+									}
+									masked_buf[mlen < MKGUI_MAX_TEXT - 1 ? mlen : MKGUI_MAX_TEXT - 1] = '\0';
+									display = masked_buf;
 								}
-								masked_buf[mlen < MKGUI_MAX_TEXT - 1 ? mlen : MKGUI_MAX_TEXT - 1] = '\0';
-								display = masked_buf;
+								inp->cursor = input_hit_cursor(ctx, inp, display, ctx->rects[hi].x, ctx->mouse_x);
+								input_clear_selection(inp);
+								ctx->drag_select_id = hw->id;
 							}
-							inp->cursor = input_hit_cursor(ctx, inp, display, ctx->rects[hi].x, ctx->mouse_x);
-							input_clear_selection(inp);
-							ctx->drag_select_id = hw->id;
 							dirty_all(ctx);
 						}
 					}
@@ -4960,6 +4976,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 				}
 			} break;
 
+			// -=[ BUTTON RELEASE ]=-
 			case MKGUI_PLAT_BUTTON_RELEASE: {
 				if(pev.button >= 4) {
 					break;
@@ -5159,6 +5176,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 				}
 			} break;
 
+			// -=[ KEY ]=-
 			case MKGUI_PLAT_KEY: {
 				uint32_t ks = pev.keysym;
 
@@ -5518,12 +5536,14 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 				return 1;
 			} break;
 
+			// -=[ CLOSE ]=-
 			case MKGUI_PLAT_CLOSE: {
 				ev->type = MKGUI_EVENT_CLOSE;
 				ctx->close_requested = 1;
 				return 1;
 			} break;
 
+			// -=[ LEAVE ]=-
 			case MKGUI_PLAT_LEAVE: {
 				if(popup_idx >= 0) {
 					uint32_t has_child_popup = (uint32_t)popup_idx + 1 < ctx->popup_count;
