@@ -306,6 +306,21 @@ static int32_t listview_total_col_w(struct mkgui_listview_data *lv) {
 	return total;
 }
 
+// [=]===^=[ listview_clamp_scroll_y ]=============================[=]
+static void listview_clamp_scroll_y(struct mkgui_listview_data *lv, int32_t content_h) {
+	int32_t total = (int32_t)lv->row_count * MKGUI_ROW_HEIGHT;
+	int32_t max_scroll = total - content_h;
+	if(max_scroll < 0) {
+		max_scroll = 0;
+	}
+	if(lv->scroll_y < 0) {
+		lv->scroll_y = 0;
+	}
+	if(lv->scroll_y > max_scroll) {
+		lv->scroll_y = max_scroll;
+	}
+}
+
 // [=]===^=[ listview_clamp_scroll_x ]=============================[=]
 static void listview_clamp_scroll_x(struct mkgui_listview_data *lv, int32_t content_w) {
 	int32_t total = listview_total_col_w(lv);
@@ -351,6 +366,7 @@ static void render_listview(struct mkgui_ctx *ctx, uint32_t idx) {
 	}
 
 	listview_clamp_scroll_x(lv, content_w);
+	listview_clamp_scroll_y(lv, content_h);
 	int32_t sx = lv->scroll_x;
 
 	draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, rx + 1, ry + 1, content_w, hh, ctx->theme.header_bg);

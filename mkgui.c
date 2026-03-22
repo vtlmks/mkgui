@@ -447,7 +447,7 @@ static uint32_t icon_count;
 
 static uint32_t icon_text_color;
 
-#define MKGUI_ICON_HASH_SIZE 4096
+#define MKGUI_ICON_HASH_SIZE 16384
 #define MKGUI_ICON_HASH_MASK (MKGUI_ICON_HASH_SIZE - 1)
 
 static uint32_t icon_hash[MKGUI_ICON_HASH_SIZE];

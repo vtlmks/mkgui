@@ -1,25 +1,17 @@
 // Copyright (c) 2026, Peter Fors
 // SPDX-License-Identifier: MIT
 
-#define IB_MAX_ICONS   1280
+#define IB_MAX_ICONS   8192
 #define IB_ICON_NAME   64
-#define IB_WIN_W       640
-#define IB_WIN_H       480
+#define IB_WIN_W       500
+#define IB_WIN_H       500
 
 enum {
 	IB_ID_WINDOW   = 1,
-	IB_ID_TABS     = 2,
-	IB_ID_ITEMVIEW = 3,
-	IB_ID_TAB_BASE = 10,
+	IB_ID_VBOX,
+	IB_ID_SEARCH,
+	IB_ID_ITEMVIEW,
 };
-
-static const char *ib_categories[] = {
-	"A", "B", "C", "D-E", "F", "G-L", "M-N", "O-P", "Q-S", "T-Z",
-};
-#define IB_CAT_COUNT (sizeof(ib_categories) / sizeof(ib_categories[0]))
-
-static const char ib_cat_start[] = { 'a', 'b', 'c', 'd', 'f', 'g', 'm', 'o', 'q', 't' };
-static const char ib_cat_end[]   = { 'a', 'b', 'c', 'e', 'f', 'l', 'n', 'p', 's', 'z' };
 
 struct ib_state {
 	char names[IB_MAX_ICONS][IB_ICON_NAME];
@@ -35,27 +27,48 @@ struct ib_state {
 
 static struct ib_state ib;
 
-// [=]===^=[ ib_scan_category ]=====================================[=]
-static void ib_scan_category(uint32_t cat) {
+// [=]===^=[ ib_scan ]==============================================[=]
+static void ib_scan(const char *filter) {
 	ib.count = 0;
 	icon_count = ib.saved_icon_count;
 	icon_pixels_used = ib.saved_pixels_used;
 
-	if(cat >= IB_CAT_COUNT) {
-		return;
-	}
-
-	char lo = ib_cat_start[cat];
-	char hi = ib_cat_end[cat];
+	uint32_t filter_len = filter ? (uint32_t)strlen(filter) : 0;
 
 	for(uint32_t i = 0; i < ib.pack->icon_count && ib.count < IB_MAX_ICONS; ++i) {
 		const char *name = ib.pack->name_block + ib.pack->name_offsets[i];
-		char first = name[0];
-		if(first < lo) {
-			continue;
-		}
-		if(first > hi) {
-			break;
+		if(filter_len > 0) {
+			const char *p = name;
+			uint32_t found = 0;
+			while(*p) {
+				uint32_t match = 1;
+				for(uint32_t fi = 0; fi < filter_len; ++fi) {
+					char fc = filter[fi];
+					char nc = p[fi];
+					if(nc == '\0') {
+						match = 0;
+						break;
+					}
+					if(fc >= 'A' && fc <= 'Z') {
+						fc = (char)(fc + 32);
+					}
+					if(nc >= 'A' && nc <= 'Z') {
+						nc = (char)(nc + 32);
+					}
+					if(fc != nc) {
+						match = 0;
+						break;
+					}
+				}
+				if(match) {
+					found = 1;
+					break;
+				}
+				++p;
+			}
+			if(!found) {
+				continue;
+			}
 		}
 		strncpy(ib.names[ib.count], name, IB_ICON_NAME - 1);
 		ib.names[ib.count][IB_ICON_NAME - 1] = '\0';
@@ -85,7 +98,7 @@ static void ib_icon_cb(uint32_t item, char *buf, uint32_t buf_size, void *userda
 	}
 }
 
-// [=]===^=[ mkgui_icon_browser ]===================================[=]
+// [=]===^=[ mkgui_icon_browser_pack ]===============================[=]
 static uint32_t mkgui_icon_browser_pack(struct mkgui_ctx *ctx, struct mdi_pack *pack, char *out, uint32_t out_size) {
 	memset(&ib, 0, sizeof(ib));
 	ib.result[0] = '\0';
@@ -99,25 +112,23 @@ static uint32_t mkgui_icon_browser_pack(struct mkgui_ctx *ctx, struct mdi_pack *
 
 	popup_destroy_all(ctx);
 
-	uint32_t tab_count = IB_CAT_COUNT;
-	uint32_t wcount = 3 + tab_count;
-	struct mkgui_widget widgets[3 + IB_CAT_COUNT];
-
-	widgets[0] = (struct mkgui_widget){ MKGUI_WINDOW, IB_ID_WINDOW, "Icon Browser", "", 0, 0, 0, IB_WIN_W, IB_WIN_H, 0, 0 };
-	widgets[1] = (struct mkgui_widget){ MKGUI_TABS, IB_ID_TABS, "", "", IB_ID_WINDOW, 0, 0, 0, 0, MKGUI_ANCHOR_LEFT | MKGUI_ANCHOR_TOP | MKGUI_ANCHOR_RIGHT | MKGUI_ANCHOR_BOTTOM, 0 };
-	for(uint32_t i = 0; i < tab_count; ++i) {
-		widgets[2 + i] = (struct mkgui_widget){ MKGUI_TAB, IB_ID_TAB_BASE + i, "", "", IB_ID_TABS, 0, 0, 0, 0, 0, 0 };
-		strncpy(widgets[2 + i].label, ib_categories[i], MKGUI_MAX_TEXT - 1);
-	}
-	widgets[2 + tab_count] = (struct mkgui_widget){ MKGUI_ITEMVIEW, IB_ID_ITEMVIEW, "", "", IB_ID_TAB_BASE, 0, 0, 0, 0, MKGUI_ANCHOR_LEFT | MKGUI_ANCHOR_TOP | MKGUI_ANCHOR_RIGHT | MKGUI_ANCHOR_BOTTOM, 0 };
+	struct mkgui_widget widgets[] = {
+		{ MKGUI_WINDOW, IB_ID_WINDOW, "Icon Browser", "", 0, 0, 0, IB_WIN_W, IB_WIN_H, 0, 0 },
+		{ MKGUI_VBOX, IB_ID_VBOX, "", "", IB_ID_WINDOW, 0, 0, 0, 0,
+			MKGUI_ANCHOR_LEFT | MKGUI_ANCHOR_TOP | MKGUI_ANCHOR_RIGHT | MKGUI_ANCHOR_BOTTOM, 0 },
+		{ MKGUI_INPUT, IB_ID_SEARCH, "", "magnify", IB_ID_VBOX, 0, 0, 0, 24, MKGUI_FIXED, 0 },
+		{ MKGUI_ITEMVIEW, IB_ID_ITEMVIEW, "", "", IB_ID_VBOX, 0, 0, 0, 0, 0, 1 },
+	};
+	uint32_t wcount = sizeof(widgets) / sizeof(widgets[0]);
 
 	struct mkgui_ctx *dlg = mkgui_create_child(ctx, widgets, wcount, "Icon Browser", IB_WIN_W, IB_WIN_H);
 	if(!dlg) {
 		return 0;
 	}
 
-	ib_scan_category(0);
-	mkgui_itemview_setup(dlg, IB_ID_ITEMVIEW, ib.count, MKGUI_VIEW_ICON, ib_label_cb, ib_icon_cb, NULL);
+	ib_scan(NULL);
+	mkgui_itemview_setup(dlg, IB_ID_ITEMVIEW, ib.count, MKGUI_VIEW_COMPACT, ib_label_cb, ib_icon_cb, NULL);
+	mkgui_set_focus(dlg, IB_ID_SEARCH);
 
 	uint32_t running = 1;
 	struct mkgui_event ev;
@@ -142,26 +153,26 @@ static uint32_t mkgui_icon_browser_pack(struct mkgui_ctx *ctx, struct mdi_pack *
 					}
 				} break;
 
-				case MKGUI_EVENT_TAB_CHANGED: {
-					uint32_t cat = (uint32_t)ev.value - IB_ID_TAB_BASE;
-					if(cat < IB_CAT_COUNT) {
-						int32_t iv_idx = find_widget_idx(dlg, IB_ID_ITEMVIEW);
-						if(iv_idx >= 0) {
-							dlg->widgets[iv_idx].parent_id = (uint32_t)ev.value;
-						}
-						ib_scan_category(cat);
-						mkgui_itemview_setup(dlg, IB_ID_ITEMVIEW, ib.count, MKGUI_VIEW_ICON, ib_label_cb, ib_icon_cb, NULL);
+				case MKGUI_EVENT_INPUT_CHANGED: {
+					if(ev.id == IB_ID_SEARCH) {
+						const char *filter = mkgui_input_get(dlg, IB_ID_SEARCH);
+						ib_scan(filter);
+						mkgui_itemview_set_items(dlg, IB_ID_ITEMVIEW, ib.count);
+						mkgui_itemview_set_selected(dlg, IB_ID_ITEMVIEW, -1);
 						ib.prev_selected = -1;
 					}
 				} break;
 
-				case MKGUI_EVENT_ITEMVIEW_SELECT: {
-					if(ev.value == ib.prev_selected && ev.value >= 0 && ev.value < (int32_t)ib.count) {
+				case MKGUI_EVENT_ITEMVIEW_DBLCLICK: {
+					if(ev.id == IB_ID_ITEMVIEW && ev.value >= 0 && ev.value < (int32_t)ib.count) {
 						strncpy(ib.result, ib.names[ev.value], IB_ICON_NAME - 1);
 						ib.result[IB_ICON_NAME - 1] = '\0';
 						ib.confirmed = 1;
 						running = 0;
 					}
+				} break;
+
+				case MKGUI_EVENT_ITEMVIEW_SELECT: {
 					ib.prev_selected = ev.value;
 				} break;
 

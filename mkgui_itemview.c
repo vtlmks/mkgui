@@ -392,7 +392,11 @@ static void render_itemview_compact(struct mkgui_ctx *ctx, uint32_t idx, struct 
 			if(label[0]) {
 				int32_t ty = cy + (row_h - ctx->font_height) / 2;
 				uint32_t tc = (item == iv->selected) ? ctx->theme.sel_text : ((ctx->widgets[idx].flags & MKGUI_DISABLED) ? ctx->theme.text_disabled : ctx->theme.text);
-				push_text_clip(tx, ty, label, tc, ca_x, ca_y, clip_x2, clip_y2);
+				int32_t col_clip_r = col_x + col_w;
+				if(col_clip_r > clip_x2) {
+					col_clip_r = clip_x2;
+				}
+				push_text_clip(tx, ty, label, tc, ca_x, ca_y, col_clip_r, clip_y2);
 			}
 		}
 	}
@@ -525,6 +529,7 @@ static void render_itemview(struct mkgui_ctx *ctx, uint32_t idx) {
 
 	int32_t ca_x, ca_y, ca_w, ca_h;
 	itemview_content_area(iv, rx, ry, rw, rh, &ca_x, &ca_y, &ca_w, &ca_h);
+	itemview_clamp_scroll(iv, ca_w, ca_h);
 	if(ca_x > render_clip_x1) {
 		render_clip_x1 = ca_x;
 	}

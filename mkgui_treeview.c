@@ -102,6 +102,25 @@ static void render_treeview(struct mkgui_ctx *ctx, uint32_t idx) {
 
 	int32_t clip_top = ry + 1;
 	int32_t clip_bottom = ry + rh - 1;
+	int32_t view_h = rh - 2;
+
+	uint32_t vis_count = 0;
+	for(uint32_t vi = 0; vi < tv->node_count; ++vi) {
+		if(treeview_node_visible(tv, vi)) {
+			++vis_count;
+		}
+	}
+	int32_t max_scroll = (int32_t)vis_count * MKGUI_ROW_HEIGHT - view_h;
+	if(max_scroll < 0) {
+		max_scroll = 0;
+	}
+	if(tv->scroll_y < 0) {
+		tv->scroll_y = 0;
+	}
+	if(tv->scroll_y > max_scroll) {
+		tv->scroll_y = max_scroll;
+	}
+
 	int32_t draw_y = ry + 1 - tv->scroll_y;
 
 	uint32_t line_active[32] = {0};
@@ -359,6 +378,59 @@ static uint32_t handle_treeview_key(struct mkgui_ctx *ctx, struct mkgui_event *e
 				ev->value = tv->selected_node;
 				return 1;
 			}
+		}
+
+	} else if(ks == MKGUI_KEY_PAGE_UP || ks == MKGUI_KEY_PAGE_DOWN || ks == MKGUI_KEY_HOME || ks == MKGUI_KEY_END) {
+		uint32_t vis_idx = 0;
+		uint32_t vis_total = 0;
+		for(uint32_t i = 0; i < tv->node_count; ++i) {
+			if(!treeview_node_visible(tv, i)) {
+				continue;
+			}
+			if((int32_t)tv->nodes[i].id == tv->selected_node) {
+				vis_idx = vis_total;
+			}
+			++vis_total;
+		}
+		if(vis_total == 0) {
+			return 0;
+		}
+		int32_t idx = find_widget_idx(ctx, ctx->focus_id);
+		int32_t page = idx >= 0 ? (ctx->rects[idx].h - 2) / MKGUI_ROW_HEIGHT : 10;
+		if(page < 1) {
+			page = 1;
+		}
+		int32_t target = (int32_t)vis_idx;
+		if(ks == MKGUI_KEY_PAGE_UP) {
+			target -= page;
+		} else if(ks == MKGUI_KEY_PAGE_DOWN) {
+			target += page;
+		} else if(ks == MKGUI_KEY_HOME) {
+			target = 0;
+		} else {
+			target = (int32_t)vis_total - 1;
+		}
+		if(target < 0) {
+			target = 0;
+		}
+		if(target >= (int32_t)vis_total) {
+			target = (int32_t)vis_total - 1;
+		}
+		uint32_t vis_cur = 0;
+		for(uint32_t i = 0; i < tv->node_count; ++i) {
+			if(!treeview_node_visible(tv, i)) {
+				continue;
+			}
+			if((int32_t)vis_cur == target) {
+				tv->selected_node = (int32_t)tv->nodes[i].id;
+				dirty_all(ctx);
+				treeview_clamp_scroll(ctx, ctx->focus_id);
+				ev->type = MKGUI_EVENT_TREEVIEW_SELECT;
+				ev->id = ctx->focus_id;
+				ev->value = tv->selected_node;
+				return 1;
+			}
+			++vis_cur;
 		}
 
 	} else if(ks == MKGUI_KEY_LEFT) {
