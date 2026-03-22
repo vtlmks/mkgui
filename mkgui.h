@@ -113,6 +113,7 @@ enum {
 	MKGUI_COMBOBOX,
 	MKGUI_DATEPICKER,
 	MKGUI_GRIDVIEW,
+	MKGUI_RICHLIST,
 };
 
 // ---------------------------------------------------------------------------
@@ -211,6 +212,8 @@ enum {
 	MKGUI_EVENT_GRID_CHECK,
 	MKGUI_EVENT_GRIDVIEW_SELECT,
 	MKGUI_EVENT_GRIDVIEW_REORDER,
+	MKGUI_EVENT_RICHLIST_SELECT,
+	MKGUI_EVENT_RICHLIST_DBLCLICK,
 	MKGUI_EVENT_CONTEXT_HEADER,
 	MKGUI_EVENT_CONTEXT_MENU,
 };
@@ -339,6 +342,14 @@ struct mkgui_file_dialog_opts {
 	uint32_t multi_select;
 };
 
+struct mkgui_richlist_row {
+	char title[MKGUI_MAX_TEXT];
+	char subtitle[MKGUI_MAX_TEXT];
+	char right_text[64];
+	uint32_t *thumbnail;
+	int32_t thumb_w, thumb_h;
+};
+
 // Opaque context
 struct mkgui_ctx;
 
@@ -349,6 +360,7 @@ struct mkgui_ctx;
 typedef void (*mkgui_render_cb)(struct mkgui_ctx *ctx, void *userdata);
 typedef void (*mkgui_row_cb)(uint32_t row, uint32_t col, char *buf, uint32_t buf_size, void *userdata);
 typedef void (*mkgui_grid_cell_cb)(uint32_t row, uint32_t col, char *buf, uint32_t buf_size, void *userdata);
+typedef void (*mkgui_richlist_cb)(uint32_t row, struct mkgui_richlist_row *out, void *userdata);
 typedef void (*mkgui_itemview_label_cb)(uint32_t item, char *buf, uint32_t buf_size, void *userdata);
 typedef void (*mkgui_itemview_icon_cb)(uint32_t item, char *buf, uint32_t buf_size, void *userdata);
 typedef void (*mkgui_thumbnail_cb)(uint32_t item, uint32_t *pixels, int32_t w, int32_t h, void *userdata);
@@ -617,6 +629,16 @@ MKGUI_API void mkgui_gridview_set_check(struct mkgui_ctx *ctx, uint32_t id, uint
 MKGUI_API int32_t mkgui_gridview_get_col_width(struct mkgui_ctx *ctx, uint32_t id, uint32_t col);
 MKGUI_API void mkgui_gridview_set_col_width(struct mkgui_ctx *ctx, uint32_t id, uint32_t col, int32_t width);
 MKGUI_API void mkgui_gridview_scroll_to(struct mkgui_ctx *ctx, uint32_t id, int32_t row);
+
+// ---------------------------------------------------------------------------
+// RichList
+// ---------------------------------------------------------------------------
+
+MKGUI_API void mkgui_richlist_setup(struct mkgui_ctx *ctx, uint32_t id, uint32_t row_count, int32_t row_height, mkgui_richlist_cb cb, void *userdata);
+MKGUI_API void mkgui_richlist_set_rows(struct mkgui_ctx *ctx, uint32_t id, uint32_t row_count);
+MKGUI_API int32_t mkgui_richlist_get_selected(struct mkgui_ctx *ctx, uint32_t id);
+MKGUI_API void mkgui_richlist_set_selected(struct mkgui_ctx *ctx, uint32_t id, int32_t row);
+MKGUI_API void mkgui_richlist_scroll_to(struct mkgui_ctx *ctx, uint32_t id, int32_t row);
 
 // ---------------------------------------------------------------------------
 // TreeView

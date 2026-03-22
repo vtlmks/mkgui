@@ -96,6 +96,7 @@ struct mkgui_widget {
 | `MKGUI_SPINNER` | Animated spinning arc indicator. No events, no setup needed. |
 | `MKGUI_LISTVIEW` | Scrollable multi-column list with virtual rows and per-column cell types. Emits `MKGUI_EVENT_LISTVIEW_SELECT`, `_DBLCLICK`, `_SORT`, `_COL_REORDER`, `_REORDER`. |
 | `MKGUI_GRIDVIEW` | Multi-column grid with per-cell checkboxes and resizable columns. Virtual data via callback. Emits `MKGUI_EVENT_GRID_CLICK`, `MKGUI_EVENT_GRID_CHECK`, `_GRIDVIEW_REORDER`. |
+| `MKGUI_RICHLIST` | Rich list with thumbnail, title, subtitle, and right-aligned text per row. Virtual data via callback. Emits `MKGUI_EVENT_RICHLIST_SELECT`, `_RICHLIST_DBLCLICK`. |
 | `MKGUI_ITEMVIEW` | Multi-mode item view (icon, thumbnail, compact, detail). Emits `MKGUI_EVENT_ITEMVIEW_SELECT`, `_DBLCLICK`. |
 | `MKGUI_TREEVIEW` | Hierarchical tree. Emits `MKGUI_EVENT_TREEVIEW_SELECT`, `_DBLCLICK`, `_EXPAND`, `_COLLAPSE`, `_MOVE`. |
 | `MKGUI_TABS` | Tab container. Children must be `MKGUI_TAB`. Emits `MKGUI_EVENT_TAB_CHANGED`. |
@@ -263,6 +264,8 @@ struct mkgui_event {
 | `MKGUI_EVENT_CONTEXT_MENU` | Context menu item selected | item id | checked state (0/1) |
 | `MKGUI_EVENT_GRIDVIEW_SELECT` | Grid cell selected | row | column |
 | `MKGUI_EVENT_GRIDVIEW_REORDER` | Row drag-and-drop reorder | source row | target row |
+| `MKGUI_EVENT_RICHLIST_SELECT` | Rich list row selected | row | -- |
+| `MKGUI_EVENT_RICHLIST_DBLCLICK` | Rich list row double-clicked | row | -- |
 | `MKGUI_EVENT_INPUT_SUBMIT` | Enter pressed in input | -- | -- |
 | `MKGUI_EVENT_FOCUS` | Widget gained focus | -- | -- |
 | `MKGUI_EVENT_UNFOCUS` | Widget lost focus | -- | -- |
@@ -685,6 +688,39 @@ Grid lines are drawn between cells. Keyboard navigation: arrow keys to move sele
 #### Column resize
 
 Column headers support manual resize and auto-fit. Drag the divider between column headers to resize (minimum 40px, cursor changes to a resize arrow on hover). Double-click a column divider to auto-fit the column width to its contents (measures the header label and all rows via the cell callback).
+
+### RichList
+
+A list widget where each row displays a thumbnail, title, subtitle, and right-aligned text. Suitable for media players, email clients, and similar applications with rich row content.
+
+```c
+struct mkgui_richlist_row {
+    char title[MKGUI_MAX_TEXT];
+    char subtitle[MKGUI_MAX_TEXT];
+    char right_text[64];
+    uint32_t *thumbnail;      // ARGB pixels, NULL for no thumbnail
+    int32_t thumb_w, thumb_h; // source thumbnail dimensions
+};
+
+typedef void (*mkgui_richlist_cb)(uint32_t row, struct mkgui_richlist_row *out, void *userdata);
+
+void mkgui_richlist_setup(struct mkgui_ctx *ctx, uint32_t id, uint32_t row_count, int32_t row_height, mkgui_richlist_cb cb, void *userdata);
+void mkgui_richlist_set_rows(struct mkgui_ctx *ctx, uint32_t id, uint32_t row_count);
+int32_t mkgui_richlist_get_selected(struct mkgui_ctx *ctx, uint32_t id);
+void mkgui_richlist_set_selected(struct mkgui_ctx *ctx, uint32_t id, int32_t row);
+void mkgui_richlist_scroll_to(struct mkgui_ctx *ctx, uint32_t id, int32_t row);
+```
+
+The callback fills a `struct mkgui_richlist_row` for each visible row. The widget renders: thumbnail on the left (scaled to fit row height minus padding), title and subtitle stacked in the center, right-aligned text on the right. Virtual scrolling -- only visible rows are queried.
+
+Row height is configurable (default 56px). Pass 0 for `row_height` to use the default.
+
+Events:
+
+- `MKGUI_EVENT_RICHLIST_SELECT` -- row selected. `ev->value` = row index.
+- `MKGUI_EVENT_RICHLIST_DBLCLICK` -- row double-clicked. `ev->value` = row index.
+
+Keyboard navigation: arrow keys, Page Up/Down, Home/End. Right-click emits `MKGUI_EVENT_CONTEXT`.
 
 ### Itemview
 

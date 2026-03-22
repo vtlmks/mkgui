@@ -165,6 +165,16 @@ struct mkgui_gridview_data {
 	uint32_t drag_active;
 };
 
+struct mkgui_richlist_data {
+	uint32_t widget_id;
+	uint32_t row_count;
+	int32_t row_height;
+	mkgui_richlist_cb row_cb;
+	void *userdata;
+	int32_t scroll_y;
+	int32_t selected_row;
+};
+
 struct mkgui_input_data {
 	uint32_t widget_id;
 	char text[MKGUI_MAX_TEXT];
@@ -561,6 +571,8 @@ struct mkgui_ctx {
 	uint32_t datepicker_count, datepicker_cap;
 	struct mkgui_gridview_data *gridviews;
 	uint32_t gridview_count, gridview_cap;
+	struct mkgui_richlist_data *richlists;
+	uint32_t richlist_count, richlist_cap;
 
 	struct mkgui_popup popups[MKGUI_MAX_POPUPS];
 	uint32_t popup_count;
@@ -757,6 +769,7 @@ static struct type *name(struct mkgui_ctx *ctx, uint32_t widget_id) { \
 MKGUI_FIND_AUX(find_tabs_data,       mkgui_tabs_data,       tabs,        tab_count)
 MKGUI_FIND_AUX(find_listv_data,      mkgui_listview_data,   listvs,      listv_count)
 MKGUI_FIND_AUX(find_gridv_data,      mkgui_gridview_data,   gridviews,   gridview_count)
+MKGUI_FIND_AUX(find_richlist_data,   mkgui_richlist_data,   richlists,   richlist_count)
 MKGUI_FIND_AUX(find_input_data,      mkgui_input_data,      inputs,      input_count)
 MKGUI_FIND_AUX(find_ipinput_data,    mkgui_ipinput_data,    ipinputs,    ipinput_count)
 MKGUI_FIND_AUX(find_toggle_data,     mkgui_toggle_data,     toggles,     toggle_count)
@@ -870,6 +883,10 @@ static uint32_t is_focusable(struct mkgui_widget *w) {
 		case MKGUI_COMBOBOX:
 		case MKGUI_DATEPICKER:
 		case MKGUI_GRIDVIEW: {
+			return 1;
+		} break;
+
+		case MKGUI_RICHLIST: {
 			return 1;
 		} break;
 
@@ -1899,6 +1916,7 @@ static void draw_icon_popup(struct mkgui_popup *p, struct mkgui_icon *icon, int3
 #include "mkgui_combobox.c"
 #include "mkgui_datepicker.c"
 #include "mkgui_gridview.c"
+#include "mkgui_richlist.c"
 #include "mkgui_spinner.c"
 #include "mkgui_itemview.c"
 #include "mkgui_scrollbar.c"
@@ -2041,6 +2059,10 @@ static void render_widget(struct mkgui_ctx *ctx, uint32_t idx) {
 
 		case MKGUI_GRIDVIEW: {
 			render_gridview(ctx, idx);
+		} break;
+
+		case MKGUI_RICHLIST: {
+			render_richlist(ctx, idx);
 		} break;
 
 		case MKGUI_VBOX:
@@ -2725,6 +2747,18 @@ static void mkgui_remove_aux_(struct mkgui_ctx *ctx, uint32_t id, uint32_t type)
 			}
 		} break;
 
+		case MKGUI_RICHLIST: {
+			for(uint32_t i = 0; i < ctx->richlist_count; ++i) {
+				if(ctx->richlists[i].widget_id == id) {
+					if(i < ctx->richlist_count - 1) {
+						ctx->richlists[i] = ctx->richlists[ctx->richlist_count - 1];
+					}
+					--ctx->richlist_count;
+					break;
+				}
+			}
+		} break;
+
 		case MKGUI_SCROLLBAR: {
 			for(uint32_t i = 0; i < ctx->scrollbar_count; ++i) {
 				if(ctx->scrollbars[i].id == id) {
@@ -2958,6 +2992,8 @@ static uint32_t mkgui_alloc_arrays(struct mkgui_ctx *ctx, uint32_t widget_cap) {
 	ctx->datepickers = (struct mkgui_datepicker_data *)calloc(ctx->datepicker_cap, sizeof(struct mkgui_datepicker_data));
 	ctx->gridview_cap = 16;
 	ctx->gridviews = (struct mkgui_gridview_data *)calloc(ctx->gridview_cap, sizeof(struct mkgui_gridview_data));
+	ctx->richlist_cap = 16;
+	ctx->richlists = (struct mkgui_richlist_data *)calloc(ctx->richlist_cap, sizeof(struct mkgui_richlist_data));
 
 	return 1;
 }
@@ -2993,6 +3029,7 @@ static void mkgui_free_arrays(struct mkgui_ctx *ctx) {
 		free(ctx->gridviews[i].checks);
 	}
 	free(ctx->gridviews);
+	free(ctx->richlists);
 }
 
 // [=]===^=[ mkgui_create ]======================================[=]
@@ -3612,6 +3649,8 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 						}
 					} else if(dsi >= 0 && ctx->widgets[dsi].type == MKGUI_GRIDVIEW) {
 						gridview_scroll_to_y(ctx, ctx->drag_scrollbar_id, ctx->mouse_y);
+					} else if(dsi >= 0 && ctx->widgets[dsi].type == MKGUI_RICHLIST) {
+						richlist_scroll_to_y(ctx, ctx->drag_scrollbar_id, ctx->mouse_y);
 					} else if(ctx->drag_scrollbar_horiz) {
 						listview_scroll_to_x(ctx, ctx->drag_scrollbar_id, ctx->mouse_x);
 					} else {
@@ -4180,6 +4219,20 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 								return 1;
 							}
 
+						} else if(hw->type == MKGUI_RICHLIST) {
+							struct mkgui_richlist_data *rl = find_richlist_data(ctx, hw->id);
+							if(rl) {
+								int32_t row = richlist_row_hit(ctx, (uint32_t)hi, ctx->mouse_y);
+								if(row >= 0 && rl->selected_row != row) {
+									rl->selected_row = row;
+									dirty_all(ctx);
+								}
+								ev->type = MKGUI_EVENT_CONTEXT;
+								ev->id = hw->id;
+								ev->value = row;
+								return 1;
+							}
+
 						} else if(hw->type == MKGUI_TREEVIEW) {
 							struct mkgui_treeview_data *tv = find_treeview_data(ctx, hw->id);
 							if(tv) {
@@ -4272,6 +4325,14 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 							int32_t hh = gv->header_height > 0 ? gv->header_height : MKGUI_ROW_HEIGHT;
 							int32_t content_h = ctx->rects[hi].h - hh - 2;
 							gridview_clamp_scroll(gv, content_h);
+							dirty_all(ctx);
+						}
+
+					} else if(hi >= 0 && ctx->widgets[hi].type == MKGUI_RICHLIST) {
+						struct mkgui_richlist_data *rl = find_richlist_data(ctx, ctx->widgets[hi].id);
+						if(rl) {
+							rl->scroll_y += delta;
+							richlist_clamp_scroll(rl, ctx->rects[hi].h - 2);
 							dirty_all(ctx);
 						}
 
@@ -4806,6 +4867,49 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 										dirty_all(ctx);
 										return 1;
 									}
+								}
+							}
+						}
+					}
+
+					if(hw->type == MKGUI_RICHLIST) {
+						uint32_t rl_sb_hit = richlist_scrollbar_hit(ctx, (uint32_t)hi, ctx->mouse_x, ctx->mouse_y);
+						if(rl_sb_hit == 1) {
+							ctx->drag_scrollbar_id = hw->id;
+							ctx->drag_scrollbar_offset = richlist_thumb_offset(ctx, (uint32_t)hi, ctx->mouse_y);
+
+						} else if(rl_sb_hit == 2 || rl_sb_hit == 3) {
+							struct mkgui_richlist_data *rl = find_richlist_data(ctx, hw->id);
+							if(rl) {
+								int32_t content_h = ctx->rects[hi].h - 2;
+								rl->scroll_y += (rl_sb_hit == 2 ? -1 : 1) * content_h;
+								richlist_clamp_scroll(rl, content_h);
+								dirty_all(ctx);
+							}
+
+						} else {
+							struct mkgui_richlist_data *rl = find_richlist_data(ctx, hw->id);
+							if(rl) {
+								int32_t row = richlist_row_hit(ctx, (uint32_t)hi, ctx->mouse_y);
+								if(row >= 0) {
+									uint32_t now = mkgui_time_ms();
+									uint32_t is_dblclick = (ctx->dblclick_id == hw->id && ctx->dblclick_row == row && (now - ctx->dblclick_time) < 400);
+									ctx->dblclick_id = hw->id;
+									ctx->dblclick_row = row;
+									ctx->dblclick_time = now;
+									rl->selected_row = row;
+									dirty_all(ctx);
+									if(is_dblclick) {
+										ctx->dblclick_id = 0;
+										ev->type = MKGUI_EVENT_RICHLIST_DBLCLICK;
+										ev->id = hw->id;
+										ev->value = row;
+										return 1;
+									}
+									ev->type = MKGUI_EVENT_RICHLIST_SELECT;
+									ev->id = hw->id;
+									ev->value = row;
+									return 1;
 								}
 							}
 						}
@@ -5450,6 +5554,12 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 
 							case MKGUI_GRIDVIEW: {
 								if(handle_gridview_key(ctx, ev, ks)) {
+									return 1;
+								}
+							} break;
+
+							case MKGUI_RICHLIST: {
+								if(handle_richlist_key(ctx, ev, ks)) {
 									return 1;
 								}
 							} break;
