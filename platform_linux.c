@@ -417,6 +417,10 @@ static void platform_translate_xevent(struct mkgui_ctx *owner, XEvent *xev, stru
 			pev->type = MKGUI_PLAT_LEAVE;
 		} break;
 
+		case FocusOut: {
+			pev->type = MKGUI_PLAT_FOCUS_OUT;
+		} break;
+
 		case SelectionRequest: {
 			XSelectionRequestEvent *req = &xev->xselectionrequest;
 			XSelectionEvent resp;

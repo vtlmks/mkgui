@@ -61,6 +61,7 @@ enum {
 	MKGUI_PLAT_KEY,
 	MKGUI_PLAT_CLOSE,
 	MKGUI_PLAT_LEAVE,
+	MKGUI_PLAT_FOCUS_OUT,
 };
 
 struct mkgui_plat_event {
@@ -5654,6 +5655,14 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 				ev->type = MKGUI_EVENT_CLOSE;
 				ctx->close_requested = 1;
 				return 1;
+			} break;
+
+			// -=[ FOCUS OUT ]=-
+			case MKGUI_PLAT_FOCUS_OUT: {
+				if(ctx->popup_count > 0) {
+					popup_destroy_all(ctx);
+					dirty_all(ctx);
+				}
 			} break;
 
 			// -=[ LEAVE ]=-
