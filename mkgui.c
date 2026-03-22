@@ -5241,6 +5241,23 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 				}
 
 				if(was_press) {
+					int32_t pi = find_widget_idx(ctx, was_press);
+					if(pi >= 0) {
+						uint32_t pt = ctx->widgets[pi].type;
+						if(pt == MKGUI_SLIDER) {
+							struct mkgui_slider_data *sd = find_slider_data(ctx, was_press);
+							ev->type = MKGUI_EVENT_SLIDER_END;
+							ev->id = was_press;
+							ev->value = sd ? sd->value : 0;
+							return 1;
+						}
+						if(pt == MKGUI_HSPLIT || pt == MKGUI_VSPLIT) {
+							ev->type = MKGUI_EVENT_SPLIT_MOVED;
+							ev->id = was_press;
+							return 1;
+						}
+					}
+
 					int32_t hi = hit_test(ctx, pev.x, pev.y);
 					if(hi >= 0 && ctx->widgets[hi].id == was_press) {
 						struct mkgui_widget *hw = &ctx->widgets[hi];
@@ -5261,20 +5278,6 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 
 						if(hw->type == MKGUI_RADIO) {
 							return handle_radio_click(ctx, ev, hw);
-						}
-
-						if(hw->type == MKGUI_SLIDER) {
-							struct mkgui_slider_data *sd = find_slider_data(ctx, hw->id);
-							ev->type = MKGUI_EVENT_SLIDER_END;
-							ev->id = hw->id;
-							ev->value = sd ? sd->value : 0;
-							return 1;
-						}
-
-						if(hw->type == MKGUI_HSPLIT || hw->type == MKGUI_VSPLIT) {
-							ev->type = MKGUI_EVENT_SPLIT_MOVED;
-							ev->id = hw->id;
-							return 1;
 						}
 					}
 				}
