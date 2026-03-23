@@ -124,7 +124,12 @@ static LRESULT CALLBACK mkgui_wndproc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 			pev.type = MKGUI_PLAT_MOTION;
 			pev.x = (int16_t)LOWORD(lp);
 			pev.y = (int16_t)HIWORD(lp);
-			evq_push_ctx(&owner->plat, &pev);
+			uint32_t prev = (owner->plat.evq_head + MKGUI_EVQ_SIZE - 1) % MKGUI_EVQ_SIZE;
+			if(owner->plat.evq_head != owner->plat.evq_tail && owner->plat.evq_buf[prev].type == MKGUI_PLAT_MOTION) {
+				owner->plat.evq_buf[prev] = pev;
+			} else {
+				evq_push_ctx(&owner->plat, &pev);
+			}
 			return 0;
 		} break;
 
@@ -513,7 +518,14 @@ static void platform_wait_event(struct mkgui_ctx *ctx, int32_t timeout_ms) {
 	if(ctx->plat.evq_head != ctx->plat.evq_tail) {
 		return;
 	}
-	MsgWaitForMultipleObjects(0, NULL, FALSE, (DWORD)timeout_ms, QS_ALLINPUT);
+	HANDLE handles[MKGUI_MAX_TIMERS];
+	DWORD handle_count = 0;
+	for(uint32_t i = 0; i < ctx->timer_count; ++i) {
+		if(ctx->timers[i].active && ctx->timers[i].handle) {
+			handles[handle_count++] = ctx->timers[i].handle;
+		}
+	}
+	MsgWaitForMultipleObjects(handle_count, handle_count ? handles : NULL, FALSE, (DWORD)timeout_ms, QS_ALLINPUT);
 }
 
 // [=]===^=[ platform_pending ]====================================[=]

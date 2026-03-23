@@ -318,10 +318,20 @@ static void platform_wait_event(struct mkgui_ctx *ctx, int32_t timeout_ms) {
 		return;
 	}
 	XFlush(ctx->plat.dpy);
-	struct pollfd pfd;
-	pfd.fd = ConnectionNumber(ctx->plat.dpy);
-	pfd.events = POLLIN;
-	if(poll(&pfd, 1, timeout_ms) > 0) {
+	struct pollfd pfds[1 + MKGUI_MAX_TIMERS];
+	uint32_t nfds = 0;
+	pfds[nfds].fd = ConnectionNumber(ctx->plat.dpy);
+	pfds[nfds].events = POLLIN;
+	++nfds;
+	for(uint32_t i = 0; i < ctx->timer_count; ++i) {
+		if(ctx->timers[i].active && ctx->timers[i].fd >= 0) {
+			pfds[nfds].fd = ctx->timers[i].fd;
+			pfds[nfds].events = POLLIN;
+			++nfds;
+		}
+	}
+	poll(pfds, nfds, timeout_ms);
+	if(pfds[0].revents & POLLIN) {
 		XEventsQueued(ctx->plat.dpy, QueuedAfterReading);
 	}
 }
@@ -392,6 +402,14 @@ static void platform_translate_xevent(struct mkgui_ctx *owner, XEvent *xev, stru
 		} break;
 
 		case MotionNotify: {
+			while(XEventsQueued(owner->plat.dpy, QueuedAlready) > 0) {
+				XEvent peek;
+				XPeekEvent(owner->plat.dpy, &peek);
+				if(peek.type != MotionNotify || peek.xmotion.window != xev->xmotion.window) {
+					break;
+				}
+				XNextEvent(owner->plat.dpy, xev);
+			}
 			pev->type = MKGUI_PLAT_MOTION;
 			pev->x = xev->xmotion.x;
 			pev->y = xev->xmotion.y;

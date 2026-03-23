@@ -281,6 +281,7 @@ struct mkgui_event {
 | `MKGUI_EVENT_DRAG_END` | DnD drag cancelled | -- | -- |
 | `MKGUI_EVENT_TREEVIEW_MOVE` | Tree node moved via DnD | source node id | target node id |
 | `MKGUI_EVENT_TAB_CLOSE` | Tab close button clicked | tab id | -- |
+| `MKGUI_EVENT_TIMER` | Timer fired (when cb is NULL) | timer id | -- |
 
 ## API reference
 
@@ -292,6 +293,10 @@ void mkgui_destroy(struct mkgui_ctx *ctx);
 uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev);
 void mkgui_wait(struct mkgui_ctx *ctx);
 void mkgui_set_poll_timeout(struct mkgui_ctx *ctx, int32_t ms);
+uint32_t mkgui_add_timer(struct mkgui_ctx *ctx, uint64_t interval_ns, mkgui_timer_cb cb, void *userdata);
+void mkgui_remove_timer(struct mkgui_ctx *ctx, uint32_t timer_id);
+void mkgui_run(struct mkgui_ctx *ctx, mkgui_event_cb cb, void *userdata);
+void mkgui_quit(struct mkgui_ctx *ctx);
 ```
 
 `mkgui_create` takes a widget array and returns a context. `mkgui_poll` processes pending platform events and renders when dirty. Returns 1 if an event was written to `ev`, 0 otherwise. `mkgui_poll` is non-blocking -- it returns immediately when there are no more events to process.
@@ -339,6 +344,77 @@ while(running) {
 ```
 
 When the caller owns timing (emulators, games), omit `mkgui_wait` and use your own frame pacing instead.
+
+#### Timers
+
+```c
+typedef void (*mkgui_timer_cb)(struct mkgui_ctx *ctx, uint32_t timer_id, void *userdata);
+
+uint32_t mkgui_add_timer(struct mkgui_ctx *ctx, uint64_t interval_ns, mkgui_timer_cb cb, void *userdata);
+void mkgui_remove_timer(struct mkgui_ctx *ctx, uint32_t timer_id);
+```
+
+`mkgui_add_timer` creates a repeating timer with nanosecond-resolution interval. Returns a timer ID (0 on failure). Up to `MKGUI_MAX_TIMERS` (8) timers per context.
+
+If `cb` is non-NULL, the callback fires during `mkgui_poll`. If `cb` is NULL, an `MKGUI_EVENT_TIMER` event is emitted instead (with `ev.id` set to the timer ID).
+
+Timers do not drift. On Linux, `timerfd_create(CLOCK_MONOTONIC)` provides kernel-managed absolute deadlines. On Windows, `SetWaitableTimer` with absolute re-arming after each firing prevents accumulation error.
+
+`mkgui_wait` wakes when any timer fires, so timers work correctly in both `mkgui_poll`+`mkgui_wait` loops and `mkgui_run`.
+
+Call `mkgui_remove_timer` inside the callback to make a one-shot timer.
+
+**Example** (periodic data refresh at 30Hz):
+
+```c
+void refresh(struct mkgui_ctx *ctx, uint32_t timer_id, void *data) {
+    update_data();
+    update_widgets(ctx);
+}
+
+mkgui_add_timer(ctx, 33333333, refresh, NULL);  // 33.3ms = 30Hz
+```
+
+#### mkgui_run (toolkit-owned mainloop)
+
+```c
+typedef void (*mkgui_event_cb)(struct mkgui_ctx *ctx, struct mkgui_event *ev, void *userdata);
+
+void mkgui_run(struct mkgui_ctx *ctx, mkgui_event_cb cb, void *userdata);
+void mkgui_quit(struct mkgui_ctx *ctx);
+```
+
+`mkgui_run` is an event-driven mainloop alternative to the manual `mkgui_poll`+`mkgui_wait` pattern. It processes events and delivers them to `cb` until `mkgui_quit` is called or the window is closed.
+
+Use `mkgui_quit(ctx)` inside the event callback to exit the loop (e.g. in response to `MKGUI_EVENT_CLOSE`).
+
+Dialogs (`mkgui_message_box`, `mkgui_open_dialog`, etc.) work normally when called from the event callback -- they run their own nested event loop.
+
+**Example:**
+
+```c
+void on_event(struct mkgui_ctx *ctx, struct mkgui_event *ev, void *data) {
+    switch(ev->type) {
+        case MKGUI_EVENT_CLOSE: {
+            mkgui_quit(ctx);
+        } break;
+
+        case MKGUI_EVENT_CLICK: {
+            // handle click
+        } break;
+    }
+}
+
+int main(void) {
+    struct mkgui_ctx *ctx = mkgui_create(widgets, count);
+    mkgui_run(ctx, on_event, NULL);
+    mkgui_destroy(ctx);
+}
+```
+
+#### Motion compression
+
+Mouse motion events are automatically compressed. When multiple consecutive motion events are queued, only the last position is delivered. This prevents unnecessary redraws at high mouse polling rates (1000Hz).
 
 ### Runtime widget management
 

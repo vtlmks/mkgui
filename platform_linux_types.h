@@ -10,6 +10,7 @@
 #include <sys/shm.h>
 #include <unistd.h>
 #include <poll.h>
+#include <sys/timerfd.h>
 #include <ft2build.h>
 #include FT_FREETYPE_H
 

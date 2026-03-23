@@ -524,6 +524,21 @@ struct mkgui_rect {
 	int32_t x, y, w, h;
 };
 
+struct mkgui_timer {
+	uint32_t id;
+	uint64_t interval_ns;
+	mkgui_timer_cb cb;
+	void *userdata;
+	uint32_t active;
+#ifdef _WIN32
+	HANDLE handle;
+	LARGE_INTEGER epoch;
+	uint64_t fire_count;
+#else
+	int32_t fd;
+#endif
+};
+
 struct mkgui_ctx {
 	struct mkgui_platform plat;
 
@@ -641,6 +656,10 @@ struct mkgui_ctx {
 	uint32_t anim_active;
 	uint32_t close_requested;
 	int32_t poll_timeout_ms;
+
+	struct mkgui_timer timers[MKGUI_MAX_TIMERS];
+	uint32_t timer_count;
+	uint32_t timer_next_id;
 
 	double perf_layout_us;
 	double perf_render_us;
@@ -3307,6 +3326,19 @@ MKGUI_API void mkgui_destroy(struct mkgui_ctx *ctx) {
 			platform_glview_destroy(ctx, &ctx->glviews[i]);
 		}
 	}
+	for(uint32_t i = 0; i < ctx->timer_count; ++i) {
+#ifdef _WIN32
+		if(ctx->timers[i].handle) {
+			CancelWaitableTimer(ctx->timers[i].handle);
+			CloseHandle(ctx->timers[i].handle);
+		}
+#else
+		if(ctx->timers[i].fd >= 0) {
+			close(ctx->timers[i].fd);
+		}
+#endif
+	}
+	ctx->timer_count = 0;
 	mkgui_free_arrays(ctx);
 	platform_font_fini(ctx);
 	platform_destroy(ctx);
@@ -3411,6 +3443,39 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 	ctx->anim_prev = now;
 #endif
 	ctx->anim_time += dt;
+
+	for(uint32_t ti = 0; ti < ctx->timer_count; ++ti) {
+		struct mkgui_timer *t = &ctx->timers[ti];
+		if(!t->active) {
+			continue;
+		}
+#ifdef _WIN32
+		if(WaitForSingleObject(t->handle, 0) == WAIT_OBJECT_0) {
+			++t->fire_count;
+			LARGE_INTEGER next;
+			next.QuadPart = t->epoch.QuadPart + (int64_t)(t->fire_count * (t->interval_ns / 100));
+			SetWaitableTimer(t->handle, &next, 0, NULL, NULL, FALSE);
+			if(t->cb) {
+				t->cb(ctx, t->id, t->userdata);
+			} else {
+				ev->type = MKGUI_EVENT_TIMER;
+				ev->id = t->id;
+				return 1;
+			}
+		}
+#else
+		uint64_t expirations;
+		if(read(t->fd, &expirations, sizeof(expirations)) == (int64_t)sizeof(expirations)) {
+			if(t->cb) {
+				t->cb(ctx, t->id, t->userdata);
+			} else {
+				ev->type = MKGUI_EVENT_TIMER;
+				ev->id = t->id;
+				return 1;
+			}
+		}
+#endif
+	}
 
 	if(ctx->focus_id != ctx->prev_focus_id) {
 		if(ctx->prev_focus_id) {
@@ -5922,6 +5987,87 @@ MKGUI_API void mkgui_wait(struct mkgui_ctx *ctx) {
 // [=]===^=[ mkgui_set_poll_timeout ]==============================[=]
 MKGUI_API void mkgui_set_poll_timeout(struct mkgui_ctx *ctx, int32_t ms) {
 	ctx->poll_timeout_ms = ms;
+}
+
+// [=]===^=[ mkgui_add_timer ]=====================================[=]
+MKGUI_API uint32_t mkgui_add_timer(struct mkgui_ctx *ctx, uint64_t interval_ns, mkgui_timer_cb cb, void *userdata) {
+	if(ctx->timer_count >= MKGUI_MAX_TIMERS) {
+		return 0;
+	}
+	struct mkgui_timer *t = &ctx->timers[ctx->timer_count];
+	memset(t, 0, sizeof(*t));
+	t->id = ++ctx->timer_next_id;
+	t->interval_ns = interval_ns;
+	t->cb = cb;
+	t->userdata = userdata;
+	t->active = 1;
+#ifdef _WIN32
+	t->handle = CreateWaitableTimerExW(NULL, NULL, CREATE_WAITABLE_TIMER_HIGH_RESOLUTION, TIMER_ALL_ACCESS);
+	if(!t->handle) {
+		t->handle = CreateWaitableTimerW(NULL, FALSE, NULL);
+	}
+	if(!t->handle) {
+		return 0;
+	}
+	FILETIME ft;
+	GetSystemTimeAsFileTime(&ft);
+	t->epoch.LowPart = ft.dwLowDateTime;
+	t->epoch.HighPart = (LONG)ft.dwHighDateTime;
+	t->fire_count = 0;
+	LARGE_INTEGER due;
+	due.QuadPart = -(int64_t)(interval_ns / 100);
+	SetWaitableTimer(t->handle, &due, 0, NULL, NULL, FALSE);
+#else
+	t->fd = timerfd_create(CLOCK_MONOTONIC, TFD_NONBLOCK);
+	if(t->fd < 0) {
+		return 0;
+	}
+	struct itimerspec its = {0};
+	its.it_value.tv_sec = (time_t)(interval_ns / 1000000000);
+	its.it_value.tv_nsec = (long)(interval_ns % 1000000000);
+	its.it_interval = its.it_value;
+	timerfd_settime(t->fd, 0, &its, NULL);
+#endif
+	++ctx->timer_count;
+	return t->id;
+}
+
+// [=]===^=[ mkgui_remove_timer ]==================================[=]
+MKGUI_API void mkgui_remove_timer(struct mkgui_ctx *ctx, uint32_t timer_id) {
+	for(uint32_t i = 0; i < ctx->timer_count; ++i) {
+		if(ctx->timers[i].id == timer_id) {
+#ifdef _WIN32
+			if(ctx->timers[i].handle) {
+				CancelWaitableTimer(ctx->timers[i].handle);
+				CloseHandle(ctx->timers[i].handle);
+			}
+#else
+			if(ctx->timers[i].fd >= 0) {
+				close(ctx->timers[i].fd);
+			}
+#endif
+			ctx->timers[i] = ctx->timers[--ctx->timer_count];
+			return;
+		}
+	}
+}
+
+// [=]===^=[ mkgui_run ]===========================================[=]
+MKGUI_API void mkgui_run(struct mkgui_ctx *ctx, mkgui_event_cb cb, void *userdata) {
+	while(!ctx->close_requested) {
+		struct mkgui_event ev;
+		while(mkgui_poll(ctx, &ev)) {
+			if(cb) {
+				cb(ctx, &ev, userdata);
+			}
+		}
+		mkgui_wait(ctx);
+	}
+}
+
+// [=]===^=[ mkgui_quit ]==========================================[=]
+MKGUI_API void mkgui_quit(struct mkgui_ctx *ctx) {
+	ctx->close_requested = 1;
 }
 
 // ---------------------------------------------------------------------------

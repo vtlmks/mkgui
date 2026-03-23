@@ -275,6 +275,282 @@ static void demo_canvas_cb(struct mkgui_ctx *ctx, uint32_t id, uint32_t *pixels,
 
 #define ANCHOR_ALL (MKGUI_ANCHOR_LEFT | MKGUI_ANCHOR_TOP | MKGUI_ANCHOR_RIGHT | MKGUI_ANCHOR_BOTTOM)
 
+struct demo_state {
+#ifdef _WIN32
+	HGLRC gl_ctx;
+	HDC gl_hdc;
+#else
+	GLXContext gl_ctx;
+#endif
+};
+
+// [=]===^=[ demo_handle_file_action ]=============================[=]
+static void demo_handle_file_action(struct mkgui_ctx *ctx, uint32_t id) {
+	if(id == ID_EXIT) {
+		if(mkgui_confirm_dialog(ctx, "Quit", "Are you sure you want to exit?")) {
+			mkgui_quit(ctx);
+		}
+
+	} else if(id == ID_FILE_NEW || id == ID_TB_NEW) {
+		char name[256];
+		if(mkgui_input_dialog(ctx, "New File", "File name:", "untitled.txt", name, sizeof(name))) {
+			char buf[512];
+			snprintf(buf, sizeof(buf), "Created: %s", name);
+			mkgui_statusbar_set(ctx, ID_STATUSBAR, 0, buf);
+		}
+
+	} else if(id == ID_OPEN || id == ID_TB_OPEN) {
+		struct mkgui_file_dialog_opts open_opts = {0};
+		uint32_t count = mkgui_open_dialog(ctx, &open_opts);
+		if(count > 0) {
+			char buf[FD_PATH_SIZE + 320];
+			snprintf(buf, sizeof(buf), "Opened %u file(s): %s", count, mkgui_dialog_path(ctx, 0));
+			mkgui_statusbar_set(ctx, ID_STATUSBAR, 0, buf);
+		}
+
+	} else if(id == ID_SAVE || id == ID_TB_SAVE) {
+		struct mkgui_file_dialog_opts save_opts = {0};
+		save_opts.default_name = "untitled.txt";
+		if(mkgui_save_dialog(ctx, &save_opts)) {
+			char buf[FD_PATH_SIZE + 320];
+			snprintf(buf, sizeof(buf), "Save to: %s", mkgui_dialog_path(ctx, 0));
+			mkgui_statusbar_set(ctx, ID_STATUSBAR, 0, buf);
+		}
+
+	} else if(id == ID_HELP_ABOUT) {
+		mkgui_message_box(ctx, "About", "mkgui demo v1.0\nDemonstrates all widget types.", MKGUI_DLG_ICON_INFO, MKGUI_DLG_BUTTONS_OK);
+	}
+}
+
+// [=]===^=[ demo_gl_render ]======================================[=]
+static void demo_gl_render(struct mkgui_ctx *ctx, struct demo_state *state) {
+	if(!state->gl_ctx || !widget_visible(ctx, (uint32_t)find_widget_idx(ctx, ID_GLVIEW1))) {
+		return;
+	}
+	int32_t glw, glh;
+	mkgui_glview_get_size(ctx, ID_GLVIEW1, &glw, &glh);
+	if(glw <= 0 || glh <= 0) {
+		return;
+	}
+#ifdef _WIN32
+	wglMakeCurrent(state->gl_hdc, state->gl_ctx);
+#else
+	glXMakeCurrent(mkgui_glview_get_x11_display(ctx), mkgui_glview_get_x11_window(ctx, ID_GLVIEW1), state->gl_ctx);
+#endif
+	glViewport(0, 0, glw, glh);
+	glClearColor(0.1f, 0.12f, 0.15f, 1.0f);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+	glMatrixMode(GL_PROJECTION);
+	glLoadIdentity();
+	float aspect = (float)glw / (float)glh;
+	glFrustum(-aspect * 0.5, aspect * 0.5, -0.5, 0.5, 1.0, 100.0);
+
+	glMatrixMode(GL_MODELVIEW);
+	glLoadIdentity();
+	glTranslatef(0.0f, 0.0f, -3.0f);
+	glRotatef((float)ctx->anim_time * 30.0f, 0.4f, 1.0f, 0.2f);
+
+	glEnable(GL_DEPTH_TEST);
+	glBegin(GL_QUADS);
+		glColor3f(0.2f, 0.6f, 0.9f); glVertex3f(-0.5f, -0.5f,  0.5f); glVertex3f( 0.5f, -0.5f,  0.5f); glVertex3f( 0.5f,  0.5f,  0.5f); glVertex3f(-0.5f,  0.5f,  0.5f);
+		glColor3f(0.9f, 0.3f, 0.2f); glVertex3f(-0.5f, -0.5f, -0.5f); glVertex3f(-0.5f,  0.5f, -0.5f); glVertex3f( 0.5f,  0.5f, -0.5f); glVertex3f( 0.5f, -0.5f, -0.5f);
+		glColor3f(0.2f, 0.8f, 0.3f); glVertex3f(-0.5f,  0.5f, -0.5f); glVertex3f(-0.5f,  0.5f,  0.5f); glVertex3f( 0.5f,  0.5f,  0.5f); glVertex3f( 0.5f,  0.5f, -0.5f);
+		glColor3f(0.9f, 0.7f, 0.1f); glVertex3f(-0.5f, -0.5f, -0.5f); glVertex3f( 0.5f, -0.5f, -0.5f); glVertex3f( 0.5f, -0.5f,  0.5f); glVertex3f(-0.5f, -0.5f,  0.5f);
+		glColor3f(0.7f, 0.2f, 0.8f); glVertex3f( 0.5f, -0.5f, -0.5f); glVertex3f( 0.5f,  0.5f, -0.5f); glVertex3f( 0.5f,  0.5f,  0.5f); glVertex3f( 0.5f, -0.5f,  0.5f);
+		glColor3f(0.1f, 0.5f, 0.7f); glVertex3f(-0.5f, -0.5f, -0.5f); glVertex3f(-0.5f, -0.5f,  0.5f); glVertex3f(-0.5f,  0.5f,  0.5f); glVertex3f(-0.5f,  0.5f, -0.5f);
+	glEnd();
+
+#ifdef _WIN32
+	SwapBuffers(state->gl_hdc);
+#else
+	glXSwapBuffers(mkgui_glview_get_x11_display(ctx), mkgui_glview_get_x11_window(ctx, ID_GLVIEW1));
+#endif
+}
+
+// [=]===^=[ demo_gl_timer ]=======================================[=]
+static void demo_gl_timer(struct mkgui_ctx *ctx, uint32_t timer_id, void *userdata) {
+	(void)timer_id;
+	demo_gl_render(ctx, (struct demo_state *)userdata);
+}
+
+// [=]===^=[ demo_event ]==========================================[=]
+static void demo_event(struct mkgui_ctx *ctx, struct mkgui_event *ev, void *userdata) {
+	(void)userdata;
+	char buf[128];
+	switch(ev->type) {
+		case MKGUI_EVENT_CLOSE: {
+			mkgui_quit(ctx);
+		} break;
+
+		case MKGUI_EVENT_CLICK: {
+			if(ev->id == ID_BUTTON1) {
+				mkgui_statusbar_set(ctx, ID_STATUSBAR, 0, "Applied!");
+
+			} else if(ev->id == ID_TB_NEW || ev->id == ID_TB_OPEN || ev->id == ID_TB_SAVE) {
+				demo_handle_file_action(ctx, ev->id);
+
+			} else if(ev->id == ID_IV_ICON) {
+				mkgui_itemview_set_view(ctx, ID_ITEMVIEW1, MKGUI_VIEW_ICON);
+
+			} else if(ev->id == ID_IV_THUMB) {
+				mkgui_itemview_set_view(ctx, ID_ITEMVIEW1, MKGUI_VIEW_THUMBNAIL);
+
+			} else if(ev->id == ID_IV_COMPACT) {
+				mkgui_itemview_set_view(ctx, ID_ITEMVIEW1, MKGUI_VIEW_COMPACT);
+
+			} else if(ev->id == ID_IV_DETAIL) {
+				mkgui_itemview_set_view(ctx, ID_ITEMVIEW1, MKGUI_VIEW_DETAIL);
+			}
+		} break;
+
+		case MKGUI_EVENT_MENU: {
+			demo_handle_file_action(ctx, ev->id);
+		} break;
+
+		case MKGUI_EVENT_CHECKBOX_CHANGED: {
+			if(ev->id == ID_THEME_CHECK) {
+				mkgui_set_theme(ctx, ev->value ? light_theme() : default_theme());
+			}
+		} break;
+
+		case MKGUI_EVENT_SLIDER_CHANGED: {
+			snprintf(buf, sizeof(buf), "Volume: %d", ev->value);
+			mkgui_statusbar_set(ctx, ID_STATUSBAR, 0, buf);
+		} break;
+
+		case MKGUI_EVENT_TOGGLE_CHANGED: {
+			snprintf(buf, sizeof(buf), "Power: %s", ev->value ? "ON" : "OFF");
+			mkgui_statusbar_set(ctx, ID_STATUSBAR, 0, buf);
+			uint32_t ids[] = { ID_DATEPICKER1, ID_IPINPUT1 };
+			for(uint32_t i = 0; i < 2; ++i) {
+				int32_t wi = find_widget_idx(ctx, ids[i]);
+				if(wi >= 0) {
+					if(ev->value) {
+						ctx->widgets[wi].flags &= ~MKGUI_HIDDEN;
+					} else {
+						ctx->widgets[wi].flags |= MKGUI_HIDDEN;
+					}
+				}
+			}
+			dirty_all(ctx);
+		} break;
+
+		case MKGUI_EVENT_DATEPICKER_CHANGED: {
+			snprintf(buf, sizeof(buf), "Date changed: %d", ev->value);
+			mkgui_statusbar_set(ctx, ID_STATUSBAR, 0, buf);
+		} break;
+
+		case MKGUI_EVENT_IPINPUT_CHANGED: {
+			mkgui_statusbar_set(ctx, ID_STATUSBAR, 0, "IP address changed");
+		} break;
+
+		case MKGUI_EVENT_COMBOBOX_CHANGED: {
+			snprintf(buf, sizeof(buf), "Combobox selection: %d", ev->value);
+			mkgui_statusbar_set(ctx, ID_STATUSBAR, 0, buf);
+		} break;
+
+		case MKGUI_EVENT_DROPDOWN_CHANGED: {
+			if(ev->id == ID_TBMODE_DROP) {
+				uint32_t tb_mode_flags[] = { MKGUI_TOOLBAR_ICONS_TEXT, MKGUI_TOOLBAR_ICONS_ONLY, MKGUI_TOOLBAR_TEXT_ONLY };
+				if(ev->value >= 0 && ev->value < 3) {
+					mkgui_toolbar_set_mode(ctx, ID_TOOLBAR, tb_mode_flags[ev->value]);
+				}
+			}
+		} break;
+
+		case MKGUI_EVENT_ITEMVIEW_SELECT: {
+			snprintf(buf, sizeof(buf), "Item selected: %d", ev->value);
+			mkgui_statusbar_set(ctx, ID_STATUSBAR, 0, buf);
+		} break;
+
+		case MKGUI_EVENT_LISTVIEW_SELECT: {
+			snprintf(buf, sizeof(buf), "Selected row: %d", ev->value);
+			mkgui_statusbar_set(ctx, ID_STATUSBAR, 0, buf);
+		} break;
+
+		case MKGUI_EVENT_SCROLL: {
+			snprintf(buf, sizeof(buf), "Scroll: %d", ev->value);
+			mkgui_statusbar_set(ctx, ID_STATUSBAR, 0, buf);
+		} break;
+
+		case MKGUI_EVENT_PATHBAR_NAV: {
+			snprintf(buf, sizeof(buf), "Pathbar navigate: segment %d", ev->value);
+			mkgui_statusbar_set(ctx, ID_STATUSBAR, 0, buf);
+		} break;
+
+		case MKGUI_EVENT_CONTEXT: {
+			if(ev->id == ID_LISTVIEW1 || ev->id == ID_GRIDVIEW1 || ev->id == ID_TREEVIEW1 || ev->id == ID_ITEMVIEW1) {
+				mkgui_context_menu_clear(ctx);
+				mkgui_context_menu_add(ctx, ID_CTX_CUT, "Cut", "content-cut", 0);
+				mkgui_context_menu_add(ctx, ID_CTX_COPY, "Copy", "content-copy", 0);
+				mkgui_context_menu_add(ctx, ID_CTX_PASTE, "Paste", "content-paste", 0);
+				mkgui_context_menu_add_separator(ctx);
+				mkgui_context_menu_add(ctx, ID_CTX_DELETE, "Delete", "delete", (ev->value < 0) ? MKGUI_DISABLED : 0);
+				mkgui_context_menu_add(ctx, ID_CTX_SELECT_ALL, "Select All", "select-all", 0);
+				mkgui_context_menu_add_separator(ctx);
+				mkgui_context_menu_add(ctx, ID_CTX_PROPERTIES, "Properties", "information-outline", (ev->value < 0) ? MKGUI_DISABLED : 0);
+				mkgui_context_menu_show(ctx);
+			}
+		} break;
+
+		case MKGUI_EVENT_CONTEXT_HEADER: {
+			if(ev->id == ID_LISTVIEW1) {
+				struct mkgui_listview_data *lv = find_listv_data(ctx, ID_LISTVIEW1);
+				if(lv) {
+					mkgui_context_menu_clear(ctx);
+					for(uint32_t c = 0; c < lv->col_count; ++c) {
+						mkgui_context_menu_add(ctx, ID_CTX_COL_NAME + c, lv->columns[c].label, NULL, MKGUI_MENU_CHECK | MKGUI_CHECKED);
+					}
+					mkgui_context_menu_add_separator(ctx);
+					mkgui_context_menu_add(ctx, ID_CTX_COL_AUTOSIZE, "Auto-size Column", "arrow-expand-horizontal", 0);
+					mkgui_context_menu_show(ctx);
+				}
+
+			} else if(ev->id == ID_GRIDVIEW1) {
+				struct mkgui_gridview_data *gv = find_gridv_data(ctx, ID_GRIDVIEW1);
+				if(gv) {
+					mkgui_context_menu_clear(ctx);
+					for(uint32_t c = 0; c < gv->col_count; ++c) {
+						mkgui_context_menu_add(ctx, ID_CTX_COL_NAME + c, gv->columns[c].label, NULL, MKGUI_MENU_CHECK | MKGUI_CHECKED);
+					}
+					mkgui_context_menu_add_separator(ctx);
+					mkgui_context_menu_add(ctx, ID_CTX_COL_AUTOSIZE, "Auto-size Column", "arrow-expand-horizontal", 0);
+					mkgui_context_menu_show(ctx);
+				}
+			}
+		} break;
+
+		case MKGUI_EVENT_CONTEXT_MENU: {
+			snprintf(buf, sizeof(buf), "Context menu item: %u", ev->id);
+			mkgui_statusbar_set(ctx, ID_STATUSBAR, 0, buf);
+		} break;
+
+		case MKGUI_EVENT_GRIDVIEW_REORDER: {
+			if(ev->id == ID_GRIDVIEW1) {
+				int32_t src = ev->value;
+				int32_t tgt = ev->col;
+				if(src >= 0 && src < DEMO_GRID_ROWS && tgt >= 0 && tgt < DEMO_GRID_ROWS) {
+					uint32_t tmp = demo_grid_order[src];
+					if(src < tgt) {
+						for(int32_t i = src; i < tgt; ++i) {
+							demo_grid_order[i] = demo_grid_order[i + 1];
+						}
+					} else {
+						for(int32_t i = src; i > tgt; --i) {
+							demo_grid_order[i] = demo_grid_order[i - 1];
+						}
+					}
+					demo_grid_order[tgt] = tmp;
+				}
+			}
+		} break;
+
+		default: {
+		} break;
+	}
+}
+
 // [=]===^=[ main ]==============================================[=]
 int main(void) {
 	struct mkgui_widget widgets[] = {
@@ -591,263 +867,16 @@ int main(void) {
 	}
 #endif
 
-	float gl_speed = 30.0f;
-
-	struct mkgui_event ev;
-	uint32_t running = 1;
-	while(running) {
-		while(mkgui_poll(ctx, &ev)) {
-			char buf[128];
-		switch(ev.type) {
-				case MKGUI_EVENT_CLOSE: {
-					running = 0;
-				} break;
-
-				case MKGUI_EVENT_CLICK: {
-					if(ev.id == ID_BUTTON1) {
-						mkgui_statusbar_set(ctx, ID_STATUSBAR, 0, "Applied!");
-
-					} else if(ev.id == ID_TB_NEW || ev.id == ID_TB_OPEN || ev.id == ID_TB_SAVE) {
-						goto handle_file_action;
-
-					} else if(ev.id == ID_IV_ICON) {
-						mkgui_itemview_set_view(ctx, ID_ITEMVIEW1, MKGUI_VIEW_ICON);
-
-					} else if(ev.id == ID_IV_THUMB) {
-						mkgui_itemview_set_view(ctx, ID_ITEMVIEW1, MKGUI_VIEW_THUMBNAIL);
-
-					} else if(ev.id == ID_IV_COMPACT) {
-						mkgui_itemview_set_view(ctx, ID_ITEMVIEW1, MKGUI_VIEW_COMPACT);
-
-					} else if(ev.id == ID_IV_DETAIL) {
-						mkgui_itemview_set_view(ctx, ID_ITEMVIEW1, MKGUI_VIEW_DETAIL);
-					}
-				} break;
-
-				case MKGUI_EVENT_MENU: {
-					handle_file_action:
-					if(ev.id == ID_EXIT) {
-						if(mkgui_confirm_dialog(ctx, "Quit", "Are you sure you want to exit?")) {
-							running = 0;
-						}
-
-					} else if(ev.id == ID_FILE_NEW || ev.id == ID_TB_NEW) {
-						char name[256];
-						if(mkgui_input_dialog(ctx, "New File", "File name:", "untitled.txt", name, sizeof(name))) {
-							char buf[512];
-							snprintf(buf, sizeof(buf), "Created: %s", name);
-							mkgui_statusbar_set(ctx, ID_STATUSBAR, 0, buf);
-						}
-
-					} else if(ev.id == ID_OPEN || ev.id == ID_TB_OPEN) {
-						struct mkgui_file_dialog_opts open_opts = {0};
-						uint32_t count = mkgui_open_dialog(ctx, &open_opts);
-						if(count > 0) {
-							char buf[FD_PATH_SIZE + 320];
-							snprintf(buf, sizeof(buf), "Opened %u file(s): %s", count, mkgui_dialog_path(ctx, 0));
-							mkgui_statusbar_set(ctx, ID_STATUSBAR, 0, buf);
-						}
-
-					} else if(ev.id == ID_SAVE || ev.id == ID_TB_SAVE) {
-						struct mkgui_file_dialog_opts save_opts = {0};
-						save_opts.default_name = "untitled.txt";
-						if(mkgui_save_dialog(ctx, &save_opts)) {
-							char buf[FD_PATH_SIZE + 320];
-							snprintf(buf, sizeof(buf), "Save to: %s", mkgui_dialog_path(ctx, 0));
-							mkgui_statusbar_set(ctx, ID_STATUSBAR, 0, buf);
-						}
-
-					} else if(ev.id == ID_HELP_ABOUT) {
-						mkgui_message_box(ctx, "About", "mkgui demo v1.0\nDemonstrates all widget types.", MKGUI_DLG_ICON_INFO, MKGUI_DLG_BUTTONS_OK);
-					}
-				} break;
-
-				case MKGUI_EVENT_CHECKBOX_CHANGED: {
-					if(ev.id == ID_THEME_CHECK) {
-						mkgui_set_theme(ctx, ev.value ? light_theme() : default_theme());
-					}
-				} break;
-
-				case MKGUI_EVENT_SLIDER_CHANGED: {
-					snprintf(buf, sizeof(buf), "Volume: %d", ev.value);
-					mkgui_statusbar_set(ctx, ID_STATUSBAR, 0, buf);
-				} break;
-
-				case MKGUI_EVENT_TOGGLE_CHANGED: {
-					snprintf(buf, sizeof(buf), "Power: %s", ev.value ? "ON" : "OFF");
-					mkgui_statusbar_set(ctx, ID_STATUSBAR, 0, buf);
-					uint32_t ids[] = { ID_DATEPICKER1, ID_IPINPUT1 };
-					for(uint32_t i = 0; i < 2; ++i) {
-						int32_t wi = find_widget_idx(ctx, ids[i]);
-						if(wi >= 0) {
-							if(ev.value) {
-								ctx->widgets[wi].flags &= ~MKGUI_HIDDEN;
-							} else {
-								ctx->widgets[wi].flags |= MKGUI_HIDDEN;
-							}
-						}
-					}
-					dirty_all(ctx);
-				} break;
-
-				case MKGUI_EVENT_DATEPICKER_CHANGED: {
-					snprintf(buf, sizeof(buf), "Date changed: %d", ev.value);
-					mkgui_statusbar_set(ctx, ID_STATUSBAR, 0, buf);
-				} break;
-
-				case MKGUI_EVENT_IPINPUT_CHANGED: {
-					mkgui_statusbar_set(ctx, ID_STATUSBAR, 0, "IP address changed");
-				} break;
-
-				case MKGUI_EVENT_COMBOBOX_CHANGED: {
-					snprintf(buf, sizeof(buf), "Combobox selection: %d", ev.value);
-					mkgui_statusbar_set(ctx, ID_STATUSBAR, 0, buf);
-				} break;
-
-				case MKGUI_EVENT_DROPDOWN_CHANGED: {
-					if(ev.id == ID_TBMODE_DROP) {
-						uint32_t tb_mode_flags[] = { MKGUI_TOOLBAR_ICONS_TEXT, MKGUI_TOOLBAR_ICONS_ONLY, MKGUI_TOOLBAR_TEXT_ONLY };
-						if(ev.value >= 0 && ev.value < 3) {
-							mkgui_toolbar_set_mode(ctx, ID_TOOLBAR, tb_mode_flags[ev.value]);
-						}
-					}
-				} break;
-
-				case MKGUI_EVENT_ITEMVIEW_SELECT: {
-					snprintf(buf, sizeof(buf), "Item selected: %d", ev.value);
-					mkgui_statusbar_set(ctx, ID_STATUSBAR, 0, buf);
-				} break;
-
-				case MKGUI_EVENT_LISTVIEW_SELECT: {
-					snprintf(buf, sizeof(buf), "Selected row: %d", ev.value);
-					mkgui_statusbar_set(ctx, ID_STATUSBAR, 0, buf);
-				} break;
-
-				case MKGUI_EVENT_SCROLL: {
-					snprintf(buf, sizeof(buf), "Scroll: %d", ev.value);
-					mkgui_statusbar_set(ctx, ID_STATUSBAR, 0, buf);
-				} break;
-
-				case MKGUI_EVENT_PATHBAR_NAV: {
-					snprintf(buf, sizeof(buf), "Pathbar navigate: segment %d", ev.value);
-					mkgui_statusbar_set(ctx, ID_STATUSBAR, 0, buf);
-				} break;
-
-				case MKGUI_EVENT_CONTEXT: {
-					if(ev.id == ID_LISTVIEW1 || ev.id == ID_GRIDVIEW1 || ev.id == ID_TREEVIEW1 || ev.id == ID_ITEMVIEW1) {
-						mkgui_context_menu_clear(ctx);
-						mkgui_context_menu_add(ctx, ID_CTX_CUT, "Cut", "content-cut", 0);
-						mkgui_context_menu_add(ctx, ID_CTX_COPY, "Copy", "content-copy", 0);
-						mkgui_context_menu_add(ctx, ID_CTX_PASTE, "Paste", "content-paste", 0);
-						mkgui_context_menu_add_separator(ctx);
-						mkgui_context_menu_add(ctx, ID_CTX_DELETE, "Delete", "delete", (ev.value < 0) ? MKGUI_DISABLED : 0);
-						mkgui_context_menu_add(ctx, ID_CTX_SELECT_ALL, "Select All", "select-all", 0);
-						mkgui_context_menu_add_separator(ctx);
-						mkgui_context_menu_add(ctx, ID_CTX_PROPERTIES, "Properties", "information-outline", (ev.value < 0) ? MKGUI_DISABLED : 0);
-						mkgui_context_menu_show(ctx);
-					}
-				} break;
-
-				case MKGUI_EVENT_CONTEXT_HEADER: {
-					if(ev.id == ID_LISTVIEW1) {
-						struct mkgui_listview_data *lv = find_listv_data(ctx, ID_LISTVIEW1);
-						if(lv) {
-							mkgui_context_menu_clear(ctx);
-							for(uint32_t c = 0; c < lv->col_count; ++c) {
-								mkgui_context_menu_add(ctx, ID_CTX_COL_NAME + c, lv->columns[c].label, NULL, MKGUI_MENU_CHECK | MKGUI_CHECKED);
-							}
-							mkgui_context_menu_add_separator(ctx);
-							mkgui_context_menu_add(ctx, ID_CTX_COL_AUTOSIZE, "Auto-size Column", "arrow-expand-horizontal", 0);
-							mkgui_context_menu_show(ctx);
-						}
-
-					} else if(ev.id == ID_GRIDVIEW1) {
-						struct mkgui_gridview_data *gv = find_gridv_data(ctx, ID_GRIDVIEW1);
-						if(gv) {
-							mkgui_context_menu_clear(ctx);
-							for(uint32_t c = 0; c < gv->col_count; ++c) {
-								mkgui_context_menu_add(ctx, ID_CTX_COL_NAME + c, gv->columns[c].label, NULL, MKGUI_MENU_CHECK | MKGUI_CHECKED);
-							}
-							mkgui_context_menu_add_separator(ctx);
-							mkgui_context_menu_add(ctx, ID_CTX_COL_AUTOSIZE, "Auto-size Column", "arrow-expand-horizontal", 0);
-							mkgui_context_menu_show(ctx);
-						}
-					}
-				} break;
-
-				case MKGUI_EVENT_CONTEXT_MENU: {
-					snprintf(buf, sizeof(buf), "Context menu item: %u", ev.id);
-					mkgui_statusbar_set(ctx, ID_STATUSBAR, 0, buf);
-				} break;
-
-				case MKGUI_EVENT_GRIDVIEW_REORDER: {
-					if(ev.id == ID_GRIDVIEW1) {
-						int32_t src = ev.value;
-						int32_t tgt = ev.col;
-						if(src >= 0 && src < DEMO_GRID_ROWS && tgt >= 0 && tgt < DEMO_GRID_ROWS) {
-							uint32_t tmp = demo_grid_order[src];
-							if(src < tgt) {
-								for(int32_t i = src; i < tgt; ++i) {
-									demo_grid_order[i] = demo_grid_order[i + 1];
-								}
-							} else {
-								for(int32_t i = src; i > tgt; --i) {
-									demo_grid_order[i] = demo_grid_order[i - 1];
-								}
-							}
-							demo_grid_order[tgt] = tmp;
-						}
-					}
-				} break;
-
-				default: {
-				} break;
-			}
-		}
-
-		if(gl_ctx && widget_visible(ctx, (uint32_t)find_widget_idx(ctx, ID_GLVIEW1))) {
-			int32_t glw, glh;
-			mkgui_glview_get_size(ctx, ID_GLVIEW1, &glw, &glh);
-			if(glw > 0 && glh > 0) {
+	struct demo_state state = {0};
 #ifdef _WIN32
-				wglMakeCurrent(gl_hdc, gl_ctx);
+	state.gl_ctx = gl_ctx;
+	state.gl_hdc = gl_hdc;
 #else
-				glXMakeCurrent(mkgui_glview_get_x11_display(ctx), mkgui_glview_get_x11_window(ctx, ID_GLVIEW1), gl_ctx);
+	state.gl_ctx = gl_ctx;
 #endif
-				glViewport(0, 0, glw, glh);
-				glClearColor(0.1f, 0.12f, 0.15f, 1.0f);
-				glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-				glMatrixMode(GL_PROJECTION);
-				glLoadIdentity();
-				float aspect = (float)glw / (float)glh;
-				glFrustum(-aspect * 0.5, aspect * 0.5, -0.5, 0.5, 1.0, 100.0);
-
-				glMatrixMode(GL_MODELVIEW);
-				glLoadIdentity();
-				glTranslatef(0.0f, 0.0f, -3.0f);
-				glRotatef((float)ctx->anim_time * gl_speed, 0.4f, 1.0f, 0.2f);
-
-				glEnable(GL_DEPTH_TEST);
-				glBegin(GL_QUADS);
-					glColor3f(0.2f, 0.6f, 0.9f); glVertex3f(-0.5f, -0.5f,  0.5f); glVertex3f( 0.5f, -0.5f,  0.5f); glVertex3f( 0.5f,  0.5f,  0.5f); glVertex3f(-0.5f,  0.5f,  0.5f);
-					glColor3f(0.9f, 0.3f, 0.2f); glVertex3f(-0.5f, -0.5f, -0.5f); glVertex3f(-0.5f,  0.5f, -0.5f); glVertex3f( 0.5f,  0.5f, -0.5f); glVertex3f( 0.5f, -0.5f, -0.5f);
-					glColor3f(0.2f, 0.8f, 0.3f); glVertex3f(-0.5f,  0.5f, -0.5f); glVertex3f(-0.5f,  0.5f,  0.5f); glVertex3f( 0.5f,  0.5f,  0.5f); glVertex3f( 0.5f,  0.5f, -0.5f);
-					glColor3f(0.9f, 0.7f, 0.1f); glVertex3f(-0.5f, -0.5f, -0.5f); glVertex3f( 0.5f, -0.5f, -0.5f); glVertex3f( 0.5f, -0.5f,  0.5f); glVertex3f(-0.5f, -0.5f,  0.5f);
-					glColor3f(0.7f, 0.2f, 0.8f); glVertex3f( 0.5f, -0.5f, -0.5f); glVertex3f( 0.5f,  0.5f, -0.5f); glVertex3f( 0.5f,  0.5f,  0.5f); glVertex3f( 0.5f, -0.5f,  0.5f);
-					glColor3f(0.1f, 0.5f, 0.7f); glVertex3f(-0.5f, -0.5f, -0.5f); glVertex3f(-0.5f, -0.5f,  0.5f); glVertex3f(-0.5f,  0.5f,  0.5f); glVertex3f(-0.5f,  0.5f, -0.5f);
-				glEnd();
-
-#ifdef _WIN32
-				SwapBuffers(gl_hdc);
-#else
-				glXSwapBuffers(mkgui_glview_get_x11_display(ctx), mkgui_glview_get_x11_window(ctx, ID_GLVIEW1));
-#endif
-			}
-		}
-
-		mkgui_wait(ctx);
-	}
+	mkgui_add_timer(ctx, 16000000, demo_gl_timer, &state);
+	mkgui_run(ctx, demo_event, &state);
 
 #ifdef _WIN32
 	if(gl_ctx) {

@@ -44,6 +44,7 @@
 #define MKGUI_TOOLBAR_BTN_W        28
 #define MKGUI_TOOLBAR_SEP_W        8
 #define MKGUI_STATUSBAR_HEIGHT     22
+#define MKGUI_MAX_TIMERS           8
 
 // ---------------------------------------------------------------------------
 // Key constants
@@ -219,6 +220,7 @@ enum {
 	MKGUI_EVENT_RICHLIST_DBLCLICK,
 	MKGUI_EVENT_CONTEXT_HEADER,
 	MKGUI_EVENT_CONTEXT_MENU,
+	MKGUI_EVENT_TIMER,
 };
 
 // ---------------------------------------------------------------------------
@@ -368,6 +370,8 @@ typedef void (*mkgui_itemview_label_cb)(uint32_t item, char *buf, uint32_t buf_s
 typedef void (*mkgui_itemview_icon_cb)(uint32_t item, char *buf, uint32_t buf_size, void *userdata);
 typedef void (*mkgui_thumbnail_cb)(uint32_t item, uint32_t *pixels, int32_t w, int32_t h, void *userdata);
 typedef void (*mkgui_canvas_cb)(struct mkgui_ctx *ctx, uint32_t id, uint32_t *pixels, int32_t x, int32_t y, int32_t w, int32_t h, void *userdata);
+typedef void (*mkgui_timer_cb)(struct mkgui_ctx *ctx, uint32_t timer_id, void *userdata);
+typedef void (*mkgui_event_cb)(struct mkgui_ctx *ctx, struct mkgui_event *ev, void *userdata);
 
 // ---------------------------------------------------------------------------
 // Lifecycle
@@ -380,6 +384,10 @@ MKGUI_API void mkgui_destroy_child(struct mkgui_ctx *ctx);
 MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev);
 MKGUI_API void mkgui_wait(struct mkgui_ctx *ctx);
 MKGUI_API void mkgui_set_poll_timeout(struct mkgui_ctx *ctx, int32_t ms);
+MKGUI_API uint32_t mkgui_add_timer(struct mkgui_ctx *ctx, uint64_t interval_ns, mkgui_timer_cb cb, void *userdata);
+MKGUI_API void mkgui_remove_timer(struct mkgui_ctx *ctx, uint32_t timer_id);
+MKGUI_API void mkgui_run(struct mkgui_ctx *ctx, mkgui_event_cb cb, void *userdata);
+MKGUI_API void mkgui_quit(struct mkgui_ctx *ctx);
 
 // ---------------------------------------------------------------------------
 // Widget management
