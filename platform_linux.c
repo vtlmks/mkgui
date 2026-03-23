@@ -70,7 +70,16 @@ static uint32_t platform_init(struct mkgui_ctx *ctx, const char *title, int32_t 
 	plat->utf8_string = XInternAtom(plat->dpy, "UTF8_STRING", False);
 	plat->targets = XInternAtom(plat->dpy, "TARGETS", False);
 	plat->mkgui_clip_prop = XInternAtom(plat->dpy, "MKGUI_CLIP", False);
+	plat->net_wm_pid = XInternAtom(plat->dpy, "_NET_WM_PID", False);
 	XSetWMProtocols(plat->dpy, plat->win, &plat->wm_delete, 1);
+
+	pid_t pid = getpid();
+	XChangeProperty(plat->dpy, plat->win, plat->net_wm_pid, XA_CARDINAL, 32,
+		PropModeReplace, (unsigned char *)&pid, 1);
+	XSetWMClientMachine(plat->dpy, plat->win, &(XTextProperty){
+		.value = (unsigned char *)"localhost", .encoding = XA_STRING,
+		.format = 8, .nitems = 9
+	});
 
 	XSelectInput(plat->dpy, plat->win,
 		ExposureMask | StructureNotifyMask |
@@ -114,6 +123,7 @@ static uint32_t platform_init_child(struct mkgui_ctx *ctx, struct mkgui_ctx *par
 	plat->utf8_string = pplat->utf8_string;
 	plat->targets = pplat->targets;
 	plat->mkgui_clip_prop = pplat->mkgui_clip_prop;
+	plat->net_wm_pid = pplat->net_wm_pid;
 	plat->is_child = 1;
 
 	XSetWindowAttributes wa;
@@ -127,6 +137,14 @@ static uint32_t platform_init_child(struct mkgui_ctx *ctx, struct mkgui_ctx *par
 
 	plat->wm_delete = XInternAtom(plat->dpy, "WM_DELETE_WINDOW", False);
 	XSetWMProtocols(plat->dpy, plat->win, &plat->wm_delete, 1);
+
+	pid_t pid = getpid();
+	XChangeProperty(plat->dpy, plat->win, plat->net_wm_pid, XA_CARDINAL, 32,
+		PropModeReplace, (unsigned char *)&pid, 1);
+	XSetWMClientMachine(plat->dpy, plat->win, &(XTextProperty){
+		.value = (unsigned char *)"localhost", .encoding = XA_STRING,
+		.format = 8, .nitems = 9
+	});
 
 	XSelectInput(plat->dpy, plat->win,
 		ExposureMask | StructureNotifyMask |

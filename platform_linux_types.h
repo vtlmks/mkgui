@@ -8,6 +8,7 @@
 #include <X11/cursorfont.h>
 #include <X11/extensions/XShm.h>
 #include <sys/shm.h>
+#include <unistd.h>
 #include <poll.h>
 #include <ft2build.h>
 #include FT_FREETYPE_H
@@ -27,6 +28,7 @@ struct mkgui_platform {
 	Atom utf8_string;
 	Atom targets;
 	Atom mkgui_clip_prop;
+	Atom net_wm_pid;
 	XShmSegmentInfo shm;
 	XImage *img;
 	Cursor cursor_default;
