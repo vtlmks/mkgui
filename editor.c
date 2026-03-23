@@ -76,6 +76,7 @@ enum {
 	ED_PROP_FL_TBSEP,
 	ED_PROP_FL_VERTICAL,
 	ED_PROP_FL_MIXER,
+	ED_PROP_FL_TRUNCATE,
 	ED_PROP_WEIGHT_LBL, ED_PROP_WEIGHT_SPN,
 	ED_PROP_ALIGN_LBL, ED_PROP_ALIGN_DRP,
 	ED_PROP_ICON_BROWSE,
@@ -844,6 +845,7 @@ enum {
 	ED_VIS_IN_TOOLBAR = (1 << 10),
 	ED_VIS_SLIDER      = (1 << 11),
 	ED_VIS_SLIDER_ONLY = (1 << 12),
+	ED_VIS_LABEL       = (1 << 13),
 };
 
 enum {
@@ -913,6 +915,7 @@ static struct ed_prop_desc ed_props[] = {
 	{ ED_PK_FLAG,          "Sep",             offsetof(struct ed_widget, flags),         MKGUI_SEPARATOR,    0,      0,    ED_VIS_IN_TOOLBAR,ED_ACT_NONE,         ED_PROP_FL_TBSEP,     0,                   0,                 0 },
 	{ ED_PK_FLAG,          "Vertical",       offsetof(struct ed_widget, flags),         MKGUI_VERTICAL,     0,      0,    ED_VIS_SLIDER,    ED_ACT_NONE,         ED_PROP_FL_VERTICAL,  0,                   0,                 0 },
 	{ ED_PK_FLAG,          "Mixer",          offsetof(struct ed_widget, flags),         MKGUI_SLIDER_MIXER, 0,      0,    ED_VIS_SLIDER_ONLY,ED_ACT_NONE,        ED_PROP_FL_MIXER,     0,                   0,                 0 },
+	{ ED_PK_FLAG,          "Truncate",       offsetof(struct ed_widget, flags),         MKGUI_TRUNCATE,     0,      0,    ED_VIS_LABEL,      ED_ACT_NONE,        ED_PROP_FL_TRUNCATE,  0,                   0,                 0 },
 	{ ED_PK_MENU_TREE,     "",                0,                                        0,                  0,      0,    ED_VIS_MENU,      ED_ACT_NONE,         ED_MENU_TREE,         0,                   0,                 0 },
 };
 #define ED_PROP_COUNT (sizeof(ed_props) / sizeof(ed_props[0]))
@@ -946,6 +949,9 @@ static uint32_t ed_compute_vis_mask(struct ed_widget *w) {
 	}
 	if(w->type == MKGUI_SLIDER) {
 		mask |= ED_VIS_SLIDER_ONLY;
+	}
+	if(w->type == MKGUI_LABEL) {
+		mask |= ED_VIS_LABEL;
 	}
 	if(w->type == MKGUI_MENU || w->type == MKGUI_MENUITEM) {
 		mask |= ED_VIS_MENU;
@@ -3927,6 +3933,7 @@ static const char *ed_flags_to_str(uint32_t flags, char *buf, uint32_t buf_size)
 		{ MKGUI_FIXED,           "MKGUI_FIXED" },
 		{ MKGUI_SLIDER_MIXER,    "MKGUI_SLIDER_MIXER" },
 		{ MKGUI_VERTICAL,        "MKGUI_VERTICAL" },
+		{ MKGUI_TRUNCATE,        "MKGUI_TRUNCATE" },
 	};
 
 	buf[0] = '\0';
@@ -4648,6 +4655,7 @@ int main(void) {
 		{ MKGUI_CHECKBOX, ED_PROP_FL_TBSEP,    "TbSep",         "", ED_PROP_FL_COL3, 0, 0, 0, 20, MKGUI_FIXED, 0 },
 		{ MKGUI_CHECKBOX, ED_PROP_FL_VERTICAL, "Vertical",      "", ED_PROP_FL_COL0, 0, 0, 0, 20, MKGUI_FIXED, 0 },
 		{ MKGUI_CHECKBOX, ED_PROP_FL_MIXER,    "Mixer",         "", ED_PROP_FL_COL1, 0, 0, 0, 20, MKGUI_FIXED, 0 },
+		{ MKGUI_CHECKBOX, ED_PROP_FL_TRUNCATE, "Truncate",      "", ED_PROP_FL_COL2, 0, 0, 0, 20, MKGUI_FIXED, 0 },
 
 		/* Cross-axis alignment (visible when parent is HBOX/VBOX) */
 		{ MKGUI_LABEL,    ED_PROP_ALIGN_LBL,  "Align:",         "", ED_PROP_VBOX, 0, 0, 0, 24, MKGUI_HIDDEN | MKGUI_FIXED, 0 },

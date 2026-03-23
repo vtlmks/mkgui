@@ -155,6 +155,7 @@ enum {
 #define MKGUI_TOOLBAR_TEXT_ONLY    (2u << 28)
 #define MKGUI_TOOLBAR_MODE_MASK    (3u << 28)
 #define MKGUI_VERTICAL             (1u << 30)
+#define MKGUI_TRUNCATE             (1u << 31)
 
 // ---------------------------------------------------------------------------
 // Event types

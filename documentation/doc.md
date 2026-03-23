@@ -190,6 +190,7 @@ Combine horizontal and vertical anchors freely. Common patterns:
 | `MKGUI_NO_PAD` | `1 << 22` | Suppress automatic container padding |
 | `MKGUI_TAB_CLOSABLE` | `1 << 23` | Show close button on tab (emits `MKGUI_EVENT_TAB_CLOSE`) |
 | `MKGUI_MULTI_SELECT` | `1 << 24` | Enable multi-selection on listview |
+| `MKGUI_TRUNCATE` | `1 << 31` | Truncate label text with "..." when it exceeds widget width |
 
 ### Cross-axis alignment flags
 
@@ -447,6 +448,13 @@ case MKGUI_EVENT_CLICK: {
 ```c
 void mkgui_label_set(struct mkgui_ctx *ctx, uint32_t id, const char *text);
 const char *mkgui_label_get(struct mkgui_ctx *ctx, uint32_t id);
+```
+
+Set `MKGUI_TRUNCATE` to clip text that overflows the widget width, replacing the tail with "...". Without this flag, text is hard-clipped at the widget boundary. The full text is preserved in the widget -- only the rendered output is affected.
+
+```c
+{ MKGUI_LABEL, ID_NAME, "Very Long Channel Name", "", ID_PARENT, 0, 0, 80, 20,
+  MKGUI_TRUNCATE, 0 }
 ```
 
 ### Input

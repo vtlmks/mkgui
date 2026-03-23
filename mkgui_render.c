@@ -590,3 +590,42 @@ static int32_t text_width(struct mkgui_ctx *ctx, const char *text) {
 	}
 	return w;
 }
+
+// [=]===^=[ text_truncate ]=====================================[=]
+static const char *text_truncate(struct mkgui_ctx *ctx, const char *text, int32_t max_w) {
+	static char buf[MKGUI_MAX_TEXT];
+	int32_t tw = text_width(ctx, text);
+	if(tw <= max_w) {
+		return text;
+	}
+	int32_t dots_w = 0;
+	for(uint32_t i = 0; i < 3; ++i) {
+		dots_w += ctx->glyphs['.' - MKGUI_GLYPH_FIRST].advance;
+	}
+	int32_t budget = max_w - dots_w;
+	if(budget <= 0) {
+		buf[0] = '\0';
+		return buf;
+	}
+	int32_t w = 0;
+	uint32_t n = 0;
+	for(const char *p = text; *p && n < MKGUI_MAX_TEXT - 4; ++p, ++n) {
+		uint32_t ch = (uint8_t)*p;
+		int32_t adv;
+		if(ch >= MKGUI_GLYPH_FIRST && ch <= MKGUI_GLYPH_LAST) {
+			adv = ctx->glyphs[ch - MKGUI_GLYPH_FIRST].advance;
+		} else {
+			adv = ctx->char_width;
+		}
+		if(w + adv > budget) {
+			break;
+		}
+		buf[n] = *p;
+		w += adv;
+	}
+	buf[n++] = '.';
+	buf[n++] = '.';
+	buf[n++] = '.';
+	buf[n] = '\0';
+	return buf;
+}
