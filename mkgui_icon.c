@@ -31,6 +31,7 @@ static uint32_t mdi_pack_load(struct mdi_pack *pack, const char *path) {
 	}
 	fclose(fp);
 	pack->dat_size = (uint32_t)sz;
+	pack->dat_owned = 1;
 
 	if(memcmp(pack->dat, "MKIC", 4) != 0) {
 		free(pack->dat);
@@ -55,6 +56,36 @@ static uint32_t mdi_pack_load(struct mdi_pack *pack, const char *path) {
 	return 1;
 }
 
+// [=]===^=[ mdi_pack_load_mem ]=======================================[=]
+static uint32_t mdi_pack_load_mem(struct mdi_pack *pack, const uint8_t *data, uint32_t size) {
+	if(!data || size < 8) {
+		return 0;
+	}
+	if(memcmp(data, "MKIC", 4) != 0) {
+		return 0;
+	}
+
+	pack->dat = (uint8_t *)data;
+	pack->dat_size = size;
+	pack->dat_owned = 0;
+
+	memcpy(&pack->icon_size, data + 4, 2);
+	memcpy(&pack->icon_count, data + 6, 2);
+
+	pack->name_block = (const char *)(data + 8);
+
+	uint32_t name_block_size = 0;
+	for(uint16_t i = 0; i < pack->icon_count; ++i) {
+		name_block_size += (uint32_t)strlen(pack->name_block + name_block_size) + 1;
+	}
+	uint32_t name_block_padded = (name_block_size + 3) & ~3u;
+
+	pack->name_offsets = (const uint32_t *)(data + 8 + name_block_padded);
+	pack->pixel_data = (const uint8_t *)(data + 8 + name_block_padded + (uint32_t)pack->icon_count * 4);
+
+	return 1;
+}
+
 // [=]===^=[ mdi_dat_free ]===========================================[=]
 static void mdi_dat_free(void) {
 	for(uint32_t i = 0; i < icon_count; ++i) {
@@ -62,10 +93,10 @@ static void mdi_dat_free(void) {
 			free(icons[i].pixels);
 		}
 	}
-	if(mdi_toolbar.dat && mdi_toolbar.dat != mdi.dat) {
+	if(mdi_toolbar.dat && mdi_toolbar.dat != mdi.dat && mdi_toolbar.dat_owned) {
 		free(mdi_toolbar.dat);
 	}
-	if(mdi.dat) {
+	if(mdi.dat && mdi.dat_owned) {
 		free(mdi.dat);
 	}
 	memset(&mdi, 0, sizeof(mdi));
@@ -189,45 +220,113 @@ static int32_t toolbar_icon_idx(struct mkgui_widget *w) {
 	return toolbar_icon_resolve(w->icon);
 }
 
+// [=]===^=[ mkgui_icons_load_both ]====================================[=]
+static void mkgui_icons_load_both(const char *path, const char *toolbar_path) {
+	if(path) {
+		if(mdi_pack_load(&mdi, path)) {
+			fprintf(stderr, "mkgui: icon pack loaded from %s (%u icons, %ux%u)\n", path, mdi.icon_count, mdi.icon_size, mdi.icon_size);
+		}
+	}
+	if(toolbar_path) {
+		if(mdi_pack_load(&mdi_toolbar, toolbar_path)) {
+			fprintf(stderr, "mkgui: toolbar icon pack loaded from %s (%u icons, %ux%u)\n", toolbar_path, mdi_toolbar.icon_count, mdi_toolbar.icon_size, mdi_toolbar.icon_size);
+		}
+	}
+	if(mdi.dat && !mdi_toolbar.dat) {
+		mdi_toolbar = mdi;
+	}
+}
+
+// [=]===^=[ mkgui_set_icon_data ]=====================================[=]
+MKGUI_API void mkgui_set_icon_data(const uint8_t *icons_dat, uint32_t icons_size, const uint8_t *toolbar_dat, uint32_t toolbar_size) {
+	if(icons_dat && icons_size > 0) {
+		mdi_pack_load_mem(&mdi, icons_dat, icons_size);
+	}
+	if(toolbar_dat && toolbar_size > 0) {
+		mdi_pack_load_mem(&mdi_toolbar, toolbar_dat, toolbar_size);
+	}
+	if(mdi.dat && !mdi_toolbar.dat) {
+		mdi_toolbar = mdi;
+	}
+}
+
+// [=]===^=[ mkgui_icons_load ]========================================[=]
+MKGUI_API void mkgui_icons_load(const char *path, const char *toolbar_path) {
+	mkgui_icons_load_both(path, toolbar_path);
+}
+
+// [=]===^=[ mkgui_icons_search ]======================================[=]
+MKGUI_API void mkgui_icons_search(const char *app_name) {
+	if(!app_name || !app_name[0]) {
+		return;
+	}
+	char path[512];
+	char tb_path[512];
+
+	const char *search_dirs[] = {
+		".",
+#ifndef _WIN32
+		"/usr/share",
+		"/usr/local/share",
+#endif
+		NULL
+	};
+
+	for(uint32_t i = 0; search_dirs[i]; ++i) {
+		if(strcmp(search_dirs[i], ".") == 0) {
+			snprintf(path, sizeof(path), "%s_icons.dat", app_name);
+			snprintf(tb_path, sizeof(tb_path), "%s_icons_toolbar.dat", app_name);
+		} else {
+			snprintf(path, sizeof(path), "%s/%s/%s_icons.dat", search_dirs[i], app_name, app_name);
+			snprintf(tb_path, sizeof(tb_path), "%s/%s/%s_icons_toolbar.dat", search_dirs[i], app_name, app_name);
+		}
+		if(!mdi.dat) {
+			mdi_pack_load(&mdi, path);
+		}
+		if(!mdi_toolbar.dat) {
+			mdi_pack_load(&mdi_toolbar, tb_path);
+		}
+		if(mdi.dat) {
+			break;
+		}
+	}
+
+#ifndef _WIN32
+	const char *xdg = getenv("XDG_DATA_DIRS");
+	if(!mdi.dat && xdg) {
+		char xdg_buf[1024];
+		snprintf(xdg_buf, sizeof(xdg_buf), "%s", xdg);
+		char *tok = strtok(xdg_buf, ":");
+		while(tok && !mdi.dat) {
+			snprintf(path, sizeof(path), "%s/%s/%s_icons.dat", tok, app_name, app_name);
+			snprintf(tb_path, sizeof(tb_path), "%s/%s/%s_icons_toolbar.dat", tok, app_name, app_name);
+			if(!mdi.dat) {
+				mdi_pack_load(&mdi, path);
+			}
+			if(!mdi_toolbar.dat) {
+				mdi_pack_load(&mdi_toolbar, tb_path);
+			}
+			tok = strtok(NULL, ":");
+		}
+	}
+#endif
+
+	if(mdi.dat) {
+		fprintf(stderr, "mkgui: icon pack loaded (%u icons, %ux%u)\n", mdi.icon_count, mdi.icon_size, mdi.icon_size);
+	}
+	if(mdi_toolbar.dat && mdi_toolbar.dat != mdi.dat) {
+		fprintf(stderr, "mkgui: toolbar icon pack loaded (%u icons, %ux%u)\n", mdi_toolbar.icon_count, mdi_toolbar.icon_size, mdi_toolbar.icon_size);
+	}
+	if(mdi.dat && !mdi_toolbar.dat) {
+		mdi_toolbar = mdi;
+	}
+}
+
 // [=]===^=[ mkgui_icon_init ]========================================[=]
 static void mkgui_icon_init(void) {
 	icon_count = 0;
 	icon_pixels_used = 0;
 	icon_hash_clear();
-
-	const char *paths[] = {
-		"mdi_icons.dat",
-		"ext/mdi_icons.dat",
-		NULL
-	};
-
-	for(uint32_t i = 0; paths[i]; ++i) {
-		if(mdi_pack_load(&mdi, paths[i])) {
-			fprintf(stderr, "mkgui: icon pack loaded from %s (%u icons, %ux%u)\n", paths[i], mdi.icon_count, mdi.icon_size, mdi.icon_size);
-			break;
-		}
-	}
-	if(!mdi.dat) {
-		fprintf(stderr, "mkgui: warning: mdi_icons.dat not found, icons unavailable\n");
-	}
-
-	const char *tb_paths[] = {
-		"mdi_icons_toolbar.dat",
-		"ext/mdi_icons_toolbar.dat",
-		NULL
-	};
-
-	uint32_t tb_loaded = 0;
-	for(uint32_t i = 0; tb_paths[i]; ++i) {
-		if(mdi_pack_load(&mdi_toolbar, tb_paths[i])) {
-			fprintf(stderr, "mkgui: toolbar icon pack loaded from %s (%u icons, %ux%u)\n", tb_paths[i], mdi_toolbar.icon_count, mdi_toolbar.icon_size, mdi_toolbar.icon_size);
-			tb_loaded = 1;
-			break;
-		}
-	}
-	if(!tb_loaded) {
-		mdi_toolbar = mdi;
-	}
 }
 
 // [=]===^=[ icon_load_from_widgets ]=================================[=]

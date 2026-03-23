@@ -714,6 +714,7 @@ int main(void) {
 	};
 
 	uint32_t widget_count = sizeof(widgets) / sizeof(widgets[0]);
+	mkgui_icons_load("mdi_icons.dat", "mdi_icons_toolbar.dat");
 	struct mkgui_ctx *ctx = mkgui_create(widgets, widget_count);
 	if(!ctx) {
 		return 1;

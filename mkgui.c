@@ -509,6 +509,7 @@ static int32_t icon_hash_lookup(const char *name) {
 struct mdi_pack {
 	uint8_t *dat;
 	uint32_t dat_size;
+	uint32_t dat_owned;
 	uint16_t icon_size;
 	uint16_t icon_count;
 	const char *name_block;

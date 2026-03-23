@@ -377,6 +377,9 @@ typedef void (*mkgui_event_cb)(struct mkgui_ctx *ctx, struct mkgui_event *ev, vo
 // Lifecycle
 // ---------------------------------------------------------------------------
 
+MKGUI_API void mkgui_set_icon_data(const uint8_t *icons_dat, uint32_t icons_size, const uint8_t *toolbar_dat, uint32_t toolbar_size);
+MKGUI_API void mkgui_icons_load(const char *path, const char *toolbar_path);
+MKGUI_API void mkgui_icons_search(const char *app_name);
 MKGUI_API struct mkgui_ctx *mkgui_create(struct mkgui_widget *widgets, uint32_t count);
 MKGUI_API void mkgui_destroy(struct mkgui_ctx *ctx);
 MKGUI_API struct mkgui_ctx *mkgui_create_child(struct mkgui_ctx *parent, struct mkgui_widget *widgets, uint32_t count, const char *title, int32_t w, int32_t h);

@@ -1326,9 +1326,7 @@ MKGUI_BOX_PAD           6    // internal padding in layout containers
 
 ## Icons
 
-mkgui uses pre-rasterized icons from the Material Design Icons (MDI) set, stored in an external `mdi_icons.dat` file. This file must be placed next to the executable (or in `ext/` during development). At startup, mkgui looks for it at `mdi_icons.dat` then `ext/mdi_icons.dat`.
-
-Icons are looked up by name (e.g. `"folder-open"`, `"content-save"`) and rendered at the size baked into the `.dat` file (default 18x18). Browse available icons at https://pictogrammers.com/library/mdi/.
+mkgui uses pre-rasterized icons from the Material Design Icons (MDI) set. Icons are looked up by name (e.g. `"folder-open"`, `"content-save"`). Browse available icons at https://pictogrammers.com/library/mdi/.
 
 ```c
 // Set icon on a widget (toolbar button, menu item, button, tab)
@@ -1338,15 +1336,93 @@ void mkgui_set_icon(struct mkgui_ctx *ctx, uint32_t widget_id, const char *icon_
 void mkgui_set_treenode_icon(struct mkgui_ctx *ctx, uint32_t widget_id, uint32_t node_id, const char *icon_name);
 ```
 
+### Icon loading
+
+Icons are **not loaded automatically**. The application must explicitly load icons before calling `mkgui_create`. There are three ways to provide icon data:
+
+**Explicit file paths:**
+
+```c
+void mkgui_icons_load(const char *path, const char *toolbar_path);
+```
+
+Load icon packs from specific file paths. Pass NULL for `toolbar_path` to reuse the main pack for toolbars.
+
+```c
+mkgui_icons_load("mdi_icons.dat", "mdi_icons_toolbar.dat");
+struct mkgui_ctx *ctx = mkgui_create(widgets, count);
+```
+
+**Auto-search by app name:**
+
+```c
+void mkgui_icons_search(const char *app_name);
+```
+
+Searches for `<name>_icons.dat` and `<name>_icons_toolbar.dat` in standard locations:
+
+| Search order | Path |
+|---|---|
+| 1 | `./<name>_icons.dat` |
+| 2 | `/usr/share/<name>/<name>_icons.dat` |
+| 3 | `/usr/local/share/<name>/<name>_icons.dat` |
+| 4 | `$XDG_DATA_DIRS/<name>/<name>_icons.dat` |
+
+```c
+mkgui_icons_search("myapp");
+struct mkgui_ctx *ctx = mkgui_create(widgets, count);
+```
+
+This is what the editor emits in generated code. For distribution, place the `.dat` files in `/usr/share/<appname>/`.
+
+**Embedded data (incbin):**
+
+```c
+void mkgui_set_icon_data(const uint8_t *icons_dat, uint32_t icons_size,
+                         const uint8_t *toolbar_dat, uint32_t toolbar_size);
+```
+
+Provide icon data directly from memory, ideal for single-binary distribution using incbin. Pass NULL/0 for toolbar to reuse the main pack.
+
+```c
+#include "incbin.h"
+INCBIN(app_icons, "myapp_icons.dat");
+INCBIN(app_icons_tb, "myapp_icons_toolbar.dat");
+
+int main(void) {
+    mkgui_set_icon_data(app_icons_data, (uint32_t)INCBIN_SIZE(app_icons),
+                        app_icons_tb_data, (uint32_t)INCBIN_SIZE(app_icons_tb));
+    struct mkgui_ctx *ctx = mkgui_create(widgets, count);
+}
+```
+
+The data is used in-place (not copied), so the pointers must remain valid for the lifetime of the application.
+
 ### Generating the icon pack
 
 The icon pack is generated from the MDI TTF font using the `gen_icons` tool:
 
 ```bash
-./tools/gen_icons ext/materialdesignicons-webfont.ttf 18 mdi_icons.dat
+./tools/gen_icons ext/materialdesignicons-webfont.ttf 16 mdi_icons.dat
+./tools/gen_icons ext/materialdesignicons-webfont.ttf 40 mdi_icons_toolbar.dat
 ```
 
-The second argument is the icon size in pixels. Regenerate with a different size at any time.
+The second argument is the icon size in pixels. The full MDI set has ~7400 icons (2 MB at 16px). To generate a subset, pass a text file listing the icon names to include:
+
+```bash
+./tools/gen_icons ext/materialdesignicons-webfont.ttf 16 mdi_icons.dat tools/subset.txt
+```
+
+The subset file has one kebab-case icon name per line. Comments start with `#`. The editor generates subset files automatically during code generation -- see below.
+
+### Editor icon list generation
+
+When the editor generates code ("File > Generate Code"), it also writes icon subset files alongside the `.c` file:
+
+- `<name>_icons.txt` -- all icons used by non-toolbar widgets
+- `<name>_icons_toolbar.txt` -- all icons used by toolbar buttons plus menu/widget icons
+
+Add any icons you load dynamically in code (e.g. file type icons for a treeview) to these files, then pass them to `gen_icons` to build minimal `.dat` files for your application.
 
 ### Custom icons
 
