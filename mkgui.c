@@ -320,6 +320,17 @@ struct mkgui_progress_data {
 	uint32_t color;
 };
 
+struct mkgui_meter_data {
+	uint32_t widget_id;
+	int32_t value;
+	int32_t max_val;
+	int32_t zone_t1;
+	int32_t zone_t2;
+	uint32_t zone_c1;
+	uint32_t zone_c2;
+	uint32_t zone_c3;
+};
+
 struct mkgui_textarea_data {
 	uint32_t widget_id;
 	char *text;
@@ -547,6 +558,8 @@ struct mkgui_ctx {
 	uint32_t spinbox_count, spinbox_cap;
 	struct mkgui_progress_data *progress;
 	uint32_t progress_count, progress_cap;
+	struct mkgui_meter_data *meters;
+	uint32_t meter_count, meter_cap;
 	struct mkgui_textarea_data *textareas;
 	uint32_t textarea_count, textarea_cap;
 	struct mkgui_itemview_data *itemviews;
@@ -784,6 +797,7 @@ MKGUI_FIND_AUX(find_treeview_data,   mkgui_treeview_data,   treeviews,   treevie
 MKGUI_FIND_AUX(find_statusbar_data,  mkgui_statusbar_data,  statusbars,  statusbar_count)
 MKGUI_FIND_AUX(find_spinbox_data,    mkgui_spinbox_data,    spinboxes,   spinbox_count)
 MKGUI_FIND_AUX(find_progress_data,   mkgui_progress_data,   progress,    progress_count)
+MKGUI_FIND_AUX(find_meter_data,     mkgui_meter_data,      meters,      meter_count)
 MKGUI_FIND_AUX(find_textarea_data,   mkgui_textarea_data,   textareas,   textarea_count)
 MKGUI_FIND_AUX(find_itemview_data,   mkgui_itemview_data,   itemviews,   itemview_count)
 MKGUI_FIND_AUX(find_canvas_data,     mkgui_canvas_data,     canvases,    canvas_count)
@@ -1909,6 +1923,7 @@ static void draw_icon_popup(struct mkgui_popup *p, struct mkgui_icon *icon, int3
 #include "mkgui_pathbar.c"
 #include "mkgui_spinbox.c"
 #include "mkgui_progress.c"
+#include "mkgui_meter.c"
 #include "mkgui_textarea.c"
 #include "mkgui_group.c"
 #include "mkgui_panel.c"
@@ -2001,6 +2016,10 @@ static void render_widget(struct mkgui_ctx *ctx, uint32_t idx) {
 
 		case MKGUI_PROGRESS: {
 			render_progress(ctx, idx);
+		} break;
+
+		case MKGUI_METER: {
+			render_meter(ctx, idx);
 		} break;
 
 		case MKGUI_TEXTAREA: {
@@ -2384,6 +2403,21 @@ static void init_widget_aux(struct mkgui_ctx *ctx, struct mkgui_widget *w) {
 			}
 		} break;
 
+		case MKGUI_METER: {
+			MKGUI_AUX_GROW(ctx->meters, ctx->meter_count, ctx->meter_cap, struct mkgui_meter_data);
+			if(ctx->meter_count < ctx->meter_cap) {
+				struct mkgui_meter_data *md = &ctx->meters[ctx->meter_count++];
+				memset(md, 0, sizeof(*md));
+				md->widget_id = w->id;
+				md->max_val = 100;
+				md->zone_t1 = 75;
+				md->zone_t2 = 90;
+				md->zone_c1 = 0xff44cc44;
+				md->zone_c2 = 0xffffcc00;
+				md->zone_c3 = 0xffff4444;
+			}
+		} break;
+
 		case MKGUI_TEXTAREA: {
 			MKGUI_AUX_GROW(ctx->textareas, ctx->textarea_count, ctx->textarea_cap, struct mkgui_textarea_data);
 			if(ctx->textarea_count < ctx->textarea_cap) {
@@ -2698,6 +2732,18 @@ static void mkgui_remove_aux_(struct mkgui_ctx *ctx, uint32_t id, uint32_t type)
 			}
 		} break;
 
+		case MKGUI_METER: {
+			for(uint32_t i = 0; i < ctx->meter_count; ++i) {
+				if(ctx->meters[i].widget_id == id) {
+					if(i < ctx->meter_count - 1) {
+						ctx->meters[i] = ctx->meters[ctx->meter_count - 1];
+					}
+					--ctx->meter_count;
+					break;
+				}
+			}
+		} break;
+
 		case MKGUI_TEXTAREA: {
 			for(uint32_t i = 0; i < ctx->textarea_count; ++i) {
 				if(ctx->textareas[i].widget_id == id) {
@@ -2968,6 +3014,8 @@ static uint32_t mkgui_alloc_arrays(struct mkgui_ctx *ctx, uint32_t widget_cap) {
 	ctx->spinboxes = (struct mkgui_spinbox_data *)calloc(ctx->spinbox_cap, sizeof(struct mkgui_spinbox_data));
 	ctx->progress_cap = 32;
 	ctx->progress = (struct mkgui_progress_data *)calloc(ctx->progress_cap, sizeof(struct mkgui_progress_data));
+	ctx->meter_cap = 32;
+	ctx->meters = (struct mkgui_meter_data *)calloc(ctx->meter_cap, sizeof(struct mkgui_meter_data));
 	ctx->textarea_cap = 16;
 	ctx->textareas = (struct mkgui_textarea_data *)calloc(ctx->textarea_cap, sizeof(struct mkgui_textarea_data));
 	ctx->itemview_cap = 16;
@@ -3015,6 +3063,7 @@ static void mkgui_free_arrays(struct mkgui_ctx *ctx) {
 	free(ctx->statusbars);
 	free(ctx->spinboxes);
 	free(ctx->progress);
+	free(ctx->meters);
 	free(ctx->textareas);
 	free(ctx->itemviews);
 	free(ctx->scrollbars);

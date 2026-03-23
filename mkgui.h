@@ -114,6 +114,7 @@ enum {
 	MKGUI_DATEPICKER,
 	MKGUI_GRIDVIEW,
 	MKGUI_RICHLIST,
+	MKGUI_METER,
 };
 
 // ---------------------------------------------------------------------------
@@ -156,6 +157,7 @@ enum {
 #define MKGUI_TOOLBAR_MODE_MASK    (3u << 28)
 #define MKGUI_VERTICAL             (1u << 30)
 #define MKGUI_TRUNCATE             (1u << 31)
+#define MKGUI_METER_TEXT           (1u << 19)
 
 // ---------------------------------------------------------------------------
 // Event types
@@ -538,6 +540,17 @@ MKGUI_API int32_t mkgui_progress_get(struct mkgui_ctx *ctx, uint32_t id);
 MKGUI_API void mkgui_progress_set_range(struct mkgui_ctx *ctx, uint32_t id, int32_t max_val);
 MKGUI_API void mkgui_progress_get_range(struct mkgui_ctx *ctx, uint32_t id, int32_t *max_val);
 MKGUI_API void mkgui_progress_set_color(struct mkgui_ctx *ctx, uint32_t id, uint32_t color);
+
+// ---------------------------------------------------------------------------
+// Meter
+// ---------------------------------------------------------------------------
+
+MKGUI_API void mkgui_meter_setup(struct mkgui_ctx *ctx, uint32_t id, int32_t max_val);
+MKGUI_API void mkgui_meter_set(struct mkgui_ctx *ctx, uint32_t id, int32_t value);
+MKGUI_API int32_t mkgui_meter_get(struct mkgui_ctx *ctx, uint32_t id);
+MKGUI_API void mkgui_meter_set_range(struct mkgui_ctx *ctx, uint32_t id, int32_t max_val);
+MKGUI_API void mkgui_meter_get_range(struct mkgui_ctx *ctx, uint32_t id, int32_t *max_val);
+MKGUI_API void mkgui_meter_set_zones(struct mkgui_ctx *ctx, uint32_t id, int32_t t1, int32_t t2, uint32_t c1, uint32_t c2, uint32_t c3);
 
 // ---------------------------------------------------------------------------
 // Toggle

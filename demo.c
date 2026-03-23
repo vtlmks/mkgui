@@ -38,6 +38,7 @@ enum {
 	ID_LBL_VOLUME, ID_SLIDER1,
 	ID_GRP_RADIO, ID_RADIO_HBOX, ID_RADIO1, ID_RADIO2, ID_RADIO3,
 	ID_PROG_HBOX, ID_PROG_LBL, ID_PROGRESS1, ID_SPINNER1,
+	ID_METER_HBOX, ID_METER_LBL, ID_METER1,
 	ID_COUNT_HBOX, ID_LBL_COUNT, ID_SPINBOX1,
 	ID_BTN_HBOX, ID_BUTTON1, ID_SPACER1, ID_THEME_CHECK,
 	ID_CTL_RVBOX,
@@ -345,6 +346,10 @@ int main(void) {
 		{ MKGUI_PROGRESS, ID_PROGRESS1, "",                  "", ID_PROG_HBOX, 0, 0, 0, 0, 0, 1 },
 		{ MKGUI_SPINNER,  ID_SPINNER1,  "",                  "", ID_PROG_HBOX, 0, 0, 28, 0, MKGUI_FIXED, 0 },
 
+		{ MKGUI_HBOX,     ID_METER_HBOX,"",                  "", ID_CTL_LVBOX, 0, 0, 0, 28, MKGUI_FIXED, 0 },
+		{ MKGUI_LABEL,    ID_METER_LBL, "Meter:",            "", ID_METER_HBOX, 0, 0, 80, 0, MKGUI_FIXED, 0 },
+		{ MKGUI_METER,    ID_METER1,    "",                  "", ID_METER_HBOX, 0, 0, 0, 0, MKGUI_METER_TEXT, 1 },
+
 		{ MKGUI_HBOX,     ID_COUNT_HBOX,"",                  "", ID_CTL_LVBOX, 0, 0, 0, 24, MKGUI_FIXED, 0 },
 		{ MKGUI_LABEL,    ID_LBL_COUNT, "Count:",            "", ID_COUNT_HBOX, 0, 0, 80, 0, MKGUI_FIXED, 0 },
 		{ MKGUI_SPINBOX,  ID_SPINBOX1,  "",                  "", ID_COUNT_HBOX, 0, 0, 120, 0, MKGUI_FIXED, 0 },
@@ -449,6 +454,8 @@ int main(void) {
 	mkgui_spinbox_setup(ctx, ID_SPINBOX1, 0, 999, 42, 1);
 	mkgui_progress_setup(ctx, ID_PROGRESS1, 100);
 	mkgui_progress_set(ctx, ID_PROGRESS1, 65);
+	mkgui_meter_setup(ctx, ID_METER1, 100);
+	mkgui_meter_set(ctx, ID_METER1, 72);
 
 	mkgui_toggle_set(ctx, ID_TOGGLE1, 1);
 	int32_t today_y, today_m, today_d;

@@ -93,6 +93,7 @@ struct mkgui_widget {
 | `MKGUI_SLIDER` | Horizontal slider. `MKGUI_VERTICAL` for vertical, `MKGUI_SLIDER_MIXER` for tapered volume style with meter. Emits `MKGUI_EVENT_SLIDER_START`, `MKGUI_EVENT_SLIDER_CHANGED`, `MKGUI_EVENT_SLIDER_END`. |
 | `MKGUI_SPINBOX` | Numeric input with +/- buttons. Emits `MKGUI_EVENT_SPINBOX_CHANGED`. Click the text area to type directly, Enter to confirm (clears focus), Escape to cancel editing. |
 | `MKGUI_PROGRESS` | Progress bar with animated shimmer effect. Per-widget color override via `mkgui_progress_set_color`. No events. |
+| `MKGUI_METER` | Level meter with colored zones. `MKGUI_VERTICAL` for vertical, `MKGUI_METER_TEXT` for percentage text. No events. |
 | `MKGUI_SPINNER` | Animated spinning arc indicator. No events, no setup needed. |
 | `MKGUI_LISTVIEW` | Scrollable multi-column list with virtual rows and per-column cell types. Emits `MKGUI_EVENT_LISTVIEW_SELECT`, `_DBLCLICK`, `_SORT`, `_COL_REORDER`, `_REORDER`. |
 | `MKGUI_GRIDVIEW` | Multi-column grid with per-cell checkboxes and resizable columns. Virtual data via callback. Emits `MKGUI_EVENT_GRID_CLICK`, `MKGUI_EVENT_GRID_CHECK`, `_GRIDVIEW_REORDER`. |
@@ -582,6 +583,21 @@ void mkgui_progress_set_color(struct mkgui_ctx *ctx, uint32_t id, uint32_t color
 ```
 
 Renders a filled bar with an animated diagonal shimmer sweep while in progress. The fill color defaults to `theme.accent`. Use `progress_set_color` to override the bar color per-widget; pass `0` to revert to the theme default. The percentage text is centered on the bar. `progress_set_range` changes max at runtime (clamps value).
+
+### Meter
+
+```c
+void mkgui_meter_setup(struct mkgui_ctx *ctx, uint32_t id, int32_t max_val);
+void mkgui_meter_set(struct mkgui_ctx *ctx, uint32_t id, int32_t value);
+int32_t mkgui_meter_get(struct mkgui_ctx *ctx, uint32_t id);
+void mkgui_meter_set_range(struct mkgui_ctx *ctx, uint32_t id, int32_t max_val);
+void mkgui_meter_get_range(struct mkgui_ctx *ctx, uint32_t id, int32_t *max_val);
+void mkgui_meter_set_zones(struct mkgui_ctx *ctx, uint32_t id, int32_t t1, int32_t t2, uint32_t c1, uint32_t c2, uint32_t c3);
+```
+
+Level meter with colored zones showing capacity/usage. The background displays three color zones at fixed thresholds, and a thinner bar on top fills from the start to the current value. The thin bar takes the color of whichever zone the current value falls in. Set `MKGUI_VERTICAL` for a vertical meter (zones bottom-to-top). Set `MKGUI_METER_TEXT` to display a centered percentage.
+
+`meter_setup` initializes with default zone thresholds at 75% and 90% of max, with green/yellow/red colors. `meter_set_zones` overrides thresholds (`t1`, `t2` as absolute values, not percentages) and colors (`c1`, `c2`, `c3` as ARGB). `meter_set_range` changes max at runtime (clamps value).
 
 ### Spinner
 

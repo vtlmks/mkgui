@@ -77,6 +77,7 @@ enum {
 	ED_PROP_FL_VERTICAL,
 	ED_PROP_FL_MIXER,
 	ED_PROP_FL_TRUNCATE,
+	ED_PROP_FL_METER_TEXT,
 	ED_PROP_WEIGHT_LBL, ED_PROP_WEIGHT_SPN,
 	ED_PROP_ALIGN_LBL, ED_PROP_ALIGN_DRP,
 	ED_PROP_ICON_BROWSE,
@@ -129,6 +130,7 @@ static struct ed_palette_entry ed_widgets[] = {
 	{ "ItemView",   MKGUI_ITEMVIEW },
 	{ "Label",      MKGUI_LABEL },
 	{ "Listview",   MKGUI_LISTVIEW },
+	{ "Meter",      MKGUI_METER },
 	{ "Pathbar",    MKGUI_PATHBAR },
 	{ "Progress",   MKGUI_PROGRESS },
 	{ "Radio",      MKGUI_RADIO },
@@ -660,6 +662,7 @@ static struct ed_help_entry ed_help[] = {
 	{ MKGUI_ITEMVIEW,  "Multi-mode item view: icons, thumbnails, compact list, or detail. Uses callbacks for labels and icons." },
 	{ MKGUI_LABEL,     "Static text display. Not interactive. Use mkgui_label_set() to change text at runtime." },
 	{ MKGUI_LISTVIEW,  "Scrollable multi-column list. Fully virtual (callback provides data). Supports sorting, column reorder, row drag." },
+	{ MKGUI_METER,     "Level meter with colored zones (green/yellow/red). MKGUI_VERTICAL for vertical, MKGUI_METER_TEXT for percentage. Set zones with mkgui_meter_set_zones()." },
 	{ MKGUI_PROGRESS,  "Progress bar with animated shimmer. Set value/max with mkgui_progress_set(). No user interaction." },
 	{ MKGUI_RADIO,     "Radio button. Mutually exclusive within the same parent container. Clicking one unchecks siblings." },
 	{ MKGUI_SCROLLBAR, "Standalone scrollbar. Horizontal by default, set MKGUI_VERTICAL for vertical. Emits scroll events." },
@@ -846,6 +849,7 @@ enum {
 	ED_VIS_SLIDER      = (1 << 11),
 	ED_VIS_SLIDER_ONLY = (1 << 12),
 	ED_VIS_LABEL       = (1 << 13),
+	ED_VIS_METER       = (1 << 14),
 };
 
 enum {
@@ -916,6 +920,7 @@ static struct ed_prop_desc ed_props[] = {
 	{ ED_PK_FLAG,          "Vertical",       offsetof(struct ed_widget, flags),         MKGUI_VERTICAL,     0,      0,    ED_VIS_SLIDER,    ED_ACT_NONE,         ED_PROP_FL_VERTICAL,  0,                   0,                 0 },
 	{ ED_PK_FLAG,          "Mixer",          offsetof(struct ed_widget, flags),         MKGUI_SLIDER_MIXER, 0,      0,    ED_VIS_SLIDER_ONLY,ED_ACT_NONE,        ED_PROP_FL_MIXER,     0,                   0,                 0 },
 	{ ED_PK_FLAG,          "Truncate",       offsetof(struct ed_widget, flags),         MKGUI_TRUNCATE,     0,      0,    ED_VIS_LABEL,      ED_ACT_NONE,        ED_PROP_FL_TRUNCATE,  0,                   0,                 0 },
+	{ ED_PK_FLAG,          "Show %",         offsetof(struct ed_widget, flags),         MKGUI_METER_TEXT,   0,      0,    ED_VIS_METER,      ED_ACT_NONE,        ED_PROP_FL_METER_TEXT, 0,                   0,                 0 },
 	{ ED_PK_MENU_TREE,     "",                0,                                        0,                  0,      0,    ED_VIS_MENU,      ED_ACT_NONE,         ED_MENU_TREE,         0,                   0,                 0 },
 };
 #define ED_PROP_COUNT (sizeof(ed_props) / sizeof(ed_props[0]))
@@ -944,11 +949,14 @@ static uint32_t ed_compute_vis_mask(struct ed_widget *w) {
 	if(w->type == MKGUI_INPUT || w->type == MKGUI_TEXTAREA) {
 		mask |= ED_VIS_INPUT;
 	}
-	if(w->type == MKGUI_SLIDER || w->type == MKGUI_SCROLLBAR) {
+	if(w->type == MKGUI_SLIDER || w->type == MKGUI_SCROLLBAR || w->type == MKGUI_METER) {
 		mask |= ED_VIS_SLIDER;
 	}
 	if(w->type == MKGUI_SLIDER) {
 		mask |= ED_VIS_SLIDER_ONLY;
+	}
+	if(w->type == MKGUI_METER) {
+		mask |= ED_VIS_METER;
 	}
 	if(w->type == MKGUI_LABEL) {
 		mask |= ED_VIS_LABEL;
@@ -1266,6 +1274,7 @@ static void ed_gen_id_name(struct ed_widget *w) {
 		case MKGUI_TOOLBAR:    { prefix = "ID_TOOLBAR"; } break;
 		case MKGUI_RADIO:      { prefix = "ID_RADIO"; } break;
 		case MKGUI_PROGRESS:   { prefix = "ID_PROGRESS"; } break;
+		case MKGUI_METER:      { prefix = "ID_METER"; } break;
 		case MKGUI_TEXTAREA:   { prefix = "ID_TEXTAREA"; } break;
 		case MKGUI_SPINBOX:    { prefix = "ID_SPINBOX"; } break;
 		case MKGUI_GROUP:      { prefix = "ID_GROUP"; } break;
@@ -1426,6 +1435,11 @@ static int32_t ed_add_widget(uint32_t type, int32_t x, int32_t y) {
 		} break;
 
 		case MKGUI_PROGRESS: {
+			w->w = 200;
+			w->h = 20;
+		} break;
+
+		case MKGUI_METER: {
 			w->w = 200;
 			w->h = 20;
 		} break;
@@ -2053,6 +2067,24 @@ static void ed_draw_widget(struct mkgui_ctx *ctx, uint32_t idx) {
 			int32_t fill_w = (rw - 2) / 2;
 			int32_t fill_r = ctx->theme.corner_radius > 1 ? ctx->theme.corner_radius - 1 : 0;
 			draw_rounded_rect_fill(buf, bw, bh, rx + 1, ry + 1, fill_w, rh - 2, ctx->theme.accent, fill_r);
+		} break;
+
+		case MKGUI_METER: {
+			draw_patch(ctx, MKGUI_STYLE_SUNKEN, rx, ry, rw, rh, ctx->theme.input_bg, ctx->theme.widget_border);
+			int32_t iw = rw - 2;
+			int32_t ih = rh - 2;
+			int32_t z1 = iw * 75 / 100;
+			int32_t z2 = iw * 90 / 100;
+			draw_rect_fill(buf, bw, bh, rx + 1, ry + 1, z1, ih, 0xff44cc44);
+			draw_rect_fill(buf, bw, bh, rx + 1 + z1, ry + 1, z2 - z1, ih, 0xffffcc00);
+			draw_rect_fill(buf, bw, bh, rx + 1 + z2, ry + 1, iw - z2, ih, 0xffff4444);
+			int32_t bar_h = ih * 6 / 10;
+			if(bar_h < 3) {
+				bar_h = 3;
+			}
+			int32_t bar_y = ry + 1 + (ih - bar_h) / 2;
+			int32_t fill_w_m = iw / 2;
+			draw_rect_fill(buf, bw, bh, rx + 1, bar_y, fill_w_m, bar_h, 0xff44cc44);
 		} break;
 
 		case MKGUI_TABS: {
@@ -3875,6 +3907,7 @@ static const char *ed_type_name_upper(uint32_t type) {
 		case MKGUI_SPINBOX:    { return "MKGUI_SPINBOX"; }
 		case MKGUI_RADIO:      { return "MKGUI_RADIO"; }
 		case MKGUI_PROGRESS:   { return "MKGUI_PROGRESS"; }
+		case MKGUI_METER:      { return "MKGUI_METER"; }
 		case MKGUI_TEXTAREA:   { return "MKGUI_TEXTAREA"; }
 		case MKGUI_GROUP:      { return "MKGUI_GROUP"; }
 		case MKGUI_SPINNER:    { return "MKGUI_SPINNER"; }
@@ -3900,7 +3933,7 @@ static const char *ed_type_name_upper(uint32_t type) {
 }
 
 // [=]===^=[ ed_flags_to_str ]=====================================[=]
-static const char *ed_flags_to_str(uint32_t flags, char *buf, uint32_t buf_size) {
+static const char *ed_flags_to_str(uint32_t flags, uint32_t widget_type, char *buf, uint32_t buf_size) {
 	if(flags == 0) {
 		return "0";
 	}
@@ -3931,7 +3964,6 @@ static const char *ed_flags_to_str(uint32_t flags, char *buf, uint32_t buf_size)
 		{ MKGUI_TAB_CLOSABLE,    "MKGUI_TAB_CLOSABLE" },
 		{ MKGUI_MULTI_SELECT,    "MKGUI_MULTI_SELECT" },
 		{ MKGUI_FIXED,           "MKGUI_FIXED" },
-		{ MKGUI_SLIDER_MIXER,    "MKGUI_SLIDER_MIXER" },
 		{ MKGUI_VERTICAL,        "MKGUI_VERTICAL" },
 		{ MKGUI_TRUNCATE,        "MKGUI_TRUNCATE" },
 	};
@@ -3948,6 +3980,15 @@ static const char *ed_flags_to_str(uint32_t flags, char *buf, uint32_t buf_size)
 			pos += (uint32_t)snprintf(buf + pos, buf_size - pos, "%s", single_bits[i].name);
 			remaining &= ~single_bits[i].bit;
 		}
+	}
+
+	if(flags & MKGUI_SLIDER_MIXER) {
+		const char *name = (widget_type == MKGUI_METER) ? "MKGUI_METER_TEXT" : "MKGUI_SLIDER_MIXER";
+		if(pos > 0) {
+			pos += (uint32_t)snprintf(buf + pos, buf_size - pos, " | ");
+		}
+		pos += (uint32_t)snprintf(buf + pos, buf_size - pos, "%s", name);
+		remaining &= ~MKGUI_SLIDER_MIXER;
 	}
 
 	uint32_t align = flags & MKGUI_ALIGN_MASK;
@@ -4073,7 +4114,7 @@ static void ed_generate_code(struct mkgui_ctx *ctx) {
 		char flag_buf[512];
 		fprintf(f, "\t\t{ %s, %s, \"%s\", \"%s\", %s, %d, %d, %d, %d, %s, %u },\n",
 			ed_type_name_upper(w->type), w->id_name, w->label, w->icon,
-			parent_name, lx, ly, lw, lh, ed_flags_to_str(w->flags, flag_buf, sizeof(flag_buf)), w->weight);
+			parent_name, lx, ly, lw, lh, ed_flags_to_str(w->flags, w->type, flag_buf, sizeof(flag_buf)), w->weight);
 	}
 	fprintf(f, "\t};\n\n");
 
@@ -4145,6 +4186,9 @@ static void ed_generate_code(struct mkgui_ctx *ctx) {
 
 		} else if(w->type == MKGUI_PROGRESS) {
 			fprintf(f, "\tmkgui_progress_setup(ctx, %s, 100);\n", w->id_name);
+
+		} else if(w->type == MKGUI_METER) {
+			fprintf(f, "\tmkgui_meter_setup(ctx, %s, 100);\n", w->id_name);
 
 		} else if(w->type == MKGUI_ITEMVIEW) {
 			fprintf(f, "\tmkgui_itemview_setup(ctx, %s, 0, MKGUI_VIEW_ICON, %s_label_cb, %s_icon_cb, NULL);\n", w->id_name, w->id_name, w->id_name);
@@ -4475,6 +4519,11 @@ static void ed_test_gui(struct mkgui_ctx *editor_ctx) {
 				mkgui_progress_set(test, ew->id, 50);
 			} break;
 
+			case MKGUI_METER: {
+				mkgui_meter_setup(test, ew->id, 100);
+				mkgui_meter_set(test, ew->id, 50);
+			} break;
+
 			case MKGUI_PATHBAR: {
 				mkgui_pathbar_set(test, ew->id, "/home/user/documents");
 			} break;
@@ -4656,6 +4705,7 @@ int main(void) {
 		{ MKGUI_CHECKBOX, ED_PROP_FL_VERTICAL, "Vertical",      "", ED_PROP_FL_COL0, 0, 0, 0, 20, MKGUI_FIXED, 0 },
 		{ MKGUI_CHECKBOX, ED_PROP_FL_MIXER,    "Mixer",         "", ED_PROP_FL_COL1, 0, 0, 0, 20, MKGUI_FIXED, 0 },
 		{ MKGUI_CHECKBOX, ED_PROP_FL_TRUNCATE, "Truncate",      "", ED_PROP_FL_COL2, 0, 0, 0, 20, MKGUI_FIXED, 0 },
+		{ MKGUI_CHECKBOX, ED_PROP_FL_METER_TEXT,"Show %",       "", ED_PROP_FL_COL3, 0, 0, 0, 20, MKGUI_FIXED, 0 },
 
 		/* Cross-axis alignment (visible when parent is HBOX/VBOX) */
 		{ MKGUI_LABEL,    ED_PROP_ALIGN_LBL,  "Align:",         "", ED_PROP_VBOX, 0, 0, 0, 24, MKGUI_HIDDEN | MKGUI_FIXED, 0 },
