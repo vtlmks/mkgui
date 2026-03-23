@@ -336,6 +336,30 @@ static void platform_wait_event(struct mkgui_ctx *ctx, int32_t timeout_ms) {
 	}
 }
 
+// [=]===^=[ platform_wait_timeout ]================================[=]
+static void platform_wait_timeout(struct mkgui_ctx *ctx, int32_t timeout_ms) {
+	if(timeout_ms <= 0) {
+		return;
+	}
+	struct pollfd pfds[MKGUI_MAX_TIMERS];
+	uint32_t nfds = 0;
+	for(uint32_t i = 0; i < ctx->timer_count; ++i) {
+		if(ctx->timers[i].active && ctx->timers[i].fd >= 0) {
+			pfds[nfds].fd = ctx->timers[i].fd;
+			pfds[nfds].events = POLLIN;
+			++nfds;
+		}
+	}
+	if(nfds > 0) {
+		poll(pfds, nfds, timeout_ms);
+	} else {
+		struct timespec ts;
+		ts.tv_sec = timeout_ms / 1000;
+		ts.tv_nsec = (long)(timeout_ms % 1000) * 1000000L;
+		nanosleep(&ts, NULL);
+	}
+}
+
 // [=]===^=[ platform_deferred_push ]==============================[=]
 static void platform_deferred_push(struct mkgui_ctx *ctx, struct mkgui_plat_event *pev) {
 	uint32_t next = (ctx->plat.deferred_head + 1) % MKGUI_DEFERRED_SIZE;

@@ -528,6 +528,25 @@ static void platform_wait_event(struct mkgui_ctx *ctx, int32_t timeout_ms) {
 	MsgWaitForMultipleObjects(handle_count, handle_count ? handles : NULL, FALSE, (DWORD)timeout_ms, QS_ALLINPUT);
 }
 
+// [=]===^=[ platform_wait_timeout ]================================[=]
+static void platform_wait_timeout(struct mkgui_ctx *ctx, int32_t timeout_ms) {
+	if(timeout_ms <= 0) {
+		return;
+	}
+	HANDLE handles[MKGUI_MAX_TIMERS];
+	DWORD handle_count = 0;
+	for(uint32_t i = 0; i < ctx->timer_count; ++i) {
+		if(ctx->timers[i].active && ctx->timers[i].handle) {
+			handles[handle_count++] = ctx->timers[i].handle;
+		}
+	}
+	if(handle_count > 0) {
+		WaitForMultipleObjects(handle_count, handles, FALSE, (DWORD)timeout_ms);
+	} else {
+		Sleep((DWORD)timeout_ms);
+	}
+}
+
 // [=]===^=[ platform_pending ]====================================[=]
 static uint32_t platform_pending(struct mkgui_ctx *ctx) {
 	platform_pump_messages();
