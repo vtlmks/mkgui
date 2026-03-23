@@ -19,7 +19,6 @@
 #define ED_PALETTE_H      (36 + ED_PAL_ROWS * 22 + (ED_PAL_ROWS - 1) * MKGUI_BOX_GAP)
 #define ED_CTN_ROWS       ((ED_CONTAINER_COUNT + 1) / 2)
 #define ED_CTN_H          (36 + ED_CTN_ROWS * 22 + (ED_CTN_ROWS - 1) * MKGUI_BOX_GAP)
-#define ED_TOP_H          (MKGUI_MENU_HEIGHT + MKGUI_TOOLBAR_HEIGHT_DEFAULT)
 #define ED_BOT_H          MKGUI_STATUSBAR_HEIGHT
 #define ED_PROP_FORM_H    (6 * 24 + 5 * MKGUI_BOX_GAP)
 #define ED_PROP_FL_H      (4 * 20 + 3 * MKGUI_BOX_GAP)
@@ -34,26 +33,26 @@ enum {
 	ED_MI_NEW, ED_MI_OPEN, ED_MI_SAVE, ED_MI_SAVEAS, ED_MI_RECENT, ED_MI_GENERATE, ED_MI_SNIPPET, ED_MI_EXIT,
 	ED_MI_UNDO, ED_MI_REDO, ED_MI_COPY, ED_MI_PASTE, ED_MI_DELETE,
 	ED_MI_SEP1, ED_MI_SEP2, ED_MI_SEP3, ED_MI_SEP4,
-	ED_TOOLBAR = 20,
+	ED_TOOLBAR,
 	ED_TB_NEW, ED_TB_OPEN, ED_TB_SAVE, ED_TB_SEP1, ED_TB_GEN, ED_TB_TEST,
 	ED_TB_SEP2, ED_TB_UNDO, ED_TB_REDO,
-	ED_SPLIT_MAIN = 30,
-	ED_SPLIT_RIGHT = 31,
-	ED_TREE = 32,
-	ED_CANVAS_LBL = 33,
-	ED_RIGHT_PANEL = 34,
-	ED_PAL_GROUP = 40,
-	ED_PAL_FIRST = 41,
-	ED_PAL_HBOX = 70,
-	ED_PAL_COL0 = 71,
-	ED_PAL_COL1 = 72,
-	ED_CTN_GROUP = 73,
-	ED_CTN_HBOX = 74,
-	ED_CTN_COL0 = 75,
-	ED_CTN_COL1 = 76,
+	ED_SPLIT_MAIN,
+	ED_SPLIT_RIGHT,
+	ED_TREE,
+	ED_CANVAS_LBL,
+	ED_RIGHT_PANEL,
+	ED_PAL_GROUP = 50,
+	ED_PAL_FIRST = 51,
+	ED_PAL_HBOX = 80,
+	ED_PAL_COL0 = 81,
+	ED_PAL_COL1 = 82,
+	ED_CTN_GROUP = 83,
+	ED_CTN_HBOX = 84,
+	ED_CTN_COL0 = 85,
+	ED_CTN_COL1 = 86,
 	ED_CTN_FIRST = 200,
-	ED_PROP_GROUP = 80,
-	ED_PROP_TYPE_LBL = 81, ED_PROP_TYPE_VAL,
+	ED_PROP_GROUP = 90,
+	ED_PROP_TYPE_LBL, ED_PROP_TYPE_VAL,
 	ED_PROP_ID_LBL, ED_PROP_ID_INP,
 	ED_PROP_LABEL_LBL, ED_PROP_LABEL_INP,
 	ED_PROP_ICON_LBL, ED_PROP_ICON_INP,
@@ -4594,9 +4593,9 @@ int main(void) {
 		{ MKGUI_MENU,     ED_MENU,        "",                 "", ED_WINDOW,  0, 0, 0, 0, 0, 0 },
 		{ MKGUI_MENUITEM, ED_FILE_MENU,   "File",             "", ED_MENU,    0, 0, 0, 0, 0, 0 },
 		{ MKGUI_MENUITEM, ED_EDIT_MENU,   "Edit",             "", ED_MENU,    0, 0, 0, 0, 0, 0 },
-		{ MKGUI_MENUITEM, ED_MI_NEW,      "New",              "document-new",  ED_FILE_MENU, 0, 0, 0, 0, 0, 0 },
-		{ MKGUI_MENUITEM, ED_MI_OPEN,     "Open",             "document-open", ED_FILE_MENU, 0, 0, 0, 0, 0, 0 },
-		{ MKGUI_MENUITEM, ED_MI_SAVE,     "Save",             "document-save", ED_FILE_MENU, 0, 0, 0, 0, 0, 0 },
+		{ MKGUI_MENUITEM, ED_MI_NEW,      "New",              "file-plus",  ED_FILE_MENU, 0, 0, 0, 0, 0, 0 },
+		{ MKGUI_MENUITEM, ED_MI_OPEN,     "Open",             "folder-open", ED_FILE_MENU, 0, 0, 0, 0, 0, 0 },
+		{ MKGUI_MENUITEM, ED_MI_SAVE,     "Save",             "content-save", ED_FILE_MENU, 0, 0, 0, 0, 0, 0 },
 		{ MKGUI_MENUITEM, ED_MI_SAVEAS,   "Save As...",       "", ED_FILE_MENU, 0, 0, 0, 0, 0, 0 },
 		{ MKGUI_MENUITEM, ED_MI_SEP1,     "",                 "", ED_FILE_MENU, 0, 0, 0, 0, MKGUI_SEPARATOR, 0 },
 		{ MKGUI_MENUITEM, ED_MI_RECENT,   "Recent Files",     "", ED_FILE_MENU, 0, 0, 0, 0, 0, 0 },
@@ -4614,22 +4613,22 @@ int main(void) {
 		{ MKGUI_MENUITEM, ED_MI_GENERATE, "Generate Code",    "", ED_FILE_MENU, 0, 0, 0, 0, 0, 0 },
 		{ MKGUI_MENUITEM, ED_MI_SNIPPET,  "Generate Snippet", "", ED_FILE_MENU, 0, 0, 0, 0, 0, 0 },
 		{ MKGUI_MENUITEM, ED_MI_SEP3,     "",                 "", ED_FILE_MENU, 0, 0, 0, 0, MKGUI_SEPARATOR, 0 },
-		{ MKGUI_MENUITEM, ED_MI_EXIT,     "Exit",             "application-exit", ED_FILE_MENU, 0, 0, 0, 0, 0, 0 },
-		{ MKGUI_MENUITEM, ED_MI_UNDO,     "Undo",             "edit-undo", ED_EDIT_MENU, 0, 0, 0, 0, 0, 0 },
-		{ MKGUI_MENUITEM, ED_MI_REDO,     "Redo",             "edit-redo", ED_EDIT_MENU, 0, 0, 0, 0, 0, 0 },
+		{ MKGUI_MENUITEM, ED_MI_EXIT,     "Exit",             "exit-to-app", ED_FILE_MENU, 0, 0, 0, 0, 0, 0 },
+		{ MKGUI_MENUITEM, ED_MI_UNDO,     "Undo",             "undo-variant", ED_EDIT_MENU, 0, 0, 0, 0, 0, 0 },
+		{ MKGUI_MENUITEM, ED_MI_REDO,     "Redo",             "redo-variant", ED_EDIT_MENU, 0, 0, 0, 0, 0, 0 },
 		{ MKGUI_MENUITEM, ED_MI_SEP4,     "",                 "", ED_EDIT_MENU, 0, 0, 0, 0, MKGUI_SEPARATOR, 0 },
-		{ MKGUI_MENUITEM, ED_MI_DELETE,   "Delete",           "edit-delete", ED_EDIT_MENU, 0, 0, 0, 0, 0, 0 },
+		{ MKGUI_MENUITEM, ED_MI_DELETE,   "Delete",           "delete", ED_EDIT_MENU, 0, 0, 0, 0, 0, 0 },
 
 		{ MKGUI_TOOLBAR,  ED_TOOLBAR,     "",                 "", ED_WINDOW,  0, 0, 0, 0, 0, 0 },
-		{ MKGUI_BUTTON,   ED_TB_NEW,      "New",              "document-new",  ED_TOOLBAR, 0, 0, 0, 0, 0, 0 },
-		{ MKGUI_BUTTON,   ED_TB_OPEN,     "Open",             "document-open", ED_TOOLBAR, 0, 0, 0, 0, 0, 0 },
-		{ MKGUI_BUTTON,   ED_TB_SAVE,     "Save",             "document-save", ED_TOOLBAR, 0, 0, 0, 0, 0, 0 },
+		{ MKGUI_BUTTON,   ED_TB_NEW,      "New",              "file-plus",  ED_TOOLBAR, 0, 0, 0, 0, 0, 0 },
+		{ MKGUI_BUTTON,   ED_TB_OPEN,     "Open",             "folder-open", ED_TOOLBAR, 0, 0, 0, 0, 0, 0 },
+		{ MKGUI_BUTTON,   ED_TB_SAVE,     "Save",             "content-save", ED_TOOLBAR, 0, 0, 0, 0, 0, 0 },
 		{ MKGUI_BUTTON,   ED_TB_SEP1,     "",                 "", ED_TOOLBAR, 0, 0, 0, 0, MKGUI_SEPARATOR, 0 },
-		{ MKGUI_BUTTON,   ED_TB_GEN,      "Gen",              "", ED_TOOLBAR, 0, 0, 0, 0, 0, 0 },
-		{ MKGUI_BUTTON,   ED_TB_TEST,     "Test",             "", ED_TOOLBAR, 0, 0, 0, 0, 0, 0 },
+		{ MKGUI_BUTTON,   ED_TB_GEN,      "Gen",              "code-json", ED_TOOLBAR, 0, 0, 0, 0, 0, 0 },
+		{ MKGUI_BUTTON,   ED_TB_TEST,     "Test",             "play", ED_TOOLBAR, 0, 0, 0, 0, 0, 0 },
 		{ MKGUI_BUTTON,   ED_TB_SEP2,     "",                 "", ED_TOOLBAR, 0, 0, 0, 0, MKGUI_SEPARATOR, 0 },
-		{ MKGUI_BUTTON,   ED_TB_UNDO,     "Undo",             "edit-undo", ED_TOOLBAR, 0, 0, 0, 0, 0, 0 },
-		{ MKGUI_BUTTON,   ED_TB_REDO,     "Redo",             "edit-redo", ED_TOOLBAR, 0, 0, 0, 0, 0, 0 },
+		{ MKGUI_BUTTON,   ED_TB_UNDO,     "Undo",             "undo-variant", ED_TOOLBAR, 0, 0, 0, 0, 0, 0 },
+		{ MKGUI_BUTTON,   ED_TB_REDO,     "Redo",             "redo-variant", ED_TOOLBAR, 0, 0, 0, 0, 0, 0 },
 
 		{ MKGUI_VSPLIT, ED_SPLIT_MAIN, "",              "", ED_WINDOW,  0, 0, 0, 0, MKGUI_ANCHOR_LEFT | MKGUI_ANCHOR_TOP | MKGUI_ANCHOR_RIGHT | MKGUI_ANCHOR_BOTTOM, 0 },
 		{ MKGUI_TREEVIEW, ED_TREE,        "",                 "", ED_SPLIT_MAIN, 0, 0, 0, 0, MKGUI_REGION_LEFT, 0 },
@@ -4819,6 +4818,7 @@ int main(void) {
 		sd_right->ratio = 1.0f - (float)ED_RIGHT_W / (1280.0f - ED_LEFT_W - MKGUI_SPLIT_THICK);
 	}
 
+	mkgui_toolbar_set_mode(ctx, ED_TOOLBAR, MKGUI_TOOLBAR_ICONS_ONLY);
 	mkgui_canvas_set_callback(ctx, ED_CANVAS_LBL, ed_render_canvas, NULL);
 	ctx->render_cb = ed_render_help_popup;
 
