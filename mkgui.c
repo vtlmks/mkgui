@@ -5893,7 +5893,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 
 // [=]===^=[ mkgui_wait ]=========================================[=]
 MKGUI_API void mkgui_wait(struct mkgui_ctx *ctx) {
-	if(platform_pending(ctx) || ctx->close_requested || ctx->dirty) {
+	if(platform_pending(ctx) || ctx->close_requested) {
 		return;
 	}
 	if(ctx->poll_timeout_ms == 0) {
@@ -5901,6 +5901,9 @@ MKGUI_API void mkgui_wait(struct mkgui_ctx *ctx) {
 	}
 	if(ctx->poll_timeout_ms > 0) {
 		platform_wait_event(ctx, ctx->poll_timeout_ms);
+		return;
+	}
+	if(ctx->dirty) {
 		return;
 	}
 	uint32_t any_anim = ctx->anim_active;
