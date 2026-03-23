@@ -123,7 +123,6 @@ static struct ed_palette_entry ed_widgets[] = {
 	{ "Dropdown",   MKGUI_DROPDOWN },
 	{ "GLView",     MKGUI_GLVIEW },
 	{ "Gridview",   MKGUI_GRIDVIEW },
-	{ "RichList",   MKGUI_RICHLIST },
 	{ "Image",      MKGUI_IMAGE },
 	{ "Input",      MKGUI_INPUT },
 	{ "IPInput",    MKGUI_IPINPUT },
@@ -134,6 +133,7 @@ static struct ed_palette_entry ed_widgets[] = {
 	{ "Pathbar",    MKGUI_PATHBAR },
 	{ "Progress",   MKGUI_PROGRESS },
 	{ "Radio",      MKGUI_RADIO },
+	{ "RichList",   MKGUI_RICHLIST },
 	{ "Scrollbar",  MKGUI_SCROLLBAR },
 	{ "Slider",     MKGUI_SLIDER },
 	{ "Spacer",     MKGUI_SPACER },
@@ -2182,18 +2182,34 @@ static void ed_draw_widget(struct mkgui_ctx *ctx, uint32_t idx) {
 			draw_patch(ctx, MKGUI_STYLE_SUNKEN, rx, ry, rw, rh, ctx->theme.input_bg, ctx->theme.widget_border);
 			int32_t rl_rh = 56;
 			uint32_t rl_sep = blend_pixel(ctx->theme.input_bg, ctx->theme.widget_border, 60);
+			int32_t rl_cx1 = rx + 1;
+			int32_t rl_cy1 = ry + 1;
+			int32_t rl_cx2 = rx + rw - 1;
+			int32_t rl_cy2 = ry + rh - 1;
+			int32_t prev_cx1 = render_clip_x1;
+			int32_t prev_cy1 = render_clip_y1;
+			int32_t prev_cx2 = render_clip_x2;
+			int32_t prev_cy2 = render_clip_y2;
+			if(rl_cx1 > render_clip_x1) { render_clip_x1 = rl_cx1; }
+			if(rl_cy1 > render_clip_y1) { render_clip_y1 = rl_cy1; }
+			if(rl_cx2 < render_clip_x2) { render_clip_x2 = rl_cx2; }
+			if(rl_cy2 < render_clip_y2) { render_clip_y2 = rl_cy2; }
 			for(int32_t row_y = ry + 1; row_y < ry + rh - 2; row_y += rl_rh) {
 				int32_t thumb_sz = rl_rh - 8;
 				draw_rect_fill(buf, bw, bh, rx + 5, row_y + 4, thumb_sz, thumb_sz, ctx->theme.listview_alt);
 				draw_rect_border(buf, bw, bh, rx + 5, row_y + 4, thumb_sz, thumb_sz, ctx->theme.widget_border);
 				int32_t txt_x = rx + 5 + thumb_sz + 6;
-				push_text_clip(txt_x, row_y + rl_rh / 2 - ctx->font_height - 1, "Title", ctx->theme.text, rx + 1, ry + 1, rx + rw - 1, ry + rh - 1);
-				push_text_clip(txt_x, row_y + rl_rh / 2 + 2, "Subtitle", ctx->theme.text_disabled, rx + 1, ry + 1, rx + rw - 1, ry + rh - 1);
+				push_text_clip(txt_x, row_y + rl_rh / 2 - ctx->font_height - 1, "Title", ctx->theme.text, rl_cx1, rl_cy1, rl_cx2, rl_cy2);
+				push_text_clip(txt_x, row_y + rl_rh / 2 + 2, "Subtitle", ctx->theme.text_disabled, rl_cx1, rl_cy1, rl_cx2, rl_cy2);
 				int32_t sep_y = row_y + rl_rh - 1;
 				if(sep_y < ry + rh - 2) {
 					draw_hline(buf, bw, bh, rx + 1, sep_y, rw - 2, rl_sep);
 				}
 			}
+			render_clip_x1 = prev_cx1;
+			render_clip_y1 = prev_cy1;
+			render_clip_x2 = prev_cx2;
+			render_clip_y2 = prev_cy2;
 		} break;
 
 		case MKGUI_TREEVIEW: {
