@@ -92,7 +92,7 @@ struct mkgui_widget {
 | `MKGUI_DROPDOWN` | Drop-down selector. Emits `MKGUI_EVENT_DROPDOWN_CHANGED`. |
 | `MKGUI_SLIDER` | Horizontal slider. `MKGUI_VERTICAL` for vertical, `MKGUI_SLIDER_MIXER` for tapered volume style with meter. Emits `MKGUI_EVENT_SLIDER_START`, `MKGUI_EVENT_SLIDER_CHANGED`, `MKGUI_EVENT_SLIDER_END`. |
 | `MKGUI_SPINBOX` | Numeric input with +/- buttons. Emits `MKGUI_EVENT_SPINBOX_CHANGED`. Click the text area to type directly, Enter to confirm (clears focus), Escape to cancel editing. |
-| `MKGUI_PROGRESS` | Progress bar with animated shimmer effect. No events. |
+| `MKGUI_PROGRESS` | Progress bar with animated shimmer effect. Per-widget color override via `mkgui_progress_set_color`. No events. |
 | `MKGUI_SPINNER` | Animated spinning arc indicator. No events, no setup needed. |
 | `MKGUI_LISTVIEW` | Scrollable multi-column list with virtual rows and per-column cell types. Emits `MKGUI_EVENT_LISTVIEW_SELECT`, `_DBLCLICK`, `_SORT`, `_COL_REORDER`, `_REORDER`. |
 | `MKGUI_GRIDVIEW` | Multi-column grid with per-cell checkboxes and resizable columns. Virtual data via callback. Emits `MKGUI_EVENT_GRID_CLICK`, `MKGUI_EVENT_GRID_CHECK`, `_GRIDVIEW_REORDER`. |
@@ -578,9 +578,10 @@ void mkgui_progress_set(struct mkgui_ctx *ctx, uint32_t id, int32_t value);
 int32_t mkgui_progress_get(struct mkgui_ctx *ctx, uint32_t id);
 void mkgui_progress_set_range(struct mkgui_ctx *ctx, uint32_t id, int32_t max_val);
 void mkgui_progress_get_range(struct mkgui_ctx *ctx, uint32_t id, int32_t *max_val);
+void mkgui_progress_set_color(struct mkgui_ctx *ctx, uint32_t id, uint32_t color);
 ```
 
-Renders a filled bar with an animated diagonal shimmer sweep while in progress. The fill color uses `theme.accent`. The percentage text is centered on the bar. `progress_set_range` changes max at runtime (clamps value).
+Renders a filled bar with an animated diagonal shimmer sweep while in progress. The fill color defaults to `theme.accent`. Use `progress_set_color` to override the bar color per-widget; pass `0` to revert to the theme default. The percentage text is centered on the bar. `progress_set_range` changes max at runtime (clamps value).
 
 ### Spinner
 

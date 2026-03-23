@@ -537,6 +537,7 @@ MKGUI_API void mkgui_progress_set(struct mkgui_ctx *ctx, uint32_t id, int32_t va
 MKGUI_API int32_t mkgui_progress_get(struct mkgui_ctx *ctx, uint32_t id);
 MKGUI_API void mkgui_progress_set_range(struct mkgui_ctx *ctx, uint32_t id, int32_t max_val);
 MKGUI_API void mkgui_progress_get_range(struct mkgui_ctx *ctx, uint32_t id, int32_t *max_val);
+MKGUI_API void mkgui_progress_set_color(struct mkgui_ctx *ctx, uint32_t id, uint32_t color);
 
 // ---------------------------------------------------------------------------
 // Toggle

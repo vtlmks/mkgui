@@ -317,6 +317,7 @@ struct mkgui_progress_data {
 	uint32_t widget_id;
 	int32_t value;
 	int32_t max_val;
+	uint32_t color;
 };
 
 struct mkgui_textarea_data {

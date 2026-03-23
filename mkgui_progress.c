@@ -21,7 +21,8 @@ static void render_progress(struct mkgui_ctx *ctx, uint32_t idx) {
 			fill_w = rw - 2;
 		}
 		int32_t fill_r = ctx->theme.corner_radius > 1 ? ctx->theme.corner_radius - 1 : 0;
-		draw_rounded_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, rx + 1, ry + 1, fill_w, rh - 2, ctx->theme.accent, fill_r);
+		uint32_t bar_color = pd->color ? pd->color : ctx->theme.accent;
+		draw_rounded_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, rx + 1, ry + 1, fill_w, rh - 2, bar_color, fill_r);
 
 		if(pd->value > 0 && pd->value < pd->max_val) {
 			int32_t shimmer_w = fill_w / 4;
@@ -162,5 +163,14 @@ MKGUI_API void mkgui_progress_get_range(struct mkgui_ctx *ctx, uint32_t id, int3
 	struct mkgui_progress_data *pd = find_progress_data(ctx, id);
 	if(max_val) {
 		*max_val = pd ? pd->max_val : 0;
+	}
+}
+
+// [=]===^=[ mkgui_progress_set_color ]=============================[=]
+MKGUI_API void mkgui_progress_set_color(struct mkgui_ctx *ctx, uint32_t id, uint32_t color) {
+	struct mkgui_progress_data *pd = find_progress_data(ctx, id);
+	if(pd) {
+		pd->color = color;
+		dirty_all(ctx);
 	}
 }
