@@ -209,6 +209,23 @@ static LRESULT CALLBACK mkgui_wndproc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 			return 0;
 		} break;
 
+		case WM_ENTERSIZEMOVE: {
+			SetTimer(hwnd, 1, 16, NULL);
+			return 0;
+		} break;
+
+		case WM_EXITSIZEMOVE: {
+			KillTimer(hwnd, 1);
+			return 0;
+		} break;
+
+		case WM_TIMER: {
+			if(wp == 1 && pev.popup_idx < 0) {
+				mkgui_resize_render(owner);
+			}
+			return 0;
+		} break;
+
 		case WM_CLOSE: {
 			pev.type = MKGUI_PLAT_CLOSE;
 			evq_push_ctx(&owner->plat, &pev);

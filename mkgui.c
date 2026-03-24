@@ -1758,6 +1758,11 @@ static void window_unregister(struct mkgui_ctx *ctx) {
 // Platform backend
 // ---------------------------------------------------------------------------
 
+static void mkgui_resize_render_impl(struct mkgui_ctx *ctx);
+static void mkgui_resize_render(struct mkgui_ctx *ctx) {
+	mkgui_resize_render_impl(ctx);
+}
+
 #ifdef _WIN32
 #include "platform_win32.c"
 #else
@@ -3422,6 +3427,40 @@ MKGUI_API void mkgui_destroy_child(struct mkgui_ctx *ctx) {
 // ---------------------------------------------------------------------------
 // Event processing
 // ---------------------------------------------------------------------------
+
+// [=]===^=[ mkgui_resize_render_impl ]=============================[=]
+static void mkgui_resize_render_impl(struct mkgui_ctx *ctx) {
+#ifdef _WIN32
+	RECT rc;
+	GetClientRect(ctx->plat.hwnd, &rc);
+	int32_t nw = rc.right - rc.left;
+	int32_t nh = rc.bottom - rc.top;
+	if(nw > 0 && nh > 0 && (nw != ctx->win_w || nh != ctx->win_h)) {
+		ctx->win_w = nw;
+		ctx->win_h = nh;
+		platform_fb_resize(ctx);
+		dirty_all(ctx);
+	}
+#endif
+	if(!ctx->dirty) {
+		return;
+	}
+	layout_widgets(ctx);
+	glview_sync_all(ctx);
+	render_widgets(ctx);
+	if(ctx->render_cb) {
+		flush_text(ctx);
+		ctx->render_cb(ctx, ctx->render_cb_data);
+	}
+	flush_text(ctx);
+	render_tooltip(ctx);
+	flush_text(ctx);
+	platform_blit(ctx);
+	platform_flush(ctx);
+	ctx->dirty = 0;
+	ctx->dirty_full = 0;
+	ctx->dirty_count = 0;
+}
 
 // [=]===^=[ mkgui_poll ]========================================[=]
 MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
