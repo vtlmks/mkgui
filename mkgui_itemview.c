@@ -861,14 +861,12 @@ static uint32_t handle_itemview_key(struct mkgui_ctx *ctx, struct mkgui_itemview
 				++iv->selected;
 			}
 		} else if(keysym == MKGUI_KEY_LEFT) {
-			iv->selected -= rows_per_col;
-			if(iv->selected < 0) {
-				iv->selected = 0;
+			if(iv->selected >= rows_per_col) {
+				iv->selected -= rows_per_col;
 			}
 		} else if(keysym == MKGUI_KEY_RIGHT) {
-			iv->selected += rows_per_col;
-			if(iv->selected >= (int32_t)iv->item_count) {
-				iv->selected = (int32_t)iv->item_count - 1;
+			if(iv->selected + rows_per_col < (int32_t)iv->item_count) {
+				iv->selected += rows_per_col;
 			}
 		} else if(keysym == MKGUI_KEY_PAGE_UP) {
 			int32_t page = ca_h / ch;
@@ -926,14 +924,12 @@ static uint32_t handle_itemview_key(struct mkgui_ctx *ctx, struct mkgui_itemview
 				++iv->selected;
 			}
 		} else if(keysym == MKGUI_KEY_UP) {
-			iv->selected -= cols;
-			if(iv->selected < 0) {
-				iv->selected = 0;
+			if(iv->selected >= cols) {
+				iv->selected -= cols;
 			}
 		} else if(keysym == MKGUI_KEY_DOWN) {
-			iv->selected += cols;
-			if(iv->selected >= (int32_t)iv->item_count) {
-				iv->selected = (int32_t)iv->item_count - 1;
+			if(iv->selected + cols < (int32_t)iv->item_count) {
+				iv->selected += cols;
 			}
 		} else if(keysym == MKGUI_KEY_HOME) {
 			iv->selected = 0;

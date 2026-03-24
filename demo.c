@@ -480,7 +480,7 @@ static void demo_event(struct mkgui_ctx *ctx, struct mkgui_event *ev, void *user
 		} break;
 
 		case MKGUI_EVENT_CONTEXT: {
-			if(ev->id == ID_LISTVIEW1 || ev->id == ID_GRIDVIEW1 || ev->id == ID_TREEVIEW1 || ev->id == ID_ITEMVIEW1) {
+			if(ev->id == ID_LISTVIEW1 || ev->id == ID_GRIDVIEW1 || ev->id == ID_ITEMVIEW1 || ev->id == ID_RICHLIST1) {
 				mkgui_context_menu_clear(ctx);
 				mkgui_context_menu_add(ctx, ID_CTX_CUT, "Cut", "content-cut", 0);
 				mkgui_context_menu_add(ctx, ID_CTX_COPY, "Copy", "content-copy", 0);
@@ -489,6 +489,11 @@ static void demo_event(struct mkgui_ctx *ctx, struct mkgui_event *ev, void *user
 				mkgui_context_menu_add(ctx, ID_CTX_DELETE, "Delete", "delete", (ev->value < 0) ? MKGUI_DISABLED : 0);
 				mkgui_context_menu_add(ctx, ID_CTX_SELECT_ALL, "Select All", "select-all", 0);
 				mkgui_context_menu_add_separator(ctx);
+				mkgui_context_menu_add(ctx, ID_CTX_PROPERTIES, "Properties", "information-outline", (ev->value < 0) ? MKGUI_DISABLED : 0);
+				mkgui_context_menu_show(ctx);
+
+			} else if(ev->id == ID_TREEVIEW1) {
+				mkgui_context_menu_clear(ctx);
 				mkgui_context_menu_add(ctx, ID_CTX_PROPERTIES, "Properties", "information-outline", (ev->value < 0) ? MKGUI_DISABLED : 0);
 				mkgui_context_menu_show(ctx);
 			}
