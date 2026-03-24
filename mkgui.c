@@ -5993,7 +5993,7 @@ static void mkgui_flush(struct mkgui_ctx *ctx) {
 MKGUI_API void mkgui_wait(struct mkgui_ctx *ctx) {
 	mkgui_flush(ctx);
 
-	if(platform_pending(ctx) || ctx->close_requested) {
+	if(ctx->close_requested) {
 		return;
 	}
 	if(ctx->poll_timeout_ms == 0) {
