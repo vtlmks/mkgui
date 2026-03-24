@@ -121,24 +121,28 @@ static void demo_grid_cb(uint32_t row, uint32_t col, char *buf, uint32_t buf_siz
 	}
 }
 
+static int32_t demo_lv_sort_dir;
+static uint32_t demo_lv_row_count = 1000000;
+
 // [=]===^=[ demo_row_cb ]=======================================[=]
 static void demo_row_cb(uint32_t row, uint32_t col, char *buf, uint32_t buf_size, void *userdata) {
 	(void)userdata;
+	uint32_t r = (demo_lv_sort_dir < 0) ? (demo_lv_row_count - 1 - row) : row;
 	switch(col) {
 		case 0: {
-			snprintf(buf, buf_size, "text-x-generic\tItem %u", row + 1);
+			snprintf(buf, buf_size, "text-x-generic\tItem %u", r + 1);
 		} break;
 
 		case 1: {
-			snprintf(buf, buf_size, "%u", (row + 1) * 1024);
+			snprintf(buf, buf_size, "%u", (r + 1) * 1024);
 		} break;
 
 		case 2: {
-			snprintf(buf, buf_size, "%lld", (long long)(1741900800 - (long long)row * 86400));
+			snprintf(buf, buf_size, "%lld", (long long)(1741900800 - (long long)r * 86400));
 		} break;
 
 		case 3: {
-			snprintf(buf, buf_size, "%u/100", ((row * 7 + 13) % 101));
+			snprintf(buf, buf_size, "%u/100", ((r * 7 + 13) % 101));
 		} break;
 
 		default: {
@@ -467,6 +471,14 @@ static void demo_event(struct mkgui_ctx *ctx, struct mkgui_event *ev, void *user
 		case MKGUI_EVENT_LISTVIEW_SELECT: {
 			snprintf(buf, sizeof(buf), "Selected row: %d", ev->value);
 			mkgui_statusbar_set(ctx, ID_STATUSBAR, 0, buf);
+		} break;
+
+		case MKGUI_EVENT_LISTVIEW_SORT: {
+			if(ev->id == ID_LISTVIEW1) {
+				demo_lv_sort_dir = ev->value;
+				snprintf(buf, sizeof(buf), "Sort column %d %s", ev->col, ev->value > 0 ? "ascending" : "descending");
+				mkgui_statusbar_set(ctx, ID_STATUSBAR, 0, buf);
+			}
 		} break;
 
 		case MKGUI_EVENT_SCROLL: {

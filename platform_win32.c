@@ -240,6 +240,23 @@ static LRESULT CALLBACK mkgui_wndproc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 
 		case WM_TIMER: {
 			if(wp == 1 && pev.popup_idx < 0) {
+				int64_t now;
+				QueryPerformanceCounter((LARGE_INTEGER *)&now);
+				double dt = (double)(now - owner->anim_prev) / (double)owner->perf_freq;
+				owner->anim_prev = now;
+				owner->anim_time += dt;
+				for(uint32_t ti = 0; ti < owner->timer_count; ++ti) {
+					struct mkgui_timer *tmr = &owner->timers[ti];
+					if(tmr->active && tmr->handle && WaitForSingleObject(tmr->handle, 0) == WAIT_OBJECT_0) {
+						++tmr->fire_count;
+						LARGE_INTEGER next;
+						next.QuadPart = tmr->epoch.QuadPart + (int64_t)(tmr->fire_count * (tmr->interval_ns / 100));
+						SetWaitableTimer(tmr->handle, &next, 0, NULL, NULL, FALSE);
+						if(tmr->cb) {
+							tmr->cb(owner, tmr->id, tmr->userdata);
+						}
+					}
+				}
 				mkgui_resize_render(owner);
 			}
 			return 0;
@@ -554,33 +571,28 @@ static void platform_wait_event(struct mkgui_ctx *ctx, int32_t timeout_ms) {
 	if(ctx->plat.evq_head != ctx->plat.evq_tail) {
 		return;
 	}
-	HANDLE handles[MKGUI_MAX_TIMERS];
-	DWORD handle_count = 0;
+	DWORD wait_ms = (DWORD)timeout_ms;
 	for(uint32_t i = 0; i < ctx->timer_count; ++i) {
-		if(ctx->timers[i].active && ctx->timers[i].handle) {
-			handles[handle_count++] = ctx->timers[i].handle;
+		if(ctx->timers[i].active) {
+			DWORD timer_ms = (DWORD)(ctx->timers[i].interval_ns / 1000000);
+			if(timer_ms < 1) {
+				timer_ms = 1;
+			}
+			if(timer_ms < wait_ms) {
+				wait_ms = timer_ms;
+			}
 		}
 	}
-	MsgWaitForMultipleObjects(handle_count, handle_count ? handles : NULL, FALSE, (DWORD)timeout_ms, QS_ALLINPUT);
+	MsgWaitForMultipleObjects(0, NULL, FALSE, wait_ms, QS_ALLINPUT);
 }
 
 // [=]===^=[ platform_wait_timeout ]================================[=]
 static void platform_wait_timeout(struct mkgui_ctx *ctx, int32_t timeout_ms) {
+	(void)ctx;
 	if(timeout_ms <= 0) {
 		return;
 	}
-	HANDLE handles[MKGUI_MAX_TIMERS];
-	DWORD handle_count = 0;
-	for(uint32_t i = 0; i < ctx->timer_count; ++i) {
-		if(ctx->timers[i].active && ctx->timers[i].handle) {
-			handles[handle_count++] = ctx->timers[i].handle;
-		}
-	}
-	if(handle_count > 0) {
-		WaitForMultipleObjects(handle_count, handles, FALSE, (DWORD)timeout_ms);
-	} else {
-		Sleep((DWORD)timeout_ms);
-	}
+	Sleep((DWORD)timeout_ms);
 }
 
 // [=]===^=[ platform_pending ]====================================[=]
@@ -800,9 +812,29 @@ static char *platform_clipboard_get_alloc(struct mkgui_ctx *ctx, uint32_t *out_l
 // GL view child window
 // ---------------------------------------------------------------------------
 
+static uint32_t glview_wc_registered;
+
+// [=]===^=[ glview_wndproc ]======================================[=]
+static LRESULT CALLBACK glview_wndproc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
+	if(msg == WM_ERASEBKGND) {
+		return 1;
+	}
+	return DefWindowProcA(hwnd, msg, wp, lp);
+}
+
 // [=]===^=[ platform_glview_create ]==============================[=]
 static uint32_t platform_glview_create(struct mkgui_ctx *ctx, struct mkgui_glview_data *gv, int32_t x, int32_t y, int32_t w, int32_t h) {
-	gv->plat.hwnd = CreateWindowExA(0, "STATIC", "", WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS,
+	if(!glview_wc_registered) {
+		WNDCLASSEXA wc;
+		memset(&wc, 0, sizeof(wc));
+		wc.cbSize = sizeof(wc);
+		wc.style = CS_OWNDC;
+		wc.lpfnWndProc = glview_wndproc;
+		wc.lpszClassName = "mkgui_glview";
+		RegisterClassExA(&wc);
+		glview_wc_registered = 1;
+	}
+	gv->plat.hwnd = CreateWindowExA(0, "mkgui_glview", "", WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS,
 		x, y, w, h, ctx->plat.hwnd, NULL, GetModuleHandle(NULL), NULL);
 	if(!gv->plat.hwnd) {
 		return 0;

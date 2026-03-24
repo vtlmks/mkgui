@@ -30,6 +30,7 @@
 #define MKGUI_MENU_HEIGHT          22
 #define MKGUI_SCROLLBAR_W          14
 #define MKGUI_SPLIT_THICK          5
+#define MKGUI_SPLIT_MIN_PX        50
 #define MKGUI_BOX_GAP              6
 #define MKGUI_BOX_PAD              6
 #define MKGUI_MARGIN               3

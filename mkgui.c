@@ -3860,6 +3860,25 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 					if(dx < -3 || dx > 3) {
 						dirty_all(ctx);
 					}
+					int32_t lv_idx = find_widget_idx(ctx, ctx->drag_col_id);
+					if(lv_idx >= 0) {
+						struct mkgui_listview_data *lv = find_listv_data(ctx, ctx->drag_col_id);
+						if(lv) {
+							int32_t lx = ctx->rects[lv_idx].x;
+							int32_t lw = ctx->rects[lv_idx].w;
+							int32_t edge = 30;
+							int32_t scroll_step = MKGUI_ROW_HEIGHT * 2;
+							int32_t content_w = lw - 2 - MKGUI_SCROLLBAR_W;
+							if(ctx->mouse_x < lx + edge) {
+								lv->scroll_x -= scroll_step;
+								dirty_all(ctx);
+							} else if(ctx->mouse_x > lx + lw - edge) {
+								lv->scroll_x += scroll_step;
+								dirty_all(ctx);
+							}
+							listview_clamp_scroll_x(lv, content_w);
+						}
+					}
 					break;
 				}
 
@@ -3875,19 +3894,41 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 									int32_t rh = ctx->rects[pi].h;
 									if(rh > 0) {
 										sd->ratio = (float)(ctx->mouse_y - ctx->rects[pi].y) / (float)rh;
+										float min_ratio = (float)MKGUI_SPLIT_MIN_PX / (float)rh;
+										float max_ratio = 1.0f - (float)(MKGUI_SPLIT_MIN_PX + MKGUI_SPLIT_THICK) / (float)rh;
+										if(min_ratio > 0.45f) {
+											min_ratio = 0.45f;
+										}
+										if(max_ratio < 0.55f) {
+											max_ratio = 0.55f;
+										}
+										if(sd->ratio < min_ratio) {
+											sd->ratio = min_ratio;
+										}
+										if(sd->ratio > max_ratio) {
+											sd->ratio = max_ratio;
+										}
 									}
 
 								} else {
 									int32_t rw = ctx->rects[pi].w;
 									if(rw > 0) {
 										sd->ratio = (float)(ctx->mouse_x - ctx->rects[pi].x) / (float)rw;
+										float min_ratio = (float)MKGUI_SPLIT_MIN_PX / (float)rw;
+										float max_ratio = 1.0f - (float)(MKGUI_SPLIT_MIN_PX + MKGUI_SPLIT_THICK) / (float)rw;
+										if(min_ratio > 0.45f) {
+											min_ratio = 0.45f;
+										}
+										if(max_ratio < 0.55f) {
+											max_ratio = 0.55f;
+										}
+										if(sd->ratio < min_ratio) {
+											sd->ratio = min_ratio;
+										}
+										if(sd->ratio > max_ratio) {
+											sd->ratio = max_ratio;
+										}
 									}
-								}
-								if(sd->ratio < 0.05f) {
-									sd->ratio = 0.05f;
-								}
-								if(sd->ratio > 0.95f) {
-									sd->ratio = 0.95f;
 								}
 								dirty_all(ctx);
 							}
@@ -6142,10 +6183,7 @@ MKGUI_API uint32_t mkgui_add_timer(struct mkgui_ctx *ctx, uint64_t interval_ns, 
 	t->userdata = userdata;
 	t->active = 1;
 #ifdef _WIN32
-	t->handle = CreateWaitableTimerExW(NULL, NULL, CREATE_WAITABLE_TIMER_HIGH_RESOLUTION, TIMER_ALL_ACCESS);
-	if(!t->handle) {
-		t->handle = CreateWaitableTimerW(NULL, FALSE, NULL);
-	}
+	t->handle = CreateWaitableTimerW(NULL, FALSE, NULL);
 	if(!t->handle) {
 		return 0;
 	}
