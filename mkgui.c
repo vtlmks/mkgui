@@ -3708,6 +3708,38 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 							ta->sel_end = ta->cursor;
 							dirty_all(ctx);
 						}
+
+					} else if(dsi >= 0 && ctx->widgets[dsi].type == MKGUI_PATHBAR) {
+						struct mkgui_pathbar_data *pb = find_pathbar_data(ctx, ctx->drag_select_id);
+						if(pb && pb->editing) {
+							int32_t rx = ctx->rects[dsi].x;
+							int32_t base_x = rx + 4;
+							uint32_t len = (uint32_t)strlen(pb->edit_buf);
+							char tmp[4096];
+							uint32_t hit_pos = len;
+							for(uint32_t i = 0; i <= len; ++i) {
+								memcpy(tmp, pb->edit_buf, i);
+								tmp[i] = '\0';
+								int32_t tw = text_width(ctx, tmp);
+								if(base_x + tw >= ctx->mouse_x) {
+									if(i > 0) {
+										tmp[i - 1] = '\0';
+										int32_t prev_w = text_width(ctx, tmp);
+										if(ctx->mouse_x - (base_x + prev_w) < (base_x + tw) - ctx->mouse_x) {
+											hit_pos = i - 1;
+										} else {
+											hit_pos = i;
+										}
+									} else {
+										hit_pos = i;
+									}
+									break;
+								}
+							}
+							pb->edit_cursor = hit_pos;
+							pb->edit_sel_end = hit_pos;
+							dirty_all(ctx);
+						}
 					}
 					break;
 				}
@@ -4263,11 +4295,19 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 				}
 
 				uint32_t closed_dropdown_id = 0;
+				uint32_t closed_combobox_id = 0;
 				if(ctx->popup_count > 0) {
 					for(uint32_t pi = 0; pi < ctx->popup_count; ++pi) {
 						struct mkgui_widget *pw = find_widget(ctx, ctx->popups[pi].widget_id);
 						if(pw && pw->type == MKGUI_DROPDOWN) {
 							closed_dropdown_id = ctx->popups[pi].widget_id;
+						}
+						if(pw && pw->type == MKGUI_COMBOBOX) {
+							closed_combobox_id = ctx->popups[pi].widget_id;
+							struct mkgui_combobox_data *cb = find_combobox_data(ctx, pw->id);
+							if(cb) {
+								cb->popup_open = 0;
+							}
 						}
 					}
 					popup_destroy_all(ctx);
@@ -4782,12 +4822,14 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 
 					if(is_focusable(hw)) {
 						spinbox_focus_lost(ctx);
-					pathbar_focus_lost(ctx);
+						if(ctx->focus_id != hw->id) {
+							pathbar_focus_lost(ctx);
+						}
 						ctx->focus_id = hw->id;
 
 					} else {
 						spinbox_focus_lost(ctx);
-					pathbar_focus_lost(ctx);
+						pathbar_focus_lost(ctx);
 						ctx->focus_id = 0;
 					}
 
@@ -4838,7 +4880,14 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 					}
 
 					if(hw->type == MKGUI_COMBOBOX) {
-						handle_combobox_click(ctx, ev, hw->id);
+						if(closed_combobox_id == hw->id) {
+							int32_t btn_x = ctx->rects[hi].x + ctx->rects[hi].w - MKGUI_COMBOBOX_BTN_W;
+							if(ctx->mouse_x < btn_x) {
+								handle_combobox_click(ctx, ev, hw->id);
+							}
+						} else {
+							handle_combobox_click(ctx, ev, hw->id);
+						}
 					}
 
 					if(hw->type == MKGUI_DATEPICKER) {

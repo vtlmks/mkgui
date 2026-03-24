@@ -1,7 +1,7 @@
 // Copyright (c) 2026, Peter Fors
 // SPDX-License-Identifier: MIT
 
-#define MKGUI_COMBOBOX_BTN_W 20
+#define MKGUI_COMBOBOX_BTN_W 24
 #define MKGUI_COMBOBOX_MAX_VISIBLE 12
 
 // [=]===^=[ combobox_filter ]=====================================[=]
@@ -157,7 +157,7 @@ static void render_combobox(struct mkgui_ctx *ctx, uint32_t idx) {
 	draw_patch(ctx, MKGUI_STYLE_RAISED, rx + text_w, ry, MKGUI_COMBOBOX_BTN_W, rh, btn_bg, border);
 
 	uint32_t tc = disabled ? ctx->theme.text_disabled : ctx->theme.text;
-	int32_t ax = rx + text_w + 3;
+	int32_t ax = rx + text_w + (MKGUI_COMBOBOX_BTN_W - 9) / 2;
 	int32_t ay = ry + rh / 2 - 2;
 	for(uint32_t j = 0; j < 5; ++j) {
 		draw_hline(ctx->pixels, ctx->win_w, ctx->win_h, ax + (int32_t)j, ay + (int32_t)j, 9 - (int32_t)j * 2, tc);
@@ -328,7 +328,11 @@ static void handle_combobox_click(struct mkgui_ctx *ctx, struct mkgui_event *ev,
 	int32_t btn_x = rx + rw - MKGUI_COMBOBOX_BTN_W;
 
 	if(ctx->mouse_x >= btn_x) {
-		combobox_open_popup(ctx, widget_id, 0);
+		if(cb->popup_open) {
+			combobox_close_popup(ctx, cb);
+		} else {
+			combobox_open_popup(ctx, widget_id, 0);
+		}
 	} else {
 		if(ctx->focus_id != widget_id) {
 			combobox_select_all(cb);

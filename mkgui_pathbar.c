@@ -263,6 +263,7 @@ static uint32_t handle_pathbar_click(struct mkgui_ctx *ctx, struct mkgui_event *
 		pb->edit_cursor = hit_pos;
 		pb->edit_sel_start = hit_pos;
 		pb->edit_sel_end = hit_pos;
+		ctx->drag_select_id = w->id;
 		dirty_all(ctx);
 		return 0;
 	}
