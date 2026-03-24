@@ -115,7 +115,12 @@ static LRESULT CALLBACK mkgui_wndproc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 				pev.type = MKGUI_PLAT_RESIZE;
 				pev.width = LOWORD(lp);
 				pev.height = HIWORD(lp);
-				evq_push_ctx(&owner->plat, &pev);
+				uint32_t prev = (owner->plat.evq_head + MKGUI_EVQ_SIZE - 1) % MKGUI_EVQ_SIZE;
+				if(owner->plat.evq_head != owner->plat.evq_tail && owner->plat.evq_buf[prev].type == MKGUI_PLAT_RESIZE) {
+					owner->plat.evq_buf[prev] = pev;
+				} else {
+					evq_push_ctx(&owner->plat, &pev);
+				}
 			}
 			return 0;
 		} break;

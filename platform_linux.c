@@ -419,6 +419,14 @@ static void platform_translate_xevent(struct mkgui_ctx *owner, XEvent *xev, stru
 
 		case ConfigureNotify: {
 			if(xev->xconfigure.window == owner->plat.win) {
+				while(XEventsQueued(owner->plat.dpy, QueuedAlready) > 0) {
+					XEvent peek;
+					XPeekEvent(owner->plat.dpy, &peek);
+					if(peek.type != ConfigureNotify || peek.xconfigure.window != xev->xconfigure.window) {
+						break;
+					}
+					XNextEvent(owner->plat.dpy, xev);
+				}
 				pev->type = MKGUI_PLAT_RESIZE;
 				pev->width = xev->xconfigure.width;
 				pev->height = xev->xconfigure.height;

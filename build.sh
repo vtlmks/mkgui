@@ -36,7 +36,7 @@ case "$BUILD_TYPE" in
 		CFLAGS+="-g -O0 "
 		;;
 	"clean")
-		rm -f demo editor benchmark demo.exe editor.exe mkgui.o libmkgui.a
+		rm -f demo editor demo.exe editor.exe mkgui.o libmkgui.a
 		exit 0
 		;;
 	*)
@@ -55,11 +55,6 @@ set -e
 # Build Linux editor
 (
 	$CC $CFLAGS editor.c -o editor $LINUX_LIBS
-) &
-
-# Build Linux benchmark
-(
-	$CC $CFLAGS benchmark.c -o benchmark $LINUX_LIBS
 ) &
 
 # Build Windows demo
