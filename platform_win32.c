@@ -191,6 +191,20 @@ static LRESULT CALLBACK mkgui_wndproc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 			return 0;
 		} break;
 
+		case WM_MOUSEHWHEEL: {
+			int16_t delta = (int16_t)HIWORD(wp);
+			pev.type = MKGUI_PLAT_BUTTON_PRESS;
+			POINT pt = { (int16_t)LOWORD(lp), (int16_t)HIWORD(lp) };
+			ScreenToClient(hwnd, &pt);
+			pev.x = pt.x;
+			pev.y = pt.y;
+			pev.button = delta > 0 ? 7 : 6;
+			evq_push_ctx(&owner->plat, &pev);
+			pev.type = MKGUI_PLAT_BUTTON_RELEASE;
+			evq_push_ctx(&owner->plat, &pev);
+			return 0;
+		} break;
+
 		case WM_KEYDOWN: {
 			pev.type = MKGUI_PLAT_KEY;
 			pev.keysym = platform_translate_vk(wp);
@@ -295,7 +309,7 @@ static void platform_register_class(void) {
 	WNDCLASSEXA wc;
 	memset(&wc, 0, sizeof(wc));
 	wc.cbSize = sizeof(wc);
-	wc.style = CS_OWNDC | CS_DBLCLKS;
+	wc.style = CS_OWNDC;
 	wc.lpfnWndProc = mkgui_wndproc;
 	wc.hCursor = LoadCursorA(NULL, IDC_ARROW);
 	wc.lpszClassName = "mkgui";

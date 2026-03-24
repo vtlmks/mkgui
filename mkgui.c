@@ -182,6 +182,7 @@ struct mkgui_input_data {
 	uint32_t cursor;
 	uint32_t sel_start;
 	uint32_t sel_end;
+	int32_t scroll_x;
 };
 
 struct mkgui_ipinput_data {
@@ -207,12 +208,14 @@ struct mkgui_combobox_data {
 	char text[MKGUI_MAX_TEXT];
 	char prev_text[MKGUI_MAX_TEXT];
 	uint32_t cursor;
-	uint32_t sel_all;
+	uint32_t sel_start;
+	uint32_t sel_end;
 	uint32_t popup_open;
 	int32_t highlight;
 	uint32_t filter_map[MKGUI_MAX_DROPDOWN];
 	uint32_t filter_count;
 	int32_t scroll_y;
+	int32_t scroll_x;
 };
 
 struct mkgui_datepicker_data {
@@ -3676,6 +3679,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 							inp->cursor = input_hit_cursor(ctx, inp, display, ctx->rects[dsi].x, ctx->mouse_x);
 							inp->sel_end = inp->cursor;
 							dirty_all(ctx);
+							input_scroll_to_cursor(ctx, ctx->drag_select_id);
 						}
 
 					} else if(dsi >= 0 && ctx->widgets[dsi].type == MKGUI_TEXTAREA) {
@@ -4152,7 +4156,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 								cb->selected = (int32_t)real_idx;
 								{ size_t _l = strlen(cb->items[real_idx]); if(_l >= MKGUI_MAX_TEXT) { _l = MKGUI_MAX_TEXT - 1; } memcpy(cb->text, cb->items[real_idx], _l); cb->text[_l] = '\0'; }
 								cb->cursor = (uint32_t)strlen(cb->text);
-								cb->sel_all = 0;
+								combobox_clear_selection(cb);
 								combobox_close_popup(ctx, cb);
 								ev->type = MKGUI_EVENT_COMBOBOX_CHANGED;
 								ev->id = pw->id;
@@ -4433,7 +4437,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 					if(hi >= 0 && ctx->widgets[hi].type == MKGUI_LISTVIEW) {
 						struct mkgui_listview_data *lv = find_listv_data(ctx, ctx->widgets[hi].id);
 						if(lv) {
-							if(pev.keymod & MKGUI_MOD_SHIFT) {
+							if((pev.keymod & MKGUI_MOD_SHIFT) || listview_hscrollbar_hit(ctx, (uint32_t)hi, ctx->mouse_x, ctx->mouse_y)) {
 								lv->scroll_x += delta;
 								int32_t content_w = ctx->rects[hi].w - 2 - MKGUI_SCROLLBAR_W;
 								listview_clamp_scroll_x(lv, content_w);
@@ -4635,6 +4639,49 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 					break;
 				}
 
+				if(pev.button == 6 || pev.button == 7) {
+					int32_t hi = hit_test(ctx, ctx->mouse_x, ctx->mouse_y);
+					int32_t delta = (pev.button == 6) ? -MKGUI_ROW_HEIGHT * 3 : MKGUI_ROW_HEIGHT * 3;
+					if(hi >= 0 && ctx->widgets[hi].type == MKGUI_LISTVIEW) {
+						struct mkgui_listview_data *lv = find_listv_data(ctx, ctx->widgets[hi].id);
+						if(lv) {
+							lv->scroll_x += delta;
+							int32_t content_w = ctx->rects[hi].w - 2 - MKGUI_SCROLLBAR_W;
+							listview_clamp_scroll_x(lv, content_w);
+							dirty_all(ctx);
+						}
+
+					} else {
+						uint32_t sid = hi >= 0 ? ctx->widgets[hi].parent_id : 0;
+						while(sid) {
+							int32_t si = find_widget_idx(ctx, sid);
+							if(si < 0) {
+								break;
+							}
+							if((ctx->widgets[si].type == MKGUI_VBOX || ctx->widgets[si].type == MKGUI_HBOX) && (ctx->widgets[si].flags & MKGUI_SCROLL)) {
+								struct mkgui_box_scroll *bs = find_box_scroll(ctx, sid);
+								if(bs && bs->content_w > ctx->rects[si].w) {
+									int32_t max_scroll = bs->content_w - ctx->rects[si].w;
+									if(max_scroll < 0) {
+										max_scroll = 0;
+									}
+									bs->scroll_x += delta;
+									if(bs->scroll_x < 0) {
+										bs->scroll_x = 0;
+									}
+									if(bs->scroll_x > max_scroll) {
+										bs->scroll_x = max_scroll;
+									}
+									dirty_all(ctx);
+								}
+								break;
+							}
+							sid = ctx->widgets[si].parent_id;
+						}
+					}
+					break;
+				}
+
 				for(int32_t bi = (int32_t)ctx->widget_count - 1; bi >= 0; --bi) {
 					struct mkgui_widget *bw = &ctx->widgets[bi];
 					if((bw->type == MKGUI_VBOX || bw->type == MKGUI_HBOX) && (bw->flags & MKGUI_SCROLL)) {
@@ -4777,6 +4824,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 								ctx->drag_select_id = hw->id;
 							}
 							dirty_all(ctx);
+							input_scroll_to_cursor(ctx, hw->id);
 						}
 					}
 
@@ -5522,6 +5570,14 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 								inp->sel_end = (uint32_t)strlen(inp->text);
 								inp->cursor = inp->sel_end;
 								dirty_all(ctx);
+								input_scroll_to_cursor(ctx, ctx->focus_id);
+							}
+
+						} else if(fw->type == MKGUI_COMBOBOX) {
+							struct mkgui_combobox_data *cb = find_combobox_data(ctx, ctx->focus_id);
+							if(cb) {
+								combobox_select_all(cb);
+								dirty_all(ctx);
 							}
 
 						} else if(fw->type == MKGUI_TEXTAREA) {
@@ -5573,6 +5629,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 								platform_clipboard_set(ctx, inp->text + lo, hi - lo);
 								input_delete_selection(inp);
 								dirty_all(ctx);
+								input_scroll_to_cursor(ctx, ctx->focus_id);
 								ev->type = MKGUI_EVENT_INPUT_CHANGED;
 								ev->id = ctx->focus_id;
 								return 1;
@@ -5617,6 +5674,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 										inp->cursor += clip_len;
 										input_clear_selection(inp);
 										dirty_all(ctx);
+										input_scroll_to_cursor(ctx, ctx->focus_id);
 										ev->type = MKGUI_EVENT_INPUT_CHANGED;
 										ev->id = ctx->focus_id;
 										return 1;
