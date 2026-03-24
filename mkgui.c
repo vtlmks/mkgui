@@ -5573,10 +5573,10 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 					}
 
 					if(fw && (ks == 'v' || ks == 'V') && !(fw->flags & MKGUI_READONLY)) {
-						char clip_buf[MKGUI_CLIP_MAX];
-						uint32_t clip_len = platform_clipboard_get(ctx, clip_buf, sizeof(clip_buf));
-						if(clip_len > 0) {
-							if(fw->type == MKGUI_INPUT) {
+						if(fw->type == MKGUI_INPUT) {
+							char clip_buf[MKGUI_CLIP_MAX];
+							uint32_t clip_len = platform_clipboard_get(ctx, clip_buf, sizeof(clip_buf));
+							if(clip_len > 0) {
 								struct mkgui_input_data *inp = find_input_data(ctx, ctx->focus_id);
 								if(inp) {
 									if(input_has_selection(inp)) {
@@ -5599,8 +5599,12 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 										return 1;
 									}
 								}
+							}
 
-							} else if(fw->type == MKGUI_TEXTAREA) {
+						} else if(fw->type == MKGUI_TEXTAREA) {
+							uint32_t clip_len = 0;
+							char *clip_buf = platform_clipboard_get_alloc(ctx, &clip_len);
+							if(clip_buf && clip_len > 0) {
 								struct mkgui_textarea_data *ta = find_textarea_data(ctx, ctx->focus_id);
 								if(ta) {
 									if(textarea_has_selection(ta)) {
@@ -5624,9 +5628,11 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 									textarea_scroll_to_cursor(ctx, ctx->focus_id);
 									ev->type = MKGUI_EVENT_TEXTAREA_CHANGED;
 									ev->id = ctx->focus_id;
+									free(clip_buf);
 									return 1;
 								}
 							}
+							free(clip_buf);
 						}
 						break;
 					}
@@ -5821,7 +5827,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 		}
 	}
 
-	if(ctx->dirty) {
+	if(ctx->dirty && ev->type == MKGUI_EVENT_NONE) {
 		double t0 = mkgui_time_us();
 		layout_widgets(ctx);
 		glview_sync_all(ctx);
@@ -5900,7 +5906,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 		ctx->dirty_count = 0;
 	}
 
-	if(ctx->parent) {
+	if(ctx->parent && ev->type == MKGUI_EVENT_NONE) {
 		struct mkgui_ctx *p = ctx->parent;
 #ifdef _WIN32
 		int64_t pnow;

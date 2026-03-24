@@ -846,55 +846,98 @@ static uint32_t handle_itemview_key(struct mkgui_ctx *ctx, struct mkgui_itemview
 
 	int32_t old_sel = iv->selected;
 
-	if(iv->view_mode == MKGUI_VIEW_DETAIL || iv->view_mode == MKGUI_VIEW_COMPACT) {
-		if(keysym == 0xff52) {
+	if(iv->view_mode == MKGUI_VIEW_COMPACT) {
+		int32_t row_h = MKGUI_ITEMVIEW_COMPACT_ROW_H;
+		int32_t rows_per_col = ca_h / row_h;
+		if(rows_per_col < 1) {
+			rows_per_col = 1;
+		}
+		if(keysym == MKGUI_KEY_UP) {
 			if(iv->selected > 0) {
 				--iv->selected;
 			}
-		} else if(keysym == 0xff54) {
+		} else if(keysym == MKGUI_KEY_DOWN) {
 			if(iv->selected < (int32_t)iv->item_count - 1) {
 				++iv->selected;
 			}
-		} else if(keysym == 0xff55) {
+		} else if(keysym == MKGUI_KEY_LEFT) {
+			iv->selected -= rows_per_col;
+			if(iv->selected < 0) {
+				iv->selected = 0;
+			}
+		} else if(keysym == MKGUI_KEY_RIGHT) {
+			iv->selected += rows_per_col;
+			if(iv->selected >= (int32_t)iv->item_count) {
+				iv->selected = (int32_t)iv->item_count - 1;
+			}
+		} else if(keysym == MKGUI_KEY_PAGE_UP) {
 			int32_t page = ca_h / ch;
 			iv->selected -= page;
 			if(iv->selected < 0) {
 				iv->selected = 0;
 			}
-		} else if(keysym == 0xff56) {
+		} else if(keysym == MKGUI_KEY_PAGE_DOWN) {
 			int32_t page = ca_h / ch;
 			iv->selected += page;
 			if(iv->selected >= (int32_t)iv->item_count) {
 				iv->selected = (int32_t)iv->item_count - 1;
 			}
-		} else if(keysym == 0xff50) {
+		} else if(keysym == MKGUI_KEY_HOME) {
 			iv->selected = 0;
-		} else if(keysym == 0xff57) {
+		} else if(keysym == MKGUI_KEY_END) {
 			iv->selected = (int32_t)iv->item_count - 1;
 		}
-	} else {
-		int32_t cols = itemview_grid_cols(ca_w, cw);
-		if(keysym == 0xff51) {
+
+	} else if(iv->view_mode == MKGUI_VIEW_DETAIL) {
+		if(keysym == MKGUI_KEY_UP) {
 			if(iv->selected > 0) {
 				--iv->selected;
 			}
-		} else if(keysym == 0xff53) {
+		} else if(keysym == MKGUI_KEY_DOWN) {
 			if(iv->selected < (int32_t)iv->item_count - 1) {
 				++iv->selected;
 			}
-		} else if(keysym == 0xff52) {
+		} else if(keysym == MKGUI_KEY_PAGE_UP) {
+			int32_t page = ca_h / ch;
+			iv->selected -= page;
+			if(iv->selected < 0) {
+				iv->selected = 0;
+			}
+		} else if(keysym == MKGUI_KEY_PAGE_DOWN) {
+			int32_t page = ca_h / ch;
+			iv->selected += page;
+			if(iv->selected >= (int32_t)iv->item_count) {
+				iv->selected = (int32_t)iv->item_count - 1;
+			}
+		} else if(keysym == MKGUI_KEY_HOME) {
+			iv->selected = 0;
+		} else if(keysym == MKGUI_KEY_END) {
+			iv->selected = (int32_t)iv->item_count - 1;
+		}
+
+	} else {
+		int32_t cols = itemview_grid_cols(ca_w, cw);
+		if(keysym == MKGUI_KEY_LEFT) {
+			if(iv->selected > 0) {
+				--iv->selected;
+			}
+		} else if(keysym == MKGUI_KEY_RIGHT) {
+			if(iv->selected < (int32_t)iv->item_count - 1) {
+				++iv->selected;
+			}
+		} else if(keysym == MKGUI_KEY_UP) {
 			iv->selected -= cols;
 			if(iv->selected < 0) {
 				iv->selected = 0;
 			}
-		} else if(keysym == 0xff54) {
+		} else if(keysym == MKGUI_KEY_DOWN) {
 			iv->selected += cols;
 			if(iv->selected >= (int32_t)iv->item_count) {
 				iv->selected = (int32_t)iv->item_count - 1;
 			}
-		} else if(keysym == 0xff50) {
+		} else if(keysym == MKGUI_KEY_HOME) {
 			iv->selected = 0;
-		} else if(keysym == 0xff57) {
+		} else if(keysym == MKGUI_KEY_END) {
 			iv->selected = (int32_t)iv->item_count - 1;
 		}
 	}

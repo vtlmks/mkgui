@@ -729,6 +729,37 @@ static uint32_t platform_clipboard_get(struct mkgui_ctx *ctx, char *buf, uint32_
 	return len;
 }
 
+// [=]===^=[ platform_clipboard_get_alloc ]========================[=]
+static char *platform_clipboard_get_alloc(struct mkgui_ctx *ctx, uint32_t *out_len) {
+	*out_len = 0;
+	if(!OpenClipboard(ctx->plat.hwnd)) {
+		return NULL;
+	}
+	HANDLE h = GetClipboardData(CF_TEXT);
+	if(!h) {
+		CloseClipboard();
+		return NULL;
+	}
+	const char *p = (const char *)GlobalLock(h);
+	if(!p) {
+		CloseClipboard();
+		return NULL;
+	}
+	uint32_t len = (uint32_t)strlen(p);
+	char *buf = (char *)malloc(len + 1);
+	if(!buf) {
+		GlobalUnlock(h);
+		CloseClipboard();
+		return NULL;
+	}
+	memcpy(buf, p, len);
+	buf[len] = '\0';
+	GlobalUnlock(h);
+	CloseClipboard();
+	*out_len = len;
+	return buf;
+}
+
 // ---------------------------------------------------------------------------
 // GL view child window
 // ---------------------------------------------------------------------------

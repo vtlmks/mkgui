@@ -763,6 +763,62 @@ static uint32_t platform_clipboard_get(struct mkgui_ctx *ctx, char *buf, uint32_
 	return 0;
 }
 
+// [=]===^=[ platform_clipboard_get_alloc ]========================[=]
+static char *platform_clipboard_get_alloc(struct mkgui_ctx *ctx, uint32_t *out_len) {
+	struct mkgui_platform *plat = &ctx->plat;
+	*out_len = 0;
+
+	if(XGetSelectionOwner(plat->dpy, plat->clipboard) == plat->win) {
+		uint32_t len = ctx->clip_len;
+		char *buf = (char *)malloc(len + 1);
+		if(!buf) {
+			return NULL;
+		}
+		memcpy(buf, ctx->clip_text, len);
+		buf[len] = '\0';
+		*out_len = len;
+		return buf;
+	}
+
+	XConvertSelection(plat->dpy, plat->clipboard, plat->utf8_string, plat->mkgui_clip_prop, plat->win, CurrentTime);
+	XFlush(plat->dpy);
+
+	XEvent xev;
+	for(uint32_t i = 0; i < 50; ++i) {
+		if(XCheckTypedWindowEvent(plat->dpy, plat->win, SelectionNotify, &xev)) {
+			if(xev.xselection.property == None) {
+				return NULL;
+			}
+			Atom type;
+			int format;
+			unsigned long nitems, bytes_after;
+			unsigned char *data = NULL;
+			XGetWindowProperty(plat->dpy, plat->win, plat->mkgui_clip_prop, 0, 1024 * 1024, True,
+				AnyPropertyType, &type, &format, &nitems, &bytes_after, &data);
+			if(data && nitems > 0) {
+				uint32_t len = (uint32_t)nitems;
+				char *buf = (char *)malloc(len + 1);
+				if(!buf) {
+					XFree(data);
+					return NULL;
+				}
+				memcpy(buf, data, len);
+				buf[len] = '\0';
+				XFree(data);
+				*out_len = len;
+				return buf;
+			}
+			if(data) {
+				XFree(data);
+			}
+			return NULL;
+		}
+		struct timespec ts = {0, 10000000};
+		nanosleep(&ts, NULL);
+	}
+	return NULL;
+}
+
 // ---------------------------------------------------------------------------
 // GL view child window
 // ---------------------------------------------------------------------------
