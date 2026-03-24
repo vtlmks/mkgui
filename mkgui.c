@@ -1758,6 +1758,7 @@ static void window_unregister(struct mkgui_ctx *ctx) {
 // Platform backend
 // ---------------------------------------------------------------------------
 
+static void mkgui_flush(struct mkgui_ctx *ctx);
 static void mkgui_resize_render_impl(struct mkgui_ctx *ctx);
 static void mkgui_resize_render(struct mkgui_ctx *ctx) {
 	mkgui_resize_render_impl(ctx);
@@ -3442,24 +3443,7 @@ static void mkgui_resize_render_impl(struct mkgui_ctx *ctx) {
 		dirty_all(ctx);
 	}
 #endif
-	if(!ctx->dirty) {
-		return;
-	}
-	layout_widgets(ctx);
-	glview_sync_all(ctx);
-	render_widgets(ctx);
-	if(ctx->render_cb) {
-		flush_text(ctx);
-		ctx->render_cb(ctx, ctx->render_cb_data);
-	}
-	flush_text(ctx);
-	render_tooltip(ctx);
-	flush_text(ctx);
-	platform_blit(ctx);
-	platform_flush(ctx);
-	ctx->dirty = 0;
-	ctx->dirty_full = 0;
-	ctx->dirty_count = 0;
+	mkgui_flush(ctx);
 }
 
 // [=]===^=[ mkgui_poll ]========================================[=]
@@ -5866,7 +5850,12 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 		}
 	}
 
-	if(ctx->dirty && ev->type == MKGUI_EVENT_NONE) {
+	return ev->type != MKGUI_EVENT_NONE;
+}
+
+// [=]===^=[ mkgui_flush ]========================================[=]
+static void mkgui_flush(struct mkgui_ctx *ctx) {
+	if(ctx->dirty) {
 		double t0 = mkgui_time_us();
 		layout_widgets(ctx);
 		glview_sync_all(ctx);
@@ -5945,7 +5934,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 		ctx->dirty_count = 0;
 	}
 
-	if(ctx->parent && ev->type == MKGUI_EVENT_NONE) {
+	if(ctx->parent) {
 		struct mkgui_ctx *p = ctx->parent;
 #ifdef _WIN32
 		int64_t pnow;
@@ -5998,12 +5987,12 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 			p->dirty_count = 0;
 		}
 	}
-
-	return ev->type != MKGUI_EVENT_NONE;
 }
 
 // [=]===^=[ mkgui_wait ]=========================================[=]
 MKGUI_API void mkgui_wait(struct mkgui_ctx *ctx) {
+	mkgui_flush(ctx);
+
 	if(platform_pending(ctx) || ctx->close_requested) {
 		return;
 	}
@@ -6012,9 +6001,6 @@ MKGUI_API void mkgui_wait(struct mkgui_ctx *ctx) {
 	}
 	if(ctx->poll_timeout_ms > 0) {
 		platform_wait_event(ctx, ctx->poll_timeout_ms);
-		return;
-	}
-	if(ctx->dirty) {
 		return;
 	}
 	uint32_t any_anim = ctx->anim_active;
