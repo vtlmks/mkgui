@@ -28,6 +28,21 @@ Dependencies: FreeType2, X11, Xext (MIT-SHM) on Linux. GDI on Windows.
 
 enum { ID_WIN = 0, ID_BTN = 1, ID_LBL = 2 };
 
+static void on_event(struct mkgui_ctx *ctx, struct mkgui_event *ev, void *userdata) {
+    (void)userdata;
+    switch(ev->type) {
+        case MKGUI_EVENT_CLOSE: {
+            mkgui_quit(ctx);
+        } break;
+
+        case MKGUI_EVENT_CLICK: {
+            if(ev->id == ID_BTN) {
+                mkgui_label_set(ctx, ID_LBL, "Clicked!");
+            }
+        } break;
+    }
+}
+
 int main(void) {
     struct mkgui_widget widgets[] = {
         { MKGUI_WINDOW, ID_WIN, "Hello",  "",  0,      0, 0, 400, 300, 0, 0 },
@@ -38,18 +53,7 @@ int main(void) {
     struct mkgui_ctx *ctx = mkgui_create(widgets, 3);
     if(!ctx) return 1;
 
-    struct mkgui_event ev;
-    uint32_t running = 1;
-    while(running) {
-        while(mkgui_poll(ctx, &ev)) {
-            if(ev.type == MKGUI_EVENT_CLOSE) running = 0;
-            if(ev.type == MKGUI_EVENT_CLICK && ev.id == ID_BTN) {
-                mkgui_label_set(ctx, ID_LBL, "Clicked!");
-            }
-        }
-        mkgui_wait(ctx);
-    }
-
+    mkgui_run(ctx, on_event, NULL);
     mkgui_destroy(ctx);
     return 0;
 }
@@ -57,7 +61,7 @@ int main(void) {
 
 ## Architecture
 
-Your application is a single `.c` file that includes `mkgui.c`. All functions are `static` (unity build). You define widgets as a flat array of `struct mkgui_widget`, create a context, then poll for events in a loop.
+Your application is a single `.c` file that includes `mkgui.c`. All functions are `static` (unity build). You define widgets as a flat array of `struct mkgui_widget`, create a context, provide an event callback, and call `mkgui_run`.
 
 Widget hierarchy is expressed via `parent_id`. Every widget has a unique integer `id`. The first widget must be `MKGUI_WINDOW` with `parent_id = 0`.
 
@@ -290,110 +294,30 @@ struct mkgui_event {
 ```c
 struct mkgui_ctx *mkgui_create(struct mkgui_widget *widgets, uint32_t count);
 void mkgui_destroy(struct mkgui_ctx *ctx);
-uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev);
-void mkgui_wait(struct mkgui_ctx *ctx);
-void mkgui_set_poll_timeout(struct mkgui_ctx *ctx, int32_t ms);
-uint32_t mkgui_add_timer(struct mkgui_ctx *ctx, uint64_t interval_ns, mkgui_timer_cb cb, void *userdata);
-void mkgui_remove_timer(struct mkgui_ctx *ctx, uint32_t timer_id);
 void mkgui_run(struct mkgui_ctx *ctx, mkgui_event_cb cb, void *userdata);
 void mkgui_quit(struct mkgui_ctx *ctx);
-```
-
-`mkgui_create` takes a widget array and returns a context. `mkgui_poll` processes pending platform events and renders when dirty. Returns 1 if an event was written to `ev`, 0 otherwise. `mkgui_poll` is non-blocking -- it returns immediately when there are no more events to process.
-
-`mkgui_wait` handles frame pacing. It blocks until the next event arrives or the next animation frame is due. Call it once per iteration of the main loop, after all `mkgui_poll` calls:
-
-```c
-while(running) {
-    while(mkgui_poll(ctx, &ev)) {
-        // handle ev
-    }
-    mkgui_wait(ctx);
-}
-```
-
-`mkgui_wait` is smart about timing:
-- If any registered window has pending events or is dirty, it returns immediately
-- If any registered window has animations (spinners, progress bars, GL views), it waits up to 16ms (~60fps)
-- If everything is idle, it blocks indefinitely until an event arrives (zero CPU usage)
-- It wakes immediately when a platform event arrives (mouse click, key press, expose)
-
-On Linux, blocking uses `poll()` on the X11 connection fd. On Windows, it uses `MsgWaitForMultipleObjects`.
-
-#### Wait timeout modes
-
-`mkgui_set_poll_timeout` controls how long `mkgui_wait` blocks:
-
-| Value | Behavior |
-|-------|----------|
-| `-1` (default) | **Auto mode.** Waits 16ms (~60fps) when animated widgets are visible. Blocks indefinitely when idle -- zero CPU usage. |
-| `> 0` | **Fixed timeout.** Always waits for the given number of milliseconds. Use `5` for 200Hz, `8` for 120Hz, `16` for 60Hz. |
-| `0` | **No blocking.** `mkgui_wait` returns immediately. The caller owns all timing. |
-
-**Emulator / real-time example** (caller drives timing):
-
-```c
-mkgui_set_poll_timeout(ctx, 0);
-while(running) {
-    while(mkgui_poll(ctx, &ev)) {
-        // handle ev
-    }
-    emulator_tick();
-    precision_sleep_until_next_frame();
-}
-```
-
-When the caller owns timing (emulators, games), omit `mkgui_wait` and use your own frame pacing instead.
-
-#### Timers
-
-```c
-typedef void (*mkgui_timer_cb)(struct mkgui_ctx *ctx, uint32_t timer_id, void *userdata);
-
 uint32_t mkgui_add_timer(struct mkgui_ctx *ctx, uint64_t interval_ns, mkgui_timer_cb cb, void *userdata);
 void mkgui_remove_timer(struct mkgui_ctx *ctx, uint32_t timer_id);
 ```
 
-`mkgui_add_timer` creates a repeating timer with nanosecond-resolution interval. Returns a timer ID (0 on failure). Up to `MKGUI_MAX_TIMERS` (8) timers per context.
+`mkgui_create` takes a widget array and returns a context.
 
-If `cb` is non-NULL, the callback fires during `mkgui_poll`. If `cb` is NULL, an `MKGUI_EVENT_TIMER` event is emitted instead (with `ev.id` set to the timer ID).
+`mkgui_run` runs the event loop. It drains all pending events, delivers each to `cb`, renders the frame, then blocks until the next event or timer. This repeats until `mkgui_quit` is called.
 
-Timers do not drift. On Linux, `timerfd_create(CLOCK_MONOTONIC)` provides kernel-managed absolute deadlines. On Windows, `SetWaitableTimer` with absolute re-arming after each firing prevents accumulation error.
+`mkgui_run` handles frame pacing automatically:
+- When animated widgets are visible (spinners, progress bars, GL views), it runs at ~60fps
+- When idle, it blocks indefinitely until an event arrives (zero CPU usage)
+- It wakes immediately on platform events (mouse, keyboard, expose) or timer expiration
 
-`mkgui_wait` wakes when any timer fires, so timers work correctly in both `mkgui_poll`+`mkgui_wait` loops and `mkgui_run`.
+On Linux, blocking uses `poll()` on the X11 connection fd and timer fds. On Windows, it uses `MsgWaitForMultipleObjects`.
 
-Call `mkgui_remove_timer` inside the callback to make a one-shot timer.
-
-**Example** (periodic data refresh at 30Hz):
-
-```c
-void refresh(struct mkgui_ctx *ctx, uint32_t timer_id, void *data) {
-    update_data();
-    update_widgets(ctx);
-}
-
-mkgui_add_timer(ctx, 33333333, refresh, NULL);  // 33.3ms = 30Hz
-```
-
-#### mkgui_run (toolkit-owned mainloop)
-
-```c
-typedef void (*mkgui_event_cb)(struct mkgui_ctx *ctx, struct mkgui_event *ev, void *userdata);
-
-void mkgui_run(struct mkgui_ctx *ctx, mkgui_event_cb cb, void *userdata);
-void mkgui_quit(struct mkgui_ctx *ctx);
-```
-
-`mkgui_run` is an event-driven mainloop alternative to the manual `mkgui_poll`+`mkgui_wait` pattern. It processes events and delivers them to `cb` until `mkgui_quit` is called or the window is closed.
-
-Use `mkgui_quit(ctx)` inside the event callback to exit the loop (e.g. in response to `MKGUI_EVENT_CLOSE`).
-
-Dialogs (`mkgui_message_box`, `mkgui_open_dialog`, etc.) work normally when called from the event callback -- they run their own nested event loop.
+Mouse motion events are automatically compressed. When multiple consecutive motion events are queued, only the last position is delivered.
 
 **Example:**
 
 ```c
-void on_event(struct mkgui_ctx *ctx, struct mkgui_event *ev, void *data) {
+static void on_event(struct mkgui_ctx *ctx, struct mkgui_event *ev, void *userdata) {
+    (void)userdata;
     switch(ev->type) {
         case MKGUI_EVENT_CLOSE: {
             mkgui_quit(ctx);
@@ -412,9 +336,36 @@ int main(void) {
 }
 ```
 
-#### Motion compression
+Dialogs (`mkgui_message_box`, `mkgui_open_dialog`, etc.) work normally when called from the event callback -- they run their own nested event loop internally.
 
-Mouse motion events are automatically compressed. When multiple consecutive motion events are queued, only the last position is delivered. This prevents unnecessary redraws at high mouse polling rates (1000Hz).
+#### Timers
+
+```c
+typedef void (*mkgui_timer_cb)(struct mkgui_ctx *ctx, uint32_t timer_id, void *userdata);
+
+uint32_t mkgui_add_timer(struct mkgui_ctx *ctx, uint64_t interval_ns, mkgui_timer_cb cb, void *userdata);
+void mkgui_remove_timer(struct mkgui_ctx *ctx, uint32_t timer_id);
+```
+
+`mkgui_add_timer` creates a repeating timer with nanosecond-resolution interval. Returns a timer ID (0 on failure). Up to `MKGUI_MAX_TIMERS` (8) timers per context.
+
+If `cb` is non-NULL, the callback fires during event processing. If `cb` is NULL, an `MKGUI_EVENT_TIMER` event is delivered to the event callback instead (with `ev->id` set to the timer ID).
+
+Timers do not drift. On Linux, `timerfd_create(CLOCK_MONOTONIC)` provides kernel-managed absolute deadlines. On Windows, `SetWaitableTimer` with absolute re-arming after each firing prevents accumulation error.
+
+Call `mkgui_remove_timer` inside the callback to make a one-shot timer.
+
+**Example** (periodic data refresh at 30Hz):
+
+```c
+void refresh(struct mkgui_ctx *ctx, uint32_t timer_id, void *data) {
+    update_data();
+    update_widgets(ctx);
+}
+
+mkgui_add_timer(ctx, 33333333, refresh, NULL);  // 33.3ms = 30Hz
+```
+
 
 ### Runtime widget management
 
@@ -452,7 +403,7 @@ mkgui_remove_widget(ctx, 500);
 
 ### Performance timing
 
-After each `mkgui_poll` call that renders, the context contains timing data for the last frame:
+After each frame, the context contains timing data:
 
 ```c
 ctx->perf_layout_us   // layout calculation time in microseconds
@@ -509,9 +460,9 @@ const char *mkgui_button_get_text(struct mkgui_ctx *ctx, uint32_t id);
 // Icon-only buttons center the icon automatically when label is empty
 { MKGUI_BUTTON, ID_MUTE, "", "volume-high", ID_VBOX, 0, 0, 28, 28, MKGUI_FIXED | MKGUI_ALIGN_CENTER, 0 },
 
-// In event loop:
+// In event callback:
 case MKGUI_EVENT_CLICK: {
-    if(ev.id == ID_MUTE) {
+    if(ev->id == ID_MUTE) {
         uint32_t f = mkgui_get_flags(ctx, ID_MUTE);
         f ^= MKGUI_CHECKED;
         mkgui_set_flags(ctx, ID_MUTE, f);
@@ -1509,19 +1460,19 @@ Context menus are built and shown in response to `MKGUI_EVENT_CONTEXT` or `MKGUI
 
 ```c
 case MKGUI_EVENT_CONTEXT: {
-    if(ev.id == ID_LISTVIEW1) {
+    if(ev->id == ID_LISTVIEW1) {
         mkgui_context_menu_clear(ctx);
         mkgui_context_menu_add(ctx, 100, "Cut", "content-cut", 0);
         mkgui_context_menu_add(ctx, 101, "Copy", "content-copy", 0);
         mkgui_context_menu_add(ctx, 102, "Paste", "content-paste", 0);
         mkgui_context_menu_add_separator(ctx);
-        mkgui_context_menu_add(ctx, 103, "Delete", "delete", (ev.value < 0) ? MKGUI_DISABLED : 0);
+        mkgui_context_menu_add(ctx, 103, "Delete", "delete", (ev->value < 0) ? MKGUI_DISABLED : 0);
         mkgui_context_menu_show(ctx);
     }
 } break;
 
 case MKGUI_EVENT_CONTEXT_HEADER: {
-    // Right-click on column header -- ev.col has the column index
+    // Right-click on column header -- ev->col has the column index
     mkgui_context_menu_clear(ctx);
     mkgui_context_menu_add(ctx, 200, "Name", NULL, MKGUI_MENU_CHECK | MKGUI_CHECKED);
     mkgui_context_menu_add(ctx, 201, "Size", NULL, MKGUI_MENU_CHECK | MKGUI_CHECKED);
@@ -1529,8 +1480,8 @@ case MKGUI_EVENT_CONTEXT_HEADER: {
 } break;
 
 case MKGUI_EVENT_CONTEXT_MENU: {
-    // ev.id is the item id passed to mkgui_context_menu_add()
-    printf("Selected context menu item: %u\n", ev.id);
+    // ev->id is the item id passed to mkgui_context_menu_add()
+    printf("Selected context menu item: %u\n", ev->id);
 } break;
 ```
 
@@ -1538,7 +1489,7 @@ case MKGUI_EVENT_CONTEXT_MENU: {
 
 For `MKGUI_LISTVIEW`, `MKGUI_GRIDVIEW`, `MKGUI_TREEVIEW`, and `MKGUI_ITEMVIEW`, the `MKGUI_EVENT_CONTEXT` event provides additional information:
 
-| Widget type | `ev.value` | `ev.col` |
+| Widget type | `ev->value` | `ev->col` |
 |---|---|---|
 | `MKGUI_LISTVIEW` | row index (-1 if empty area) | column index |
 | `MKGUI_GRIDVIEW` | row index (-1 if empty area) | column index |
@@ -1696,72 +1647,15 @@ Destroy child windows with `mkgui_destroy_child(child)` instead of `mkgui_destro
 
 ### Modal windows
 
-A modal window runs its own event loop, blocking the caller. The parent window does not receive input, but continues to repaint and animate (spinners, progress bars, GL views).
+Modal dialogs are handled internally by the built-in dialog functions (`mkgui_message_box`, `mkgui_confirm_dialog`, `mkgui_input_dialog`, `mkgui_open_dialog`, `mkgui_save_dialog`). They run their own nested event loop, blocking the caller. The parent window does not receive input during a modal dialog, but continues to repaint and animate (spinners, progress bars, GL views).
 
-```c
-// Create a modal dialog
-struct mkgui_ctx *dlg = mkgui_create_child(ctx, dlg_widgets, dlg_count,
-                                            "Settings", 400, 300);
-if(!dlg) return;
+### How multi-window works
 
-struct mkgui_event ev;
-uint32_t running = 1;
-while(running) {
-    while(mkgui_poll(dlg, &ev)) {
-        if(ev.type == MKGUI_EVENT_CLOSE) {
-            running = 0;
-        }
-        // handle dialog events...
-    }
-    mkgui_wait(dlg);
-}
-// Parent animations kept running the whole time
+All windows created with `mkgui_create_child` share the parent's X11 Display connection (or Win32 message thread). A global window registry maps platform window handles to their owning `mkgui_ctx`. Events are automatically routed to the correct context:
 
-mkgui_destroy_child(dlg);
-```
-
-The built-in dialogs (`mkgui_message_box`, `mkgui_confirm_dialog`, `mkgui_input_dialog`, `mkgui_open_dialog`, `mkgui_save_dialog`) all use this pattern internally.
-
-### Non-modal windows
-
-For windows that should both be interactive simultaneously, poll both contexts in the same loop:
-
-```c
-struct mkgui_ctx *main_ctx = mkgui_create(main_widgets, main_count);
-struct mkgui_ctx *tool_ctx = mkgui_create_child(main_ctx, tool_widgets, tool_count,
-                                                 "Tools", 300, 400);
-
-struct mkgui_event ev;
-uint32_t running = 1;
-while(running) {
-    while(mkgui_poll(main_ctx, &ev)) {
-        if(ev.type == MKGUI_EVENT_CLOSE) running = 0;
-        // handle main window events...
-    }
-    while(mkgui_poll(tool_ctx, &ev)) {
-        if(ev.type == MKGUI_EVENT_CLOSE) {
-            // hide or destroy the tool window
-        }
-        // handle tool window events...
-    }
-    mkgui_wait(main_ctx);  // one wait paces the whole loop
-}
-
-mkgui_destroy_child(tool_ctx);
-mkgui_destroy(main_ctx);
-```
-
-Both windows accept input, animate, and repaint independently. Events that arrive for one window while the other is polling are automatically routed to the correct context via an internal deferred event queue.
-
-### How it works
-
-All windows created with `mkgui_create_child` share the parent's X11 Display connection (or Win32 message thread). A global window registry maps platform window handles to their owning `mkgui_ctx`. When `mkgui_poll` pulls an event from the shared connection:
-
-1. If the event belongs to the calling context or its popups, it is processed normally
-2. If the event belongs to the parent, expose/resize events trigger a parent repaint (keeping it visually fresh during modal dialogs)
-3. If the event belongs to a different registered context, it is translated and pushed to that context's deferred event queue, where it will be consumed on that context's next `mkgui_poll` call
-
-This means no manual event pumping, no timeout hacks, and no frame rate issues between windows.
+1. Events for the running context or its popups are processed normally
+2. Events for the parent trigger expose/resize handling (keeping it visually fresh during modal dialogs)
+3. Events for other registered contexts are pushed to that context's deferred event queue
 
 ### API reference
 
@@ -1781,9 +1675,9 @@ void mkgui_destroy_child(struct mkgui_ctx *ctx);
 
 All widget rendering is software-based (no GPU). The framebuffer is blitted to the X11 window via MIT-SHM (`XShmPutImage`).
 
-### Dirty rectangle tracking
+### Rendering pipeline
 
-mkgui uses dirty rectangle tracking to minimize CPU usage. Only regions that have changed are re-rendered and blitted. When two dirty rects are close together, they are merged if the union area is less than 1.5x the sum of individual areas. Animated widgets (spinners, progress bars, glviews) only dirty their own rect. Widgets on inactive tabs or hidden parents do not trigger redraws.
+mkgui currently performs a full redraw every frame. The dirty rectangle tracking infrastructure is in place (widgets mark themselves dirty, rects are merged when close together) but partial rendering is temporarily disabled due to a clipping bug. All rendering goes to a client-side framebuffer, then a single `XShmPutImage` (Linux) or `BitBlt` (Windows) blits the result to the window.
 
 ### Antialiased drawing
 

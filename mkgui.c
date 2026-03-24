@@ -5856,6 +5856,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 // [=]===^=[ mkgui_flush ]========================================[=]
 static void mkgui_flush(struct mkgui_ctx *ctx) {
 	if(ctx->dirty) {
+		dirty_all(ctx); // TODO: partial rendering disabled - dirty rect path has a bug, always full redraw for now
 		double t0 = mkgui_time_us();
 		layout_widgets(ctx);
 		glview_sync_all(ctx);

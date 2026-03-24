@@ -384,13 +384,10 @@ MKGUI_API struct mkgui_ctx *mkgui_create(struct mkgui_widget *widgets, uint32_t 
 MKGUI_API void mkgui_destroy(struct mkgui_ctx *ctx);
 MKGUI_API struct mkgui_ctx *mkgui_create_child(struct mkgui_ctx *parent, struct mkgui_widget *widgets, uint32_t count, const char *title, int32_t w, int32_t h);
 MKGUI_API void mkgui_destroy_child(struct mkgui_ctx *ctx);
-MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev);
-MKGUI_API void mkgui_wait(struct mkgui_ctx *ctx);
-MKGUI_API void mkgui_set_poll_timeout(struct mkgui_ctx *ctx, int32_t ms);
-MKGUI_API uint32_t mkgui_add_timer(struct mkgui_ctx *ctx, uint64_t interval_ns, mkgui_timer_cb cb, void *userdata);
-MKGUI_API void mkgui_remove_timer(struct mkgui_ctx *ctx, uint32_t timer_id);
 MKGUI_API void mkgui_run(struct mkgui_ctx *ctx, mkgui_event_cb cb, void *userdata);
 MKGUI_API void mkgui_quit(struct mkgui_ctx *ctx);
+MKGUI_API uint32_t mkgui_add_timer(struct mkgui_ctx *ctx, uint64_t interval_ns, mkgui_timer_cb cb, void *userdata);
+MKGUI_API void mkgui_remove_timer(struct mkgui_ctx *ctx, uint32_t timer_id);
 
 // ---------------------------------------------------------------------------
 // Widget management

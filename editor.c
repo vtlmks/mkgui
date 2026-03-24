@@ -4094,6 +4094,71 @@ static void ed_generate_code(struct mkgui_ctx *ctx) {
 		}
 	}
 
+	uint32_t events_used[64];
+	uint32_t events_used_count = 0;
+
+	for(uint32_t i = 0; i < ed.widget_count; ++i) {
+		if(ed.widgets[i].event_mask == 0) {
+			continue;
+		}
+		for(uint32_t bit = 1; bit < 40; ++bit) {
+			if(!(ed.widgets[i].event_mask & (1ULL << bit))) {
+				continue;
+			}
+			uint32_t found = 0;
+			for(uint32_t j = 0; j < events_used_count; ++j) {
+				if(events_used[j] == bit) {
+					found = 1;
+					break;
+				}
+			}
+			if(!found && events_used_count < 64) {
+				events_used[events_used_count++] = bit;
+			}
+		}
+	}
+
+	fprintf(f, "// [=]===^=[ on_event ]===\n");
+	fprintf(f, "static void on_event(struct mkgui_ctx *ctx, struct mkgui_event *ev, void *userdata) {\n");
+	fprintf(f, "\t(void)userdata;\n");
+	fprintf(f, "\tswitch(ev->type) {\n");
+
+	for(uint32_t ei = 0; ei < events_used_count; ++ei) {
+		uint32_t evt = events_used[ei];
+		fprintf(f, "\t\tcase MKGUI_EVENT_%s: {\n", ed_event_name(evt));
+
+		if(evt == MKGUI_EVENT_CLOSE) {
+			fprintf(f, "\t\t\tmkgui_quit(ctx);\n");
+		} else {
+			for(uint32_t i = 0; i < ed.widget_count; ++i) {
+				if(ed.widgets[i].event_mask & (1ULL << evt)) {
+					fprintf(f, "\t\t\tif(ev->id == %s) {\n", ed.widgets[i].id_name);
+					fprintf(f, "\t\t\t\t// TODO: handle %s for %s\n", ed_event_name(evt), ed.widgets[i].id_name);
+					fprintf(f, "\t\t\t}\n");
+				}
+			}
+		}
+
+		fprintf(f, "\t\t} break;\n\n");
+	}
+
+	uint32_t has_close = 0;
+	for(uint32_t j = 0; j < events_used_count; ++j) {
+		if(events_used[j] == MKGUI_EVENT_CLOSE) {
+			has_close = 1;
+			break;
+		}
+	}
+	if(!has_close) {
+		fprintf(f, "\t\tcase MKGUI_EVENT_CLOSE: {\n");
+		fprintf(f, "\t\t\tmkgui_quit(ctx);\n");
+		fprintf(f, "\t\t} break;\n\n");
+	}
+
+	fprintf(f, "\t\tdefault: break;\n");
+	fprintf(f, "\t}\n");
+	fprintf(f, "}\n\n");
+
 	fprintf(f, "// [=]===^=[ main ]===\n");
 	fprintf(f, "int main(void) {\n");
 	fprintf(f, "\tstruct mkgui_widget widgets[] = {\n");
@@ -4215,73 +4280,7 @@ static void ed_generate_code(struct mkgui_ctx *ctx) {
 		}
 	}
 
-	fprintf(f, "\n\tstruct mkgui_event ev;\n");
-	fprintf(f, "\tuint32_t running = 1;\n");
-	fprintf(f, "\twhile(running) {\n");
-	fprintf(f, "\t\twhile(mkgui_poll(ctx, &ev)) {\n");
-	fprintf(f, "\t\t\tswitch(ev.type) {\n");
-
-	uint32_t events_used[64];
-	uint32_t events_used_count = 0;
-
-	for(uint32_t i = 0; i < ed.widget_count; ++i) {
-		if(ed.widgets[i].event_mask == 0) {
-			continue;
-		}
-		for(uint32_t bit = 1; bit < 40; ++bit) {
-			if(!(ed.widgets[i].event_mask & (1ULL << bit))) {
-				continue;
-			}
-			uint32_t found = 0;
-			for(uint32_t j = 0; j < events_used_count; ++j) {
-				if(events_used[j] == bit) {
-					found = 1;
-					break;
-				}
-			}
-			if(!found && events_used_count < 64) {
-				events_used[events_used_count++] = bit;
-			}
-		}
-	}
-
-	for(uint32_t ei = 0; ei < events_used_count; ++ei) {
-		uint32_t evt = events_used[ei];
-		fprintf(f, "\t\t\t\tcase MKGUI_EVENT_%s: {\n", ed_event_name(evt));
-
-		if(evt == MKGUI_EVENT_CLOSE) {
-			fprintf(f, "\t\t\t\t\trunning = 0;\n");
-		} else {
-			for(uint32_t i = 0; i < ed.widget_count; ++i) {
-				if(ed.widgets[i].event_mask & (1ULL << evt)) {
-					fprintf(f, "\t\t\t\t\tif(ev.id == %s) {\n", ed.widgets[i].id_name);
-					fprintf(f, "\t\t\t\t\t\t// TODO: handle %s for %s\n", ed_event_name(evt), ed.widgets[i].id_name);
-					fprintf(f, "\t\t\t\t\t}\n");
-				}
-			}
-		}
-
-		fprintf(f, "\t\t\t\t} break;\n\n");
-	}
-
-	uint32_t has_close = 0;
-	for(uint32_t j = 0; j < events_used_count; ++j) {
-		if(events_used[j] == MKGUI_EVENT_CLOSE) {
-			has_close = 1;
-			break;
-		}
-	}
-	if(!has_close) {
-		fprintf(f, "\t\t\t\tcase MKGUI_EVENT_CLOSE: {\n");
-		fprintf(f, "\t\t\t\t\trunning = 0;\n");
-		fprintf(f, "\t\t\t\t} break;\n\n");
-	}
-
-	fprintf(f, "\t\t\t\tdefault: break;\n");
-	fprintf(f, "\t\t\t}\n");
-	fprintf(f, "\t\t}\n");
-	fprintf(f, "\t\tmkgui_wait(ctx);\n");
-	fprintf(f, "\t}\n\n");
+	fprintf(f, "\n\tmkgui_run(ctx, on_event, NULL);\n");
 	fprintf(f, "\tmkgui_destroy(ctx);\n");
 	fprintf(f, "\treturn 0;\n");
 	fprintf(f, "}\n");
