@@ -688,6 +688,111 @@ struct mkgui_ctx {
 };
 
 // ---------------------------------------------------------------------------
+// Virtual memory arena (reserve-commit, no realloc)
+// ---------------------------------------------------------------------------
+
+#define MKGUI_VM_MAX_TEXT_CMDS   32768
+#define MKGUI_VM_MAX_WIDGETS     65536
+#define MKGUI_VM_MAX_HASH_SLOTS  (MKGUI_VM_MAX_WIDGETS * 2)
+
+struct vm_arena {
+	uint8_t *base;
+	size_t reserved;
+	size_t committed;
+};
+
+#ifdef _WIN32
+
+// [=]===^=[ vm_arena_create ]=====================================[=]
+static uint32_t vm_arena_create(struct vm_arena *a, size_t reserve_bytes) {
+	a->base = (uint8_t *)VirtualAlloc(NULL, reserve_bytes, MEM_RESERVE, PAGE_NOACCESS);
+	if(!a->base) {
+		return 0;
+	}
+	a->reserved = reserve_bytes;
+	a->committed = 0;
+	return 1;
+}
+
+// [=]===^=[ vm_arena_ensure ]=====================================[=]
+static uint32_t vm_arena_ensure(struct vm_arena *a, size_t needed) {
+	if(needed <= a->committed) {
+		return 1;
+	}
+	if(needed > a->reserved) {
+		return 0;
+	}
+	size_t page_size = 65536;
+	size_t new_commit = (needed + page_size - 1) & ~(page_size - 1);
+	if(new_commit > a->reserved) {
+		new_commit = a->reserved;
+	}
+	if(!VirtualAlloc(a->base, new_commit, MEM_COMMIT, PAGE_READWRITE)) {
+		return 0;
+	}
+	a->committed = new_commit;
+	return 1;
+}
+
+// [=]===^=[ vm_arena_destroy ]====================================[=]
+static void vm_arena_destroy(struct vm_arena *a) {
+	if(a->base) {
+		VirtualFree(a->base, 0, MEM_RELEASE);
+		a->base = NULL;
+		a->reserved = 0;
+		a->committed = 0;
+	}
+}
+
+#else
+
+#include <sys/mman.h>
+
+// [=]===^=[ vm_arena_create ]=====================================[=]
+static uint32_t vm_arena_create(struct vm_arena *a, size_t reserve_bytes) {
+	a->base = (uint8_t *)mmap(NULL, reserve_bytes, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+	if(a->base == MAP_FAILED) {
+		a->base = NULL;
+		return 0;
+	}
+	a->reserved = reserve_bytes;
+	a->committed = 0;
+	return 1;
+}
+
+// [=]===^=[ vm_arena_ensure ]=====================================[=]
+static uint32_t vm_arena_ensure(struct vm_arena *a, size_t needed) {
+	if(needed <= a->committed) {
+		return 1;
+	}
+	if(needed > a->reserved) {
+		return 0;
+	}
+	size_t page_size = 4096;
+	size_t new_commit = (needed + page_size - 1) & ~(page_size - 1);
+	if(new_commit > a->reserved) {
+		new_commit = a->reserved;
+	}
+	if(mprotect(a->base, new_commit, PROT_READ | PROT_WRITE) != 0) {
+		return 0;
+	}
+	a->committed = new_commit;
+	return 1;
+}
+
+// [=]===^=[ vm_arena_destroy ]====================================[=]
+static void vm_arena_destroy(struct vm_arena *a) {
+	if(a->base) {
+		munmap(a->base, a->reserved);
+		a->base = NULL;
+		a->reserved = 0;
+		a->committed = 0;
+	}
+}
+
+#endif
+
+// ---------------------------------------------------------------------------
 // Dynamic array growth
 // ---------------------------------------------------------------------------
 
@@ -768,6 +873,13 @@ MKGUI_API struct mkgui_theme light_theme(void) {
 	return t;
 }
 
+// ---------------------------------------------------------------------------
+// Public API validation macros
+// ---------------------------------------------------------------------------
+
+#define MKGUI_CHECK(ctx) do { if(!(ctx)) { return; } } while(0)
+#define MKGUI_CHECK_VAL(ctx, val) do { if(!(ctx)) { return (val); } } while(0)
+
 #include "mkgui_render.c"
 
 // ---------------------------------------------------------------------------
@@ -830,10 +942,15 @@ MKGUI_FIND_AUX(find_pathbar_data,    mkgui_pathbar_data,    pathbars,    pathbar
 // Layout parent index (declared early for widget_visible)
 // ---------------------------------------------------------------------------
 
+static struct vm_arena layout_parent_arena;
+static struct vm_arena layout_child_arena;
+static struct vm_arena layout_sibling_arena;
 static uint32_t *layout_parent;
 static uint32_t *layout_first_child;
 static uint32_t *layout_next_sibling;
 static uint32_t layout_arr_cap;
+
+static struct vm_arena layout_hash_arena;
 
 // ---------------------------------------------------------------------------
 // Widget visibility
@@ -1108,25 +1225,71 @@ static uint32_t layout_find_idx(uint32_t id) {
 	}
 }
 
+// [=]===^=[ layout_arena_init ]===================================[=]
+static uint32_t layout_arena_init(void) {
+	if(layout_parent_arena.base) {
+		return 1;
+	}
+	size_t per_reserve = (size_t)MKGUI_VM_MAX_WIDGETS * sizeof(uint32_t);
+	if(!vm_arena_create(&layout_parent_arena, per_reserve)) {
+		return 0;
+	}
+	if(!vm_arena_create(&layout_child_arena, per_reserve)) {
+		vm_arena_destroy(&layout_parent_arena);
+		return 0;
+	}
+	if(!vm_arena_create(&layout_sibling_arena, per_reserve)) {
+		vm_arena_destroy(&layout_parent_arena);
+		vm_arena_destroy(&layout_child_arena);
+		return 0;
+	}
+	layout_parent = (uint32_t *)layout_parent_arena.base;
+	layout_first_child = (uint32_t *)layout_child_arena.base;
+	layout_next_sibling = (uint32_t *)layout_sibling_arena.base;
+
+	size_t hash_reserve = (size_t)MKGUI_VM_MAX_HASH_SLOTS * sizeof(struct mkgui_layout_hash_entry);
+	if(!vm_arena_create(&layout_hash_arena, hash_reserve)) {
+		vm_arena_destroy(&layout_parent_arena);
+		vm_arena_destroy(&layout_child_arena);
+		vm_arena_destroy(&layout_sibling_arena);
+		layout_parent = NULL;
+		layout_first_child = NULL;
+		layout_next_sibling = NULL;
+		return 0;
+	}
+	layout_id_map = (struct mkgui_layout_hash_entry *)layout_hash_arena.base;
+	return 1;
+}
+
+// [=]===^=[ layout_arena_fini ]===================================[=]
+static void layout_arena_fini(void) {
+	vm_arena_destroy(&layout_parent_arena);
+	vm_arena_destroy(&layout_child_arena);
+	vm_arena_destroy(&layout_sibling_arena);
+	vm_arena_destroy(&layout_hash_arena);
+	layout_parent = NULL;
+	layout_first_child = NULL;
+	layout_next_sibling = NULL;
+	layout_id_map = NULL;
+	layout_arr_cap = 0;
+	layout_hash_size = 0;
+	layout_hash_mask = 0;
+}
+
 // [=]===^=[ layout_build_index ]==================================[=]
 static void layout_build_index(struct mkgui_ctx *ctx) {
 	if(ctx->widget_count > layout_arr_cap) {
 		uint32_t nc = (ctx->widget_count + MKGUI_GROW_WIDGETS - 1) & ~(uint32_t)(MKGUI_GROW_WIDGETS - 1);
-		uint32_t *np = (uint32_t *)realloc(layout_parent, (size_t)nc * sizeof(uint32_t));
-		uint32_t *nf = (uint32_t *)realloc(layout_first_child, (size_t)nc * sizeof(uint32_t));
-		uint32_t *ns = (uint32_t *)realloc(layout_next_sibling, (size_t)nc * sizeof(uint32_t));
-		if(np) {
-			layout_parent = np;
+		if(nc > MKGUI_VM_MAX_WIDGETS) {
+			return;
 		}
-		if(nf) {
-			layout_first_child = nf;
+		size_t needed = (size_t)nc * sizeof(uint32_t);
+		if(!vm_arena_ensure(&layout_parent_arena, needed) ||
+		   !vm_arena_ensure(&layout_child_arena, needed) ||
+		   !vm_arena_ensure(&layout_sibling_arena, needed)) {
+			return;
 		}
-		if(ns) {
-			layout_next_sibling = ns;
-		}
-		if(np && nf && ns) {
-			layout_arr_cap = nc;
-		}
+		layout_arr_cap = nc;
 	}
 	uint32_t need = ctx->widget_count * 2;
 	if(need < 256) {
@@ -1137,12 +1300,14 @@ static void layout_build_index(struct mkgui_ctx *ctx) {
 		hs <<= 1;
 	}
 	if(hs > layout_hash_size) {
-		struct mkgui_layout_hash_entry *nh = (struct mkgui_layout_hash_entry *)realloc(layout_id_map, (size_t)hs * sizeof(*layout_id_map));
-		if(nh) {
-			layout_id_map = nh;
-			layout_hash_size = hs;
-			layout_hash_mask = hs - 1;
+		if(hs > MKGUI_VM_MAX_HASH_SLOTS) {
+			return;
 		}
+		if(!vm_arena_ensure(&layout_hash_arena, (size_t)hs * sizeof(struct mkgui_layout_hash_entry))) {
+			return;
+		}
+		layout_hash_size = hs;
+		layout_hash_mask = hs - 1;
 	}
 	for(uint32_t i = 0; i < layout_hash_size; ++i) {
 		layout_id_map[i].idx = UINT32_MAX;
@@ -2542,6 +2707,7 @@ static uint32_t mkgui_grow_widgets(struct mkgui_ctx *ctx) {
 
 // [=]===^=[ mkgui_add_widget ]===================================[=]
 MKGUI_API uint32_t mkgui_add_widget(struct mkgui_ctx *ctx, struct mkgui_widget w, uint32_t after_id) {
+	MKGUI_CHECK_VAL(ctx, 0);
 	if(ctx->widget_count >= ctx->widget_cap) {
 		if(!mkgui_grow_widgets(ctx)) {
 			return 0;
@@ -2907,6 +3073,7 @@ static void mkgui_remove_aux_(struct mkgui_ctx *ctx, uint32_t id, uint32_t type)
 
 // [=]===^=[ mkgui_remove_widget ]================================[=]
 MKGUI_API uint32_t mkgui_remove_widget(struct mkgui_ctx *ctx, uint32_t id) {
+	MKGUI_CHECK_VAL(ctx, 0);
 	int32_t idx = find_widget_idx(ctx, id);
 	if(idx < 0) {
 		return 0;
@@ -3114,6 +3281,9 @@ static void mkgui_free_arrays(struct mkgui_ctx *ctx) {
 
 // [=]===^=[ mkgui_create ]======================================[=]
 MKGUI_API struct mkgui_ctx *mkgui_create(struct mkgui_widget *widgets, uint32_t count) {
+	if(!widgets && count > 0) {
+		return NULL;
+	}
 	struct mkgui_ctx *ctx = (struct mkgui_ctx *)calloc(1, sizeof(struct mkgui_ctx));
 
 	uint32_t cap = (count + MKGUI_GROW_WIDGETS - 1) & ~(uint32_t)(MKGUI_GROW_WIDGETS - 1);
@@ -3155,6 +3325,21 @@ MKGUI_API struct mkgui_ctx *mkgui_create(struct mkgui_widget *widgets, uint32_t 
 	render_clip_x2 = ctx->win_w;
 	render_clip_y2 = ctx->win_h;
 
+	if(!text_cmd_arena.base) {
+		if(!text_cmd_init()) {
+			mkgui_free_arrays(ctx);
+			platform_destroy(ctx);
+			free(ctx);
+			return NULL;
+		}
+	}
+	if(!layout_arena_init()) {
+		mkgui_free_arrays(ctx);
+		platform_destroy(ctx);
+		free(ctx);
+		return NULL;
+	}
+
 	platform_font_init(ctx);
 	ctx->theme = default_theme();
 	icon_text_color = ctx->theme.text & 0x00ffffff;
@@ -3178,6 +3363,7 @@ MKGUI_API struct mkgui_ctx *mkgui_create(struct mkgui_widget *widgets, uint32_t 
 
 // [=]===^=[ mkgui_set_theme ]====================================[=]
 MKGUI_API void mkgui_set_theme(struct mkgui_ctx *ctx, struct mkgui_theme theme) {
+	MKGUI_CHECK(ctx);
 	ctx->theme = theme;
 	icon_text_color = theme.text & 0x00ffffff;
 	icon_reload_all();
@@ -3186,6 +3372,7 @@ MKGUI_API void mkgui_set_theme(struct mkgui_ctx *ctx, struct mkgui_theme theme) 
 
 // [=]===^=[ mkgui_set_weight ]===================================[=]
 MKGUI_API void mkgui_set_weight(struct mkgui_ctx *ctx, uint32_t id, uint32_t weight) {
+	MKGUI_CHECK(ctx);
 	struct mkgui_widget *w = find_widget(ctx, id);
 	if(w) {
 		w->weight = weight;
@@ -3195,6 +3382,7 @@ MKGUI_API void mkgui_set_weight(struct mkgui_ctx *ctx, uint32_t id, uint32_t wei
 
 // [=]===^=[ mkgui_toolbar_set_mode ]==============================[=]
 MKGUI_API void mkgui_toolbar_set_mode(struct mkgui_ctx *ctx, uint32_t toolbar_id, uint32_t mode) {
+	MKGUI_CHECK(ctx);
 	struct mkgui_widget *w = find_widget(ctx, toolbar_id);
 	if(w && w->type == MKGUI_TOOLBAR) {
 		w->flags = (w->flags & ~MKGUI_TOOLBAR_MODE_MASK) | (mode & MKGUI_TOOLBAR_MODE_MASK);
@@ -3204,6 +3392,7 @@ MKGUI_API void mkgui_toolbar_set_mode(struct mkgui_ctx *ctx, uint32_t toolbar_id
 
 // [=]===^=[ mkgui_set_enabled ]====================================[=]
 MKGUI_API void mkgui_set_enabled(struct mkgui_ctx *ctx, uint32_t id, uint32_t enabled) {
+	MKGUI_CHECK(ctx);
 	struct mkgui_widget *w = find_widget(ctx, id);
 	if(!w) {
 		return;
@@ -3222,6 +3411,7 @@ MKGUI_API void mkgui_set_enabled(struct mkgui_ctx *ctx, uint32_t id, uint32_t en
 
 // [=]===^=[ mkgui_get_enabled ]====================================[=]
 MKGUI_API uint32_t mkgui_get_enabled(struct mkgui_ctx *ctx, uint32_t id) {
+	MKGUI_CHECK_VAL(ctx, 0);
 	struct mkgui_widget *w = find_widget(ctx, id);
 	if(!w) {
 		return 0;
@@ -3231,6 +3421,7 @@ MKGUI_API uint32_t mkgui_get_enabled(struct mkgui_ctx *ctx, uint32_t id) {
 
 // [=]===^=[ mkgui_set_visible ]====================================[=]
 MKGUI_API void mkgui_set_visible(struct mkgui_ctx *ctx, uint32_t id, uint32_t visible) {
+	MKGUI_CHECK(ctx);
 	struct mkgui_widget *w = find_widget(ctx, id);
 	if(!w) {
 		return;
@@ -3249,6 +3440,7 @@ MKGUI_API void mkgui_set_visible(struct mkgui_ctx *ctx, uint32_t id, uint32_t vi
 
 // [=]===^=[ mkgui_get_visible ]====================================[=]
 MKGUI_API uint32_t mkgui_get_visible(struct mkgui_ctx *ctx, uint32_t id) {
+	MKGUI_CHECK_VAL(ctx, 0);
 	struct mkgui_widget *w = find_widget(ctx, id);
 	if(!w) {
 		return 0;
@@ -3258,6 +3450,7 @@ MKGUI_API uint32_t mkgui_get_visible(struct mkgui_ctx *ctx, uint32_t id) {
 
 // [=]===^=[ mkgui_set_focus ]======================================[=]
 MKGUI_API void mkgui_set_focus(struct mkgui_ctx *ctx, uint32_t id) {
+	MKGUI_CHECK(ctx);
 	struct mkgui_widget *w = find_widget(ctx, id);
 	if(!w || !is_focusable(w)) {
 		return;
@@ -3268,11 +3461,13 @@ MKGUI_API void mkgui_set_focus(struct mkgui_ctx *ctx, uint32_t id) {
 
 // [=]===^=[ mkgui_has_focus ]======================================[=]
 MKGUI_API uint32_t mkgui_has_focus(struct mkgui_ctx *ctx, uint32_t id) {
+	MKGUI_CHECK_VAL(ctx, 0);
 	return ctx->focus_id == id ? 1 : 0;
 }
 
 // [=]===^=[ mkgui_get_tooltip ]====================================[=]
 MKGUI_API const char *mkgui_get_tooltip(struct mkgui_ctx *ctx, uint32_t id) {
+	MKGUI_CHECK_VAL(ctx, "");
 	int32_t idx = find_widget_idx(ctx, id);
 	if(idx < 0) {
 		return "";
@@ -3282,6 +3477,7 @@ MKGUI_API const char *mkgui_get_tooltip(struct mkgui_ctx *ctx, uint32_t id) {
 
 // [=]===^=[ mkgui_get_geometry ]====================================[=]
 MKGUI_API void mkgui_get_geometry(struct mkgui_ctx *ctx, uint32_t id, int32_t *x, int32_t *y, int32_t *w, int32_t *h) {
+	MKGUI_CHECK(ctx);
 	int32_t idx = find_widget_idx(ctx, id);
 	if(idx < 0) {
 		if(x) { *x = 0; }
@@ -3298,6 +3494,7 @@ MKGUI_API void mkgui_get_geometry(struct mkgui_ctx *ctx, uint32_t id, int32_t *x
 
 // [=]===^=[ mkgui_set_flags ]======================================[=]
 MKGUI_API void mkgui_set_flags(struct mkgui_ctx *ctx, uint32_t id, uint32_t flags) {
+	MKGUI_CHECK(ctx);
 	struct mkgui_widget *w = find_widget(ctx, id);
 	if(!w) {
 		return;
@@ -3308,6 +3505,7 @@ MKGUI_API void mkgui_set_flags(struct mkgui_ctx *ctx, uint32_t id, uint32_t flag
 
 // [=]===^=[ mkgui_get_flags ]======================================[=]
 MKGUI_API uint32_t mkgui_get_flags(struct mkgui_ctx *ctx, uint32_t id) {
+	MKGUI_CHECK_VAL(ctx, 0);
 	struct mkgui_widget *w = find_widget(ctx, id);
 	return w ? w->flags : 0;
 }
@@ -3353,11 +3551,18 @@ MKGUI_API void mkgui_destroy(struct mkgui_ctx *ctx) {
 	platform_font_fini(ctx);
 	platform_destroy(ctx);
 	mdi_dat_free();
+	if(window_registry_count == 0) {
+		text_cmd_fini();
+		layout_arena_fini();
+	}
 	free(ctx);
 }
 
 // [=]===^=[ mkgui_create_child ]=================================[=]
 MKGUI_API struct mkgui_ctx *mkgui_create_child(struct mkgui_ctx *parent, struct mkgui_widget *widgets, uint32_t count, const char *title, int32_t w, int32_t h) {
+	if(!parent || (!widgets && count > 0)) {
+		return NULL;
+	}
 	struct mkgui_ctx *ctx = (struct mkgui_ctx *)calloc(1, sizeof(struct mkgui_ctx));
 
 	uint32_t cap = (count + MKGUI_GROW_WIDGETS - 1) & ~(uint32_t)(MKGUI_GROW_WIDGETS - 1);
@@ -3451,6 +3656,10 @@ static void mkgui_resize_render_impl(struct mkgui_ctx *ctx) {
 
 // [=]===^=[ mkgui_poll ]========================================[=]
 MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
+	MKGUI_CHECK_VAL(ctx, 0);
+	if(!ev) {
+		return 0;
+	}
 	ev->type = MKGUI_EVENT_NONE;
 	ev->id = 0;
 	ev->value = 0;
@@ -6140,6 +6349,7 @@ static void mkgui_flush(struct mkgui_ctx *ctx) {
 
 // [=]===^=[ mkgui_wait ]=========================================[=]
 MKGUI_API void mkgui_wait(struct mkgui_ctx *ctx) {
+	MKGUI_CHECK(ctx);
 	mkgui_flush(ctx);
 
 	if(ctx->close_requested) {
@@ -6167,11 +6377,16 @@ MKGUI_API void mkgui_wait(struct mkgui_ctx *ctx) {
 
 // [=]===^=[ mkgui_set_poll_timeout ]==============================[=]
 MKGUI_API void mkgui_set_poll_timeout(struct mkgui_ctx *ctx, int32_t ms) {
+	MKGUI_CHECK(ctx);
 	ctx->poll_timeout_ms = ms;
 }
 
 // [=]===^=[ mkgui_add_timer ]=====================================[=]
 MKGUI_API uint32_t mkgui_add_timer(struct mkgui_ctx *ctx, uint64_t interval_ns, mkgui_timer_cb cb, void *userdata) {
+	MKGUI_CHECK_VAL(ctx, 0);
+	if(!cb) {
+		return 0;
+	}
 	if(ctx->timer_count >= MKGUI_MAX_TIMERS) {
 		return 0;
 	}
@@ -6212,6 +6427,7 @@ MKGUI_API uint32_t mkgui_add_timer(struct mkgui_ctx *ctx, uint64_t interval_ns, 
 
 // [=]===^=[ mkgui_remove_timer ]==================================[=]
 MKGUI_API void mkgui_remove_timer(struct mkgui_ctx *ctx, uint32_t timer_id) {
+	MKGUI_CHECK(ctx);
 	for(uint32_t i = 0; i < ctx->timer_count; ++i) {
 		if(ctx->timers[i].id == timer_id) {
 #ifdef _WIN32
@@ -6232,6 +6448,7 @@ MKGUI_API void mkgui_remove_timer(struct mkgui_ctx *ctx, uint32_t timer_id) {
 
 // [=]===^=[ mkgui_run ]===========================================[=]
 MKGUI_API void mkgui_run(struct mkgui_ctx *ctx, mkgui_event_cb cb, void *userdata) {
+	MKGUI_CHECK(ctx);
 	while(!ctx->close_requested) {
 		struct mkgui_event ev;
 		while(mkgui_poll(ctx, &ev)) {
@@ -6245,6 +6462,7 @@ MKGUI_API void mkgui_run(struct mkgui_ctx *ctx, mkgui_event_cb cb, void *userdat
 
 // [=]===^=[ mkgui_quit ]==========================================[=]
 MKGUI_API void mkgui_quit(struct mkgui_ctx *ctx) {
+	MKGUI_CHECK(ctx);
 	ctx->close_requested = 1;
 }
 

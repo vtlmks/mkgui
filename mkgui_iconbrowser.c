@@ -200,6 +200,10 @@ static uint32_t mkgui_icon_browser_pack(struct mkgui_ctx *ctx, struct mdi_pack *
 
 // [=]===^=[ mkgui_icon_browser ]===================================[=]
 MKGUI_API uint32_t mkgui_icon_browser(struct mkgui_ctx *ctx, char *out, uint32_t out_size) {
+	MKGUI_CHECK_VAL(ctx, 0);
+	if(!out || out_size == 0) {
+		return 0;
+	}
 	uint32_t r = mkgui_icon_browser_pack(ctx, &mdi, out, out_size);
 	if(r) {
 		icon_resolve(out);

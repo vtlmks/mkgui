@@ -116,6 +116,7 @@ static void render_progress(struct mkgui_ctx *ctx, uint32_t idx) {
 
 // [=]===^=[ mkgui_progress_setup ]===============================[=]
 MKGUI_API void mkgui_progress_setup(struct mkgui_ctx *ctx, uint32_t id, int32_t max_val) {
+	MKGUI_CHECK(ctx);
 	struct mkgui_progress_data *pd = find_progress_data(ctx, id);
 	if(pd) {
 		pd->max_val = max_val;
@@ -126,6 +127,7 @@ MKGUI_API void mkgui_progress_setup(struct mkgui_ctx *ctx, uint32_t id, int32_t 
 
 // [=]===^=[ mkgui_progress_set ]=================================[=]
 MKGUI_API void mkgui_progress_set(struct mkgui_ctx *ctx, uint32_t id, int32_t value) {
+	MKGUI_CHECK(ctx);
 	struct mkgui_progress_data *pd = find_progress_data(ctx, id);
 	if(pd) {
 		pd->value = value;
@@ -141,12 +143,14 @@ MKGUI_API void mkgui_progress_set(struct mkgui_ctx *ctx, uint32_t id, int32_t va
 
 // [=]===^=[ mkgui_progress_get ]=================================[=]
 MKGUI_API int32_t mkgui_progress_get(struct mkgui_ctx *ctx, uint32_t id) {
+	MKGUI_CHECK_VAL(ctx, 0);
 	struct mkgui_progress_data *pd = find_progress_data(ctx, id);
 	return pd ? pd->value : 0;
 }
 
 // [=]===^=[ mkgui_progress_set_range ]=============================[=]
 MKGUI_API void mkgui_progress_set_range(struct mkgui_ctx *ctx, uint32_t id, int32_t max_val) {
+	MKGUI_CHECK(ctx);
 	struct mkgui_progress_data *pd = find_progress_data(ctx, id);
 	if(!pd) {
 		return;
@@ -160,6 +164,7 @@ MKGUI_API void mkgui_progress_set_range(struct mkgui_ctx *ctx, uint32_t id, int3
 
 // [=]===^=[ mkgui_progress_get_range ]=============================[=]
 MKGUI_API void mkgui_progress_get_range(struct mkgui_ctx *ctx, uint32_t id, int32_t *max_val) {
+	MKGUI_CHECK(ctx);
 	struct mkgui_progress_data *pd = find_progress_data(ctx, id);
 	if(max_val) {
 		*max_val = pd ? pd->max_val : 0;
@@ -168,6 +173,7 @@ MKGUI_API void mkgui_progress_get_range(struct mkgui_ctx *ctx, uint32_t id, int3
 
 // [=]===^=[ mkgui_progress_set_color ]=============================[=]
 MKGUI_API void mkgui_progress_set_color(struct mkgui_ctx *ctx, uint32_t id, uint32_t color) {
+	MKGUI_CHECK(ctx);
 	struct mkgui_progress_data *pd = find_progress_data(ctx, id);
 	if(pd) {
 		pd->color = color;

@@ -333,6 +333,10 @@ static uint32_t handle_input_key(struct mkgui_ctx *ctx, struct mkgui_event *ev, 
 
 // [=]===^=[ mkgui_input_set ]=======================================[=]
 MKGUI_API void mkgui_input_set(struct mkgui_ctx *ctx, uint32_t id, const char *text) {
+	MKGUI_CHECK(ctx);
+	if(!text) {
+		text = "";
+	}
 	struct mkgui_input_data *inp = find_input_data(ctx, id);
 	if(!inp) {
 		return;
@@ -347,6 +351,7 @@ MKGUI_API void mkgui_input_set(struct mkgui_ctx *ctx, uint32_t id, const char *t
 
 // [=]===^=[ mkgui_input_get ]=======================================[=]
 MKGUI_API const char *mkgui_input_get(struct mkgui_ctx *ctx, uint32_t id) {
+	MKGUI_CHECK_VAL(ctx, "");
 	struct mkgui_input_data *inp = find_input_data(ctx, id);
 	if(!inp) {
 		return "";
@@ -356,6 +361,7 @@ MKGUI_API const char *mkgui_input_get(struct mkgui_ctx *ctx, uint32_t id) {
 
 // [=]===^=[ mkgui_input_clear ]=====================================[=]
 MKGUI_API void mkgui_input_clear(struct mkgui_ctx *ctx, uint32_t id) {
+	MKGUI_CHECK(ctx);
 	struct mkgui_input_data *inp = find_input_data(ctx, id);
 	if(!inp) {
 		return;
@@ -369,6 +375,7 @@ MKGUI_API void mkgui_input_clear(struct mkgui_ctx *ctx, uint32_t id) {
 
 // [=]===^=[ mkgui_input_set_readonly ]===============================[=]
 MKGUI_API void mkgui_input_set_readonly(struct mkgui_ctx *ctx, uint32_t id, uint32_t readonly) {
+	MKGUI_CHECK(ctx);
 	struct mkgui_widget *w = find_widget(ctx, id);
 	if(!w) {
 		return;
@@ -384,18 +391,21 @@ MKGUI_API void mkgui_input_set_readonly(struct mkgui_ctx *ctx, uint32_t id, uint
 
 // [=]===^=[ mkgui_input_get_readonly ]===============================[=]
 MKGUI_API uint32_t mkgui_input_get_readonly(struct mkgui_ctx *ctx, uint32_t id) {
+	MKGUI_CHECK_VAL(ctx, 0);
 	struct mkgui_widget *w = find_widget(ctx, id);
 	return (w && (w->flags & MKGUI_READONLY)) ? 1 : 0;
 }
 
 // [=]===^=[ mkgui_input_get_cursor ]=================================[=]
 MKGUI_API uint32_t mkgui_input_get_cursor(struct mkgui_ctx *ctx, uint32_t id) {
+	MKGUI_CHECK_VAL(ctx, 0);
 	struct mkgui_input_data *inp = find_input_data(ctx, id);
 	return inp ? inp->cursor : 0;
 }
 
 // [=]===^=[ mkgui_input_set_cursor ]=================================[=]
 MKGUI_API void mkgui_input_set_cursor(struct mkgui_ctx *ctx, uint32_t id, uint32_t pos) {
+	MKGUI_CHECK(ctx);
 	struct mkgui_input_data *inp = find_input_data(ctx, id);
 	if(!inp) {
 		return;
@@ -412,6 +422,7 @@ MKGUI_API void mkgui_input_set_cursor(struct mkgui_ctx *ctx, uint32_t id, uint32
 
 // [=]===^=[ mkgui_input_select_all ]=================================[=]
 MKGUI_API void mkgui_input_select_all(struct mkgui_ctx *ctx, uint32_t id) {
+	MKGUI_CHECK(ctx);
 	struct mkgui_input_data *inp = find_input_data(ctx, id);
 	if(!inp) {
 		return;
@@ -425,6 +436,7 @@ MKGUI_API void mkgui_input_select_all(struct mkgui_ctx *ctx, uint32_t id) {
 
 // [=]===^=[ mkgui_input_get_selection ]==============================[=]
 MKGUI_API void mkgui_input_get_selection(struct mkgui_ctx *ctx, uint32_t id, uint32_t *start, uint32_t *end) {
+	MKGUI_CHECK(ctx);
 	struct mkgui_input_data *inp = find_input_data(ctx, id);
 	if(!inp) {
 		if(start) { *start = 0; }
@@ -439,6 +451,7 @@ MKGUI_API void mkgui_input_get_selection(struct mkgui_ctx *ctx, uint32_t id, uin
 
 // [=]===^=[ mkgui_input_set_selection ]==============================[=]
 MKGUI_API void mkgui_input_set_selection(struct mkgui_ctx *ctx, uint32_t id, uint32_t start, uint32_t end) {
+	MKGUI_CHECK(ctx);
 	struct mkgui_input_data *inp = find_input_data(ctx, id);
 	if(!inp) {
 		return;

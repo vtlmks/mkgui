@@ -412,6 +412,10 @@ static uint32_t handle_richlist_key(struct mkgui_ctx *ctx, struct mkgui_event *e
 
 // [=]===^=[ mkgui_richlist_setup ]================================[=]
 MKGUI_API void mkgui_richlist_setup(struct mkgui_ctx *ctx, uint32_t id, uint32_t row_count, int32_t row_height, mkgui_richlist_cb cb, void *userdata) {
+	MKGUI_CHECK(ctx);
+	if(!cb) {
+		return;
+	}
 	struct mkgui_richlist_data *rl = find_richlist_data(ctx, id);
 	if(!rl) {
 		MKGUI_AUX_GROW(ctx->richlists, ctx->richlist_count, ctx->richlist_cap, struct mkgui_richlist_data);
@@ -433,6 +437,7 @@ MKGUI_API void mkgui_richlist_setup(struct mkgui_ctx *ctx, uint32_t id, uint32_t
 
 // [=]===^=[ mkgui_richlist_set_rows ]=============================[=]
 MKGUI_API void mkgui_richlist_set_rows(struct mkgui_ctx *ctx, uint32_t id, uint32_t row_count) {
+	MKGUI_CHECK(ctx);
 	struct mkgui_richlist_data *rl = find_richlist_data(ctx, id);
 	if(!rl) {
 		return;
@@ -443,12 +448,14 @@ MKGUI_API void mkgui_richlist_set_rows(struct mkgui_ctx *ctx, uint32_t id, uint3
 
 // [=]===^=[ mkgui_richlist_get_selected ]==========================[=]
 MKGUI_API int32_t mkgui_richlist_get_selected(struct mkgui_ctx *ctx, uint32_t id) {
+	MKGUI_CHECK_VAL(ctx, -1);
 	struct mkgui_richlist_data *rl = find_richlist_data(ctx, id);
 	return rl ? rl->selected_row : -1;
 }
 
 // [=]===^=[ mkgui_richlist_set_selected ]==========================[=]
 MKGUI_API void mkgui_richlist_set_selected(struct mkgui_ctx *ctx, uint32_t id, int32_t row) {
+	MKGUI_CHECK(ctx);
 	struct mkgui_richlist_data *rl = find_richlist_data(ctx, id);
 	if(rl) {
 		rl->selected_row = row;
@@ -458,6 +465,7 @@ MKGUI_API void mkgui_richlist_set_selected(struct mkgui_ctx *ctx, uint32_t id, i
 
 // [=]===^=[ mkgui_richlist_scroll_to ]=============================[=]
 MKGUI_API void mkgui_richlist_scroll_to(struct mkgui_ctx *ctx, uint32_t id, int32_t row) {
+	MKGUI_CHECK(ctx);
 	struct mkgui_richlist_data *rl = find_richlist_data(ctx, id);
 	if(!rl) {
 		return;

@@ -284,6 +284,10 @@ static uint32_t handle_ipinput_key(struct mkgui_ctx *ctx, struct mkgui_event *ev
 
 // [=]===^=[ mkgui_ipinput_set ]===================================[=]
 MKGUI_API void mkgui_ipinput_set(struct mkgui_ctx *ctx, uint32_t id, const char *ip_string) {
+	MKGUI_CHECK(ctx);
+	if(!ip_string) {
+		ip_string = "";
+	}
 	struct mkgui_ipinput_data *ip = find_ipinput_data(ctx, id);
 	if(!ip) {
 		return;
@@ -301,6 +305,7 @@ MKGUI_API void mkgui_ipinput_set(struct mkgui_ctx *ctx, uint32_t id, const char 
 
 // [=]===^=[ mkgui_ipinput_get ]===================================[=]
 MKGUI_API const char *mkgui_ipinput_get(struct mkgui_ctx *ctx, uint32_t id) {
+	MKGUI_CHECK_VAL(ctx, "");
 	static char ipinput_buf[16];
 	struct mkgui_ipinput_data *ip = find_ipinput_data(ctx, id);
 	if(!ip) {
@@ -313,6 +318,7 @@ MKGUI_API const char *mkgui_ipinput_get(struct mkgui_ctx *ctx, uint32_t id) {
 
 // [=]===^=[ mkgui_ipinput_get_u32 ]===============================[=]
 MKGUI_API uint32_t mkgui_ipinput_get_u32(struct mkgui_ctx *ctx, uint32_t id) {
+	MKGUI_CHECK_VAL(ctx, 0);
 	struct mkgui_ipinput_data *ip = find_ipinput_data(ctx, id);
 	if(!ip) {
 		return 0;

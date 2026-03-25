@@ -29,9 +29,13 @@ static void render_label(struct mkgui_ctx *ctx, uint32_t idx) {
 
 // [=]===^=[ mkgui_label_set ]===================================[=]
 MKGUI_API void mkgui_label_set(struct mkgui_ctx *ctx, uint32_t id, const char *text) {
+	MKGUI_CHECK(ctx);
 	struct mkgui_widget *w = find_widget(ctx, id);
 	if(!w) {
 		return;
+	}
+	if(!text) {
+		text = "";
 	}
 	strncpy(w->label, text, MKGUI_MAX_TEXT - 1);
 	w->label[MKGUI_MAX_TEXT - 1] = '\0';
@@ -40,6 +44,7 @@ MKGUI_API void mkgui_label_set(struct mkgui_ctx *ctx, uint32_t id, const char *t
 
 // [=]===^=[ mkgui_label_get ]===================================[=]
 MKGUI_API const char *mkgui_label_get(struct mkgui_ctx *ctx, uint32_t id) {
+	MKGUI_CHECK_VAL(ctx, "");
 	struct mkgui_widget *w = find_widget(ctx, id);
 	return w ? w->label : "";
 }

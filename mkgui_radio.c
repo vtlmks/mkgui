@@ -184,12 +184,14 @@ static uint32_t handle_radio_key(struct mkgui_ctx *ctx, struct mkgui_event *ev, 
 
 // [=]===^=[ mkgui_radio_get ]====================================[=]
 MKGUI_API uint32_t mkgui_radio_get(struct mkgui_ctx *ctx, uint32_t id) {
+	MKGUI_CHECK_VAL(ctx, 0);
 	struct mkgui_widget *w = find_widget(ctx, id);
 	return (w && (w->flags & MKGUI_CHECKED)) ? 1 : 0;
 }
 
 // [=]===^=[ mkgui_radio_set ]======================================[=]
 MKGUI_API void mkgui_radio_set(struct mkgui_ctx *ctx, uint32_t id, uint32_t checked) {
+	MKGUI_CHECK(ctx);
 	struct mkgui_widget *w = find_widget(ctx, id);
 	if(!w || w->type != MKGUI_RADIO) {
 		return;

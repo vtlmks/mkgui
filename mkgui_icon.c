@@ -403,8 +403,14 @@ MKGUI_API int32_t mkgui_icon_add(const char *name, const uint32_t *pixels, int32
 
 // [=]===^=[ mkgui_set_icon ]=========================================[=]
 MKGUI_API void mkgui_set_icon(struct mkgui_ctx *ctx, uint32_t widget_id, const char *icon_name) {
+	MKGUI_CHECK(ctx);
 	struct mkgui_widget *w = find_widget(ctx, widget_id);
 	if(!w) {
+		return;
+	}
+	if(!icon_name) {
+		w->icon[0] = '\0';
+		dirty_all(ctx);
 		return;
 	}
 	strncpy(w->icon, icon_name, MKGUI_ICON_NAME_LEN - 1);
@@ -415,6 +421,7 @@ MKGUI_API void mkgui_set_icon(struct mkgui_ctx *ctx, uint32_t widget_id, const c
 
 // [=]===^=[ mkgui_set_treenode_icon ]================================[=]
 MKGUI_API void mkgui_set_treenode_icon(struct mkgui_ctx *ctx, uint32_t widget_id, uint32_t node_id, const char *icon_name) {
+	MKGUI_CHECK(ctx);
 	struct mkgui_treeview_data *tv = find_treeview_data(ctx, widget_id);
 	if(!tv) {
 		return;

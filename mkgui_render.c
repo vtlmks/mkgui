@@ -486,22 +486,33 @@ struct mkgui_text_cmd {
 	uint32_t color;
 };
 
+static struct vm_arena text_cmd_arena;
 static struct mkgui_text_cmd *text_cmds;
 static uint32_t text_cmd_count;
-static uint32_t text_cmd_cap;
 
-#define MKGUI_TEXT_CMD_GROW 512
+// [=]===^=[ text_cmd_init ]======================================[=]
+static uint32_t text_cmd_init(void) {
+	if(!vm_arena_create(&text_cmd_arena, (size_t)MKGUI_VM_MAX_TEXT_CMDS * sizeof(struct mkgui_text_cmd))) {
+		return 0;
+	}
+	text_cmds = (struct mkgui_text_cmd *)text_cmd_arena.base;
+	return 1;
+}
+
+// [=]===^=[ text_cmd_fini ]======================================[=]
+static void text_cmd_fini(void) {
+	vm_arena_destroy(&text_cmd_arena);
+	text_cmds = NULL;
+	text_cmd_count = 0;
+}
 
 // [=]===^=[ push_text_clip ]=====================================[=]
 static void push_text_clip(int32_t x, int32_t y, const char *text, uint32_t color, int32_t cx1, int32_t cy1, int32_t cx2, int32_t cy2) {
-	if(text_cmd_count >= text_cmd_cap) {
-		uint32_t nc = text_cmd_cap + MKGUI_TEXT_CMD_GROW;
-		struct mkgui_text_cmd *nt = (struct mkgui_text_cmd *)realloc(text_cmds, (size_t)nc * sizeof(struct mkgui_text_cmd));
-		if(!nt) {
-			return;
-		}
-		text_cmds = nt;
-		text_cmd_cap = nc;
+	if(text_cmd_count >= MKGUI_VM_MAX_TEXT_CMDS) {
+		return;
+	}
+	if(!vm_arena_ensure(&text_cmd_arena, (size_t)(text_cmd_count + 1) * sizeof(struct mkgui_text_cmd))) {
+		return;
 	}
 	if(cx1 < render_clip_x1) {
 		cx1 = render_clip_x1;

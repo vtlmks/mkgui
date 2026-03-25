@@ -245,6 +245,7 @@ static void render_meter(struct mkgui_ctx *ctx, uint32_t idx) {
 
 // [=]===^=[ mkgui_meter_setup ]===================================[=]
 MKGUI_API void mkgui_meter_setup(struct mkgui_ctx *ctx, uint32_t id, int32_t max_val) {
+	MKGUI_CHECK(ctx);
 	struct mkgui_meter_data *md = find_meter_data(ctx, id);
 	if(md) {
 		md->max_val = max_val;
@@ -257,6 +258,7 @@ MKGUI_API void mkgui_meter_setup(struct mkgui_ctx *ctx, uint32_t id, int32_t max
 
 // [=]===^=[ mkgui_meter_set ]=====================================[=]
 MKGUI_API void mkgui_meter_set(struct mkgui_ctx *ctx, uint32_t id, int32_t value) {
+	MKGUI_CHECK(ctx);
 	struct mkgui_meter_data *md = find_meter_data(ctx, id);
 	if(md) {
 		md->value = value;
@@ -272,12 +274,14 @@ MKGUI_API void mkgui_meter_set(struct mkgui_ctx *ctx, uint32_t id, int32_t value
 
 // [=]===^=[ mkgui_meter_get ]=====================================[=]
 MKGUI_API int32_t mkgui_meter_get(struct mkgui_ctx *ctx, uint32_t id) {
+	MKGUI_CHECK_VAL(ctx, 0);
 	struct mkgui_meter_data *md = find_meter_data(ctx, id);
 	return md ? md->value : 0;
 }
 
 // [=]===^=[ mkgui_meter_set_range ]================================[=]
 MKGUI_API void mkgui_meter_set_range(struct mkgui_ctx *ctx, uint32_t id, int32_t max_val) {
+	MKGUI_CHECK(ctx);
 	struct mkgui_meter_data *md = find_meter_data(ctx, id);
 	if(!md) {
 		return;
@@ -291,6 +295,7 @@ MKGUI_API void mkgui_meter_set_range(struct mkgui_ctx *ctx, uint32_t id, int32_t
 
 // [=]===^=[ mkgui_meter_get_range ]================================[=]
 MKGUI_API void mkgui_meter_get_range(struct mkgui_ctx *ctx, uint32_t id, int32_t *max_val) {
+	MKGUI_CHECK(ctx);
 	struct mkgui_meter_data *md = find_meter_data(ctx, id);
 	if(max_val) {
 		*max_val = md ? md->max_val : 0;
@@ -299,6 +304,7 @@ MKGUI_API void mkgui_meter_get_range(struct mkgui_ctx *ctx, uint32_t id, int32_t
 
 // [=]===^=[ mkgui_meter_set_zones ]================================[=]
 MKGUI_API void mkgui_meter_set_zones(struct mkgui_ctx *ctx, uint32_t id, int32_t t1, int32_t t2, uint32_t c1, uint32_t c2, uint32_t c3) {
+	MKGUI_CHECK(ctx);
 	struct mkgui_meter_data *md = find_meter_data(ctx, id);
 	if(!md) {
 		return;

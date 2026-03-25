@@ -34,6 +34,7 @@ static void render_canvas(struct mkgui_ctx *ctx, uint32_t idx) {
 
 // [=]===^=[ mkgui_canvas_set_callback ]============================[=]
 MKGUI_API void mkgui_canvas_set_callback(struct mkgui_ctx *ctx, uint32_t id, mkgui_canvas_cb callback, void *userdata) {
+	MKGUI_CHECK(ctx);
 	struct mkgui_canvas_data *cd = find_canvas_data(ctx, id);
 	if(cd) {
 		cd->callback = callback;

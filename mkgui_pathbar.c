@@ -440,6 +440,10 @@ static void pathbar_focus_lost(struct mkgui_ctx *ctx) {
 
 // [=]===^=[ mkgui_pathbar_set ]=====================================[=]
 MKGUI_API void mkgui_pathbar_set(struct mkgui_ctx *ctx, uint32_t id, const char *path) {
+	MKGUI_CHECK(ctx);
+	if(!path) {
+		path = "";
+	}
 	struct mkgui_pathbar_data *pb = find_pathbar_data(ctx, id);
 	if(!pb) {
 		return;
@@ -454,6 +458,7 @@ MKGUI_API void mkgui_pathbar_set(struct mkgui_ctx *ctx, uint32_t id, const char 
 
 // [=]===^=[ mkgui_pathbar_get ]=====================================[=]
 MKGUI_API const char *mkgui_pathbar_get(struct mkgui_ctx *ctx, uint32_t id) {
+	MKGUI_CHECK_VAL(ctx, "");
 	struct mkgui_pathbar_data *pb = find_pathbar_data(ctx, id);
 	if(!pb) {
 		return "";
@@ -463,6 +468,10 @@ MKGUI_API const char *mkgui_pathbar_get(struct mkgui_ctx *ctx, uint32_t id) {
 
 // [=]===^=[ mkgui_pathbar_get_segment_path ]========================[=]
 MKGUI_API void mkgui_pathbar_get_segment_path(struct mkgui_ctx *ctx, uint32_t id, uint32_t seg_idx, char *out, uint32_t out_size) {
+	MKGUI_CHECK(ctx);
+	if(!out || out_size == 0) {
+		return;
+	}
 	struct mkgui_pathbar_data *pb = find_pathbar_data(ctx, id);
 	if(!pb) {
 		if(out_size > 0) {

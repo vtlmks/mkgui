@@ -13,6 +13,7 @@ static struct mkgui_scrollbar_data *find_scrollbar_data(struct mkgui_ctx *ctx, u
 
 // [=]===^=[ mkgui_scrollbar_setup ]==============================[=]
 MKGUI_API void mkgui_scrollbar_setup(struct mkgui_ctx *ctx, uint32_t id, int32_t max_value, int32_t page_size) {
+	MKGUI_CHECK(ctx);
 	struct mkgui_scrollbar_data *sb = find_scrollbar_data(ctx, id);
 	if(!sb) {
 		MKGUI_AUX_GROW(ctx->scrollbars, ctx->scrollbar_count, ctx->scrollbar_cap, struct mkgui_scrollbar_data);
@@ -29,6 +30,7 @@ MKGUI_API void mkgui_scrollbar_setup(struct mkgui_ctx *ctx, uint32_t id, int32_t
 
 // [=]===^=[ mkgui_scrollbar_set ]================================[=]
 MKGUI_API void mkgui_scrollbar_set(struct mkgui_ctx *ctx, uint32_t id, int32_t value) {
+	MKGUI_CHECK(ctx);
 	struct mkgui_scrollbar_data *sb = find_scrollbar_data(ctx, id);
 	if(!sb) {
 		return;
@@ -49,6 +51,7 @@ MKGUI_API void mkgui_scrollbar_set(struct mkgui_ctx *ctx, uint32_t id, int32_t v
 
 // [=]===^=[ mkgui_scrollbar_get ]================================[=]
 MKGUI_API int32_t mkgui_scrollbar_get(struct mkgui_ctx *ctx, uint32_t id) {
+	MKGUI_CHECK_VAL(ctx, 0);
 	struct mkgui_scrollbar_data *sb = find_scrollbar_data(ctx, id);
 	if(!sb) {
 		return 0;

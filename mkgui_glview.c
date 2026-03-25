@@ -79,6 +79,7 @@ static void render_glview(struct mkgui_ctx *ctx, uint32_t idx) {
 
 // [=]===^=[ mkgui_glview_init ]==================================[=]
 MKGUI_API uint32_t mkgui_glview_init(struct mkgui_ctx *ctx, uint32_t id) {
+	MKGUI_CHECK_VAL(ctx, 0);
 	struct mkgui_glview_data *gv = find_glview_data(ctx, id);
 	if(gv) {
 		return gv->created;
@@ -143,6 +144,7 @@ MKGUI_API uint32_t mkgui_glview_init(struct mkgui_ctx *ctx, uint32_t id) {
 
 // [=]===^=[ mkgui_glview_destroy ]================================[=]
 MKGUI_API void mkgui_glview_destroy(struct mkgui_ctx *ctx, uint32_t id) {
+	MKGUI_CHECK(ctx);
 	struct mkgui_glview_data *gv = find_glview_data(ctx, id);
 	if(!gv || !gv->created) {
 		return;
@@ -153,6 +155,7 @@ MKGUI_API void mkgui_glview_destroy(struct mkgui_ctx *ctx, uint32_t id) {
 
 // [=]===^=[ mkgui_glview_get_size ]===============================[=]
 MKGUI_API void mkgui_glview_get_size(struct mkgui_ctx *ctx, uint32_t id, int32_t *w, int32_t *h) {
+	MKGUI_CHECK(ctx);
 	struct mkgui_glview_data *gv = find_glview_data(ctx, id);
 	if(!gv || !gv->created) {
 		if(w) {
@@ -174,6 +177,7 @@ MKGUI_API void mkgui_glview_get_size(struct mkgui_ctx *ctx, uint32_t id, int32_t
 // [=]===^=[ mkgui_glview_get_native_window ]======================[=]
 #ifdef _WIN32
 MKGUI_API HWND mkgui_glview_get_hwnd(struct mkgui_ctx *ctx, uint32_t id) {
+	MKGUI_CHECK_VAL(ctx, NULL);
 	struct mkgui_glview_data *gv = find_glview_data(ctx, id);
 	if(!gv || !gv->created) {
 		return NULL;
@@ -182,6 +186,7 @@ MKGUI_API HWND mkgui_glview_get_hwnd(struct mkgui_ctx *ctx, uint32_t id) {
 }
 #else
 MKGUI_API Window mkgui_glview_get_x11_window(struct mkgui_ctx *ctx, uint32_t id) {
+	MKGUI_CHECK_VAL(ctx, 0);
 	struct mkgui_glview_data *gv = find_glview_data(ctx, id);
 	if(!gv || !gv->created) {
 		return 0;
@@ -191,6 +196,7 @@ MKGUI_API Window mkgui_glview_get_x11_window(struct mkgui_ctx *ctx, uint32_t id)
 
 // [=]===^=[ mkgui_glview_get_x11_display ]========================[=]
 MKGUI_API Display *mkgui_glview_get_x11_display(struct mkgui_ctx *ctx) {
+	MKGUI_CHECK_VAL(ctx, NULL);
 	return ctx->plat.dpy;
 }
 #endif

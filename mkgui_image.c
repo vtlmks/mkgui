@@ -13,6 +13,10 @@ static struct mkgui_image_data *find_image_data(struct mkgui_ctx *ctx, uint32_t 
 
 // [=]===^=[ mkgui_image_set ]====================================[=]
 MKGUI_API void mkgui_image_set(struct mkgui_ctx *ctx, uint32_t id, const uint32_t *pixels, int32_t w, int32_t h) {
+	MKGUI_CHECK(ctx);
+	if(!pixels) {
+		return;
+	}
 	struct mkgui_image_data *img = find_image_data(ctx, id);
 	if(!img) {
 		MKGUI_AUX_GROW(ctx->images, ctx->image_count, ctx->image_cap, struct mkgui_image_data);
@@ -42,6 +46,7 @@ MKGUI_API void mkgui_image_set(struct mkgui_ctx *ctx, uint32_t id, const uint32_
 
 // [=]===^=[ mkgui_image_clear ]==================================[=]
 MKGUI_API void mkgui_image_clear(struct mkgui_ctx *ctx, uint32_t id) {
+	MKGUI_CHECK(ctx);
 	struct mkgui_image_data *img = find_image_data(ctx, id);
 	if(!img) {
 		return;

@@ -572,6 +572,13 @@ static uint32_t handle_gridview_key(struct mkgui_ctx *ctx, struct mkgui_event *e
 // [=]===^=[ mkgui_gridview_setup ]===============================[=]
 MKGUI_API void mkgui_gridview_setup(struct mkgui_ctx *ctx, uint32_t id, uint32_t row_count, uint32_t col_count,
 	struct mkgui_grid_column *columns, mkgui_grid_cell_cb cell_cb, void *userdata) {
+	MKGUI_CHECK(ctx);
+	if(!columns) {
+		return;
+	}
+	if(!cell_cb) {
+		return;
+	}
 	struct mkgui_gridview_data *gv = find_gridv_data(ctx, id);
 	if(!gv) {
 		MKGUI_AUX_GROW(ctx->gridviews, ctx->gridview_count, ctx->gridview_cap, struct mkgui_gridview_data);
@@ -610,6 +617,7 @@ MKGUI_API void mkgui_gridview_setup(struct mkgui_ctx *ctx, uint32_t id, uint32_t
 
 // [=]===^=[ mkgui_gridview_set_rows ]============================[=]
 MKGUI_API void mkgui_gridview_set_rows(struct mkgui_ctx *ctx, uint32_t id, uint32_t row_count) {
+	MKGUI_CHECK(ctx);
 	struct mkgui_gridview_data *gv = find_gridv_data(ctx, id);
 	if(!gv) {
 		return;
@@ -632,12 +640,14 @@ MKGUI_API void mkgui_gridview_set_rows(struct mkgui_ctx *ctx, uint32_t id, uint3
 
 // [=]===^=[ mkgui_gridview_get_selected ]========================[=]
 MKGUI_API int32_t mkgui_gridview_get_selected(struct mkgui_ctx *ctx, uint32_t id) {
+	MKGUI_CHECK_VAL(ctx, -1);
 	struct mkgui_gridview_data *gv = find_gridv_data(ctx, id);
 	return gv ? gv->selected_row : -1;
 }
 
 // [=]===^=[ mkgui_gridview_set_selected ]=========================[=]
 MKGUI_API void mkgui_gridview_set_selected(struct mkgui_ctx *ctx, uint32_t id, int32_t row) {
+	MKGUI_CHECK(ctx);
 	struct mkgui_gridview_data *gv = find_gridv_data(ctx, id);
 	if(gv) {
 		gv->selected_row = row;
@@ -646,6 +656,7 @@ MKGUI_API void mkgui_gridview_set_selected(struct mkgui_ctx *ctx, uint32_t id, i
 
 // [=]===^=[ mkgui_gridview_get_check ]============================[=]
 MKGUI_API uint32_t mkgui_gridview_get_check(struct mkgui_ctx *ctx, uint32_t id, uint32_t row, uint32_t col) {
+	MKGUI_CHECK_VAL(ctx, 0);
 	struct mkgui_gridview_data *gv = find_gridv_data(ctx, id);
 	if(!gv) {
 		return 0;
@@ -655,6 +666,7 @@ MKGUI_API uint32_t mkgui_gridview_get_check(struct mkgui_ctx *ctx, uint32_t id, 
 
 // [=]===^=[ mkgui_gridview_set_check ]============================[=]
 MKGUI_API void mkgui_gridview_set_check(struct mkgui_ctx *ctx, uint32_t id, uint32_t row, uint32_t col, uint32_t checked) {
+	MKGUI_CHECK(ctx);
 	struct mkgui_gridview_data *gv = find_gridv_data(ctx, id);
 	if(!gv) {
 		return;
@@ -665,6 +677,7 @@ MKGUI_API void mkgui_gridview_set_check(struct mkgui_ctx *ctx, uint32_t id, uint
 
 // [=]===^=[ mkgui_gridview_get_col_width ]==========================[=]
 MKGUI_API int32_t mkgui_gridview_get_col_width(struct mkgui_ctx *ctx, uint32_t id, uint32_t col) {
+	MKGUI_CHECK_VAL(ctx, 0);
 	struct mkgui_gridview_data *gv = find_gridv_data(ctx, id);
 	if(!gv || col >= gv->col_count) {
 		return 0;
@@ -674,6 +687,7 @@ MKGUI_API int32_t mkgui_gridview_get_col_width(struct mkgui_ctx *ctx, uint32_t i
 
 // [=]===^=[ mkgui_gridview_set_col_width ]==========================[=]
 MKGUI_API void mkgui_gridview_set_col_width(struct mkgui_ctx *ctx, uint32_t id, uint32_t col, int32_t width) {
+	MKGUI_CHECK(ctx);
 	struct mkgui_gridview_data *gv = find_gridv_data(ctx, id);
 	if(!gv || col >= gv->col_count) {
 		return;
@@ -684,6 +698,7 @@ MKGUI_API void mkgui_gridview_set_col_width(struct mkgui_ctx *ctx, uint32_t id, 
 
 // [=]===^=[ mkgui_gridview_scroll_to ]==============================[=]
 MKGUI_API void mkgui_gridview_scroll_to(struct mkgui_ctx *ctx, uint32_t id, int32_t row) {
+	MKGUI_CHECK(ctx);
 	struct mkgui_gridview_data *gv = find_gridv_data(ctx, id);
 	if(!gv) {
 		return;

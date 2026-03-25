@@ -29,12 +29,14 @@ static void render_split(struct mkgui_ctx *ctx, uint32_t idx) {
 
 // [=]===^=[ mkgui_split_get_ratio ]================================[=]
 MKGUI_API float mkgui_split_get_ratio(struct mkgui_ctx *ctx, uint32_t id) {
+	MKGUI_CHECK_VAL(ctx, 0.0f);
 	struct mkgui_split_data *sd = find_split_data(ctx, id);
 	return sd ? sd->ratio : 0.5f;
 }
 
 // [=]===^=[ mkgui_split_set_ratio ]================================[=]
 MKGUI_API void mkgui_split_set_ratio(struct mkgui_ctx *ctx, uint32_t id, float ratio) {
+	MKGUI_CHECK(ctx);
 	struct mkgui_split_data *sd = find_split_data(ctx, id);
 	if(!sd) {
 		return;

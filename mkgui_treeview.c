@@ -463,6 +463,7 @@ static uint32_t handle_treeview_key(struct mkgui_ctx *ctx, struct mkgui_event *e
 
 // [=]===^=[ mkgui_treeview_setup ]===============================[=]
 MKGUI_API void mkgui_treeview_setup(struct mkgui_ctx *ctx, uint32_t id) {
+	MKGUI_CHECK(ctx);
 	struct mkgui_treeview_data *tv = find_treeview_data(ctx, id);
 	if(tv) {
 		tv->node_count = 0;
@@ -479,6 +480,10 @@ MKGUI_API void mkgui_treeview_setup(struct mkgui_ctx *ctx, uint32_t id) {
 
 // [=]===^=[ mkgui_treeview_add ]=================================[=]
 MKGUI_API uint32_t mkgui_treeview_add(struct mkgui_ctx *ctx, uint32_t widget_id, uint32_t node_id, uint32_t parent_node, const char *label) {
+	MKGUI_CHECK_VAL(ctx, 0);
+	if(!label) {
+		label = "";
+	}
 	struct mkgui_treeview_data *tv = find_treeview_data(ctx, widget_id);
 	if(!tv || !tv->nodes) {
 		return 0;
@@ -522,12 +527,14 @@ MKGUI_API uint32_t mkgui_treeview_add(struct mkgui_ctx *ctx, uint32_t widget_id,
 
 // [=]===^=[ mkgui_treeview_get_selected ]========================[=]
 MKGUI_API int32_t mkgui_treeview_get_selected(struct mkgui_ctx *ctx, uint32_t id) {
+	MKGUI_CHECK_VAL(ctx, -1);
 	struct mkgui_treeview_data *tv = find_treeview_data(ctx, id);
 	return tv ? tv->selected_node : -1;
 }
 
 // [=]===^=[ mkgui_treeview_select ]==============================[=]
 MKGUI_API void mkgui_treeview_select(struct mkgui_ctx *ctx, uint32_t widget_id, int32_t node_id) {
+	MKGUI_CHECK(ctx);
 	struct mkgui_treeview_data *tv = find_treeview_data(ctx, widget_id);
 	if(!tv) {
 		return;
@@ -538,6 +545,7 @@ MKGUI_API void mkgui_treeview_select(struct mkgui_ctx *ctx, uint32_t widget_id, 
 
 // [=]===^=[ mkgui_treeview_remove ]================================[=]
 MKGUI_API void mkgui_treeview_remove(struct mkgui_ctx *ctx, uint32_t widget_id, uint32_t node_id) {
+	MKGUI_CHECK(ctx);
 	struct mkgui_treeview_data *tv = find_treeview_data(ctx, widget_id);
 	if(!tv) {
 		return;
@@ -584,6 +592,7 @@ MKGUI_API void mkgui_treeview_remove(struct mkgui_ctx *ctx, uint32_t widget_id, 
 
 // [=]===^=[ mkgui_treeview_clear ]=================================[=]
 MKGUI_API void mkgui_treeview_clear(struct mkgui_ctx *ctx, uint32_t widget_id) {
+	MKGUI_CHECK(ctx);
 	struct mkgui_treeview_data *tv = find_treeview_data(ctx, widget_id);
 	if(!tv) {
 		return;
@@ -596,6 +605,10 @@ MKGUI_API void mkgui_treeview_clear(struct mkgui_ctx *ctx, uint32_t widget_id) {
 
 // [=]===^=[ mkgui_treeview_set_label ]=============================[=]
 MKGUI_API void mkgui_treeview_set_label(struct mkgui_ctx *ctx, uint32_t widget_id, uint32_t node_id, const char *label) {
+	MKGUI_CHECK(ctx);
+	if(!label) {
+		label = "";
+	}
 	struct mkgui_treeview_data *tv = find_treeview_data(ctx, widget_id);
 	if(!tv) {
 		return;
@@ -612,6 +625,7 @@ MKGUI_API void mkgui_treeview_set_label(struct mkgui_ctx *ctx, uint32_t widget_i
 
 // [=]===^=[ mkgui_treeview_get_label ]=============================[=]
 MKGUI_API const char *mkgui_treeview_get_label(struct mkgui_ctx *ctx, uint32_t widget_id, uint32_t node_id) {
+	MKGUI_CHECK_VAL(ctx, "");
 	struct mkgui_treeview_data *tv = find_treeview_data(ctx, widget_id);
 	if(!tv) {
 		return "";
@@ -626,6 +640,7 @@ MKGUI_API const char *mkgui_treeview_get_label(struct mkgui_ctx *ctx, uint32_t w
 
 // [=]===^=[ mkgui_treeview_expand ]================================[=]
 MKGUI_API void mkgui_treeview_expand(struct mkgui_ctx *ctx, uint32_t widget_id, uint32_t node_id) {
+	MKGUI_CHECK(ctx);
 	struct mkgui_treeview_data *tv = find_treeview_data(ctx, widget_id);
 	if(!tv) {
 		return;
@@ -641,6 +656,7 @@ MKGUI_API void mkgui_treeview_expand(struct mkgui_ctx *ctx, uint32_t widget_id, 
 
 // [=]===^=[ mkgui_treeview_collapse ]==============================[=]
 MKGUI_API void mkgui_treeview_collapse(struct mkgui_ctx *ctx, uint32_t widget_id, uint32_t node_id) {
+	MKGUI_CHECK(ctx);
 	struct mkgui_treeview_data *tv = find_treeview_data(ctx, widget_id);
 	if(!tv) {
 		return;
@@ -656,6 +672,7 @@ MKGUI_API void mkgui_treeview_collapse(struct mkgui_ctx *ctx, uint32_t widget_id
 
 // [=]===^=[ mkgui_treeview_is_expanded ]============================[=]
 MKGUI_API uint32_t mkgui_treeview_is_expanded(struct mkgui_ctx *ctx, uint32_t widget_id, uint32_t node_id) {
+	MKGUI_CHECK_VAL(ctx, 0);
 	struct mkgui_treeview_data *tv = find_treeview_data(ctx, widget_id);
 	if(!tv) {
 		return 0;
@@ -670,6 +687,7 @@ MKGUI_API uint32_t mkgui_treeview_is_expanded(struct mkgui_ctx *ctx, uint32_t wi
 
 // [=]===^=[ mkgui_treeview_expand_all ]=============================[=]
 MKGUI_API void mkgui_treeview_expand_all(struct mkgui_ctx *ctx, uint32_t widget_id) {
+	MKGUI_CHECK(ctx);
 	struct mkgui_treeview_data *tv = find_treeview_data(ctx, widget_id);
 	if(!tv) {
 		return;
@@ -684,6 +702,7 @@ MKGUI_API void mkgui_treeview_expand_all(struct mkgui_ctx *ctx, uint32_t widget_
 
 // [=]===^=[ mkgui_treeview_collapse_all ]============================[=]
 MKGUI_API void mkgui_treeview_collapse_all(struct mkgui_ctx *ctx, uint32_t widget_id) {
+	MKGUI_CHECK(ctx);
 	struct mkgui_treeview_data *tv = find_treeview_data(ctx, widget_id);
 	if(!tv) {
 		return;
@@ -696,6 +715,7 @@ MKGUI_API void mkgui_treeview_collapse_all(struct mkgui_ctx *ctx, uint32_t widge
 
 // [=]===^=[ mkgui_treeview_get_parent ]=============================[=]
 MKGUI_API uint32_t mkgui_treeview_get_parent(struct mkgui_ctx *ctx, uint32_t widget_id, uint32_t node_id) {
+	MKGUI_CHECK_VAL(ctx, 0);
 	struct mkgui_treeview_data *tv = find_treeview_data(ctx, widget_id);
 	if(!tv) {
 		return 0;
@@ -710,12 +730,14 @@ MKGUI_API uint32_t mkgui_treeview_get_parent(struct mkgui_ctx *ctx, uint32_t wid
 
 // [=]===^=[ mkgui_treeview_node_count ]=============================[=]
 MKGUI_API uint32_t mkgui_treeview_node_count(struct mkgui_ctx *ctx, uint32_t widget_id) {
+	MKGUI_CHECK_VAL(ctx, 0);
 	struct mkgui_treeview_data *tv = find_treeview_data(ctx, widget_id);
 	return tv ? tv->node_count : 0;
 }
 
 // [=]===^=[ mkgui_treeview_scroll_to ]==============================[=]
 MKGUI_API void mkgui_treeview_scroll_to(struct mkgui_ctx *ctx, uint32_t widget_id, uint32_t node_id) {
+	MKGUI_CHECK(ctx);
 	struct mkgui_treeview_data *tv = find_treeview_data(ctx, widget_id);
 	if(!tv) {
 		return;

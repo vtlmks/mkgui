@@ -1354,16 +1354,19 @@ static uint32_t fd_run_dialog(struct mkgui_ctx *ctx, uint32_t mode, const struct
 
 // [=]===^=[ mkgui_open_dialog ]==================================[=]
 MKGUI_API uint32_t mkgui_open_dialog(struct mkgui_ctx *ctx, const struct mkgui_file_dialog_opts *opts) {
+	MKGUI_CHECK_VAL(ctx, 0);
 	return fd_run_dialog(ctx, 0, opts);
 }
 
 // [=]===^=[ mkgui_save_dialog ]==================================[=]
 MKGUI_API uint32_t mkgui_save_dialog(struct mkgui_ctx *ctx, const struct mkgui_file_dialog_opts *opts) {
+	MKGUI_CHECK_VAL(ctx, 0);
 	return fd_run_dialog(ctx, 1, opts);
 }
 
 // [=]===^=[ mkgui_dialog_path ]==================================[=]
 MKGUI_API const char *mkgui_dialog_path(struct mkgui_ctx *ctx, uint32_t index) {
+	MKGUI_CHECK_VAL(ctx, "");
 	(void)ctx;
 	if(index >= fd_result_count) {
 		return "";

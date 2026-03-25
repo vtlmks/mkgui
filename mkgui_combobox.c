@@ -579,6 +579,10 @@ static uint32_t handle_combobox_key(struct mkgui_ctx *ctx, struct mkgui_event *e
 
 // [=]===^=[ mkgui_combobox_setup ]================================[=]
 MKGUI_API void mkgui_combobox_setup(struct mkgui_ctx *ctx, uint32_t id, const char **items, uint32_t count) {
+	MKGUI_CHECK(ctx);
+	if(!items && count > 0) {
+		return;
+	}
 	struct mkgui_combobox_data *cb = find_combobox_data(ctx, id);
 	if(!cb) {
 		return;
@@ -599,18 +603,21 @@ MKGUI_API void mkgui_combobox_setup(struct mkgui_ctx *ctx, uint32_t id, const ch
 
 // [=]===^=[ mkgui_combobox_get ]=================================[=]
 MKGUI_API int32_t mkgui_combobox_get(struct mkgui_ctx *ctx, uint32_t id) {
+	MKGUI_CHECK_VAL(ctx, -1);
 	struct mkgui_combobox_data *cb = find_combobox_data(ctx, id);
 	return cb ? cb->selected : -1;
 }
 
 // [=]===^=[ mkgui_combobox_get_text ]=============================[=]
 MKGUI_API const char *mkgui_combobox_get_text(struct mkgui_ctx *ctx, uint32_t id) {
+	MKGUI_CHECK_VAL(ctx, "");
 	struct mkgui_combobox_data *cb = find_combobox_data(ctx, id);
 	return cb ? cb->text : "";
 }
 
 // [=]===^=[ mkgui_combobox_set ]=================================[=]
 MKGUI_API void mkgui_combobox_set(struct mkgui_ctx *ctx, uint32_t id, int32_t index) {
+	MKGUI_CHECK(ctx);
 	struct mkgui_combobox_data *cb = find_combobox_data(ctx, id);
 	if(!cb) {
 		return;
@@ -631,6 +638,10 @@ MKGUI_API void mkgui_combobox_set(struct mkgui_ctx *ctx, uint32_t id, int32_t in
 
 // [=]===^=[ mkgui_combobox_set_text ]==============================[=]
 MKGUI_API void mkgui_combobox_set_text(struct mkgui_ctx *ctx, uint32_t id, const char *text) {
+	MKGUI_CHECK(ctx);
+	if(!text) {
+		text = "";
+	}
 	struct mkgui_combobox_data *cb = find_combobox_data(ctx, id);
 	if(!cb) {
 		return;
@@ -651,12 +662,14 @@ MKGUI_API void mkgui_combobox_set_text(struct mkgui_ctx *ctx, uint32_t id, const
 
 // [=]===^=[ mkgui_combobox_get_count ]=============================[=]
 MKGUI_API uint32_t mkgui_combobox_get_count(struct mkgui_ctx *ctx, uint32_t id) {
+	MKGUI_CHECK_VAL(ctx, 0);
 	struct mkgui_combobox_data *cb = find_combobox_data(ctx, id);
 	return cb ? cb->item_count : 0;
 }
 
 // [=]===^=[ mkgui_combobox_get_item_text ]=========================[=]
 MKGUI_API const char *mkgui_combobox_get_item_text(struct mkgui_ctx *ctx, uint32_t id, uint32_t index) {
+	MKGUI_CHECK_VAL(ctx, "");
 	struct mkgui_combobox_data *cb = find_combobox_data(ctx, id);
 	if(!cb || index >= cb->item_count) {
 		return "";
@@ -666,6 +679,10 @@ MKGUI_API const char *mkgui_combobox_get_item_text(struct mkgui_ctx *ctx, uint32
 
 // [=]===^=[ mkgui_combobox_add ]=================================[=]
 MKGUI_API void mkgui_combobox_add(struct mkgui_ctx *ctx, uint32_t id, const char *text) {
+	MKGUI_CHECK(ctx);
+	if(!text) {
+		return;
+	}
 	struct mkgui_combobox_data *cb = find_combobox_data(ctx, id);
 	if(!cb || cb->item_count >= MKGUI_MAX_DROPDOWN) {
 		return;
@@ -678,6 +695,7 @@ MKGUI_API void mkgui_combobox_add(struct mkgui_ctx *ctx, uint32_t id, const char
 
 // [=]===^=[ mkgui_combobox_remove ]================================[=]
 MKGUI_API void mkgui_combobox_remove(struct mkgui_ctx *ctx, uint32_t id, uint32_t index) {
+	MKGUI_CHECK(ctx);
 	struct mkgui_combobox_data *cb = find_combobox_data(ctx, id);
 	if(!cb || index >= cb->item_count) {
 		return;
@@ -694,6 +712,7 @@ MKGUI_API void mkgui_combobox_remove(struct mkgui_ctx *ctx, uint32_t id, uint32_
 
 // [=]===^=[ mkgui_combobox_clear ]=================================[=]
 MKGUI_API void mkgui_combobox_clear(struct mkgui_ctx *ctx, uint32_t id) {
+	MKGUI_CHECK(ctx);
 	struct mkgui_combobox_data *cb = find_combobox_data(ctx, id);
 	if(!cb) {
 		return;

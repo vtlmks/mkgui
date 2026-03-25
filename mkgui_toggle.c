@@ -89,6 +89,7 @@ static uint32_t handle_toggle_key(struct mkgui_ctx *ctx, struct mkgui_event *ev,
 
 // [=]===^=[ mkgui_toggle_set ]====================================[=]
 MKGUI_API void mkgui_toggle_set(struct mkgui_ctx *ctx, uint32_t id, uint32_t state) {
+	MKGUI_CHECK(ctx);
 	struct mkgui_toggle_data *td = find_toggle_data(ctx, id);
 	if(td) {
 		td->state = state ? 1 : 0;
@@ -98,6 +99,7 @@ MKGUI_API void mkgui_toggle_set(struct mkgui_ctx *ctx, uint32_t id, uint32_t sta
 
 // [=]===^=[ mkgui_toggle_get ]====================================[=]
 MKGUI_API uint32_t mkgui_toggle_get(struct mkgui_ctx *ctx, uint32_t id) {
+	MKGUI_CHECK_VAL(ctx, 0);
 	struct mkgui_toggle_data *td = find_toggle_data(ctx, id);
 	return td ? td->state : 0;
 }

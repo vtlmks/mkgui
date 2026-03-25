@@ -504,6 +504,7 @@ static uint32_t handle_datepicker_key(struct mkgui_ctx *ctx, struct mkgui_event 
 
 // [=]===^=[ mkgui_datepicker_set ]================================[=]
 MKGUI_API void mkgui_datepicker_set(struct mkgui_ctx *ctx, uint32_t id, int32_t year, int32_t month, int32_t day) {
+	MKGUI_CHECK(ctx);
 	struct mkgui_datepicker_data *dp = find_datepicker_data(ctx, id);
 	if(!dp) {
 		return;
@@ -517,6 +518,7 @@ MKGUI_API void mkgui_datepicker_set(struct mkgui_ctx *ctx, uint32_t id, int32_t 
 
 // [=]===^=[ mkgui_datepicker_get ]================================[=]
 MKGUI_API void mkgui_datepicker_get(struct mkgui_ctx *ctx, uint32_t id, int32_t *year, int32_t *month, int32_t *day) {
+	MKGUI_CHECK(ctx);
 	struct mkgui_datepicker_data *dp = find_datepicker_data(ctx, id);
 	if(!dp) {
 		*year = 2026;
@@ -531,6 +533,7 @@ MKGUI_API void mkgui_datepicker_get(struct mkgui_ctx *ctx, uint32_t id, int32_t 
 
 // [=]===^=[ mkgui_datepicker_get_text ]===========================[=]
 MKGUI_API const char *mkgui_datepicker_get_text(struct mkgui_ctx *ctx, uint32_t id) {
+	MKGUI_CHECK_VAL(ctx, "");
 	static char datepicker_buf[16];
 	struct mkgui_datepicker_data *dp = find_datepicker_data(ctx, id);
 	if(!dp) {
@@ -543,6 +546,7 @@ MKGUI_API const char *mkgui_datepicker_get_text(struct mkgui_ctx *ctx, uint32_t 
 
 // [=]===^=[ mkgui_datepicker_set_readonly ]=========================[=]
 MKGUI_API void mkgui_datepicker_set_readonly(struct mkgui_ctx *ctx, uint32_t id, uint32_t readonly) {
+	MKGUI_CHECK(ctx);
 	struct mkgui_widget *w = find_widget(ctx, id);
 	if(!w) {
 		return;
@@ -558,6 +562,7 @@ MKGUI_API void mkgui_datepicker_set_readonly(struct mkgui_ctx *ctx, uint32_t id,
 
 // [=]===^=[ mkgui_datepicker_get_readonly ]=========================[=]
 MKGUI_API uint32_t mkgui_datepicker_get_readonly(struct mkgui_ctx *ctx, uint32_t id) {
+	MKGUI_CHECK_VAL(ctx, 0);
 	struct mkgui_widget *w = find_widget(ctx, id);
 	return (w && (w->flags & MKGUI_READONLY)) ? 1 : 0;
 }

@@ -223,6 +223,7 @@ static uint32_t handle_slider_key(struct mkgui_ctx *ctx, struct mkgui_event *ev,
 
 // [=]===^=[ mkgui_slider_setup ]================================[=]
 MKGUI_API void mkgui_slider_setup(struct mkgui_ctx *ctx, uint32_t id, int32_t min_val, int32_t max_val, int32_t value) {
+	MKGUI_CHECK(ctx);
 	struct mkgui_slider_data *sd = find_slider_data(ctx, id);
 	if(!sd) {
 		return;
@@ -241,12 +242,14 @@ MKGUI_API void mkgui_slider_setup(struct mkgui_ctx *ctx, uint32_t id, int32_t mi
 
 // [=]===^=[ mkgui_slider_get ]=================================[=]
 MKGUI_API int32_t mkgui_slider_get(struct mkgui_ctx *ctx, uint32_t id) {
+	MKGUI_CHECK_VAL(ctx, 0);
 	struct mkgui_slider_data *sd = find_slider_data(ctx, id);
 	return sd ? sd->value : 0;
 }
 
 // [=]===^=[ mkgui_slider_set ]====================================[=]
 MKGUI_API void mkgui_slider_set(struct mkgui_ctx *ctx, uint32_t id, int32_t value) {
+	MKGUI_CHECK(ctx);
 	struct mkgui_slider_data *sd = find_slider_data(ctx, id);
 	if(!sd) {
 		return;
@@ -263,6 +266,7 @@ MKGUI_API void mkgui_slider_set(struct mkgui_ctx *ctx, uint32_t id, int32_t valu
 
 // [=]===^=[ mkgui_slider_get_range ]===============================[=]
 MKGUI_API void mkgui_slider_get_range(struct mkgui_ctx *ctx, uint32_t id, int32_t *min_val, int32_t *max_val) {
+	MKGUI_CHECK(ctx);
 	struct mkgui_slider_data *sd = find_slider_data(ctx, id);
 	if(!sd) {
 		if(min_val) { *min_val = 0; }
@@ -275,6 +279,7 @@ MKGUI_API void mkgui_slider_get_range(struct mkgui_ctx *ctx, uint32_t id, int32_
 
 // [=]===^=[ mkgui_slider_set_range ]===============================[=]
 MKGUI_API void mkgui_slider_set_range(struct mkgui_ctx *ctx, uint32_t id, int32_t min_val, int32_t max_val) {
+	MKGUI_CHECK(ctx);
 	struct mkgui_slider_data *sd = find_slider_data(ctx, id);
 	if(!sd) {
 		return;
@@ -292,6 +297,7 @@ MKGUI_API void mkgui_slider_set_range(struct mkgui_ctx *ctx, uint32_t id, int32_
 
 // [=]===^=[ mkgui_slider_set_meter ]=============================[=]
 MKGUI_API void mkgui_slider_set_meter(struct mkgui_ctx *ctx, uint32_t id, float pre, float post, uint32_t pre_color, uint32_t post_color) {
+	MKGUI_CHECK(ctx);
 	struct mkgui_slider_data *sd = find_slider_data(ctx, id);
 	if(!sd) {
 		return;
