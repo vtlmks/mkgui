@@ -124,10 +124,6 @@ enum {
 // Flags
 // ---------------------------------------------------------------------------
 
-#define MKGUI_ANCHOR_LEFT          (1u << 0)
-#define MKGUI_ANCHOR_TOP           (1u << 1)
-#define MKGUI_ANCHOR_RIGHT         (1u << 2)
-#define MKGUI_ANCHOR_BOTTOM        (1u << 3)
 #define MKGUI_REGION_TOP           (1u << 4)
 #define MKGUI_REGION_BOTTOM        (1u << 5)
 #define MKGUI_REGION_LEFT          (1u << 6)
@@ -284,7 +280,7 @@ struct mkgui_widget {
 	char label[MKGUI_MAX_TEXT];
 	char icon[MKGUI_ICON_NAME_LEN];
 	uint32_t parent_id;
-	int32_t x, y, w, h;
+	int32_t w, h;
 	uint32_t flags;
 	uint32_t weight;
 	int32_t margin_l, margin_r, margin_t, margin_b;

@@ -45,9 +45,9 @@ static void on_event(struct mkgui_ctx *ctx, struct mkgui_event *ev, void *userda
 
 int main(void) {
     struct mkgui_widget widgets[] = {
-        { MKGUI_WINDOW, ID_WIN, "Hello",  "",  0,      0, 0, 400, 300, 0, 0 },
-        { MKGUI_BUTTON, ID_BTN, "Click",  "",  ID_WIN, 10, 10, 100, 28, 0, 0 },
-        { MKGUI_LABEL,  ID_LBL, "Ready",  "",  ID_WIN, 10, 50, 200, 24, 0, 0 },
+        { MKGUI_WINDOW, ID_WIN, "Hello",  "",  0,      400, 300, 0, 0 },
+        { MKGUI_BUTTON, ID_BTN, "Click",  "",  ID_WIN, 100, 0, MKGUI_FIXED, 0 },
+        { MKGUI_LABEL,  ID_LBL, "Ready",  "",  ID_WIN, 0, 0, 0, 0 },
     };
 
     struct mkgui_ctx *ctx = mkgui_create(widgets, 3);
@@ -76,12 +76,14 @@ struct mkgui_widget {
     char     label[256];  // display text
     char     icon[64];    // icon name (MDI name, e.g. "folder-open")
     uint32_t parent_id;   // parent widget id
-    int32_t  x, y, w, h; // position and size
-    uint32_t flags;       // MKGUI_ANCHOR_*, MKGUI_CHECKED, etc.
-    uint32_t weight;      // layout weight (0=fixed, >0=flexible proportional)
-    int32_t  margin_l, margin_r, margin_t, margin_b; // layout margins (insets from parent edges)
+    int32_t  w, h;        // size (0 = natural size derived from font height)
+    uint32_t flags;       // MKGUI_CHECKED, MKGUI_FIXED, etc.
+    uint32_t weight;      // layout weight (0=default flex, >0=explicit proportional)
+    int32_t  margin_l, margin_r, margin_t, margin_b; // layout margins
 };
 ```
+
+There are no `x, y` fields. All positioning is handled by the container-based layout system. The `w` and `h` fields specify size; when `h` is 0, the widget uses its natural height (derived from the font height for most widget types).
 
 ## Widget types
 
@@ -114,7 +116,7 @@ struct mkgui_widget {
 | `MKGUI_HSPLIT` | Horizontal splitter. Children use `MKGUI_REGION_TOP`/`MKGUI_REGION_BOTTOM`. Neither side can be smaller than `MKGUI_SPLIT_MIN_PX` (50px). |
 | `MKGUI_VSPLIT` | Vertical splitter. Children use `MKGUI_REGION_LEFT`/`MKGUI_REGION_RIGHT`. Same minimum size enforcement. |
 | `MKGUI_GROUP` | Group box container. Draws a thin rounded border with a label in the top edge. Children are inset inside the frame. |
-| `MKGUI_PANEL` | Plain container. No border by default. Use `MKGUI_PANEL_BORDER` for a border, `MKGUI_PANEL_SUNKEN` for a recessed look. Children positioned relative to panel. |
+| `MKGUI_PANEL` | Plain container that behaves as a VBOX. No border by default. Use `MKGUI_PANEL_BORDER` for a border, `MKGUI_PANEL_SUNKEN` for a recessed look. Children are stacked vertically like VBOX. |
 | `MKGUI_SCROLLBAR` | Standalone scrollbar. Horizontal by default, `MKGUI_VERTICAL` for vertical. Emits `MKGUI_EVENT_SCROLL`. |
 | `MKGUI_IMAGE` | Displays ARGB pixel data. Centered by default, `MKGUI_IMAGE_STRETCH` to fill. `MKGUI_PANEL_BORDER` for a border. |
 | `MKGUI_GLVIEW` | OpenGL viewport. Creates a native child window for GL rendering. The user creates their own GL context. Automatically triggers 60fps redraws when visible. |
@@ -123,47 +125,50 @@ struct mkgui_widget {
 | `MKGUI_HBOX` | Horizontal box layout. Stacks children left-to-right. Uses weight-based distribution. |
 | `MKGUI_FORM` | Two-column form layout. Children are paired: odd=label, even=control. Label column auto-sizes to widest label. |
 
-## Anchor / layout system
+## Container-based layout
 
-Fields `x, y` are always position offsets and `w, h` are always size. Margins (`margin_l, margin_t, margin_r, margin_b`) provide insets from parent edges, independent of anchors.
+All layout is container-based. There are no `x, y` position fields on widgets. Every widget's position is determined by its parent container (VBOX, HBOX, FORM, PANEL, GROUP, TABS, or the WINDOW itself).
 
-| Anchors | x, y | w, h | Margins |
-|---------|------|------|---------|
-| None | position from parent top-left | width, height | offset the position |
-| `LEFT + RIGHT` | ignored | ignored (fills) | `margin_l`, `margin_r` control left/right insets |
-| `RIGHT` only | offset from right edge | width | `margin_r` adds additional inset |
-| `TOP + BOTTOM` | ignored | ignored (fills) | `margin_t`, `margin_b` control top/bottom insets |
-| `BOTTOM` only | offset from bottom edge | height | `margin_b` adds additional inset |
+### How it works
 
-Combine horizontal and vertical anchors freely. Common patterns:
+- **WINDOW** acts as a VBOX for its non-chrome children. Menu, toolbar, statusbar, and pathbar are auto-positioned as window chrome (see [Window chrome auto-layout](#window-chrome-auto-layout)). All other children fill the remaining content area using VBOX stacking.
+- **PANEL** behaves as a VBOX container. Children are stacked vertically.
+- **VBOX** stacks children top-to-bottom.
+- **HBOX** stacks children left-to-right.
+- **FORM** pairs children into label+control rows.
+- **GROUP** insets children inside a bordered frame, stacking like VBOX.
+- **TABS/TAB** -- each TAB acts as a container for its children.
+- **HSPLIT/VSPLIT** -- children use `MKGUI_REGION_*` flags to select their pane.
+
+### Natural sizing
+
+When `h` is 0, widgets use a natural height derived from the font height. Most leaf widgets (buttons, labels, inputs, checkboxes, radios, dropdowns, spinboxes, etc.) have sensible natural heights. This means you rarely need to specify `h` explicitly.
+
+When `w` is 0 in a flex container, the widget stretches to fill available space along the layout axis.
+
+### Margins
+
+The `margin_l`, `margin_r`, `margin_t`, `margin_b` fields add spacing around a widget, inset from where the container would normally place it. Margins do not affect siblings -- they only shrink the widget's own allocated area.
+
+### Common patterns
 
 ```c
 // Menu, toolbar, and statusbar are auto-positioned by the layout engine.
-// No anchors or offsets needed -- just parent them to the window:
-{ MKGUI_MENU,      ID_MENU, "",  "", ID_WINDOW, 0, 0, 0, 0, 0, 0 },
-{ MKGUI_TOOLBAR,   ID_TB,   "",  "", ID_WINDOW, 0, 0, 0, 0, 0, 0 },
-{ MKGUI_STATUSBAR, ID_SB,   "",  "", ID_WINDOW, 0, 0, 0, 0, 0, 0 },
+// Just parent them to the window:
+{ MKGUI_MENU,      ID_MENU, "",  "", ID_WINDOW, 0, 0, 0, 0 },
+{ MKGUI_TOOLBAR,   ID_TB,   "",  "", ID_WINDOW, 0, 0, 0, 0 },
+{ MKGUI_STATUSBAR, ID_SB,   "",  "", ID_WINDOW, 0, 0, 0, 0 },
 
-// Other children of the window get the remaining content area automatically:
-{ MKGUI_TABS, ID_TABS, "", "", ID_WINDOW, 0, 0, 0, 0,
-  MKGUI_ANCHOR_LEFT | MKGUI_ANCHOR_TOP | MKGUI_ANCHOR_RIGHT | MKGUI_ANCHOR_BOTTOM, 0 }
+// Other children of the window fill the remaining content area:
+{ MKGUI_TABS, ID_TABS, "", "", ID_WINDOW, 0, 0, 0, 0 },
 
-// Fill width with 80px left margin and 8px right margin:
-{ MKGUI_INPUT, ID_INP, "", "", ID_WINDOW, 0, 40, 0, 24,
-  MKGUI_ANCHOR_LEFT | MKGUI_ANCHOR_BOTTOM | MKGUI_ANCHOR_RIGHT, 0,
-  80, 0, 8, 0 }
+// A simple form inside a tab:
+{ MKGUI_FORM,  ID_FORM, "", "", ID_TAB1, 0, 0, 0, 0 },
+{ MKGUI_LABEL, ID_L1,   "Name:",  "", ID_FORM, 0, 0, 0, 0 },
+{ MKGUI_INPUT, ID_I1,   "",       "", ID_FORM, 0, 0, 0, 0 },
 ```
 
 ## Flags
-
-### Anchor flags
-
-| Flag | Value | Description |
-|------|-------|-------------|
-| `MKGUI_ANCHOR_LEFT` | `1 << 0` | Pin/stretch to left edge |
-| `MKGUI_ANCHOR_TOP` | `1 << 1` | Pin/stretch to top edge |
-| `MKGUI_ANCHOR_RIGHT` | `1 << 2` | Pin/stretch to right edge |
-| `MKGUI_ANCHOR_BOTTOM` | `1 << 3` | Pin/stretch to bottom edge |
 
 ### Splitter region flags
 
@@ -396,11 +401,11 @@ Returns 1 on success, 0 on allocation failure. The widget's aux data (slider sta
 
 ```c
 // add a slider as the first child of a vbox
-struct mkgui_widget slider = { MKGUI_SLIDER, 500, "Volume", "", VBOX_ID, 0, 0, 0, 24, 0, 0 };
+struct mkgui_widget slider = { MKGUI_SLIDER, 500, "Volume", "", VBOX_ID, 0, 0, 0, 0 };
 mkgui_add_widget(ctx, slider, VBOX_ID);
 
 // add a button after an existing sibling
-struct mkgui_widget btn = { MKGUI_BUTTON, 501, "Mute", "", VBOX_ID, 0, 0, 80, 24, 0, 0 };
+struct mkgui_widget btn = { MKGUI_BUTTON, 501, "Mute", "", VBOX_ID, 80, 0, MKGUI_FIXED, 0 };
 mkgui_add_widget(ctx, btn, 500);  // after the slider
 
 // remove the slider and anything nested inside it
@@ -464,7 +469,7 @@ const char *mkgui_button_get_text(struct mkgui_ctx *ctx, uint32_t id);
 
 ```c
 // Icon-only buttons center the icon automatically when label is empty
-{ MKGUI_BUTTON, ID_MUTE, "", "volume-high", ID_VBOX, 0, 0, 28, 28, MKGUI_FIXED | MKGUI_ALIGN_CENTER, 0 },
+{ MKGUI_BUTTON, ID_MUTE, "", "volume-high", ID_VBOX, 28, 28, MKGUI_FIXED | MKGUI_ALIGN_CENTER, 0 },
 
 // In event callback:
 case MKGUI_EVENT_CLICK: {
@@ -487,8 +492,8 @@ const char *mkgui_label_get(struct mkgui_ctx *ctx, uint32_t id);
 Set `MKGUI_TRUNCATE` to clip text that overflows the widget width, replacing the tail with "...". Without this flag, text is hard-clipped at the widget boundary. The full text is preserved in the widget -- only the rendered output is affected.
 
 ```c
-{ MKGUI_LABEL, ID_NAME, "Very Long Channel Name", "", ID_PARENT, 0, 0, 80, 20,
-  MKGUI_TRUNCATE, 0 }
+{ MKGUI_LABEL, ID_NAME, "Very Long Channel Name", "", ID_PARENT, 80, 0,
+  MKGUI_TRUNCATE | MKGUI_FIXED, 0 }
 ```
 
 ### Input
@@ -635,7 +640,7 @@ Level meter with colored zones showing capacity/usage. The background displays t
 ### Spinner
 
 ```c
-{ MKGUI_SPINNER, ID_SPIN, "", "", ID_PARENT, 10, 10, 24, 24, 0 }
+{ MKGUI_SPINNER, ID_SPIN, "", "", ID_PARENT, 24, 24, MKGUI_FIXED, 0 }
 ```
 
 No setup or API functions needed. The spinner is a rotating arc that animates automatically. Size is determined by the widget's `w` and `h` (uses the smaller of the two as diameter). Uses `theme.accent` for the arc color. Place it anywhere a loading indicator is needed.
@@ -913,7 +918,7 @@ void mkgui_canvas_set_callback(struct mkgui_ctx *ctx, uint32_t id, mkgui_canvas_
 ```
 
 ```c
-{ MKGUI_CANVAS, ID_CANVAS, "", "", ID_PARENT, 10, 10, 400, 300, MKGUI_PANEL_BORDER }
+{ MKGUI_CANVAS, ID_CANVAS, "", "", ID_PARENT, 0, 0, MKGUI_PANEL_BORDER, 0 }
 ```
 
 The callback receives the pixel buffer and the widget's rect. All `draw_*` functions respect the clip rect, which is automatically set to the widget bounds before the callback and restored after. Use `MKGUI_PANEL_BORDER` to draw a border before the callback runs.
@@ -933,12 +938,12 @@ mkgui_canvas_set_callback(ctx, ID_CANVAS, my_draw, NULL);
 Menus are built from a `MKGUI_MENU` (the bar) containing `MKGUI_MENUITEM` entries. Submenus are menu items whose parent is another menu item:
 
 ```c
-{ MKGUI_MENU,     ID_MENU,  "",     "",             ID_WINDOW, 0, 0, 0, 22, MKGUI_ANCHOR_LEFT | MKGUI_ANCHOR_TOP | MKGUI_ANCHOR_RIGHT, 0 },
-{ MKGUI_MENUITEM, ID_FILE,  "File", "",             ID_MENU,   0, 0, 0, 0, 0, 0 },
-{ MKGUI_MENUITEM, ID_OPEN,  "Open", "folder-open",  ID_FILE,   0, 0, 0, 0, 0, 0 },
-{ MKGUI_MENUITEM, ID_SAVE,  "Save", "content-save", ID_FILE,   0, 0, 0, 0, 0, 0 },
-{ MKGUI_MENUITEM, ID_SEP1,  "",     "",             ID_FILE,   0, 0, 0, 0, MKGUI_SEPARATOR, 0 },
-{ MKGUI_MENUITEM, ID_EXIT,  "Exit", "",             ID_FILE,   0, 0, 0, 0, 0, 0 },
+{ MKGUI_MENU,     ID_MENU,  "",     "",             ID_WINDOW, 0, 0, 0, 0 },
+{ MKGUI_MENUITEM, ID_FILE,  "File", "",             ID_MENU,   0, 0, 0, 0 },
+{ MKGUI_MENUITEM, ID_OPEN,  "Open", "folder-open",  ID_FILE,   0, 0, 0, 0 },
+{ MKGUI_MENUITEM, ID_SAVE,  "Save", "content-save", ID_FILE,   0, 0, 0, 0 },
+{ MKGUI_MENUITEM, ID_SEP1,  "",     "",             ID_FILE,   0, 0, MKGUI_SEPARATOR, 0 },
+{ MKGUI_MENUITEM, ID_EXIT,  "Exit", "",             ID_FILE,   0, 0, 0, 0 },
 ```
 
 `MKGUI_SEPARATOR` makes the item render as a horizontal separator line. Use a dedicated menu item with an empty label and the `MKGUI_SEPARATOR` flag to create visual grouping between menu entries.
@@ -946,9 +951,9 @@ Menus are built from a `MKGUI_MENU` (the bar) containing `MKGUI_MENUITEM` entrie
 Check/radio menu items:
 
 ```c
-{ MKGUI_MENUITEM, ID_SHOW_TB, "Show Toolbar", "", ID_VIEW, 0, 0, 0, 0, MKGUI_MENU_CHECK | MKGUI_CHECKED, 0 },
-{ MKGUI_MENUITEM, ID_SORT_NAME, "By Name",    "", ID_SORT, 0, 0, 0, 0, MKGUI_MENU_RADIO | MKGUI_CHECKED, 0 },
-{ MKGUI_MENUITEM, ID_SORT_SIZE, "By Size",    "", ID_SORT, 0, 0, 0, 0, MKGUI_MENU_RADIO, 0 },
+{ MKGUI_MENUITEM, ID_SHOW_TB, "Show Toolbar", "", ID_VIEW, 0, 0, MKGUI_MENU_CHECK | MKGUI_CHECKED, 0 },
+{ MKGUI_MENUITEM, ID_SORT_NAME, "By Name",    "", ID_SORT, 0, 0, MKGUI_MENU_RADIO | MKGUI_CHECKED, 0 },
+{ MKGUI_MENUITEM, ID_SORT_SIZE, "By Size",    "", ID_SORT, 0, 0, MKGUI_MENU_RADIO, 0 },
 ```
 
 Check items toggle on click. Radio items auto-uncheck siblings. Only leaf items (no children) emit `MKGUI_EVENT_MENU`.
@@ -958,10 +963,10 @@ Check items toggle on click. Radio items auto-uncheck siblings. Only leaf items 
 Toolbar children are `MKGUI_BUTTON` widgets. Use `MKGUI_TOOLBAR_SEP` on a button to draw a separator before it:
 
 ```c
-{ MKGUI_TOOLBAR, ID_TB,      "",     "",             ID_WINDOW, 0, 0, 0, 0, 0, 0 },
-{ MKGUI_BUTTON,  ID_TB_NEW,  "New",  "file-plus",    ID_TB,     0, 0, 0, 0, 0, 0 },
-{ MKGUI_BUTTON,  ID_TB_OPEN, "Open", "folder-open",  ID_TB,     0, 0, 0, 0, MKGUI_TOOLBAR_SEP, 0 },
-{ MKGUI_BUTTON,  ID_TB_SAVE, "Save", "content-save", ID_TB,     0, 0, 0, 0, 0, 0 },
+{ MKGUI_TOOLBAR, ID_TB,      "",     "",             ID_WINDOW, 0, 0, 0, 0 },
+{ MKGUI_BUTTON,  ID_TB_NEW,  "New",  "file-plus",    ID_TB,     0, 0, 0, 0 },
+{ MKGUI_BUTTON,  ID_TB_OPEN, "Open", "folder-open",  ID_TB,     0, 0, MKGUI_TOOLBAR_SEP, 0 },
+{ MKGUI_BUTTON,  ID_TB_SAVE, "Save", "content-save", ID_TB,     0, 0, 0, 0 },
 ```
 
 Toolbar buttons render flat (Breeze style) -- no border when idle, highlighted on hover, pressed on click. They emit `MKGUI_EVENT_CLICK`.
@@ -981,7 +986,7 @@ mkgui_toolbar_set_mode(ctx, ID_TB, MKGUI_TOOLBAR_ICONS_ONLY);
 Or set the mode in the widget flags at init time:
 
 ```c
-{ MKGUI_TOOLBAR, ID_TB, "", "", ID_WINDOW, 0, 0, 0, 0, MKGUI_TOOLBAR_ICONS_ONLY, 0 },
+{ MKGUI_TOOLBAR, ID_TB, "", "", ID_WINDOW, 0, 0, MKGUI_TOOLBAR_ICONS_ONLY, 0 },
 ```
 
 ### Toolbar icon pack
@@ -1042,9 +1047,9 @@ const char *mkgui_tabs_get_text(struct mkgui_ctx *ctx, uint32_t tabs_id, uint32_
 ## Splitters
 
 ```c
-{ MKGUI_VSPLIT,   ID_SPLIT, "", "", ID_WIN, 0, 0, 500, 400, 0, 0 },
-{ MKGUI_TREEVIEW, ID_TREE,  "", "", ID_SPLIT, 0, 0, 200, 400, MKGUI_REGION_LEFT, 0 },
-{ MKGUI_LISTVIEW, ID_LIST,  "", "", ID_SPLIT, 0, 0, 300, 400, MKGUI_REGION_RIGHT, 0 },
+{ MKGUI_VSPLIT,   ID_SPLIT, "", "", ID_WIN, 0, 0, 0, 0 },
+{ MKGUI_TREEVIEW, ID_TREE,  "", "", ID_SPLIT, 0, 0, MKGUI_REGION_LEFT, 0 },
+{ MKGUI_LISTVIEW, ID_LIST,  "", "", ID_SPLIT, 0, 0, MKGUI_REGION_RIGHT, 0 },
 ```
 
 The divider is draggable. Children sized automatically based on their region flag.
@@ -1061,20 +1066,20 @@ void mkgui_split_set_ratio(struct mkgui_ctx *ctx, uint32_t id, float ratio);
 A container that draws a thin rounded border with a title label breaking the top edge. Children are automatically inset inside the frame (top padding accounts for the label height, sides and bottom have a small margin).
 
 ```c
-{ MKGUI_GROUP,    ID_GRP, "Settings",     "", ID_TAB1, 10, 10, 400, 170, 0, 0 },
-{ MKGUI_INPUT,    ID_INP, "",             "", ID_GRP,   0,  0, 250,  24, 0, 0 },
-{ MKGUI_CHECKBOX, ID_CHK, "Enable",       "", ID_GRP,   0, 34, 200,  24, 0, 0 },
+{ MKGUI_GROUP,    ID_GRP, "Settings",     "", ID_TAB1, 0, 0, MKGUI_FIXED, 0 },
+{ MKGUI_INPUT,    ID_INP, "",             "", ID_GRP,  0, 0, MKGUI_FIXED, 0 },
+{ MKGUI_CHECKBOX, ID_CHK, "Enable",       "", ID_GRP,  0, 0, 0, 0 },
 ```
 
-Children use coordinates relative to the group's content area (inside the border). The group is not focusable and does not intercept mouse events -- clicks pass through to children.
+Children are laid out inside the group's content area (inside the border), stacking vertically like VBOX. The group is not focusable and does not intercept mouse events -- clicks pass through to children.
 
 ## Panel
 
-A plain container without the group box border/title. Useful for layout grouping. Children are positioned relative to the panel.
+A plain container that behaves as a VBOX. Useful for layout grouping. Children are stacked vertically.
 
 ```c
-{ MKGUI_PANEL, ID_PANEL, "", "", ID_TAB1, 10, 10, 300, 200, MKGUI_PANEL_BORDER | MKGUI_PANEL_SUNKEN, 0 },
-{ MKGUI_BUTTON, ID_BTN,  "OK", "", ID_PANEL, 10, 10, 80, 28, 0, 0 },
+{ MKGUI_PANEL, ID_PANEL, "", "", ID_TAB1, 0, 0, MKGUI_PANEL_BORDER | MKGUI_PANEL_SUNKEN, 0 },
+{ MKGUI_BUTTON, ID_BTN,  "OK", "", ID_PANEL, 80, 0, MKGUI_FIXED, 0 },
 ```
 
 Flags: `MKGUI_PANEL_BORDER` draws a rounded border, `MKGUI_PANEL_SUNKEN` darkens the background.
@@ -1084,7 +1089,7 @@ Flags: `MKGUI_PANEL_BORDER` draws a rounded border, `MKGUI_PANEL_SUNKEN` darkens
 Standalone scrollbar widget. Horizontal by default, set `MKGUI_VERTICAL` for vertical orientation.
 
 ```c
-{ MKGUI_SCROLLBAR, ID_SB, "", "", ID_TAB1, 10, 10, MKGUI_SCROLLBAR_W, 200, MKGUI_VERTICAL, 0 },
+{ MKGUI_SCROLLBAR, ID_SB, "", "", ID_TAB1, MKGUI_SCROLLBAR_W, 200, MKGUI_VERTICAL | MKGUI_FIXED, 0 },
 ```
 
 ```c
@@ -1104,7 +1109,7 @@ Use `MKGUI_VERTICAL` flag for a vertical scrollbar. Emits `MKGUI_EVENT_SCROLL` o
 Displays ARGB pixel data. The image is centered in the widget and scaled down to fit (never scaled up) by default.
 
 ```c
-{ MKGUI_IMAGE, ID_IMG, "", "", ID_TAB1, 10, 10, 200, 200, MKGUI_PANEL_BORDER },
+{ MKGUI_IMAGE, ID_IMG, "", "", ID_TAB1, 200, 200, MKGUI_PANEL_BORDER | MKGUI_FIXED, 0 },
 ```
 
 ```c
@@ -1119,7 +1124,7 @@ Pixels are ARGB format (alpha in bits 31-24). The widget copies the pixel data i
 Embeds an OpenGL viewport. mkgui creates a native child window; the user creates their own GL context and renders to it. The widget automatically triggers 60fps redraws when visible on the active tab.
 
 ```c
-{ MKGUI_GLVIEW, ID_GL, "", "", ID_TAB1, 10, 10, 400, 300, MKGUI_PANEL_BORDER },
+{ MKGUI_GLVIEW, ID_GL, "", "", ID_TAB1, 0, 0, MKGUI_PANEL_BORDER, 0 },
 ```
 
 ```c
@@ -1163,18 +1168,19 @@ mkgui does not link against OpenGL. The user brings their own GL loader and cont
 
 ## Window chrome auto-layout
 
-When a `MKGUI_WINDOW` has menu, toolbar, or statusbar children, the layout engine automatically positions them and reserves their space:
+When a `MKGUI_WINDOW` has menu, toolbar, statusbar, or pathbar children, the layout engine automatically positions them and reserves their space:
 
 - **Menu** -- placed at the very top, full window width
 - **Toolbar** -- placed below the menu, full window width
+- **Pathbar** -- placed below the toolbar, full window width
 - **Statusbar** -- placed at the very bottom, full window width
-- **All other children** -- positioned in the remaining content area between toolbar and statusbar
+- **All other children** -- positioned in the remaining content area between the chrome widgets, using VBOX stacking
 
-No anchor flags or manual offsets are needed on menu, toolbar, or statusbar widgets. Simply parent them to the window with zero position/size/flags. The content area is computed automatically.
+No manual offsets are needed on chrome widgets. Simply parent them to the window with zero size/flags. The content area is computed automatically.
 
 ## Auto-layout containers
 
-Three container types provide automatic child positioning. Children's `x, y` values are ignored -- the container controls placement.
+Three container types provide automatic child positioning. The container controls all placement.
 
 ### Container padding
 
@@ -1192,7 +1198,7 @@ Children in HBOX/VBOX use a weight-based distribution system. The `weight` field
 - **`weight = 0`** (default) -- Flexible with effective weight 1. Zero-initialized widgets are flexible by default.
 - **`weight > 0`** -- Flexible with explicit weight. Remaining space is distributed proportionally. A weight-2 child gets twice the extra space of a weight-1 child.
 
-For flexible children, `w`/`h` is the minimum size. The child gets at least that much, plus its proportional share of remaining space.
+For flexible children, `w`/`h` is the minimum size in the layout direction. The child gets at least that much, plus its proportional share of remaining space. When `h` is 0, the natural height (derived from font height) is used as the minimum.
 
 A container with `MKGUI_FIXED` and size 0 in the layout direction measures its children and sizes to fit them (size-to-content).
 
@@ -1203,10 +1209,10 @@ Use `mkgui_set_weight(ctx, id, weight)` to change weight at runtime.
 Stacks children vertically with 6px gap. By default children stretch to the full container width (override with `MKGUI_ALIGN_START/CENTER/END`). Use `MKGUI_SCROLL` to enable vertical scrolling when content overflows.
 
 ```c
-{ MKGUI_VBOX,   ID_VBOX,  "", "", ID_TAB1, 10, 10, 300, 400, 0, 0 },
-{ MKGUI_BUTTON, ID_BTN1,  "Fixed (28px)", "", ID_VBOX, 0, 0, 0, 28, MKGUI_FIXED, 0 },
-{ MKGUI_INPUT,  ID_INP1,  "",             "", ID_VBOX, 0, 0, 0, 24, MKGUI_FIXED, 0 },
-{ MKGUI_BUTTON, ID_BTN2,  "Flex (fills)", "", ID_VBOX, 0, 0, 0,  0, 0, 0 },
+{ MKGUI_VBOX,   ID_VBOX,  "", "", ID_TAB1, 0, 0, 0, 0 },
+{ MKGUI_BUTTON, ID_BTN1,  "Fixed (28px)", "", ID_VBOX, 0, 28, MKGUI_FIXED, 0 },
+{ MKGUI_INPUT,  ID_INP1,  "",             "", ID_VBOX, 0, 0, MKGUI_FIXED, 0 },
+{ MKGUI_BUTTON, ID_BTN2,  "Flex (fills)", "", ID_VBOX, 0, 0, 0, 0 },
 ```
 
 ### HBox
@@ -1214,10 +1220,10 @@ Stacks children vertically with 6px gap. By default children stretch to the full
 Stacks children horizontally with 6px gap. By default children stretch to the full container height (override with `MKGUI_ALIGN_START/CENTER/END`). Use `MKGUI_SCROLL` to enable horizontal scrolling when content overflows.
 
 ```c
-{ MKGUI_HBOX,   ID_HBOX, "", "", ID_TAB1, 10, 10, 600, 300, 0, 0 },
-{ MKGUI_PANEL,  ID_LEFT, "", "", ID_HBOX, 0, 0, 200, 0, MKGUI_PANEL_BORDER | MKGUI_FIXED, 0 },
-{ MKGUI_PANEL,  ID_MID,  "", "", ID_HBOX, 0, 0,   0, 0, 0, 0 },
-{ MKGUI_PANEL,  ID_RIGHT,"", "", ID_HBOX, 0, 0, 150, 0, MKGUI_PANEL_BORDER | MKGUI_FIXED, 0 },
+{ MKGUI_HBOX,   ID_HBOX, "", "", ID_TAB1, 0, 0, 0, 0 },
+{ MKGUI_PANEL,  ID_LEFT, "", "", ID_HBOX, 200, 0, MKGUI_PANEL_BORDER | MKGUI_FIXED, 0 },
+{ MKGUI_PANEL,  ID_MID,  "", "", ID_HBOX, 0, 0, 0, 0 },
+{ MKGUI_PANEL,  ID_RIGHT,"", "", ID_HBOX, 150, 0, MKGUI_PANEL_BORDER | MKGUI_FIXED, 0 },
 ```
 
 ### Form
@@ -1225,13 +1231,13 @@ Stacks children horizontally with 6px gap. By default children stretch to the fu
 Two-column form layout for label+control pairs. Children are paired in order: 1st is label, 2nd is control, 3rd is label, 4th is control, etc. The label column auto-sizes to the widest label. Each row is 24px tall with 6px gap.
 
 ```c
-{ MKGUI_FORM,     ID_FORM,  "", "", ID_TAB1, 10, 10, 400, 200, 0, 0 },
-{ MKGUI_LABEL,    ID_LBL1,  "Name:",    "", ID_FORM, 0, 0, 0, 0, 0, 0 },
-{ MKGUI_INPUT,    ID_INP1,  "",          "", ID_FORM, 0, 0, 0, 0, 0, 0 },
-{ MKGUI_LABEL,    ID_LBL2,  "Email:",   "", ID_FORM, 0, 0, 0, 0, 0, 0 },
-{ MKGUI_INPUT,    ID_INP2,  "",          "", ID_FORM, 0, 0, 0, 0, 0, 0 },
-{ MKGUI_LABEL,    ID_LBL3,  "Category:","", ID_FORM, 0, 0, 0, 0, 0, 0 },
-{ MKGUI_DROPDOWN, ID_DRP1,  "",          "", ID_FORM, 0, 0, 0, 0, 0, 0 },
+{ MKGUI_FORM,     ID_FORM,  "", "", ID_TAB1, 0, 0, 0, 0 },
+{ MKGUI_LABEL,    ID_LBL1,  "Name:",    "", ID_FORM, 0, 0, 0, 0 },
+{ MKGUI_INPUT,    ID_INP1,  "",          "", ID_FORM, 0, 0, 0, 0 },
+{ MKGUI_LABEL,    ID_LBL2,  "Email:",   "", ID_FORM, 0, 0, 0, 0 },
+{ MKGUI_INPUT,    ID_INP2,  "",          "", ID_FORM, 0, 0, 0, 0 },
+{ MKGUI_LABEL,    ID_LBL3,  "Category:","", ID_FORM, 0, 0, 0, 0 },
+{ MKGUI_DROPDOWN, ID_DRP1,  "",          "", ID_FORM, 0, 0, 0, 0 },
 ```
 
 The widget editor automatically inserts a label when dropping a non-label widget into a FORM, ensuring the pairing is always correct. Dropping a label by itself places it in the label column.
@@ -1241,13 +1247,12 @@ Containers can be nested. For example, an HBOX containing a VBOX and a FORM side
 ## Tabs
 
 ```c
-{ MKGUI_TABS, ID_TABS, "",         "", ID_WINDOW, 0, 50, 0, 22,
-  MKGUI_ANCHOR_LEFT | MKGUI_ANCHOR_TOP | MKGUI_ANCHOR_RIGHT | MKGUI_ANCHOR_BOTTOM, 0 },
-{ MKGUI_TAB,  ID_TAB1, "General",  "", ID_TABS, 0, 0, 0, 0, 0, 0 },
-{ MKGUI_TAB,  ID_TAB2, "Settings", "", ID_TABS, 0, 0, 0, 0, 0, 0 },
+{ MKGUI_TABS, ID_TABS, "",         "", ID_WINDOW, 0, 0, 0, 0 },
+{ MKGUI_TAB,  ID_TAB1, "General",  "", ID_TABS, 0, 0, 0, 0 },
+{ MKGUI_TAB,  ID_TAB2, "Settings", "", ID_TABS, 0, 0, 0, 0 },
 
 // Widgets inside tabs
-{ MKGUI_BUTTON, ID_BTN, "OK", "", ID_TAB1, 10, 10, 80, 28, 0, 0 },
+{ MKGUI_BUTTON, ID_BTN, "OK", "", ID_TAB1, 80, 0, MKGUI_FIXED, 0 },
 ```
 
 Only widgets parented to the active tab are visible. Animated widgets (spinners, progress bars, glviews) on inactive tabs do not consume CPU.

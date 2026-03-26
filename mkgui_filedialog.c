@@ -50,6 +50,10 @@ enum {
 	FD_ID_BTN_CONFIRM,
 	FD_ID_BTN_CANCEL,
 	FD_ID_SEARCH_LABEL,
+	FD_ID_CONTENT_VBOX,
+	FD_ID_NAME_HBOX,
+	FD_ID_BTN_HBOX,
+	FD_ID_SPACER,
 };
 
 // ---------------------------------------------------------------------------
@@ -1082,33 +1086,45 @@ static uint32_t fd_run_dialog(struct mkgui_ctx *ctx, uint32_t mode, const struct
 	uint32_t has_filters = (fd.filter_count > 0) ? 0 : MKGUI_HIDDEN;
 
 	struct mkgui_widget widgets[] = {
-		{ MKGUI_WINDOW,   FD_ID_WINDOW,       "",          "",                  0,              0,   0, FD_INIT_W, FD_INIT_H, 0, 0 },
+		{ MKGUI_WINDOW,   FD_ID_WINDOW,        "",              "",             0,                  FD_INIT_W, FD_INIT_H, 0, 0 },
 
-		{ MKGUI_TOOLBAR,  FD_ID_TOOLBAR,       "",          "",                  FD_ID_WINDOW,   0,   0,   0,  FD_TOOLBAR_H, MKGUI_ANCHOR_LEFT | MKGUI_ANCHOR_TOP | MKGUI_ANCHOR_RIGHT, 0 },
-		{ MKGUI_BUTTON,   FD_ID_BTN_BACK,      "",          "arrow-left",        FD_ID_TOOLBAR,  0,   0,   0,   0, 0, 0 },
-		{ MKGUI_BUTTON,   FD_ID_BTN_FWD,       "",          "arrow-right",       FD_ID_TOOLBAR,  0,   0,   0,   0, 0, 0 },
-		{ MKGUI_BUTTON,   FD_ID_BTN_UP,        "",          "arrow-up",          FD_ID_TOOLBAR,  0,   0,   0,   0, 0, 0 },
-		{ MKGUI_BUTTON,   FD_ID_TB_SEP1,       "",          "",                  FD_ID_TOOLBAR,  0,   0,   0,   0, MKGUI_SEPARATOR, 0 },
-		{ MKGUI_BUTTON,   FD_ID_BTN_NEWFOLDER, "",          "folder-plus",       FD_ID_TOOLBAR,  0,   0,   0,   0, 0, 0 },
+		{ MKGUI_TOOLBAR,  FD_ID_TOOLBAR,        "",              "",             FD_ID_WINDOW,       0, 0, 0, 0 },
+		{ MKGUI_BUTTON,   FD_ID_BTN_BACK,       "",              "arrow-left",   FD_ID_TOOLBAR,      0, 0, 0, 0 },
+		{ MKGUI_BUTTON,   FD_ID_BTN_FWD,        "",              "arrow-right",  FD_ID_TOOLBAR,      0, 0, 0, 0 },
+		{ MKGUI_BUTTON,   FD_ID_BTN_UP,         "",              "arrow-up",     FD_ID_TOOLBAR,      0, 0, 0, 0 },
+		{ MKGUI_BUTTON,   FD_ID_TB_SEP1,        "",              "",             FD_ID_TOOLBAR,      0, 0, MKGUI_SEPARATOR, 0 },
+		{ MKGUI_BUTTON,   FD_ID_BTN_NEWFOLDER,  "",              "folder-plus",  FD_ID_TOOLBAR,      0, 0, 0, 0 },
 
-		{ MKGUI_PATHBAR,  FD_ID_PATHBAR,       "",          "",                  FD_ID_WINDOW,   0,  0,  0, 24, MKGUI_ANCHOR_LEFT | MKGUI_ANCHOR_TOP | MKGUI_ANCHOR_RIGHT, 0, 126, 0, 2, 0 },
-		{ MKGUI_VSPLIT,   FD_ID_SPLIT,         "",          "",                  FD_ID_WINDOW,   0,  0,  0, 0, MKGUI_ANCHOR_LEFT | MKGUI_ANCHOR_TOP | MKGUI_ANCHOR_RIGHT | MKGUI_ANCHOR_BOTTOM, 0, 0, 0, 30, FD_BOTTOM_H },
-		{ MKGUI_LISTVIEW, FD_ID_BOOKMARKS,     "",          "",                  FD_ID_SPLIT,    0,   0,   0,   0, MKGUI_REGION_LEFT, 0 },
-		{ MKGUI_LISTVIEW, FD_ID_FILES,         "",          "",                  FD_ID_SPLIT,    0,   0,   0,   0, MKGUI_REGION_RIGHT | multi, 0 },
+		{ MKGUI_PATHBAR,  FD_ID_PATHBAR,        "",              "",             FD_ID_WINDOW,       0, 0, 0, 0 },
 
-		{ MKGUI_LABEL,    FD_ID_NAME_LABEL,    "File name:", "",                 FD_ID_WINDOW,   8,  40, 70,  24, MKGUI_ANCHOR_BOTTOM, 0 },
-		{ MKGUI_INPUT,    FD_ID_NAME_INPUT,     "",          "",                  FD_ID_WINDOW,   0,  40,  0, 24, MKGUI_ANCHOR_LEFT | MKGUI_ANCHOR_BOTTOM | MKGUI_ANCHOR_RIGHT, 0, 80, has_filters ? 8 : 240, 0, 0 },
-		{ MKGUI_LABEL,    FD_ID_FILTER_LABEL,  "Filter:",   "",                  FD_ID_WINDOW, 184,  40, 45,  24, MKGUI_ANCHOR_BOTTOM | MKGUI_ANCHOR_RIGHT | has_filters, 0 },
-		{ MKGUI_DROPDOWN, FD_ID_FILTER_DROP,    "",          "",                  FD_ID_WINDOW,   8,  40, 170, 24, MKGUI_ANCHOR_BOTTOM | MKGUI_ANCHOR_RIGHT | has_filters, 0 },
+		{ MKGUI_VBOX,     FD_ID_CONTENT_VBOX,   "",              "",             FD_ID_WINDOW,       0, 0, 0, 0 },
+		{ MKGUI_VSPLIT,   FD_ID_SPLIT,          "",              "",             FD_ID_CONTENT_VBOX, 0, 0, 0, 1 },
+		{ MKGUI_LISTVIEW, FD_ID_BOOKMARKS,      "",              "",             FD_ID_SPLIT,        0, 0, MKGUI_REGION_LEFT, 0 },
+		{ MKGUI_LISTVIEW, FD_ID_FILES,          "",              "",             FD_ID_SPLIT,        0, 0, MKGUI_REGION_RIGHT | multi, 0 },
 
-		{ MKGUI_CHECKBOX, FD_ID_CHK_HIDDEN,    "Show hidden", "",               FD_ID_WINDOW,   8,  10, 110, 24, MKGUI_ANCHOR_BOTTOM, 0 },
-		{ MKGUI_BUTTON,   FD_ID_BTN_CONFIRM,   "",            "",               FD_ID_WINDOW, 100,   8,  80, 28, MKGUI_ANCHOR_BOTTOM | MKGUI_ANCHOR_RIGHT, 0 },
-		{ MKGUI_BUTTON,   FD_ID_BTN_CANCEL,    "Cancel",      "",               FD_ID_WINDOW,  12,   8,  80, 28, MKGUI_ANCHOR_BOTTOM | MKGUI_ANCHOR_RIGHT, 0 },
-		{ MKGUI_LABEL,    FD_ID_SEARCH_LABEL,  "",            "magnify",        FD_ID_WINDOW, 130,  10, 200, 20, MKGUI_ANCHOR_BOTTOM | MKGUI_HIDDEN, 0 },
+		{ MKGUI_HBOX,     FD_ID_NAME_HBOX,      "",              "",             FD_ID_CONTENT_VBOX, 0, 24, MKGUI_FIXED, 0 },
+		{ MKGUI_LABEL,    FD_ID_NAME_LABEL,     "File name:",    "",             FD_ID_NAME_HBOX,    80, 0, MKGUI_FIXED, 0 },
+		{ MKGUI_INPUT,    FD_ID_NAME_INPUT,     "",              "",             FD_ID_NAME_HBOX,    0, 0, 0, 1 },
+		{ MKGUI_LABEL,    FD_ID_FILTER_LABEL,   "Filter:",       "",             FD_ID_NAME_HBOX,    50, 0, MKGUI_FIXED | has_filters, 0 },
+		{ MKGUI_DROPDOWN, FD_ID_FILTER_DROP,    "",              "",             FD_ID_NAME_HBOX,    170, 0, MKGUI_FIXED | has_filters, 0 },
+
+		{ MKGUI_HBOX,     FD_ID_BTN_HBOX,       "",              "",             FD_ID_CONTENT_VBOX, 0, 28, MKGUI_FIXED, 0 },
+		{ MKGUI_CHECKBOX, FD_ID_CHK_HIDDEN,     "Show hidden",   "",             FD_ID_BTN_HBOX,     110, 0, MKGUI_FIXED, 0 },
+		{ MKGUI_LABEL,    FD_ID_SEARCH_LABEL,   "",              "magnify",      FD_ID_BTN_HBOX,     200, 0, MKGUI_FIXED | MKGUI_HIDDEN, 0 },
+		{ MKGUI_LABEL,    FD_ID_SPACER,         "",              "",             FD_ID_BTN_HBOX,     0, 0, 0, 1 },
+		{ MKGUI_BUTTON,   FD_ID_BTN_CONFIRM,    "",              "",             FD_ID_BTN_HBOX,     80, 0, MKGUI_FIXED, 0 },
+		{ MKGUI_BUTTON,   FD_ID_BTN_CANCEL,     "Cancel",        "",             FD_ID_BTN_HBOX,     80, 0, MKGUI_FIXED, 0 },
 	};
 
+	uint32_t confirm_idx = 0;
+	for(uint32_t i = 0; i < sizeof(widgets) / sizeof(widgets[0]); ++i) {
+		if(widgets[i].id == FD_ID_BTN_CONFIRM) {
+			confirm_idx = i;
+			break;
+		}
+	}
 	strncpy(widgets[0].label, title, MKGUI_MAX_TEXT - 1);
-	strncpy(widgets[16].label, confirm_label, MKGUI_MAX_TEXT - 1);
+	strncpy(widgets[confirm_idx].label, confirm_label, MKGUI_MAX_TEXT - 1);
 
 	uint32_t wcount = sizeof(widgets) / sizeof(widgets[0]);
 	struct mkgui_ctx *dlg = mkgui_create_child(ctx, widgets, wcount, title, FD_INIT_W, FD_INIT_H);

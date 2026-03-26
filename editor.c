@@ -5,6 +5,15 @@
 #include "mkgui.c"
 
 // ---------------------------------------------------------------------------
+// Editor-internal anchor flags (removed from public API, kept for editor design-time layout)
+// ---------------------------------------------------------------------------
+
+#define MKGUI_ANCHOR_LEFT          (1u << 0)
+#define MKGUI_ANCHOR_TOP           (1u << 1)
+#define MKGUI_ANCHOR_RIGHT         (1u << 2)
+#define MKGUI_ANCHOR_BOTTOM        (1u << 3)
+
+// ---------------------------------------------------------------------------
 // Editor constants
 // ---------------------------------------------------------------------------
 
@@ -871,15 +880,10 @@ static struct ed_prop_desc ed_props[] = {
 	{ ED_PK_STRING_BROWSE, "Icon:",           offsetof(struct ed_widget, icon),          0,                  0,      0,    ED_VIS_ALWAYS,    ED_ACT_ICON_BROWSE,  ED_PROP_ICON_INP,     ED_PROP_ICON_LBL,    ED_PROP_ICON_BROWSE, ED_PROP_ICON_HBOX },
 	{ ED_PK_PARENT,        "Parent:",         offsetof(struct ed_widget, parent_id),     0,                  0,      0,    ED_VIS_ALWAYS,    ED_ACT_NONE,         ED_PROP_PARENT_DRP,   ED_PROP_PARENT_LBL,  0,                 0 },
 	{ ED_PK_INT32,         "Tab#:",           offsetof(struct ed_widget, tab_order),     0,                  0,      999,  ED_VIS_ALWAYS,    ED_ACT_NONE,         ED_PROP_TAB_SPN,      ED_PROP_TAB_LBL,     0,                 0 },
-	{ ED_PK_INT32_PAIR,    "X:",              offsetof(struct ed_widget, x),             0,                  -9999,  9999, ED_VIS_ALWAYS,    ED_ACT_NONE,         ED_PROP_X_SPN,        ED_PROP_X_LBL,       ED_PROP_Y_SPN,     ED_PROP_Y_LBL },
 	{ ED_PK_INT32_PAIR,    "W:",              offsetof(struct ed_widget, w),             0,                  0,      9999, ED_VIS_ALWAYS,    ED_ACT_NONE,         ED_PROP_W_SPN,        ED_PROP_W_LBL,       ED_PROP_H_SPN,     ED_PROP_H_LBL },
 	{ ED_PK_INT32_PAIR,    "ML:",             offsetof(struct ed_widget, margin_l),      0,                  0,      9999, ED_VIS_ALWAYS,    ED_ACT_NONE,         ED_PROP_ML_SPN,       ED_PROP_ML_LBL,      ED_PROP_MR_SPN,    ED_PROP_MR_LBL },
 	{ ED_PK_INT32_PAIR,    "MT:",             offsetof(struct ed_widget, margin_t),      0,                  0,      9999, ED_VIS_ALWAYS,    ED_ACT_NONE,         ED_PROP_MT_SPN,       ED_PROP_MT_LBL,      ED_PROP_MB_SPN,    ED_PROP_MB_LBL },
-	{ ED_PK_SECTION,       "Anchors/Flags:",  0,                                        0,                  0,      0,    ED_VIS_ALWAYS,    ED_ACT_NONE,         ED_PROP_FLAGS_LBL,    0,                   0,                 0 },
-	{ ED_PK_FLAG,          "Left",            offsetof(struct ed_widget, flags),         MKGUI_ANCHOR_LEFT,  0,      0,    ED_VIS_ALWAYS,    ED_ACT_NONE,         ED_PROP_FL_LEFT,      0,                   0,                 0 },
-	{ ED_PK_FLAG,          "Top",             offsetof(struct ed_widget, flags),         MKGUI_ANCHOR_TOP,   0,      0,    ED_VIS_ALWAYS,    ED_ACT_NONE,         ED_PROP_FL_TOP,       0,                   0,                 0 },
-	{ ED_PK_FLAG,          "Right",           offsetof(struct ed_widget, flags),         MKGUI_ANCHOR_RIGHT, 0,      0,    ED_VIS_ALWAYS,    ED_ACT_NONE,         ED_PROP_FL_RIGHT,     0,                   0,                 0 },
-	{ ED_PK_FLAG,          "Bottom",          offsetof(struct ed_widget, flags),         MKGUI_ANCHOR_BOTTOM,0,      0,    ED_VIS_ALWAYS,    ED_ACT_NONE,         ED_PROP_FL_BOTTOM,    0,                   0,                 0 },
+	{ ED_PK_SECTION,       "Flags:",           0,                                        0,                  0,      0,    ED_VIS_ALWAYS,    ED_ACT_NONE,         ED_PROP_FLAGS_LBL,    0,                   0,                 0 },
 	{ ED_PK_FLAG,          "Hidden",          offsetof(struct ed_widget, flags),         MKGUI_HIDDEN,       0,      0,    ED_VIS_ALWAYS,    ED_ACT_NONE,         ED_PROP_FL_HIDDEN,    0,                   0,                 0 },
 	{ ED_PK_FLAG,          "Disabled",        offsetof(struct ed_widget, flags),         MKGUI_DISABLED,     0,      0,    ED_VIS_ALWAYS,    ED_ACT_NONE,         ED_PROP_FL_DISABLED,  0,                   0,                 0 },
 	{ ED_PK_FLAG,          "Checked",         offsetof(struct ed_widget, flags),         MKGUI_CHECKED,      0,      0,    ED_VIS_HAS_CHECK, ED_ACT_NONE,         ED_PROP_FL_CHECKED,   0,                   0,                 0 },
@@ -1350,8 +1354,8 @@ static int32_t ed_add_widget(uint32_t type, int32_t x, int32_t y) {
 		} break;
 
 		case MKGUI_PATHBAR: {
-			w->w = 300;
-			w->h = 24;
+			w->w = 0;
+			w->h = 0;
 		} break;
 
 		case MKGUI_CHECKBOX: {
@@ -1499,28 +1503,11 @@ static int32_t ed_add_widget(uint32_t type, int32_t x, int32_t y) {
 			w->h = 0;
 		} break;
 
-		case MKGUI_HBOX: {
-			w->x = 0;
-			w->y = 0;
-			w->w = 0;
-			w->h = 0;
-			w->flags = MKGUI_ANCHOR_LEFT | MKGUI_ANCHOR_TOP | MKGUI_ANCHOR_RIGHT | MKGUI_ANCHOR_BOTTOM;
-		} break;
-
-		case MKGUI_VBOX: {
-			w->x = 0;
-			w->y = 0;
-			w->w = 0;
-			w->h = 0;
-			w->flags = MKGUI_ANCHOR_LEFT | MKGUI_ANCHOR_TOP | MKGUI_ANCHOR_RIGHT | MKGUI_ANCHOR_BOTTOM;
-		} break;
-
+		case MKGUI_HBOX:
+		case MKGUI_VBOX:
 		case MKGUI_FORM: {
-			w->x = 0;
-			w->y = 0;
 			w->w = 0;
 			w->h = 0;
-			w->flags = MKGUI_ANCHOR_LEFT | MKGUI_ANCHOR_TOP | MKGUI_ANCHOR_RIGHT | MKGUI_ANCHOR_BOTTOM;
 		} break;
 
 		default: {
@@ -1710,69 +1697,24 @@ static void ed_widget_canvas_pos(uint32_t idx, int32_t *out_x, int32_t *out_y) {
 // [=]===^=[ ed_convert_to_layout ]================================[=]
 static void ed_convert_to_layout(uint32_t idx, int32_t *lx, int32_t *ly, int32_t *lw, int32_t *lh) {
 	struct ed_widget *ew = &ed.widgets[idx];
-	int32_t px = 0, py = 0, pw = 0, ph = 0;
-	uint32_t parent_type = 0;
-	for(uint32_t j = 0; j < ed.widget_count; ++j) {
-		if(ed.widgets[j].id == ew->parent_id) {
-			ed_widget_canvas_pos(j, &px, &py);
-			pw = ed.widgets[j].w;
-			ph = ed.widgets[j].h;
-			parent_type = ed.widgets[j].type;
-			break;
-		}
-	}
+	*lx = 0;
+	*ly = 0;
 
-	int32_t w = ew->w;
-	int32_t h = ew->h;
-	uint32_t flags = ew->flags;
-
-	if(parent_type == MKGUI_VBOX || parent_type == MKGUI_HBOX || parent_type == MKGUI_FORM) {
-		*lx = 0;
-		*ly = 0;
-		*lw = w;
-		*lh = h;
-		return;
-	}
-
-	if(ew->type == MKGUI_MENU || ew->type == MKGUI_TOOLBAR || ew->type == MKGUI_STATUSBAR) {
-		*lx = 0;
-		*ly = 0;
+	uint32_t t = ew->type;
+	if(t == MKGUI_MENU || t == MKGUI_TOOLBAR || t == MKGUI_STATUSBAR || t == MKGUI_PATHBAR ||
+	   t == MKGUI_VBOX || t == MKGUI_HBOX || t == MKGUI_FORM || t == MKGUI_TAB ||
+	   t == MKGUI_PANEL || t == MKGUI_GROUP || t == MKGUI_TABS) {
 		*lw = 0;
 		*lh = 0;
 		return;
 	}
 
-	if(ew->type == MKGUI_VBOX || ew->type == MKGUI_HBOX || ew->type == MKGUI_FORM || ew->type == MKGUI_TAB) {
-		*lx = ew->x;
-		*ly = ew->y;
-		*lw = w;
-		*lh = h;
-		return;
-	}
-
-	int32_t rel_x = ew->x - px;
-	int32_t rel_y = ew->y - py;
-
-	if((flags & MKGUI_ANCHOR_LEFT) && (flags & MKGUI_ANCHOR_RIGHT)) {
-		*lx = 0;
+	if(ew->flags & MKGUI_FIXED) {
+		*lw = ew->w;
+		*lh = ew->h;
+	} else {
 		*lw = 0;
-	} else if(flags & MKGUI_ANCHOR_RIGHT) {
-		*lx = pw - rel_x - w;
-		*lw = w;
-	} else {
-		*lx = rel_x;
-		*lw = w;
-	}
-
-	if((flags & MKGUI_ANCHOR_TOP) && (flags & MKGUI_ANCHOR_BOTTOM)) {
-		*ly = 0;
 		*lh = 0;
-	} else if(flags & MKGUI_ANCHOR_BOTTOM) {
-		*ly = ph - rel_y - h;
-		*lh = h;
-	} else {
-		*ly = rel_y;
-		*lh = h;
 	}
 }
 
@@ -2275,6 +2217,12 @@ static void ed_draw_widget(struct mkgui_ctx *ctx, uint32_t idx) {
 			push_text_clip(rx + 4, ty, ew->label[0] ? ew->label : "Status", ctx->theme.text, rx, ry, rx + rw, ry + rh);
 		} break;
 
+		case MKGUI_PATHBAR: {
+			draw_patch(ctx, MKGUI_STYLE_SUNKEN, rx, ry, rw, rh, ctx->theme.input_bg, ctx->theme.widget_border);
+			int32_t ty = ry + (rh - ctx->font_height) / 2;
+			push_text_clip(rx + 4, ty, ew->label[0] ? ew->label : "/path/bar", ctx->theme.text_disabled, rx + 1, ry + 1, rx + rw - 1, ry + rh - 1);
+		} break;
+
 		case MKGUI_MENU: {
 			draw_rect_fill(buf, bw, bh, rx, ry, rw, rh, ctx->theme.menu_bg);
 			int32_t mx = rx;
@@ -2410,97 +2358,6 @@ static void ed_layout_build_index(void) {
 	}
 }
 
-// [=]===^=[ ed_layout_child_area ]===============================[=]
-static void ed_layout_child_area(struct mkgui_ctx *ctx, uint32_t pidx, uint32_t cidx, int32_t px, int32_t py, int32_t pw, int32_t ph) {
-	struct ed_widget *w = &ed.widgets[cidx];
-	struct ed_widget *parent = &ed.widgets[pidx];
-
-	if(parent->type == MKGUI_HSPLIT || parent->type == MKGUI_VSPLIT) {
-		struct mkgui_split_data *sd = find_split_data(ctx, parent->id);
-		float ratio = sd ? sd->ratio : 0.5f;
-		if(parent->type == MKGUI_HSPLIT) {
-			int32_t split = (int32_t)(ph * ratio);
-			if(w->flags & MKGUI_REGION_TOP) {
-				ph = split;
-			} else if(w->flags & MKGUI_REGION_BOTTOM) {
-				py += split + MKGUI_SPLIT_THICK;
-				ph = ph - split - MKGUI_SPLIT_THICK;
-			}
-		} else {
-			int32_t split = (int32_t)(pw * ratio);
-			if(w->flags & MKGUI_REGION_LEFT) {
-				pw = split;
-			} else if(w->flags & MKGUI_REGION_RIGHT) {
-				px += split + MKGUI_SPLIT_THICK;
-				pw = pw - split - MKGUI_SPLIT_THICK;
-			}
-		}
-	}
-
-	uint32_t flags = w->flags;
-	int32_t ox = w->x;
-	int32_t oy = w->y;
-	int32_t ow = w->w;
-	int32_t oh = w->h;
-	int32_t ml = w->margin_l;
-	int32_t mt = w->margin_t;
-	int32_t mr = w->margin_r;
-	int32_t mb = w->margin_b;
-	int32_t rx, ry, rw, rh;
-	uint32_t has_anchor = flags & (MKGUI_ANCHOR_LEFT | MKGUI_ANCHOR_TOP | MKGUI_ANCHOR_RIGHT | MKGUI_ANCHOR_BOTTOM);
-
-	if(!has_anchor) {
-		rx = px + ox + ml;
-		ry = py + oy + mt;
-		rw = ow;
-		rh = oh;
-	} else {
-		if((flags & MKGUI_ANCHOR_LEFT) && (flags & MKGUI_ANCHOR_RIGHT)) {
-			rx = px + ml;
-			rw = pw - ml - mr;
-		} else if(flags & MKGUI_ANCHOR_RIGHT) {
-			rx = px + pw - mr - ow - ox;
-			rw = ow;
-		} else {
-			rx = px + ml + ox;
-			rw = ow > 0 ? ow : pw - ml - mr;
-		}
-		if((flags & MKGUI_ANCHOR_TOP) && (flags & MKGUI_ANCHOR_BOTTOM)) {
-			ry = py + mt;
-			rh = ph - mt - mb;
-		} else if(flags & MKGUI_ANCHOR_BOTTOM) {
-			ry = py + ph - mb - oh - oy;
-			rh = oh;
-		} else {
-			ry = py + mt + oy;
-			rh = oh > 0 ? oh : ph - mt - mb;
-		}
-	}
-
-	if(w->type == MKGUI_TABS && ow == 0 && oh == 0 && !has_anchor) {
-		rx = px; ry = py; rw = pw; rh = ph;
-	}
-	if(w->type == MKGUI_TAB) {
-		rx = px; ry = py; rw = pw; rh = ph;
-	}
-	if((parent->type == MKGUI_HSPLIT || parent->type == MKGUI_VSPLIT) &&
-	   (flags & (MKGUI_REGION_TOP | MKGUI_REGION_BOTTOM | MKGUI_REGION_LEFT | MKGUI_REGION_RIGHT))) {
-		rx = px; ry = py; rw = pw; rh = ph;
-	}
-
-	ed_rects[cidx].x = rx;
-	ed_rects[cidx].y = ry;
-	ed_rects[cidx].w = rw;
-	ed_rects[cidx].h = rh;
-
-	if(w->type == MKGUI_GROUP || w->type == MKGUI_TABS) {
-		ed_rects[cidx].x += MKGUI_MARGIN;
-		ed_rects[cidx].y += MKGUI_MARGIN;
-		ed_rects[cidx].w -= MKGUI_MARGIN * 2;
-		ed_rects[cidx].h -= MKGUI_MARGIN * 2;
-	}
-}
-
 // [=]===^=[ ed_measure_container ]================================[=]
 static int32_t ed_measure_container(struct mkgui_ctx *ctx, uint32_t idx, uint32_t axis) {
 	struct ed_widget *w = &ed.widgets[idx];
@@ -2510,7 +2367,7 @@ static int32_t ed_measure_container(struct mkgui_ctx *ctx, uint32_t idx, uint32_
 		int32_t gpad = 6;
 		for(uint32_t j = ed_layout_first_child[idx]; j < ed.widget_count; j = ed_layout_next_sibling[j]) {
 			uint32_t ct = ed.widgets[j].type;
-			if(ct == MKGUI_VBOX || ct == MKGUI_HBOX || ct == MKGUI_FORM) {
+			if(ct == MKGUI_VBOX || ct == MKGUI_HBOX || ct == MKGUI_FORM || ct == MKGUI_PANEL) {
 				int32_t inner = ed_measure_container(ctx, j, axis);
 				if(axis == 1) {
 					return inner + gtop + gpad;
@@ -2521,7 +2378,7 @@ static int32_t ed_measure_container(struct mkgui_ctx *ctx, uint32_t idx, uint32_
 		return 0;
 	}
 
-	uint32_t is_vbox = (w->type == MKGUI_VBOX);
+	uint32_t is_vbox = (w->type == MKGUI_VBOX || w->type == MKGUI_PANEL);
 	uint32_t is_hbox = (w->type == MKGUI_HBOX);
 	uint32_t is_form = (w->type == MKGUI_FORM);
 	if(!is_vbox && !is_hbox && !is_form) {
@@ -2558,7 +2415,7 @@ static int32_t ed_measure_container(struct mkgui_ctx *ctx, uint32_t idx, uint32_
 			child_cross = ed.widgets[j].h;
 		}
 		uint32_t ct = ed.widgets[j].type;
-		if(child_main == 0 && (ed.widgets[j].flags & MKGUI_FIXED) && (ct == MKGUI_VBOX || ct == MKGUI_HBOX || ct == MKGUI_FORM || ct == MKGUI_GROUP)) {
+		if(child_main == 0 && (ed.widgets[j].flags & MKGUI_FIXED) && (ct == MKGUI_VBOX || ct == MKGUI_HBOX || ct == MKGUI_FORM || ct == MKGUI_GROUP || ct == MKGUI_PANEL)) {
 			child_main = ed_measure_container(ctx, j, is_vbox ? 1 : 0);
 		}
 		main_total += child_main;
@@ -2575,7 +2432,7 @@ static int32_t ed_measure_container(struct mkgui_ctx *ctx, uint32_t idx, uint32_
 		uint32_t nested = 0;
 		if(gpidx < ed.widget_count) {
 			uint32_t gpt = ed.widgets[gpidx].type;
-			if(gpt == MKGUI_VBOX || gpt == MKGUI_HBOX || gpt == MKGUI_FORM || gpt == MKGUI_GROUP || gpt == MKGUI_TABS) {
+			if(gpt == MKGUI_VBOX || gpt == MKGUI_HBOX || gpt == MKGUI_FORM || gpt == MKGUI_GROUP || gpt == MKGUI_TABS || gpt == MKGUI_PANEL) {
 				nested = 1;
 			}
 		}
@@ -2644,6 +2501,15 @@ static void ed_layout_node(struct mkgui_ctx *ctx, uint32_t idx) {
 			}
 		}
 		for(uint32_t c = ed_layout_first_child[idx]; c < ed.widget_count; c = ed_layout_next_sibling[c]) {
+			if(ed.widgets[c].type == MKGUI_PATHBAR && ed.widgets[c].h == 0) {
+				ed_rects[c].x = px + ed.widgets[c].margin_l;
+				ed_rects[c].y = top_y;
+				ed_rects[c].w = pw - ed.widgets[c].margin_l - ed.widgets[c].margin_r;
+				ed_rects[c].h = MKGUI_PATHBAR_HEIGHT;
+				top_y += MKGUI_PATHBAR_HEIGHT;
+			}
+		}
+		for(uint32_t c = ed_layout_first_child[idx]; c < ed.widget_count; c = ed_layout_next_sibling[c]) {
 			if(ed.widgets[c].type == MKGUI_STATUSBAR) {
 				bot_y -= MKGUI_STATUSBAR_HEIGHT;
 				ed_rects[c].x = px;
@@ -2671,13 +2537,14 @@ static void ed_layout_node(struct mkgui_ctx *ctx, uint32_t idx) {
 		ph -= gtop + gpad;
 	}
 
-	if(w->type == MKGUI_VBOX || w->type == MKGUI_HBOX || w->type == MKGUI_FORM) {
+	uint32_t ed_is_panel_vbox = (w->type == MKGUI_PANEL);
+	if(w->type == MKGUI_VBOX || w->type == MKGUI_HBOX || w->type == MKGUI_FORM || ed_is_panel_vbox) {
 		if(!(w->flags & MKGUI_NO_PAD)) {
 			uint32_t gpidx = ed_layout_parent[idx];
 			uint32_t nested = 0;
 			if(gpidx < ed.widget_count) {
 				uint32_t gpt = ed.widgets[gpidx].type;
-				if(gpt == MKGUI_VBOX || gpt == MKGUI_HBOX || gpt == MKGUI_FORM || gpt == MKGUI_GROUP || gpt == MKGUI_TABS) {
+				if(gpt == MKGUI_VBOX || gpt == MKGUI_HBOX || gpt == MKGUI_FORM || gpt == MKGUI_GROUP || gpt == MKGUI_TABS || gpt == MKGUI_PANEL) {
 					nested = 1;
 				}
 			}
@@ -2696,7 +2563,7 @@ static void ed_layout_node(struct mkgui_ctx *ctx, uint32_t idx) {
 			}
 		}
 
-		if(w->type == MKGUI_VBOX) {
+		if(w->type == MKGUI_VBOX || ed_is_panel_vbox) {
 			int32_t fixed_total = 0;
 			int32_t min_total = 0;
 			uint32_t weight_total = 0;
@@ -2707,13 +2574,20 @@ static void ed_layout_node(struct mkgui_ctx *ctx, uint32_t idx) {
 				if(ed.widgets[j].flags & MKGUI_FIXED) {
 					int32_t fh = ed.widgets[j].h;
 					uint32_t ct = ed.widgets[j].type;
-					if(fh == 0 && (ct == MKGUI_VBOX || ct == MKGUI_HBOX || ct == MKGUI_FORM || ct == MKGUI_GROUP)) {
+					if(fh == 0 && (ct == MKGUI_VBOX || ct == MKGUI_HBOX || ct == MKGUI_FORM || ct == MKGUI_GROUP || ct == MKGUI_PANEL)) {
 						fh = ed_measure_container(ctx, j, 1);
+					}
+					if(fh == 0) {
+						fh = natural_height(ctx, ct);
 					}
 					fixed_total += fh;
 				} else {
 					uint32_t ew = ed.widgets[j].weight > 0 ? ed.widgets[j].weight : 1;
-					min_total += ed.widgets[j].h;
+					int32_t minh = ed.widgets[j].h;
+					if(minh == 0) {
+						minh = natural_height(ctx, ed.widgets[j].type);
+					}
+					min_total += minh;
 					weight_total += ew;
 				}
 			}
@@ -2732,12 +2606,19 @@ static void ed_layout_node(struct mkgui_ctx *ctx, uint32_t idx) {
 				if(ed.widgets[j].flags & MKGUI_FIXED) {
 					ch = ed.widgets[j].h;
 					uint32_t ct = ed.widgets[j].type;
-					if(ch == 0 && (ct == MKGUI_VBOX || ct == MKGUI_HBOX || ct == MKGUI_FORM || ct == MKGUI_GROUP)) {
+					if(ch == 0 && (ct == MKGUI_VBOX || ct == MKGUI_HBOX || ct == MKGUI_FORM || ct == MKGUI_GROUP || ct == MKGUI_PANEL)) {
 						ch = ed_measure_container(ctx, j, 1);
+					}
+					if(ch == 0) {
+						ch = natural_height(ctx, ct);
 					}
 				} else {
 					uint32_t wt = ed.widgets[j].weight > 0 ? ed.widgets[j].weight : 1;
-					ch = ed.widgets[j].h + (weight_total > 0 ? (int32_t)(remaining * (int32_t)wt / (int32_t)weight_total) : 0);
+					int32_t base_h = ed.widgets[j].h;
+					if(base_h == 0) {
+						base_h = natural_height(ctx, ed.widgets[j].type);
+					}
+					ch = base_h + (weight_total > 0 ? (int32_t)(remaining * (int32_t)wt / (int32_t)weight_total) : 0);
 					uint32_t extra = wdist + wt * (uint32_t)(remaining % (int32_t)weight_total);
 					if(extra >= weight_total && weight_total > 0) {
 						++ch;
@@ -2776,7 +2657,7 @@ static void ed_layout_node(struct mkgui_ctx *ctx, uint32_t idx) {
 				if(ed.widgets[j].flags & MKGUI_FIXED) {
 					int32_t fw = ed.widgets[j].w;
 					uint32_t ct = ed.widgets[j].type;
-					if(fw == 0 && (ct == MKGUI_VBOX || ct == MKGUI_HBOX || ct == MKGUI_FORM || ct == MKGUI_GROUP)) {
+					if(fw == 0 && (ct == MKGUI_VBOX || ct == MKGUI_HBOX || ct == MKGUI_FORM || ct == MKGUI_GROUP || ct == MKGUI_PANEL)) {
 						fw = ed_measure_container(ctx, j, 0);
 					}
 					fixed_total += fw;
@@ -2801,7 +2682,7 @@ static void ed_layout_node(struct mkgui_ctx *ctx, uint32_t idx) {
 				if(ed.widgets[j].flags & MKGUI_FIXED) {
 					cw = ed.widgets[j].w;
 					uint32_t ct = ed.widgets[j].type;
-					if(cw == 0 && (ct == MKGUI_VBOX || ct == MKGUI_HBOX || ct == MKGUI_FORM || ct == MKGUI_GROUP)) {
+					if(cw == 0 && (ct == MKGUI_VBOX || ct == MKGUI_HBOX || ct == MKGUI_FORM || ct == MKGUI_GROUP || ct == MKGUI_PANEL)) {
 						cw = ed_measure_container(ctx, j, 0);
 					}
 				} else {
@@ -2852,17 +2733,18 @@ static void ed_layout_node(struct mkgui_ctx *ctx, uint32_t idx) {
 			for(uint32_t j = ed_layout_first_child[idx]; j < ed.widget_count; j = ed_layout_next_sibling[j]) {
 				if(!(ed.widgets[j].flags & MKGUI_HIDDEN)) {
 					uint32_t row = pair_idx / 2;
-					int32_t row_y = py + (int32_t)row * (24 + MKGUI_BOX_GAP);
+					uint32_t row_h = (uint32_t)(ctx->font_height + 10);
+					int32_t row_y = py + (int32_t)(row * (row_h + MKGUI_BOX_GAP));
 					if((pair_idx & 1) == 0) {
 						ed_rects[j].x = px;
 						ed_rects[j].y = row_y;
 						ed_rects[j].w = label_w;
-						ed_rects[j].h = 24;
+						ed_rects[j].h = (int32_t)row_h;
 					} else {
 						ed_rects[j].x = px + label_w;
 						ed_rects[j].y = row_y;
 						ed_rects[j].w = pw - label_w;
-						ed_rects[j].h = 24;
+						ed_rects[j].h = (int32_t)row_h;
 					}
 					++pair_idx;
 				}
@@ -2898,15 +2780,66 @@ static void ed_layout_node(struct mkgui_ctx *ctx, uint32_t idx) {
 		}
 
 	} else {
-		for(uint32_t c = ed_layout_first_child[idx]; c < ed.widget_count; c = ed_layout_next_sibling[c]) {
-			uint32_t ct = ed.widgets[c].type;
-			if(ct == MKGUI_MENUITEM || (ed.widgets[c].flags & MKGUI_HIDDEN)) {
-				continue;
+		if(w->type == MKGUI_HSPLIT || w->type == MKGUI_VSPLIT) {
+			struct mkgui_split_data *sd = find_split_data(ctx, w->id);
+			float ratio = sd ? sd->ratio : 0.5f;
+			if(w->type == MKGUI_HSPLIT) {
+				int32_t split = (int32_t)(ph * ratio);
+				for(uint32_t c = ed_layout_first_child[idx]; c < ed.widget_count; c = ed_layout_next_sibling[c]) {
+					if(ed.widgets[c].flags & MKGUI_HIDDEN) {
+						continue;
+					}
+					if(ed.widgets[c].flags & MKGUI_REGION_TOP) {
+						ed_rects[c].x = px; ed_rects[c].y = py;
+						ed_rects[c].w = pw; ed_rects[c].h = split;
+					} else if(ed.widgets[c].flags & MKGUI_REGION_BOTTOM) {
+						ed_rects[c].x = px; ed_rects[c].y = py + split + MKGUI_SPLIT_THICK;
+						ed_rects[c].w = pw; ed_rects[c].h = ph - split - MKGUI_SPLIT_THICK;
+					}
+				}
+			} else {
+				int32_t split = (int32_t)(pw * ratio);
+				for(uint32_t c = ed_layout_first_child[idx]; c < ed.widget_count; c = ed_layout_next_sibling[c]) {
+					if(ed.widgets[c].flags & MKGUI_HIDDEN) {
+						continue;
+					}
+					if(ed.widgets[c].flags & MKGUI_REGION_LEFT) {
+						ed_rects[c].x = px; ed_rects[c].y = py;
+						ed_rects[c].w = split; ed_rects[c].h = ph;
+					} else if(ed.widgets[c].flags & MKGUI_REGION_RIGHT) {
+						ed_rects[c].x = px + split + MKGUI_SPLIT_THICK; ed_rects[c].y = py;
+						ed_rects[c].w = pw - split - MKGUI_SPLIT_THICK; ed_rects[c].h = ph;
+					}
+				}
 			}
-			if(w->type == MKGUI_WINDOW && (ct == MKGUI_MENU || ct == MKGUI_TOOLBAR || ct == MKGUI_STATUSBAR)) {
-				continue;
+		} else {
+			for(uint32_t c = ed_layout_first_child[idx]; c < ed.widget_count; c = ed_layout_next_sibling[c]) {
+				uint32_t ct = ed.widgets[c].type;
+				if(ct == MKGUI_MENUITEM || (ed.widgets[c].flags & MKGUI_HIDDEN)) {
+					continue;
+				}
+				if(w->type == MKGUI_WINDOW && (ct == MKGUI_MENU || ct == MKGUI_TOOLBAR || ct == MKGUI_STATUSBAR)) {
+					continue;
+				}
+				if(w->type == MKGUI_WINDOW && ct == MKGUI_PATHBAR && ed.widgets[c].h == 0) {
+					continue;
+				}
+				struct ed_widget *cw = &ed.widgets[c];
+				int32_t ml = cw->margin_l;
+				int32_t mr = cw->margin_r;
+				int32_t mt = cw->margin_t;
+				int32_t mb = cw->margin_b;
+				ed_rects[c].x = px + ml;
+				ed_rects[c].y = py + mt;
+				ed_rects[c].w = pw - ml - mr;
+				ed_rects[c].h = ph - mt - mb;
+				if((cw->flags & MKGUI_FIXED) && cw->w > 0) {
+					ed_rects[c].w = cw->w;
+				}
+				if((cw->flags & MKGUI_FIXED) && cw->h > 0) {
+					ed_rects[c].h = cw->h;
+				}
 			}
-			ed_layout_child_area(ctx, idx, c, px, py, pw, ph);
 		}
 	}
 
@@ -3673,7 +3606,6 @@ static void ed_save_project(struct mkgui_ctx *ctx, uint32_t save_as) {
 		fprintf(f, "label %s\n", w->label);
 		fprintf(f, "icon %s\n", w->icon);
 		fprintf(f, "parent %u\n", w->parent_id);
-		fprintf(f, "pos %d %d\n", w->x, w->y);
 		fprintf(f, "size %d %d\n", w->w, w->h);
 		fprintf(f, "flags 0x%08x\n", w->flags);
 		fprintf(f, "weight %u\n", w->weight);
@@ -3959,10 +3891,6 @@ static const char *ed_flags_to_str(uint32_t flags, uint32_t widget_type, char *b
 	}
 
 	static const struct { uint32_t bit; const char *name; } single_bits[] = {
-		{ MKGUI_ANCHOR_LEFT,     "MKGUI_ANCHOR_LEFT" },
-		{ MKGUI_ANCHOR_TOP,      "MKGUI_ANCHOR_TOP" },
-		{ MKGUI_ANCHOR_RIGHT,    "MKGUI_ANCHOR_RIGHT" },
-		{ MKGUI_ANCHOR_BOTTOM,   "MKGUI_ANCHOR_BOTTOM" },
 		{ MKGUI_REGION_TOP,      "MKGUI_REGION_TOP" },
 		{ MKGUI_REGION_BOTTOM,   "MKGUI_REGION_BOTTOM" },
 		{ MKGUI_REGION_LEFT,     "MKGUI_REGION_LEFT" },
@@ -4197,16 +4125,17 @@ static void ed_generate_code(struct mkgui_ctx *ctx) {
 			}
 		}
 		char flag_buf[512];
+		uint32_t out_flags = w->flags & ~0xfu;
 		uint32_t has_margins = (w->margin_l || w->margin_t || w->margin_r || w->margin_b);
 		if(has_margins) {
-			fprintf(f, "\t\t{ %s, %s, \"%s\", \"%s\", %s, %d, %d, %d, %d, %s, %u, %d, %d, %d, %d },\n",
+			fprintf(f, "\t\t{ %s, %s, \"%s\", \"%s\", %s, %d, %d, %s, %u, %d, %d, %d, %d },\n",
 				ed_type_name_upper(w->type), w->id_name, w->label, w->icon,
-				parent_name, lx, ly, lw, lh, ed_flags_to_str(w->flags, w->type, flag_buf, sizeof(flag_buf)), w->weight,
+				parent_name, lw, lh, ed_flags_to_str(out_flags, w->type, flag_buf, sizeof(flag_buf)), w->weight,
 				w->margin_l, w->margin_r, w->margin_t, w->margin_b);
 		} else {
-			fprintf(f, "\t\t{ %s, %s, \"%s\", \"%s\", %s, %d, %d, %d, %d, %s, %u },\n",
+			fprintf(f, "\t\t{ %s, %s, \"%s\", \"%s\", %s, %d, %d, %s, %u },\n",
 				ed_type_name_upper(w->type), w->id_name, w->label, w->icon,
-				parent_name, lx, ly, lw, lh, ed_flags_to_str(w->flags, w->type, flag_buf, sizeof(flag_buf)), w->weight);
+				parent_name, lw, lh, ed_flags_to_str(out_flags, w->type, flag_buf, sizeof(flag_buf)), w->weight);
 		}
 	}
 	fprintf(f, "\t};\n\n");
@@ -4454,16 +4383,17 @@ static void ed_generate_snippet(struct mkgui_ctx *ctx) {
 				parent_name = ed.widgets[pidx].id_name;
 			}
 		}
+		uint32_t out_flags = w->flags & ~0xfu;
 		uint32_t has_margins = (w->margin_l || w->margin_t || w->margin_r || w->margin_b);
 		if(has_margins) {
-			fprintf(f, "\t{ %s, %s, \"%s\", \"%s\", %s, %d, %d, %d, %d, 0x%x, %u, %d, %d, %d, %d },\n",
+			fprintf(f, "\t{ %s, %s, \"%s\", \"%s\", %s, %d, %d, 0x%x, %u, %d, %d, %d, %d },\n",
 				ed_type_name_upper(w->type), w->id_name, w->label, w->icon,
-				parent_name, lx, ly, lw, lh, w->flags, w->weight,
+				parent_name, lw, lh, out_flags, w->weight,
 				w->margin_l, w->margin_r, w->margin_t, w->margin_b);
 		} else {
-			fprintf(f, "\t{ %s, %s, \"%s\", \"%s\", %s, %d, %d, %d, %d, 0x%x, %u },\n",
+			fprintf(f, "\t{ %s, %s, \"%s\", \"%s\", %s, %d, %d, 0x%x, %u },\n",
 				ed_type_name_upper(w->type), w->id_name, w->label, w->icon,
-				parent_name, lx, ly, lw, lh, w->flags, w->weight);
+				parent_name, lw, lh, out_flags, w->weight);
 		}
 	}
 	fprintf(f, "};\n");
@@ -4532,7 +4462,10 @@ static void ed_test_gui(struct mkgui_ctx *editor_ctx) {
 		tw->label[slen] = '\0';
 		tw->parent_id = ew->parent_id;
 		memcpy(tw->icon, ew->icon, MKGUI_ICON_NAME_LEN);
-		ed_convert_to_layout(i, &tw->x, &tw->y, &tw->w, &tw->h);
+		{
+			int32_t lx, ly;
+			ed_convert_to_layout(i, &lx, &ly, &tw->w, &tw->h);
+		}
 		tw->flags = ew->flags;
 		tw->weight = ew->weight;
 		tw->margin_l = ew->margin_l;
@@ -4703,185 +4636,174 @@ int main(void) {
 	int32_t win_h = (ed_cfg.window_h > 0) ? ed_cfg.window_h : 800;
 
 	struct mkgui_widget widgets[] = {
-		{ MKGUI_WINDOW,   ED_WINDOW,      "mkgui editor",    "", 0,          0, 0, win_w, win_h, 0, 0 },
+		{ MKGUI_WINDOW,   ED_WINDOW,      "mkgui editor",    "", 0,          win_w, win_h, 0, 0 },
 
-		{ MKGUI_MENU,     ED_MENU,        "",                 "", ED_WINDOW,  0, 0, 0, 0, 0, 0 },
-		{ MKGUI_MENUITEM, ED_FILE_MENU,   "File",             "", ED_MENU,    0, 0, 0, 0, 0, 0 },
-		{ MKGUI_MENUITEM, ED_EDIT_MENU,   "Edit",             "", ED_MENU,    0, 0, 0, 0, 0, 0 },
-		{ MKGUI_MENUITEM, ED_MI_NEW,      "New",              "file-plus",  ED_FILE_MENU, 0, 0, 0, 0, 0, 0 },
-		{ MKGUI_MENUITEM, ED_MI_OPEN,     "Open",             "folder-open", ED_FILE_MENU, 0, 0, 0, 0, 0, 0 },
-		{ MKGUI_MENUITEM, ED_MI_SAVE,     "Save",             "content-save", ED_FILE_MENU, 0, 0, 0, 0, 0, 0 },
-		{ MKGUI_MENUITEM, ED_MI_SAVEAS,   "Save As...",       "", ED_FILE_MENU, 0, 0, 0, 0, 0, 0 },
-		{ MKGUI_MENUITEM, ED_MI_SEP1,     "",                 "", ED_FILE_MENU, 0, 0, 0, 0, MKGUI_SEPARATOR, 0 },
-		{ MKGUI_MENUITEM, ED_MI_RECENT,   "Recent Files",     "", ED_FILE_MENU, 0, 0, 0, 0, 0, 0 },
-		{ MKGUI_MENUITEM, ED_RECENT_FIRST + 0, "", "", ED_MI_RECENT, 0, 0, 0, 0, MKGUI_HIDDEN, 0 },
-		{ MKGUI_MENUITEM, ED_RECENT_FIRST + 1, "", "", ED_MI_RECENT, 0, 0, 0, 0, MKGUI_HIDDEN, 0 },
-		{ MKGUI_MENUITEM, ED_RECENT_FIRST + 2, "", "", ED_MI_RECENT, 0, 0, 0, 0, MKGUI_HIDDEN, 0 },
-		{ MKGUI_MENUITEM, ED_RECENT_FIRST + 3, "", "", ED_MI_RECENT, 0, 0, 0, 0, MKGUI_HIDDEN, 0 },
-		{ MKGUI_MENUITEM, ED_RECENT_FIRST + 4, "", "", ED_MI_RECENT, 0, 0, 0, 0, MKGUI_HIDDEN, 0 },
-		{ MKGUI_MENUITEM, ED_RECENT_FIRST + 5, "", "", ED_MI_RECENT, 0, 0, 0, 0, MKGUI_HIDDEN, 0 },
-		{ MKGUI_MENUITEM, ED_RECENT_FIRST + 6, "", "", ED_MI_RECENT, 0, 0, 0, 0, MKGUI_HIDDEN, 0 },
-		{ MKGUI_MENUITEM, ED_RECENT_FIRST + 7, "", "", ED_MI_RECENT, 0, 0, 0, 0, MKGUI_HIDDEN, 0 },
-		{ MKGUI_MENUITEM, ED_RECENT_FIRST + 8, "", "", ED_MI_RECENT, 0, 0, 0, 0, MKGUI_HIDDEN, 0 },
-		{ MKGUI_MENUITEM, ED_RECENT_FIRST + 9, "", "", ED_MI_RECENT, 0, 0, 0, 0, MKGUI_HIDDEN, 0 },
-		{ MKGUI_MENUITEM, ED_MI_SEP2,     "",                 "", ED_FILE_MENU, 0, 0, 0, 0, MKGUI_SEPARATOR, 0 },
-		{ MKGUI_MENUITEM, ED_MI_GENERATE, "Generate Code",    "", ED_FILE_MENU, 0, 0, 0, 0, 0, 0 },
-		{ MKGUI_MENUITEM, ED_MI_SNIPPET,  "Generate Snippet", "", ED_FILE_MENU, 0, 0, 0, 0, 0, 0 },
-		{ MKGUI_MENUITEM, ED_MI_SEP3,     "",                 "", ED_FILE_MENU, 0, 0, 0, 0, MKGUI_SEPARATOR, 0 },
-		{ MKGUI_MENUITEM, ED_MI_EXIT,     "Exit",             "exit-to-app", ED_FILE_MENU, 0, 0, 0, 0, 0, 0 },
-		{ MKGUI_MENUITEM, ED_MI_UNDO,     "Undo",             "undo-variant", ED_EDIT_MENU, 0, 0, 0, 0, 0, 0 },
-		{ MKGUI_MENUITEM, ED_MI_REDO,     "Redo",             "redo-variant", ED_EDIT_MENU, 0, 0, 0, 0, 0, 0 },
-		{ MKGUI_MENUITEM, ED_MI_SEP4,     "",                 "", ED_EDIT_MENU, 0, 0, 0, 0, MKGUI_SEPARATOR, 0 },
-		{ MKGUI_MENUITEM, ED_MI_DELETE,   "Delete",           "delete", ED_EDIT_MENU, 0, 0, 0, 0, 0, 0 },
+		{ MKGUI_MENU,     ED_MENU,        "",                 "", ED_WINDOW,  0, 0, 0, 0 },
+		{ MKGUI_MENUITEM, ED_FILE_MENU,   "File",             "", ED_MENU,    0, 0, 0, 0 },
+		{ MKGUI_MENUITEM, ED_EDIT_MENU,   "Edit",             "", ED_MENU,    0, 0, 0, 0 },
+		{ MKGUI_MENUITEM, ED_MI_NEW,      "New",              "file-plus",  ED_FILE_MENU, 0, 0, 0, 0 },
+		{ MKGUI_MENUITEM, ED_MI_OPEN,     "Open",             "folder-open", ED_FILE_MENU, 0, 0, 0, 0 },
+		{ MKGUI_MENUITEM, ED_MI_SAVE,     "Save",             "content-save", ED_FILE_MENU, 0, 0, 0, 0 },
+		{ MKGUI_MENUITEM, ED_MI_SAVEAS,   "Save As...",       "", ED_FILE_MENU, 0, 0, 0, 0 },
+		{ MKGUI_MENUITEM, ED_MI_SEP1,     "",                 "", ED_FILE_MENU, 0, 0, MKGUI_SEPARATOR, 0 },
+		{ MKGUI_MENUITEM, ED_MI_RECENT,   "Recent Files",     "", ED_FILE_MENU, 0, 0, 0, 0 },
+		{ MKGUI_MENUITEM, ED_RECENT_FIRST + 0, "", "", ED_MI_RECENT, 0, 0, MKGUI_HIDDEN, 0 },
+		{ MKGUI_MENUITEM, ED_RECENT_FIRST + 1, "", "", ED_MI_RECENT, 0, 0, MKGUI_HIDDEN, 0 },
+		{ MKGUI_MENUITEM, ED_RECENT_FIRST + 2, "", "", ED_MI_RECENT, 0, 0, MKGUI_HIDDEN, 0 },
+		{ MKGUI_MENUITEM, ED_RECENT_FIRST + 3, "", "", ED_MI_RECENT, 0, 0, MKGUI_HIDDEN, 0 },
+		{ MKGUI_MENUITEM, ED_RECENT_FIRST + 4, "", "", ED_MI_RECENT, 0, 0, MKGUI_HIDDEN, 0 },
+		{ MKGUI_MENUITEM, ED_RECENT_FIRST + 5, "", "", ED_MI_RECENT, 0, 0, MKGUI_HIDDEN, 0 },
+		{ MKGUI_MENUITEM, ED_RECENT_FIRST + 6, "", "", ED_MI_RECENT, 0, 0, MKGUI_HIDDEN, 0 },
+		{ MKGUI_MENUITEM, ED_RECENT_FIRST + 7, "", "", ED_MI_RECENT, 0, 0, MKGUI_HIDDEN, 0 },
+		{ MKGUI_MENUITEM, ED_RECENT_FIRST + 8, "", "", ED_MI_RECENT, 0, 0, MKGUI_HIDDEN, 0 },
+		{ MKGUI_MENUITEM, ED_RECENT_FIRST + 9, "", "", ED_MI_RECENT, 0, 0, MKGUI_HIDDEN, 0 },
+		{ MKGUI_MENUITEM, ED_MI_SEP2,     "",                 "", ED_FILE_MENU, 0, 0, MKGUI_SEPARATOR, 0 },
+		{ MKGUI_MENUITEM, ED_MI_GENERATE, "Generate Code",    "", ED_FILE_MENU, 0, 0, 0, 0 },
+		{ MKGUI_MENUITEM, ED_MI_SNIPPET,  "Generate Snippet", "", ED_FILE_MENU, 0, 0, 0, 0 },
+		{ MKGUI_MENUITEM, ED_MI_SEP3,     "",                 "", ED_FILE_MENU, 0, 0, MKGUI_SEPARATOR, 0 },
+		{ MKGUI_MENUITEM, ED_MI_EXIT,     "Exit",             "exit-to-app", ED_FILE_MENU, 0, 0, 0, 0 },
+		{ MKGUI_MENUITEM, ED_MI_UNDO,     "Undo",             "undo-variant", ED_EDIT_MENU, 0, 0, 0, 0 },
+		{ MKGUI_MENUITEM, ED_MI_REDO,     "Redo",             "redo-variant", ED_EDIT_MENU, 0, 0, 0, 0 },
+		{ MKGUI_MENUITEM, ED_MI_SEP4,     "",                 "", ED_EDIT_MENU, 0, 0, MKGUI_SEPARATOR, 0 },
+		{ MKGUI_MENUITEM, ED_MI_DELETE,   "Delete",           "delete", ED_EDIT_MENU, 0, 0, 0, 0 },
 
-		{ MKGUI_TOOLBAR,  ED_TOOLBAR,     "",                 "", ED_WINDOW,  0, 0, 0, 0, 0, 0 },
-		{ MKGUI_BUTTON,   ED_TB_NEW,      "New",              "file-plus",  ED_TOOLBAR, 0, 0, 0, 0, 0, 0 },
-		{ MKGUI_BUTTON,   ED_TB_OPEN,     "Open",             "folder-open", ED_TOOLBAR, 0, 0, 0, 0, 0, 0 },
-		{ MKGUI_BUTTON,   ED_TB_SAVE,     "Save",             "content-save", ED_TOOLBAR, 0, 0, 0, 0, 0, 0 },
-		{ MKGUI_BUTTON,   ED_TB_SEP1,     "",                 "", ED_TOOLBAR, 0, 0, 0, 0, MKGUI_SEPARATOR, 0 },
-		{ MKGUI_BUTTON,   ED_TB_GEN,      "Gen",              "code-json", ED_TOOLBAR, 0, 0, 0, 0, 0, 0 },
-		{ MKGUI_BUTTON,   ED_TB_TEST,     "Test",             "play", ED_TOOLBAR, 0, 0, 0, 0, 0, 0 },
-		{ MKGUI_BUTTON,   ED_TB_SEP2,     "",                 "", ED_TOOLBAR, 0, 0, 0, 0, MKGUI_SEPARATOR, 0 },
-		{ MKGUI_BUTTON,   ED_TB_UNDO,     "Undo",             "undo-variant", ED_TOOLBAR, 0, 0, 0, 0, 0, 0 },
-		{ MKGUI_BUTTON,   ED_TB_REDO,     "Redo",             "redo-variant", ED_TOOLBAR, 0, 0, 0, 0, 0, 0 },
+		{ MKGUI_TOOLBAR,  ED_TOOLBAR,     "",                 "", ED_WINDOW,  0, 0, 0, 0 },
+		{ MKGUI_BUTTON,   ED_TB_NEW,      "New",              "file-plus",  ED_TOOLBAR, 0, 0, 0, 0 },
+		{ MKGUI_BUTTON,   ED_TB_OPEN,     "Open",             "folder-open", ED_TOOLBAR, 0, 0, 0, 0 },
+		{ MKGUI_BUTTON,   ED_TB_SAVE,     "Save",             "content-save", ED_TOOLBAR, 0, 0, 0, 0 },
+		{ MKGUI_BUTTON,   ED_TB_SEP1,     "",                 "", ED_TOOLBAR, 0, 0, MKGUI_SEPARATOR, 0 },
+		{ MKGUI_BUTTON,   ED_TB_GEN,      "Gen",              "code-json", ED_TOOLBAR, 0, 0, 0, 0 },
+		{ MKGUI_BUTTON,   ED_TB_TEST,     "Test",             "play", ED_TOOLBAR, 0, 0, 0, 0 },
+		{ MKGUI_BUTTON,   ED_TB_SEP2,     "",                 "", ED_TOOLBAR, 0, 0, MKGUI_SEPARATOR, 0 },
+		{ MKGUI_BUTTON,   ED_TB_UNDO,     "Undo",             "undo-variant", ED_TOOLBAR, 0, 0, 0, 0 },
+		{ MKGUI_BUTTON,   ED_TB_REDO,     "Redo",             "redo-variant", ED_TOOLBAR, 0, 0, 0, 0 },
 
-		{ MKGUI_VSPLIT, ED_SPLIT_MAIN, "",              "", ED_WINDOW,  0, 0, 0, 0, MKGUI_ANCHOR_LEFT | MKGUI_ANCHOR_TOP | MKGUI_ANCHOR_RIGHT | MKGUI_ANCHOR_BOTTOM, 0 },
-		{ MKGUI_TREEVIEW, ED_TREE,        "",                 "", ED_SPLIT_MAIN, 0, 0, 0, 0, MKGUI_REGION_LEFT, 0 },
-		{ MKGUI_VSPLIT, ED_SPLIT_RIGHT, "",              "", ED_SPLIT_MAIN, 0, 0, 0, 0, MKGUI_REGION_RIGHT, 0 },
-		{ MKGUI_CANVAS,   ED_CANVAS_LBL,  "",                 "", ED_SPLIT_RIGHT, 0, 0, 0, 0, MKGUI_REGION_LEFT, 0 },
-		{ MKGUI_VBOX,     ED_RIGHT_PANEL, "",                 "", ED_SPLIT_RIGHT, 0, 0, 0, 0, MKGUI_REGION_RIGHT | MKGUI_SCROLL, 0 },
+		{ MKGUI_VSPLIT, ED_SPLIT_MAIN, "",              "", ED_WINDOW,  0, 0, 0, 0 },
+		{ MKGUI_TREEVIEW, ED_TREE,        "",                 "", ED_SPLIT_MAIN, 0, 0, MKGUI_REGION_LEFT, 0 },
+		{ MKGUI_VSPLIT, ED_SPLIT_RIGHT, "",              "", ED_SPLIT_MAIN, 0, 0, MKGUI_REGION_RIGHT, 0 },
+		{ MKGUI_CANVAS,   ED_CANVAS_LBL,  "",                 "", ED_SPLIT_RIGHT, 0, 0, MKGUI_REGION_LEFT, 0 },
+		{ MKGUI_VBOX,     ED_RIGHT_PANEL, "",                 "", ED_SPLIT_RIGHT, 0, 0, MKGUI_REGION_RIGHT | MKGUI_SCROLL, 0 },
 
-		{ MKGUI_GROUP,    ED_PAL_GROUP,   "Widgets",          "", ED_RIGHT_PANEL, 0, 0, 0, ED_PALETTE_H, MKGUI_FIXED, 0 },
-		{ MKGUI_HBOX,     ED_PAL_HBOX,   "",                 "", ED_PAL_GROUP,   0, 0, 0, 0, MKGUI_ANCHOR_LEFT | MKGUI_ANCHOR_TOP | MKGUI_ANCHOR_RIGHT | MKGUI_ANCHOR_BOTTOM, 0 },
-		{ MKGUI_VBOX,     ED_PAL_COL0,   "",                 "", ED_PAL_HBOX,    0, 0, 0, 0, 0, 1 },
-		{ MKGUI_VBOX,     ED_PAL_COL1,   "",                 "", ED_PAL_HBOX,    0, 0, 0, 0, 0, 1 },
+		{ MKGUI_GROUP,    ED_PAL_GROUP,   "Widgets",          "", ED_RIGHT_PANEL, 0, ED_PALETTE_H, MKGUI_FIXED, 0 },
+		{ MKGUI_HBOX,     ED_PAL_HBOX,   "",                 "", ED_PAL_GROUP,   0, 0, 0, 0 },
+		{ MKGUI_VBOX,     ED_PAL_COL0,   "",                 "", ED_PAL_HBOX,    0, 0, 0, 1 },
+		{ MKGUI_VBOX,     ED_PAL_COL1,   "",                 "", ED_PAL_HBOX,    0, 0, 0, 1 },
 
-		{ MKGUI_GROUP,    ED_CTN_GROUP,   "Containers",       "", ED_RIGHT_PANEL, 0, 0, 0, ED_CTN_H, MKGUI_FIXED, 0 },
-		{ MKGUI_HBOX,     ED_CTN_HBOX,   "",                 "", ED_CTN_GROUP,   0, 0, 0, 0, MKGUI_ANCHOR_LEFT | MKGUI_ANCHOR_TOP | MKGUI_ANCHOR_RIGHT | MKGUI_ANCHOR_BOTTOM, 0 },
-		{ MKGUI_VBOX,     ED_CTN_COL0,   "",                 "", ED_CTN_HBOX,    0, 0, 0, 0, 0, 1 },
-		{ MKGUI_VBOX,     ED_CTN_COL1,   "",                 "", ED_CTN_HBOX,    0, 0, 0, 0, 0, 1 },
+		{ MKGUI_GROUP,    ED_CTN_GROUP,   "Containers",       "", ED_RIGHT_PANEL, 0, ED_CTN_H, MKGUI_FIXED, 0 },
+		{ MKGUI_HBOX,     ED_CTN_HBOX,   "",                 "", ED_CTN_GROUP,   0, 0, 0, 0 },
+		{ MKGUI_VBOX,     ED_CTN_COL0,   "",                 "", ED_CTN_HBOX,    0, 0, 0, 1 },
+		{ MKGUI_VBOX,     ED_CTN_COL1,   "",                 "", ED_CTN_HBOX,    0, 0, 0, 1 },
 
 		/* Palette buttons generated below */
 
 		/* Properties section */
-		{ MKGUI_GROUP,    ED_PROP_GROUP,     "Properties",      "", ED_RIGHT_PANEL, 0, 0, 0, 0, MKGUI_FIXED, 0 },
-		{ MKGUI_VBOX,     ED_PROP_VBOX,      "",                "", ED_PROP_GROUP, 0, 0, 0, 0, MKGUI_ANCHOR_LEFT | MKGUI_ANCHOR_TOP | MKGUI_ANCHOR_RIGHT | MKGUI_ANCHOR_BOTTOM, 0 },
+		{ MKGUI_GROUP,    ED_PROP_GROUP,     "Properties",      "", ED_RIGHT_PANEL, 0, 0, MKGUI_FIXED, 0 },
+		{ MKGUI_VBOX,     ED_PROP_VBOX,      "",                "", ED_PROP_GROUP, 0, 0, 0, 0 },
 
 		/* Form: label+control pairs */
-		{ MKGUI_FORM,     ED_PROP_FORM,      "",                "", ED_PROP_VBOX, 0, 0, 0, ED_PROP_FORM_H, MKGUI_FIXED, 0 },
-		{ MKGUI_LABEL,    ED_PROP_TYPE_LBL,  "Type:",           "", ED_PROP_FORM, 0, 0, 0, 0, 0, 0 },
-		{ MKGUI_LABEL,    ED_PROP_TYPE_VAL,  "(none)",          "", ED_PROP_FORM, 0, 0, 0, 0, 0, 0 },
-		{ MKGUI_LABEL,    ED_PROP_ID_LBL,    "ID:",             "", ED_PROP_FORM, 0, 0, 0, 0, 0, 0 },
-		{ MKGUI_INPUT,    ED_PROP_ID_INP,    "",                "", ED_PROP_FORM, 0, 0, 0, 0, 0, 0 },
-		{ MKGUI_LABEL,    ED_PROP_LABEL_LBL, "Label:",          "", ED_PROP_FORM, 0, 0, 0, 0, 0, 0 },
-		{ MKGUI_INPUT,    ED_PROP_LABEL_INP, "",                "", ED_PROP_FORM, 0, 0, 0, 0, 0, 0 },
-		{ MKGUI_LABEL,    ED_PROP_ICON_LBL,  "Icon:",           "", ED_PROP_FORM, 0, 0, 0, 0, 0, 0 },
-		{ MKGUI_HBOX,     ED_PROP_ICON_HBOX, "",                "", ED_PROP_FORM, 0, 0, 0, 0, 0, 0 },
-		{ MKGUI_INPUT,    ED_PROP_ICON_INP,  "",                "", ED_PROP_ICON_HBOX, 0, 0, 0, 0, 0, 1 },
-		{ MKGUI_BUTTON,   ED_PROP_ICON_BROWSE, "...",           "", ED_PROP_ICON_HBOX, 0, 0, 26, 0, MKGUI_FIXED, 0 },
-		{ MKGUI_LABEL,    ED_PROP_PARENT_LBL, "Parent:",        "", ED_PROP_FORM, 0, 0, 0, 0, 0, 0 },
-		{ MKGUI_DROPDOWN, ED_PROP_PARENT_DRP, "",               "", ED_PROP_FORM, 0, 0, 0, 0, 0, 0 },
-		{ MKGUI_LABEL,    ED_PROP_TAB_LBL,   "Tab#:",           "", ED_PROP_FORM, 0, 0, 0, 0, 0, 0 },
-		{ MKGUI_SPINBOX,  ED_PROP_TAB_SPN,   "",                "", ED_PROP_FORM, 0, 0, 0, 0, 0, 0 },
-
-		/* Position row: X/Y */
-		{ MKGUI_HBOX,     ED_PROP_POS_HBOX,  "",                "", ED_PROP_VBOX, 0, 0, 0, 22, MKGUI_FIXED, 0 },
-		{ MKGUI_LABEL,    ED_PROP_X_LBL,     "X:",              "", ED_PROP_POS_HBOX, 0, 0, 22, 0, MKGUI_FIXED, 0 },
-		{ MKGUI_SPINBOX,  ED_PROP_X_SPN,     "",                "", ED_PROP_POS_HBOX, 0, 0, 0, 0, 0, 1 },
-		{ MKGUI_LABEL,    ED_PROP_Y_LBL,     "Y:",              "", ED_PROP_POS_HBOX, 0, 0, 22, 0, MKGUI_FIXED, 0 },
-		{ MKGUI_SPINBOX,  ED_PROP_Y_SPN,     "",                "", ED_PROP_POS_HBOX, 0, 0, 0, 0, 0, 1 },
+		{ MKGUI_FORM,     ED_PROP_FORM,      "",                "", ED_PROP_VBOX, 0, ED_PROP_FORM_H, MKGUI_FIXED, 0 },
+		{ MKGUI_LABEL,    ED_PROP_TYPE_LBL,  "Type:",           "", ED_PROP_FORM, 0, 0, 0, 0 },
+		{ MKGUI_LABEL,    ED_PROP_TYPE_VAL,  "(none)",          "", ED_PROP_FORM, 0, 0, 0, 0 },
+		{ MKGUI_LABEL,    ED_PROP_ID_LBL,    "ID:",             "", ED_PROP_FORM, 0, 0, 0, 0 },
+		{ MKGUI_INPUT,    ED_PROP_ID_INP,    "",                "", ED_PROP_FORM, 0, 0, 0, 0 },
+		{ MKGUI_LABEL,    ED_PROP_LABEL_LBL, "Label:",          "", ED_PROP_FORM, 0, 0, 0, 0 },
+		{ MKGUI_INPUT,    ED_PROP_LABEL_INP, "",                "", ED_PROP_FORM, 0, 0, 0, 0 },
+		{ MKGUI_LABEL,    ED_PROP_ICON_LBL,  "Icon:",           "", ED_PROP_FORM, 0, 0, 0, 0 },
+		{ MKGUI_HBOX,     ED_PROP_ICON_HBOX, "",                "", ED_PROP_FORM, 0, 0, 0, 0 },
+		{ MKGUI_INPUT,    ED_PROP_ICON_INP,  "",                "", ED_PROP_ICON_HBOX, 0, 0, 0, 1 },
+		{ MKGUI_BUTTON,   ED_PROP_ICON_BROWSE, "...",           "", ED_PROP_ICON_HBOX, 26, 0, MKGUI_FIXED, 0 },
+		{ MKGUI_LABEL,    ED_PROP_PARENT_LBL, "Parent:",        "", ED_PROP_FORM, 0, 0, 0, 0 },
+		{ MKGUI_DROPDOWN, ED_PROP_PARENT_DRP, "",               "", ED_PROP_FORM, 0, 0, 0, 0 },
+		{ MKGUI_LABEL,    ED_PROP_TAB_LBL,   "Tab#:",           "", ED_PROP_FORM, 0, 0, 0, 0 },
+		{ MKGUI_SPINBOX,  ED_PROP_TAB_SPN,   "",                "", ED_PROP_FORM, 0, 0, 0, 0 },
 
 		/* Size row: W/H */
-		{ MKGUI_HBOX,     ED_PROP_SIZE_HBOX, "",                "", ED_PROP_VBOX, 0, 0, 0, 22, MKGUI_FIXED, 0 },
-		{ MKGUI_LABEL,    ED_PROP_W_LBL,     "W:",              "", ED_PROP_SIZE_HBOX, 0, 0, 22, 0, MKGUI_FIXED, 0 },
-		{ MKGUI_SPINBOX,  ED_PROP_W_SPN,     "",                "", ED_PROP_SIZE_HBOX, 0, 0, 0, 0, 0, 1 },
-		{ MKGUI_LABEL,    ED_PROP_H_LBL,     "H:",              "", ED_PROP_SIZE_HBOX, 0, 0, 22, 0, MKGUI_FIXED, 0 },
-		{ MKGUI_SPINBOX,  ED_PROP_H_SPN,     "",                "", ED_PROP_SIZE_HBOX, 0, 0, 0, 0, 0, 1 },
+		{ MKGUI_HBOX,     ED_PROP_SIZE_HBOX, "",                "", ED_PROP_VBOX, 0, 22, MKGUI_FIXED, 0 },
+		{ MKGUI_LABEL,    ED_PROP_W_LBL,     "W:",              "", ED_PROP_SIZE_HBOX, 22, 0, MKGUI_FIXED, 0 },
+		{ MKGUI_SPINBOX,  ED_PROP_W_SPN,     "",                "", ED_PROP_SIZE_HBOX, 0, 0, 0, 1 },
+		{ MKGUI_LABEL,    ED_PROP_H_LBL,     "H:",              "", ED_PROP_SIZE_HBOX, 22, 0, MKGUI_FIXED, 0 },
+		{ MKGUI_SPINBOX,  ED_PROP_H_SPN,     "",                "", ED_PROP_SIZE_HBOX, 0, 0, 0, 1 },
 
 		/* Margin rows: ML/MR and MT/MB */
-		{ MKGUI_HBOX,     ED_PROP_MARGIN_LR_HBOX, "",            "", ED_PROP_VBOX, 0, 0, 0, 22, MKGUI_FIXED, 0 },
-		{ MKGUI_LABEL,    ED_PROP_ML_LBL,    "ML:",             "", ED_PROP_MARGIN_LR_HBOX, 0, 0, 26, 0, MKGUI_FIXED, 0 },
-		{ MKGUI_SPINBOX,  ED_PROP_ML_SPN,    "",                "", ED_PROP_MARGIN_LR_HBOX, 0, 0, 0, 0, 0, 1 },
-		{ MKGUI_LABEL,    ED_PROP_MR_LBL,    "MR:",             "", ED_PROP_MARGIN_LR_HBOX, 0, 0, 26, 0, MKGUI_FIXED, 0 },
-		{ MKGUI_SPINBOX,  ED_PROP_MR_SPN,    "",                "", ED_PROP_MARGIN_LR_HBOX, 0, 0, 0, 0, 0, 1 },
-		{ MKGUI_HBOX,     ED_PROP_MARGIN_TB_HBOX, "",            "", ED_PROP_VBOX, 0, 0, 0, 22, MKGUI_FIXED, 0 },
-		{ MKGUI_LABEL,    ED_PROP_MT_LBL,    "MT:",             "", ED_PROP_MARGIN_TB_HBOX, 0, 0, 26, 0, MKGUI_FIXED, 0 },
-		{ MKGUI_SPINBOX,  ED_PROP_MT_SPN,    "",                "", ED_PROP_MARGIN_TB_HBOX, 0, 0, 0, 0, 0, 1 },
-		{ MKGUI_LABEL,    ED_PROP_MB_LBL,    "MB:",             "", ED_PROP_MARGIN_TB_HBOX, 0, 0, 26, 0, MKGUI_FIXED, 0 },
-		{ MKGUI_SPINBOX,  ED_PROP_MB_SPN,    "",                "", ED_PROP_MARGIN_TB_HBOX, 0, 0, 0, 0, 0, 1 },
+		{ MKGUI_HBOX,     ED_PROP_MARGIN_LR_HBOX, "",            "", ED_PROP_VBOX, 0, 22, MKGUI_FIXED, 0 },
+		{ MKGUI_LABEL,    ED_PROP_ML_LBL,    "ML:",             "", ED_PROP_MARGIN_LR_HBOX, 26, 0, MKGUI_FIXED, 0 },
+		{ MKGUI_SPINBOX,  ED_PROP_ML_SPN,    "",                "", ED_PROP_MARGIN_LR_HBOX, 0, 0, 0, 1 },
+		{ MKGUI_LABEL,    ED_PROP_MR_LBL,    "MR:",             "", ED_PROP_MARGIN_LR_HBOX, 26, 0, MKGUI_FIXED, 0 },
+		{ MKGUI_SPINBOX,  ED_PROP_MR_SPN,    "",                "", ED_PROP_MARGIN_LR_HBOX, 0, 0, 0, 1 },
+		{ MKGUI_HBOX,     ED_PROP_MARGIN_TB_HBOX, "",            "", ED_PROP_VBOX, 0, 22, MKGUI_FIXED, 0 },
+		{ MKGUI_LABEL,    ED_PROP_MT_LBL,    "MT:",             "", ED_PROP_MARGIN_TB_HBOX, 26, 0, MKGUI_FIXED, 0 },
+		{ MKGUI_SPINBOX,  ED_PROP_MT_SPN,    "",                "", ED_PROP_MARGIN_TB_HBOX, 0, 0, 0, 1 },
+		{ MKGUI_LABEL,    ED_PROP_MB_LBL,    "MB:",             "", ED_PROP_MARGIN_TB_HBOX, 26, 0, MKGUI_FIXED, 0 },
+		{ MKGUI_SPINBOX,  ED_PROP_MB_SPN,    "",                "", ED_PROP_MARGIN_TB_HBOX, 0, 0, 0, 1 },
 
 		/* Weight (visible when parent is HBOX/VBOX) */
-		{ MKGUI_HBOX,     ED_PROP_WEIGHT_HBOX, "",               "", ED_PROP_VBOX, 0, 0, 0, 22, MKGUI_HIDDEN | MKGUI_FIXED, 0 },
-		{ MKGUI_LABEL,    ED_PROP_WEIGHT_LBL, "Weight:",         "", ED_PROP_WEIGHT_HBOX, 0, 0, 50, 0, MKGUI_FIXED, 0 },
-		{ MKGUI_SPINBOX,  ED_PROP_WEIGHT_SPN, "",                "", ED_PROP_WEIGHT_HBOX, 0, 0, 0, 0, 0, 1 },
+		{ MKGUI_HBOX,     ED_PROP_WEIGHT_HBOX, "",               "", ED_PROP_VBOX, 0, 22, MKGUI_HIDDEN | MKGUI_FIXED, 0 },
+		{ MKGUI_LABEL,    ED_PROP_WEIGHT_LBL, "Weight:",         "", ED_PROP_WEIGHT_HBOX, 50, 0, MKGUI_FIXED, 0 },
+		{ MKGUI_SPINBOX,  ED_PROP_WEIGHT_SPN, "",                "", ED_PROP_WEIGHT_HBOX, 0, 0, 0, 1 },
 
 		/* Flags */
-		{ MKGUI_LABEL,    ED_PROP_FLAGS_LBL, "Anchors/Flags:",  "", ED_PROP_VBOX, 0, 0, 0, 20, MKGUI_FIXED, 0 },
-		{ MKGUI_HBOX,     ED_PROP_FL_HBOX,   "",                "", ED_PROP_VBOX, 0, 0, 0, ED_PROP_FL_H, MKGUI_FIXED, 0 },
-		{ MKGUI_VBOX,     ED_PROP_FL_COL0,   "",                "", ED_PROP_FL_HBOX, 0, 0, 0, 0, 0, 1 },
-		{ MKGUI_VBOX,     ED_PROP_FL_COL1,   "",                "", ED_PROP_FL_HBOX, 0, 0, 0, 0, 0, 1 },
-		{ MKGUI_VBOX,     ED_PROP_FL_COL2,   "",                "", ED_PROP_FL_HBOX, 0, 0, 0, 0, 0, 1 },
-		{ MKGUI_VBOX,     ED_PROP_FL_COL3,   "",                "", ED_PROP_FL_HBOX, 0, 0, 0, 0, 0, 1 },
-		{ MKGUI_CHECKBOX, ED_PROP_FL_LEFT,    "Left",           "", ED_PROP_FL_COL0, 0, 0, 0, 20, MKGUI_FIXED, 0 },
-		{ MKGUI_CHECKBOX, ED_PROP_FL_REGTOP,  "RgnTop",         "", ED_PROP_FL_COL0, 0, 0, 0, 20, MKGUI_FIXED, 0 },
-		{ MKGUI_CHECKBOX, ED_PROP_FL_CHECKED, "Checked",        "", ED_PROP_FL_COL0, 0, 0, 0, 20, MKGUI_FIXED, 0 },
-		{ MKGUI_CHECKBOX, ED_PROP_FL_TOP,     "Top",            "", ED_PROP_FL_COL1, 0, 0, 0, 20, MKGUI_FIXED, 0 },
-		{ MKGUI_CHECKBOX, ED_PROP_FL_REGBOT,  "RgnBot",         "", ED_PROP_FL_COL1, 0, 0, 0, 20, MKGUI_FIXED, 0 },
-		{ MKGUI_CHECKBOX, ED_PROP_FL_HIDDEN,  "Hidden",         "", ED_PROP_FL_COL1, 0, 0, 0, 20, MKGUI_FIXED, 0 },
-		{ MKGUI_CHECKBOX, ED_PROP_FL_SEPARATOR,"Sep",            "", ED_PROP_FL_COL1, 0, 0, 0, 20, MKGUI_FIXED, 0 },
-		{ MKGUI_CHECKBOX, ED_PROP_FL_RIGHT,   "Right",          "", ED_PROP_FL_COL2, 0, 0, 0, 20, MKGUI_FIXED, 0 },
-		{ MKGUI_CHECKBOX, ED_PROP_FL_REGLEFT, "RgnLeft",        "", ED_PROP_FL_COL2, 0, 0, 0, 20, MKGUI_FIXED, 0 },
-		{ MKGUI_CHECKBOX, ED_PROP_FL_DISABLED,"Disabled",       "", ED_PROP_FL_COL2, 0, 0, 0, 20, MKGUI_FIXED, 0 },
-		{ MKGUI_CHECKBOX, ED_PROP_FL_MENUCHECK,"MChk",          "", ED_PROP_FL_COL2, 0, 0, 0, 20, MKGUI_FIXED, 0 },
-		{ MKGUI_CHECKBOX, ED_PROP_FL_BOTTOM,  "Bottom",         "", ED_PROP_FL_COL3, 0, 0, 0, 20, MKGUI_FIXED, 0 },
-		{ MKGUI_CHECKBOX, ED_PROP_FL_REGRIGHT,"RgnRight",       "", ED_PROP_FL_COL3, 0, 0, 0, 20, MKGUI_FIXED, 0 },
-		{ MKGUI_CHECKBOX, ED_PROP_FL_MENURADIO,"MRad",          "", ED_PROP_FL_COL3, 0, 0, 0, 20, MKGUI_FIXED, 0 },
-		{ MKGUI_CHECKBOX, ED_PROP_FL_SCROLL,  "Scroll",         "", ED_PROP_FL_COL0, 0, 0, 0, 20, MKGUI_FIXED, 0 },
-		{ MKGUI_CHECKBOX, ED_PROP_FL_BORDER,  "Border",         "", ED_PROP_FL_COL1, 0, 0, 0, 20, MKGUI_FIXED, 0 },
-		{ MKGUI_CHECKBOX, ED_PROP_FL_SUNKEN,  "Sunken",         "", ED_PROP_FL_COL2, 0, 0, 0, 20, MKGUI_FIXED, 0 },
-		{ MKGUI_CHECKBOX, ED_PROP_FL_NOPAD,   "No Pad",         "", ED_PROP_FL_COL3, 0, 0, 0, 20, MKGUI_FIXED, 0 },
-		{ MKGUI_CHECKBOX, ED_PROP_FL_PASSWORD, "Password",      "", ED_PROP_FL_COL0, 0, 0, 0, 20, MKGUI_FIXED, 0 },
-		{ MKGUI_CHECKBOX, ED_PROP_FL_READONLY, "Readonly",      "", ED_PROP_FL_COL1, 0, 0, 0, 20, MKGUI_FIXED, 0 },
-		{ MKGUI_CHECKBOX, ED_PROP_FL_FIXED,    "Fixed",         "", ED_PROP_FL_COL2, 0, 0, 0, 20, MKGUI_FIXED, 0 },
-		{ MKGUI_CHECKBOX, ED_PROP_FL_TBSEP,    "TbSep",         "", ED_PROP_FL_COL3, 0, 0, 0, 20, MKGUI_FIXED, 0 },
-		{ MKGUI_CHECKBOX, ED_PROP_FL_VERTICAL, "Vertical",      "", ED_PROP_FL_COL0, 0, 0, 0, 20, MKGUI_FIXED, 0 },
-		{ MKGUI_CHECKBOX, ED_PROP_FL_MIXER,    "Mixer",         "", ED_PROP_FL_COL1, 0, 0, 0, 20, MKGUI_FIXED, 0 },
-		{ MKGUI_CHECKBOX, ED_PROP_FL_TRUNCATE, "Truncate",      "", ED_PROP_FL_COL2, 0, 0, 0, 20, MKGUI_FIXED, 0 },
-		{ MKGUI_CHECKBOX, ED_PROP_FL_METER_TEXT,"Show %",       "", ED_PROP_FL_COL3, 0, 0, 0, 20, MKGUI_FIXED, 0 },
+		{ MKGUI_LABEL,    ED_PROP_FLAGS_LBL, "Flags:",           "", ED_PROP_VBOX, 0, 20, MKGUI_FIXED, 0 },
+		{ MKGUI_HBOX,     ED_PROP_FL_HBOX,   "",                "", ED_PROP_VBOX, 0, ED_PROP_FL_H, MKGUI_FIXED, 0 },
+		{ MKGUI_VBOX,     ED_PROP_FL_COL0,   "",                "", ED_PROP_FL_HBOX, 0, 0, 0, 1 },
+		{ MKGUI_VBOX,     ED_PROP_FL_COL1,   "",                "", ED_PROP_FL_HBOX, 0, 0, 0, 1 },
+		{ MKGUI_VBOX,     ED_PROP_FL_COL2,   "",                "", ED_PROP_FL_HBOX, 0, 0, 0, 1 },
+		{ MKGUI_VBOX,     ED_PROP_FL_COL3,   "",                "", ED_PROP_FL_HBOX, 0, 0, 0, 1 },
+		{ MKGUI_CHECKBOX, ED_PROP_FL_REGTOP,  "RgnTop",         "", ED_PROP_FL_COL0, 0, 20, MKGUI_FIXED, 0 },
+		{ MKGUI_CHECKBOX, ED_PROP_FL_CHECKED, "Checked",        "", ED_PROP_FL_COL0, 0, 20, MKGUI_FIXED, 0 },
+		{ MKGUI_CHECKBOX, ED_PROP_FL_REGBOT,  "RgnBot",         "", ED_PROP_FL_COL1, 0, 20, MKGUI_FIXED, 0 },
+		{ MKGUI_CHECKBOX, ED_PROP_FL_HIDDEN,  "Hidden",         "", ED_PROP_FL_COL1, 0, 20, MKGUI_FIXED, 0 },
+		{ MKGUI_CHECKBOX, ED_PROP_FL_SEPARATOR,"Sep",            "", ED_PROP_FL_COL1, 0, 20, MKGUI_FIXED, 0 },
+		{ MKGUI_CHECKBOX, ED_PROP_FL_REGLEFT, "RgnLeft",        "", ED_PROP_FL_COL2, 0, 20, MKGUI_FIXED, 0 },
+		{ MKGUI_CHECKBOX, ED_PROP_FL_DISABLED,"Disabled",       "", ED_PROP_FL_COL2, 0, 20, MKGUI_FIXED, 0 },
+		{ MKGUI_CHECKBOX, ED_PROP_FL_MENUCHECK,"MChk",          "", ED_PROP_FL_COL2, 0, 20, MKGUI_FIXED, 0 },
+		{ MKGUI_CHECKBOX, ED_PROP_FL_REGRIGHT,"RgnRight",       "", ED_PROP_FL_COL3, 0, 20, MKGUI_FIXED, 0 },
+		{ MKGUI_CHECKBOX, ED_PROP_FL_MENURADIO,"MRad",          "", ED_PROP_FL_COL3, 0, 20, MKGUI_FIXED, 0 },
+		{ MKGUI_CHECKBOX, ED_PROP_FL_SCROLL,  "Scroll",         "", ED_PROP_FL_COL0, 0, 20, MKGUI_FIXED, 0 },
+		{ MKGUI_CHECKBOX, ED_PROP_FL_BORDER,  "Border",         "", ED_PROP_FL_COL1, 0, 20, MKGUI_FIXED, 0 },
+		{ MKGUI_CHECKBOX, ED_PROP_FL_SUNKEN,  "Sunken",         "", ED_PROP_FL_COL2, 0, 20, MKGUI_FIXED, 0 },
+		{ MKGUI_CHECKBOX, ED_PROP_FL_NOPAD,   "No Pad",         "", ED_PROP_FL_COL3, 0, 20, MKGUI_FIXED, 0 },
+		{ MKGUI_CHECKBOX, ED_PROP_FL_PASSWORD, "Password",      "", ED_PROP_FL_COL0, 0, 20, MKGUI_FIXED, 0 },
+		{ MKGUI_CHECKBOX, ED_PROP_FL_READONLY, "Readonly",      "", ED_PROP_FL_COL1, 0, 20, MKGUI_FIXED, 0 },
+		{ MKGUI_CHECKBOX, ED_PROP_FL_FIXED,    "Fixed",         "", ED_PROP_FL_COL2, 0, 20, MKGUI_FIXED, 0 },
+		{ MKGUI_CHECKBOX, ED_PROP_FL_TBSEP,    "TbSep",         "", ED_PROP_FL_COL3, 0, 20, MKGUI_FIXED, 0 },
+		{ MKGUI_CHECKBOX, ED_PROP_FL_VERTICAL, "Vertical",      "", ED_PROP_FL_COL0, 0, 20, MKGUI_FIXED, 0 },
+		{ MKGUI_CHECKBOX, ED_PROP_FL_MIXER,    "Mixer",         "", ED_PROP_FL_COL1, 0, 20, MKGUI_FIXED, 0 },
+		{ MKGUI_CHECKBOX, ED_PROP_FL_TRUNCATE, "Truncate",      "", ED_PROP_FL_COL2, 0, 20, MKGUI_FIXED, 0 },
+		{ MKGUI_CHECKBOX, ED_PROP_FL_METER_TEXT,"Show %",       "", ED_PROP_FL_COL3, 0, 20, MKGUI_FIXED, 0 },
 
 		/* Cross-axis alignment (visible when parent is HBOX/VBOX) */
-		{ MKGUI_LABEL,    ED_PROP_ALIGN_LBL,  "Align:",         "", ED_PROP_VBOX, 0, 0, 0, 24, MKGUI_HIDDEN | MKGUI_FIXED, 0 },
-		{ MKGUI_DROPDOWN, ED_PROP_ALIGN_DRP,  "",               "", ED_PROP_VBOX, 0, 0, 0, 24, MKGUI_HIDDEN | MKGUI_FIXED, 0 },
+		{ MKGUI_LABEL,    ED_PROP_ALIGN_LBL,  "Align:",         "", ED_PROP_VBOX, 0, 24, MKGUI_HIDDEN | MKGUI_FIXED, 0 },
+		{ MKGUI_DROPDOWN, ED_PROP_ALIGN_DRP,  "",               "", ED_PROP_VBOX, 0, 24, MKGUI_HIDDEN | MKGUI_FIXED, 0 },
 
 		/* Add/Remove buttons */
-		{ MKGUI_HBOX,     ED_PROP_BTN_HBOX,  "",                "", ED_PROP_VBOX, 0, 0, 0, 22, MKGUI_HIDDEN | MKGUI_FIXED, 0 },
-		{ MKGUI_BUTTON,   ED_PROP_ADD_TAB,   "Add Tab",         "", ED_PROP_BTN_HBOX, 0, 0, 0, 0, MKGUI_HIDDEN, 1 },
-		{ MKGUI_BUTTON,   ED_PROP_REM_TAB,   "Remove Tab",      "", ED_PROP_BTN_HBOX, 0, 0, 0, 0, MKGUI_HIDDEN, 1 },
-		{ MKGUI_BUTTON,   ED_PROP_ADD_ITEM,  "Add Item",        "", ED_PROP_BTN_HBOX, 0, 0, 0, 0, MKGUI_HIDDEN, 1 },
-		{ MKGUI_BUTTON,   ED_PROP_REM_ITEM,  "Remove Item",     "", ED_PROP_BTN_HBOX, 0, 0, 0, 0, MKGUI_HIDDEN, 1 },
-		{ MKGUI_BUTTON,   ED_PROP_ADD_TB_BTN, "Add Button",     "", ED_PROP_BTN_HBOX, 0, 0, 0, 0, MKGUI_HIDDEN, 1 },
-		{ MKGUI_BUTTON,   ED_PROP_REM_TB_BTN, "Remove Button",  "", ED_PROP_BTN_HBOX, 0, 0, 0, 0, MKGUI_HIDDEN, 1 },
+		{ MKGUI_HBOX,     ED_PROP_BTN_HBOX,  "",                "", ED_PROP_VBOX, 0, 22, MKGUI_HIDDEN | MKGUI_FIXED, 0 },
+		{ MKGUI_BUTTON,   ED_PROP_ADD_TAB,   "Add Tab",         "", ED_PROP_BTN_HBOX, 0, 0, MKGUI_HIDDEN, 1 },
+		{ MKGUI_BUTTON,   ED_PROP_REM_TAB,   "Remove Tab",      "", ED_PROP_BTN_HBOX, 0, 0, MKGUI_HIDDEN, 1 },
+		{ MKGUI_BUTTON,   ED_PROP_ADD_ITEM,  "Add Item",        "", ED_PROP_BTN_HBOX, 0, 0, MKGUI_HIDDEN, 1 },
+		{ MKGUI_BUTTON,   ED_PROP_REM_ITEM,  "Remove Item",     "", ED_PROP_BTN_HBOX, 0, 0, MKGUI_HIDDEN, 1 },
+		{ MKGUI_BUTTON,   ED_PROP_ADD_TB_BTN, "Add Button",     "", ED_PROP_BTN_HBOX, 0, 0, MKGUI_HIDDEN, 1 },
+		{ MKGUI_BUTTON,   ED_PROP_REM_TB_BTN, "Remove Button",  "", ED_PROP_BTN_HBOX, 0, 0, MKGUI_HIDDEN, 1 },
 
 		/* Menu tree */
-		{ MKGUI_TREEVIEW, ED_MENU_TREE,      "",                "", ED_PROP_VBOX, 0, 0, 0, 200, MKGUI_HIDDEN | MKGUI_FIXED, 0 },
+		{ MKGUI_TREEVIEW, ED_MENU_TREE,      "",                "", ED_PROP_VBOX, 0, 200, MKGUI_HIDDEN | MKGUI_FIXED, 0 },
 
 		/* Events section */
-		{ MKGUI_GROUP,    ED_EVT_GROUP,      "Events",          "", ED_RIGHT_PANEL, 0, 0, 0, 200, MKGUI_HIDDEN | MKGUI_FIXED, 0 },
-		{ MKGUI_VBOX,     ED_EVT_VBOX,       "",                "", ED_EVT_GROUP,   0, 0, 0, 0, MKGUI_ANCHOR_LEFT | MKGUI_ANCHOR_TOP | MKGUI_ANCHOR_RIGHT | MKGUI_ANCHOR_BOTTOM, 0 },
-		{ MKGUI_LISTVIEW, ED_EVT_LIST,       "",                "", ED_EVT_VBOX,    0, 0, 0, 0, MKGUI_MULTI_SELECT, 1 },
+		{ MKGUI_GROUP,    ED_EVT_GROUP,      "Events",          "", ED_RIGHT_PANEL, 0, 200, MKGUI_HIDDEN | MKGUI_FIXED, 0 },
+		{ MKGUI_VBOX,     ED_EVT_VBOX,       "",                "", ED_EVT_GROUP,   0, 0, 0, 0 },
+		{ MKGUI_LISTVIEW, ED_EVT_LIST,       "",                "", ED_EVT_VBOX,    0, 0, MKGUI_MULTI_SELECT, 1 },
 
 		/* Data section */
-		{ MKGUI_GROUP,    ED_DATA_GROUP,     "Data",            "", ED_RIGHT_PANEL, 0, 0, 0, 250, MKGUI_HIDDEN | MKGUI_FIXED, 0 },
-		{ MKGUI_VBOX,     ED_DATA_VBOX,      "",                "", ED_DATA_GROUP,  0, 0, 0, 0, MKGUI_ANCHOR_LEFT | MKGUI_ANCHOR_TOP | MKGUI_ANCHOR_RIGHT | MKGUI_ANCHOR_BOTTOM, 0 },
-		{ MKGUI_LISTVIEW, ED_DATA_LIST,      "",                "", ED_DATA_VBOX,   0, 0, 0, 0, 0, 1 },
-		{ MKGUI_INPUT,    ED_DATA_ITEM_INP,  "",                "", ED_DATA_VBOX,   0, 0, 0, 24, MKGUI_FIXED, 0 },
-		{ MKGUI_HBOX,     ED_DATA_BTN_HBOX,  "",                "", ED_DATA_VBOX,   0, 0, 0, 22, MKGUI_FIXED, 0 },
-		{ MKGUI_BUTTON,   ED_DATA_ADD_BTN,   "Add",             "", ED_DATA_BTN_HBOX, 0, 0, 0, 0, 0, 1 },
-		{ MKGUI_BUTTON,   ED_DATA_REM_BTN,   "Remove",          "", ED_DATA_BTN_HBOX, 0, 0, 0, 0, 0, 1 },
-		{ MKGUI_BUTTON,   ED_DATA_UP_BTN,    "Up",              "", ED_DATA_BTN_HBOX, 0, 0, 0, 0, 0, 1 },
-		{ MKGUI_BUTTON,   ED_DATA_DOWN_BTN,  "Down",            "", ED_DATA_BTN_HBOX, 0, 0, 0, 0, 0, 1 },
+		{ MKGUI_GROUP,    ED_DATA_GROUP,     "Data",            "", ED_RIGHT_PANEL, 0, 250, MKGUI_HIDDEN | MKGUI_FIXED, 0 },
+		{ MKGUI_VBOX,     ED_DATA_VBOX,      "",                "", ED_DATA_GROUP,  0, 0, 0, 0 },
+		{ MKGUI_LISTVIEW, ED_DATA_LIST,      "",                "", ED_DATA_VBOX,   0, 0, 0, 1 },
+		{ MKGUI_INPUT,    ED_DATA_ITEM_INP,  "",                "", ED_DATA_VBOX,   0, 24, MKGUI_FIXED, 0 },
+		{ MKGUI_HBOX,     ED_DATA_BTN_HBOX,  "",                "", ED_DATA_VBOX,   0, 22, MKGUI_FIXED, 0 },
+		{ MKGUI_BUTTON,   ED_DATA_ADD_BTN,   "Add",             "", ED_DATA_BTN_HBOX, 0, 0, 0, 1 },
+		{ MKGUI_BUTTON,   ED_DATA_REM_BTN,   "Remove",          "", ED_DATA_BTN_HBOX, 0, 0, 0, 1 },
+		{ MKGUI_BUTTON,   ED_DATA_UP_BTN,    "Up",              "", ED_DATA_BTN_HBOX, 0, 0, 0, 1 },
+		{ MKGUI_BUTTON,   ED_DATA_DOWN_BTN,  "Down",            "", ED_DATA_BTN_HBOX, 0, 0, 0, 1 },
 
-		{ MKGUI_STATUSBAR, ED_STATUSBAR,   "",                 "", ED_WINDOW,  0, 0, 0, 0, 0, 0 },
+		{ MKGUI_STATUSBAR, ED_STATUSBAR,   "",                 "", ED_WINDOW,  0, 0, 0, 0 },
 	};
 
 	uint32_t base_count = sizeof(widgets) / sizeof(widgets[0]);
@@ -4902,8 +4824,6 @@ int main(void) {
 		pw->label[slen] = '\0';
 		pw->icon[0] = '\0';
 		pw->parent_id = (i % 2 == 0) ? ED_PAL_COL0 : ED_PAL_COL1;
-		pw->x = 0;
-		pw->y = 0;
 		pw->w = 0;
 		pw->h = 22;
 		pw->flags = MKGUI_FIXED;
@@ -4922,8 +4842,6 @@ int main(void) {
 		pw->label[slen] = '\0';
 		pw->icon[0] = '\0';
 		pw->parent_id = (i % 2 == 0) ? ED_CTN_COL0 : ED_CTN_COL1;
-		pw->x = 0;
-		pw->y = 0;
 		pw->w = 0;
 		pw->h = 22;
 		pw->flags = MKGUI_FIXED;

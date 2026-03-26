@@ -327,8 +327,10 @@ static void render_itemview_thumbnail(struct mkgui_ctx *ctx, uint32_t idx, struc
 				int32_t max_tw = cw - 4;
 				int32_t label_x = cx + (cw - (tw < max_tw ? tw : max_tw)) / 2;
 				int32_t label_y = cy + ts + ty_off + 4;
+				int32_t cell_clip_r = cx + cw < clip_x2 ? cx + cw : clip_x2;
+				int32_t cell_clip_l = cx > ca_x ? cx : ca_x;
 				uint32_t tc = (item == iv->selected) ? ctx->theme.sel_text : ((ctx->widgets[idx].flags & MKGUI_DISABLED) ? ctx->theme.text_disabled : ctx->theme.text);
-				push_text_clip(label_x, label_y, label, tc, ca_x, ca_y, clip_x2, clip_y2);
+				push_text_clip(label_x, label_y, label, tc, cell_clip_l, ca_y, cell_clip_r, clip_y2);
 			}
 		}
 	}
@@ -930,6 +932,24 @@ static uint32_t handle_itemview_key(struct mkgui_ctx *ctx, struct mkgui_itemview
 		} else if(keysym == MKGUI_KEY_DOWN) {
 			if(iv->selected + cols < (int32_t)iv->item_count) {
 				iv->selected += cols;
+			}
+		} else if(keysym == MKGUI_KEY_PAGE_UP) {
+			int32_t page_rows = ca_h / ch;
+			if(page_rows < 1) {
+				page_rows = 1;
+			}
+			iv->selected -= page_rows * cols;
+			if(iv->selected < 0) {
+				iv->selected = 0;
+			}
+		} else if(keysym == MKGUI_KEY_PAGE_DOWN) {
+			int32_t page_rows = ca_h / ch;
+			if(page_rows < 1) {
+				page_rows = 1;
+			}
+			iv->selected += page_rows * cols;
+			if(iv->selected >= (int32_t)iv->item_count) {
+				iv->selected = (int32_t)iv->item_count - 1;
 			}
 		} else if(keysym == MKGUI_KEY_HOME) {
 			iv->selected = 0;
