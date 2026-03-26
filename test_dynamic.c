@@ -5,8 +5,7 @@
 // Exercises realloc boundaries (256, 512, ...) and verifies
 // widget array integrity after each operation.
 //
-// Build:  gcc -std=c99 -O2 -Wall test_dynamic.c -o test_dynamic
-//         $(pkg-config --cflags --libs freetype2) -lX11 -lXext -lm
+// Build:  gcc -std=c99 -O2 -Wall test_dynamic.c -o test_dynamic $(pkg-config --cflags --libs freetype2) -lX11 -lXext -lm
 // Run:    ./test_dynamic
 //         (needs an X display, creates a hidden window)
 
