@@ -76,9 +76,10 @@ struct mkgui_widget {
     char     label[256];  // display text
     char     icon[64];    // icon name (MDI name, e.g. "folder-open")
     uint32_t parent_id;   // parent widget id
-    int32_t  x, y, w, h; // position/size (anchored) or min size (in containers)
+    int32_t  x, y, w, h; // position and size
     uint32_t flags;       // MKGUI_ANCHOR_*, MKGUI_CHECKED, etc.
     uint32_t weight;      // layout weight (0=fixed, >0=flexible proportional)
+    int32_t  margin_l, margin_r, margin_t, margin_b; // layout margins (insets from parent edges)
 };
 ```
 
@@ -124,15 +125,15 @@ struct mkgui_widget {
 
 ## Anchor / layout system
 
-Widget `x, y, w, h` are interpreted differently depending on anchor flags:
+Fields `x, y` are always position offsets and `w, h` are always size. Margins (`margin_l, margin_t, margin_r, margin_b`) provide insets from parent edges, independent of anchors.
 
-| Flags | x | y | w | h |
-|-------|---|---|---|---|
-| None | absolute x | absolute y | width | height |
-| `LEFT + RIGHT` | left margin | -- | right margin | -- |
-| `RIGHT` only | right margin | -- | width | -- |
-| `TOP + BOTTOM` | -- | top margin | -- | bottom margin |
-| `BOTTOM` only | -- | bottom margin | -- | height |
+| Anchors | x, y | w, h | Margins |
+|---------|------|------|---------|
+| None | position from parent top-left | width, height | offset the position |
+| `LEFT + RIGHT` | ignored | ignored (fills) | `margin_l`, `margin_r` control left/right insets |
+| `RIGHT` only | offset from right edge | width | `margin_r` adds additional inset |
+| `TOP + BOTTOM` | ignored | ignored (fills) | `margin_t`, `margin_b` control top/bottom insets |
+| `BOTTOM` only | offset from bottom edge | height | `margin_b` adds additional inset |
 
 Combine horizontal and vertical anchors freely. Common patterns:
 
@@ -146,6 +147,11 @@ Combine horizontal and vertical anchors freely. Common patterns:
 // Other children of the window get the remaining content area automatically:
 { MKGUI_TABS, ID_TABS, "", "", ID_WINDOW, 0, 0, 0, 0,
   MKGUI_ANCHOR_LEFT | MKGUI_ANCHOR_TOP | MKGUI_ANCHOR_RIGHT | MKGUI_ANCHOR_BOTTOM, 0 }
+
+// Fill width with 80px left margin and 8px right margin:
+{ MKGUI_INPUT, ID_INP, "", "", ID_WINDOW, 0, 40, 0, 24,
+  MKGUI_ANCHOR_LEFT | MKGUI_ANCHOR_BOTTOM | MKGUI_ANCHOR_RIGHT, 0,
+  80, 0, 8, 0 }
 ```
 
 ## Flags

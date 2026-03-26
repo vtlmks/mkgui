@@ -41,6 +41,7 @@
 #define MKGUI_MAX_STATUSBAR_SECTIONS 8
 #define MKGUI_MAX_CTXMENU          64
 #define MKGUI_PATHBAR_MAX_SEGS     64
+#define MKGUI_PATHBAR_HEIGHT       24
 #define MKGUI_TOOLBAR_HEIGHT_DEFAULT 28
 #define MKGUI_TOOLBAR_BTN_W        28
 #define MKGUI_TOOLBAR_SEP_W        8
@@ -286,6 +287,7 @@ struct mkgui_widget {
 	int32_t x, y, w, h;
 	uint32_t flags;
 	uint32_t weight;
+	int32_t margin_l, margin_r, margin_t, margin_b;
 };
 
 struct mkgui_event {

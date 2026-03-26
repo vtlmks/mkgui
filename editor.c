@@ -53,6 +53,11 @@ enum {
 	ED_PROP_Y_LBL, ED_PROP_Y_SPN,
 	ED_PROP_W_LBL, ED_PROP_W_SPN,
 	ED_PROP_H_LBL, ED_PROP_H_SPN,
+	ED_PROP_ML_LBL, ED_PROP_ML_SPN,
+	ED_PROP_MT_LBL, ED_PROP_MT_SPN,
+	ED_PROP_MR_LBL, ED_PROP_MR_SPN,
+	ED_PROP_MB_LBL, ED_PROP_MB_SPN,
+	ED_PROP_MARGIN_LR_HBOX, ED_PROP_MARGIN_TB_HBOX,
 	ED_PROP_TAB_LBL, ED_PROP_TAB_SPN,
 	ED_PROP_FLAGS_LBL,
 	ED_PROP_FL_LEFT, ED_PROP_FL_TOP, ED_PROP_FL_RIGHT, ED_PROP_FL_BOTTOM,
@@ -360,6 +365,7 @@ struct ed_widget {
 	uint32_t weight;
 	uint32_t tab_order;
 	uint64_t event_mask;
+	int32_t margin_l, margin_r, margin_t, margin_b;
 };
 
 // ---------------------------------------------------------------------------
@@ -867,6 +873,8 @@ static struct ed_prop_desc ed_props[] = {
 	{ ED_PK_INT32,         "Tab#:",           offsetof(struct ed_widget, tab_order),     0,                  0,      999,  ED_VIS_ALWAYS,    ED_ACT_NONE,         ED_PROP_TAB_SPN,      ED_PROP_TAB_LBL,     0,                 0 },
 	{ ED_PK_INT32_PAIR,    "X:",              offsetof(struct ed_widget, x),             0,                  -9999,  9999, ED_VIS_ALWAYS,    ED_ACT_NONE,         ED_PROP_X_SPN,        ED_PROP_X_LBL,       ED_PROP_Y_SPN,     ED_PROP_Y_LBL },
 	{ ED_PK_INT32_PAIR,    "W:",              offsetof(struct ed_widget, w),             0,                  0,      9999, ED_VIS_ALWAYS,    ED_ACT_NONE,         ED_PROP_W_SPN,        ED_PROP_W_LBL,       ED_PROP_H_SPN,     ED_PROP_H_LBL },
+	{ ED_PK_INT32_PAIR,    "ML:",             offsetof(struct ed_widget, margin_l),      0,                  0,      9999, ED_VIS_ALWAYS,    ED_ACT_NONE,         ED_PROP_ML_SPN,       ED_PROP_ML_LBL,      ED_PROP_MR_SPN,    ED_PROP_MR_LBL },
+	{ ED_PK_INT32_PAIR,    "MT:",             offsetof(struct ed_widget, margin_t),      0,                  0,      9999, ED_VIS_ALWAYS,    ED_ACT_NONE,         ED_PROP_MT_SPN,       ED_PROP_MT_LBL,      ED_PROP_MB_SPN,    ED_PROP_MB_LBL },
 	{ ED_PK_SECTION,       "Anchors/Flags:",  0,                                        0,                  0,      0,    ED_VIS_ALWAYS,    ED_ACT_NONE,         ED_PROP_FLAGS_LBL,    0,                   0,                 0 },
 	{ ED_PK_FLAG,          "Left",            offsetof(struct ed_widget, flags),         MKGUI_ANCHOR_LEFT,  0,      0,    ED_VIS_ALWAYS,    ED_ACT_NONE,         ED_PROP_FL_LEFT,      0,                   0,                 0 },
 	{ ED_PK_FLAG,          "Top",             offsetof(struct ed_widget, flags),         MKGUI_ANCHOR_TOP,   0,      0,    ED_VIS_ALWAYS,    ED_ACT_NONE,         ED_PROP_FL_TOP,       0,                   0,                 0 },
@@ -1745,22 +1753,27 @@ static void ed_convert_to_layout(uint32_t idx, int32_t *lx, int32_t *ly, int32_t
 	int32_t rel_x = ew->x - px;
 	int32_t rel_y = ew->y - py;
 
-	if(flags & MKGUI_ANCHOR_RIGHT) {
-		if(!(flags & MKGUI_ANCHOR_LEFT)) {
-			rel_x = pw - rel_x - w;
-		}
+	if((flags & MKGUI_ANCHOR_LEFT) && (flags & MKGUI_ANCHOR_RIGHT)) {
+		*lx = 0;
+		*lw = 0;
+	} else if(flags & MKGUI_ANCHOR_RIGHT) {
+		*lx = pw - rel_x - w;
+		*lw = w;
+	} else {
+		*lx = rel_x;
+		*lw = w;
 	}
 
-	if(flags & MKGUI_ANCHOR_BOTTOM) {
-		if(!(flags & MKGUI_ANCHOR_TOP)) {
-			rel_y = ph - rel_y - h;
-		}
+	if((flags & MKGUI_ANCHOR_TOP) && (flags & MKGUI_ANCHOR_BOTTOM)) {
+		*ly = 0;
+		*lh = 0;
+	} else if(flags & MKGUI_ANCHOR_BOTTOM) {
+		*ly = ph - rel_y - h;
+		*lh = h;
+	} else {
+		*ly = rel_y;
+		*lh = h;
 	}
-
-	*lx = rel_x;
-	*ly = rel_y;
-	*lw = w;
-	*lh = h;
 }
 
 // ---------------------------------------------------------------------------
@@ -2429,34 +2442,38 @@ static void ed_layout_child_area(struct mkgui_ctx *ctx, uint32_t pidx, uint32_t 
 	int32_t oy = w->y;
 	int32_t ow = w->w;
 	int32_t oh = w->h;
+	int32_t ml = w->margin_l;
+	int32_t mt = w->margin_t;
+	int32_t mr = w->margin_r;
+	int32_t mb = w->margin_b;
 	int32_t rx, ry, rw, rh;
 	uint32_t has_anchor = flags & (MKGUI_ANCHOR_LEFT | MKGUI_ANCHOR_TOP | MKGUI_ANCHOR_RIGHT | MKGUI_ANCHOR_BOTTOM);
 
 	if(!has_anchor) {
-		rx = px + ox;
-		ry = py + oy;
+		rx = px + ox + ml;
+		ry = py + oy + mt;
 		rw = ow;
 		rh = oh;
 	} else {
 		if((flags & MKGUI_ANCHOR_LEFT) && (flags & MKGUI_ANCHOR_RIGHT)) {
-			rx = px + ox;
-			rw = pw - ox - (ow > 0 ? ow : 0);
+			rx = px + ml;
+			rw = pw - ml - mr;
 		} else if(flags & MKGUI_ANCHOR_RIGHT) {
-			rx = px + pw - ow - ox;
+			rx = px + pw - mr - ow - ox;
 			rw = ow;
 		} else {
-			rx = px + ox;
-			rw = ow;
+			rx = px + ml + ox;
+			rw = ow > 0 ? ow : pw - ml - mr;
 		}
 		if((flags & MKGUI_ANCHOR_TOP) && (flags & MKGUI_ANCHOR_BOTTOM)) {
-			ry = py + oy;
-			rh = ph - oy - (oh > 0 ? oh : 0);
+			ry = py + mt;
+			rh = ph - mt - mb;
 		} else if(flags & MKGUI_ANCHOR_BOTTOM) {
-			ry = py + ph - oh - oy;
+			ry = py + ph - mb - oh - oy;
 			rh = oh;
 		} else {
-			ry = py + oy;
-			rh = oh;
+			ry = py + mt + oy;
+			rh = oh > 0 ? oh : ph - mt - mb;
 		}
 	}
 
@@ -3662,6 +3679,9 @@ static void ed_save_project(struct mkgui_ctx *ctx, uint32_t save_as) {
 		fprintf(f, "weight %u\n", w->weight);
 		fprintf(f, "tab_order %u\n", w->tab_order);
 		fprintf(f, "event_mask 0x%016llx\n", (unsigned long long)w->event_mask);
+		if(w->margin_l || w->margin_t || w->margin_r || w->margin_b) {
+			fprintf(f, "margins %d %d %d %d\n", w->margin_l, w->margin_t, w->margin_r, w->margin_b);
+		}
 
 		struct ed_widget_data *d = ed_find_widget_data(w->id);
 		if(d) {
@@ -3818,6 +3838,9 @@ static void ed_load_file(struct mkgui_ctx *ctx, const char *path) {
 				unsigned long long em;
 				sscanf(line + 11, "%llx", &em);
 				w->event_mask = (uint64_t)em;
+
+			} else if(strncmp(line, "margins ", 8) == 0) {
+				sscanf(line + 8, "%d %d %d %d", &w->margin_l, &w->margin_t, &w->margin_r, &w->margin_b);
 
 			} else if(strncmp(line, "item ", 5) == 0) {
 				if(!cur_data_id) {
@@ -4174,9 +4197,17 @@ static void ed_generate_code(struct mkgui_ctx *ctx) {
 			}
 		}
 		char flag_buf[512];
-		fprintf(f, "\t\t{ %s, %s, \"%s\", \"%s\", %s, %d, %d, %d, %d, %s, %u },\n",
-			ed_type_name_upper(w->type), w->id_name, w->label, w->icon,
-			parent_name, lx, ly, lw, lh, ed_flags_to_str(w->flags, w->type, flag_buf, sizeof(flag_buf)), w->weight);
+		uint32_t has_margins = (w->margin_l || w->margin_t || w->margin_r || w->margin_b);
+		if(has_margins) {
+			fprintf(f, "\t\t{ %s, %s, \"%s\", \"%s\", %s, %d, %d, %d, %d, %s, %u, %d, %d, %d, %d },\n",
+				ed_type_name_upper(w->type), w->id_name, w->label, w->icon,
+				parent_name, lx, ly, lw, lh, ed_flags_to_str(w->flags, w->type, flag_buf, sizeof(flag_buf)), w->weight,
+				w->margin_l, w->margin_r, w->margin_t, w->margin_b);
+		} else {
+			fprintf(f, "\t\t{ %s, %s, \"%s\", \"%s\", %s, %d, %d, %d, %d, %s, %u },\n",
+				ed_type_name_upper(w->type), w->id_name, w->label, w->icon,
+				parent_name, lx, ly, lw, lh, ed_flags_to_str(w->flags, w->type, flag_buf, sizeof(flag_buf)), w->weight);
+		}
 	}
 	fprintf(f, "\t};\n\n");
 
@@ -4423,9 +4454,17 @@ static void ed_generate_snippet(struct mkgui_ctx *ctx) {
 				parent_name = ed.widgets[pidx].id_name;
 			}
 		}
-		fprintf(f, "\t{ %s, %s, \"%s\", \"%s\", %s, %d, %d, %d, %d, 0x%x, %u },\n",
-			ed_type_name_upper(w->type), w->id_name, w->label, w->icon,
-			parent_name, lx, ly, lw, lh, w->flags, w->weight);
+		uint32_t has_margins = (w->margin_l || w->margin_t || w->margin_r || w->margin_b);
+		if(has_margins) {
+			fprintf(f, "\t{ %s, %s, \"%s\", \"%s\", %s, %d, %d, %d, %d, 0x%x, %u, %d, %d, %d, %d },\n",
+				ed_type_name_upper(w->type), w->id_name, w->label, w->icon,
+				parent_name, lx, ly, lw, lh, w->flags, w->weight,
+				w->margin_l, w->margin_r, w->margin_t, w->margin_b);
+		} else {
+			fprintf(f, "\t{ %s, %s, \"%s\", \"%s\", %s, %d, %d, %d, %d, 0x%x, %u },\n",
+				ed_type_name_upper(w->type), w->id_name, w->label, w->icon,
+				parent_name, lx, ly, lw, lh, w->flags, w->weight);
+		}
 	}
 	fprintf(f, "};\n");
 
@@ -4496,6 +4535,10 @@ static void ed_test_gui(struct mkgui_ctx *editor_ctx) {
 		ed_convert_to_layout(i, &tw->x, &tw->y, &tw->w, &tw->h);
 		tw->flags = ew->flags;
 		tw->weight = ew->weight;
+		tw->margin_l = ew->margin_l;
+		tw->margin_t = ew->margin_t;
+		tw->margin_r = ew->margin_r;
+		tw->margin_b = ew->margin_b;
 	}
 
 	int32_t test_w = 800, test_h = 600;
@@ -4754,6 +4797,18 @@ int main(void) {
 		{ MKGUI_SPINBOX,  ED_PROP_W_SPN,     "",                "", ED_PROP_SIZE_HBOX, 0, 0, 0, 0, 0, 1 },
 		{ MKGUI_LABEL,    ED_PROP_H_LBL,     "H:",              "", ED_PROP_SIZE_HBOX, 0, 0, 22, 0, MKGUI_FIXED, 0 },
 		{ MKGUI_SPINBOX,  ED_PROP_H_SPN,     "",                "", ED_PROP_SIZE_HBOX, 0, 0, 0, 0, 0, 1 },
+
+		/* Margin rows: ML/MR and MT/MB */
+		{ MKGUI_HBOX,     ED_PROP_MARGIN_LR_HBOX, "",            "", ED_PROP_VBOX, 0, 0, 0, 22, MKGUI_FIXED, 0 },
+		{ MKGUI_LABEL,    ED_PROP_ML_LBL,    "ML:",             "", ED_PROP_MARGIN_LR_HBOX, 0, 0, 26, 0, MKGUI_FIXED, 0 },
+		{ MKGUI_SPINBOX,  ED_PROP_ML_SPN,    "",                "", ED_PROP_MARGIN_LR_HBOX, 0, 0, 0, 0, 0, 1 },
+		{ MKGUI_LABEL,    ED_PROP_MR_LBL,    "MR:",             "", ED_PROP_MARGIN_LR_HBOX, 0, 0, 26, 0, MKGUI_FIXED, 0 },
+		{ MKGUI_SPINBOX,  ED_PROP_MR_SPN,    "",                "", ED_PROP_MARGIN_LR_HBOX, 0, 0, 0, 0, 0, 1 },
+		{ MKGUI_HBOX,     ED_PROP_MARGIN_TB_HBOX, "",            "", ED_PROP_VBOX, 0, 0, 0, 22, MKGUI_FIXED, 0 },
+		{ MKGUI_LABEL,    ED_PROP_MT_LBL,    "MT:",             "", ED_PROP_MARGIN_TB_HBOX, 0, 0, 26, 0, MKGUI_FIXED, 0 },
+		{ MKGUI_SPINBOX,  ED_PROP_MT_SPN,    "",                "", ED_PROP_MARGIN_TB_HBOX, 0, 0, 0, 0, 0, 1 },
+		{ MKGUI_LABEL,    ED_PROP_MB_LBL,    "MB:",             "", ED_PROP_MARGIN_TB_HBOX, 0, 0, 26, 0, MKGUI_FIXED, 0 },
+		{ MKGUI_SPINBOX,  ED_PROP_MB_SPN,    "",                "", ED_PROP_MARGIN_TB_HBOX, 0, 0, 0, 0, 0, 1 },
 
 		/* Weight (visible when parent is HBOX/VBOX) */
 		{ MKGUI_HBOX,     ED_PROP_WEIGHT_HBOX, "",               "", ED_PROP_VBOX, 0, 0, 0, 22, MKGUI_HIDDEN | MKGUI_FIXED, 0 },

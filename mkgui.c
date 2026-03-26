@@ -292,6 +292,7 @@ struct mkgui_treeview_data {
 	int32_t drag_pos;
 	uint32_t drag_active;
 	int32_t drag_start_y;
+	uint32_t order_dirty;
 };
 
 struct mkgui_statusbar_section {
@@ -1370,34 +1371,38 @@ static void layout_child_area(struct mkgui_ctx *ctx, uint32_t pidx, uint32_t cid
 	int32_t oy = w->y;
 	int32_t ow = w->w;
 	int32_t oh = w->h;
+	int32_t ml = w->margin_l;
+	int32_t mt = w->margin_t;
+	int32_t mr = w->margin_r;
+	int32_t mb = w->margin_b;
 	int32_t rx, ry, rw, rh;
 	uint32_t has_anchor = flags & (MKGUI_ANCHOR_LEFT | MKGUI_ANCHOR_TOP | MKGUI_ANCHOR_RIGHT | MKGUI_ANCHOR_BOTTOM);
 
 	if(!has_anchor) {
-		rx = px + ox;
-		ry = py + oy;
+		rx = px + ox + ml;
+		ry = py + oy + mt;
 		rw = ow;
 		rh = oh;
 	} else {
 		if((flags & MKGUI_ANCHOR_LEFT) && (flags & MKGUI_ANCHOR_RIGHT)) {
-			rx = px + ox;
-			rw = pw - ox - (ow > 0 ? ow : 0);
+			rx = px + ml;
+			rw = pw - ml - mr;
 		} else if(flags & MKGUI_ANCHOR_RIGHT) {
-			rx = px + pw - ow - ox;
+			rx = px + pw - mr - ow - ox;
 			rw = ow;
 		} else {
-			rx = px + ox;
-			rw = ow;
+			rx = px + ml + ox;
+			rw = ow > 0 ? ow : pw - ml - mr;
 		}
 		if((flags & MKGUI_ANCHOR_TOP) && (flags & MKGUI_ANCHOR_BOTTOM)) {
-			ry = py + oy;
-			rh = ph - oy - (oh > 0 ? oh : 0);
+			ry = py + mt;
+			rh = ph - mt - mb;
 		} else if(flags & MKGUI_ANCHOR_BOTTOM) {
-			ry = py + ph - oh - oy;
+			ry = py + ph - mb - oh - oy;
 			rh = oh;
 		} else {
-			ry = py + oy;
-			rh = oh;
+			ry = py + mt + oy;
+			rh = oh > 0 ? oh : ph - mt - mb;
 		}
 	}
 
@@ -1561,6 +1566,15 @@ static void layout_node(struct mkgui_ctx *ctx, uint32_t idx) {
 				ctx->rects[c].w = pw;
 				ctx->rects[c].h = th;
 				top_y += th;
+			}
+		}
+		for(uint32_t c = layout_first_child[idx]; c < ctx->widget_count; c = layout_next_sibling[c]) {
+			if(ctx->widgets[c].type == MKGUI_PATHBAR && ctx->widgets[c].h == 0) {
+				ctx->rects[c].x = px + ctx->widgets[c].margin_l;
+				ctx->rects[c].y = top_y;
+				ctx->rects[c].w = pw - ctx->widgets[c].margin_l - ctx->widgets[c].margin_r;
+				ctx->rects[c].h = MKGUI_PATHBAR_HEIGHT;
+				top_y += MKGUI_PATHBAR_HEIGHT;
 			}
 		}
 		for(uint32_t c = layout_first_child[idx]; c < ctx->widget_count; c = layout_next_sibling[c]) {
@@ -1828,6 +1842,9 @@ static void layout_node(struct mkgui_ctx *ctx, uint32_t idx) {
 				continue;
 			}
 			if(w->type == MKGUI_WINDOW && (ct == MKGUI_MENU || ct == MKGUI_TOOLBAR || ct == MKGUI_STATUSBAR)) {
+				continue;
+			}
+			if(w->type == MKGUI_WINDOW && ct == MKGUI_PATHBAR && ctx->widgets[c].h == 0) {
 				continue;
 			}
 			layout_child_area(ctx, idx, c, px, py, pw, ph);

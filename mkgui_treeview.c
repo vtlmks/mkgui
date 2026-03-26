@@ -12,8 +12,38 @@ static struct {
 	uint32_t idx;
 } tv_idx_map[TV_IDX_HASH_SIZE];
 
+// [=]===^=[ tv_dfs_visit ]========================================[=]
+static void tv_dfs_visit(struct mkgui_treeview_data *tv, uint32_t parent_id, struct mkgui_treeview_node *out, uint32_t *pos) {
+	for(uint32_t i = 0; i < tv->node_count; ++i) {
+		if(tv->nodes[i].parent_node == parent_id) {
+			out[(*pos)++] = tv->nodes[i];
+			if(tv->nodes[i].has_children) {
+				tv_dfs_visit(tv, tv->nodes[i].id, out, pos);
+			}
+		}
+	}
+}
+
+// [=]===^=[ tv_reorder_dfs ]======================================[=]
+static void tv_reorder_dfs(struct mkgui_treeview_data *tv) {
+	if(!tv->order_dirty || tv->node_count == 0) {
+		return;
+	}
+	tv->order_dirty = 0;
+	struct mkgui_treeview_node *tmp = (struct mkgui_treeview_node *)malloc(tv->node_count * sizeof(struct mkgui_treeview_node));
+	if(!tmp) {
+		return;
+	}
+	uint32_t pos = 0;
+	tv_dfs_visit(tv, 0, tmp, &pos);
+	memcpy(tv->nodes, tmp, pos * sizeof(struct mkgui_treeview_node));
+	tv->node_count = pos;
+	free(tmp);
+}
+
 // [=]===^=[ tv_idx_build ]=======================================[=]
 static void tv_idx_build(struct mkgui_treeview_data *tv) {
+	tv_reorder_dfs(tv);
 	for(uint32_t i = 0; i < TV_IDX_HASH_SIZE; ++i) {
 		tv_idx_map[i].idx = UINT32_MAX;
 	}
@@ -499,10 +529,9 @@ MKGUI_API uint32_t mkgui_treeview_add(struct mkgui_ctx *ctx, uint32_t widget_id,
 	}
 
 	struct mkgui_treeview_node *n = &tv->nodes[tv->node_count++];
+	memset(n, 0, sizeof(*n));
 	n->id = node_id;
 	n->parent_node = parent_node;
-	n->expanded = 0;
-	n->has_children = 0;
 	n->icon_idx = -1;
 
 	size_t slen = strlen(label);
@@ -520,6 +549,7 @@ MKGUI_API uint32_t mkgui_treeview_add(struct mkgui_ctx *ctx, uint32_t widget_id,
 			}
 		}
 	}
+	tv->order_dirty = 1;
 
 	dirty_all(ctx);
 	return node_id;
