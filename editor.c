@@ -24,9 +24,11 @@
 #define ED_CANVAS_DEF_H   480
 #define ED_LEFT_W         200
 #define ED_RIGHT_W        320
-#define ED_PAL_ROWS       ((ED_WIDGET_COUNT + 1) / 2)
+#define ED_PAL_COLS       3
+#define ED_PAL_ROWS       ((ED_WIDGET_COUNT + ED_PAL_COLS - 1) / ED_PAL_COLS)
 #define ED_PALETTE_H      (36 + ED_PAL_ROWS * 22 + (ED_PAL_ROWS - 1) * MKGUI_BOX_GAP)
-#define ED_CTN_ROWS       ((ED_CONTAINER_COUNT + 1) / 2)
+#define ED_CTN_COLS       3
+#define ED_CTN_ROWS       ((ED_CONTAINER_COUNT + ED_CTN_COLS - 1) / ED_CTN_COLS)
 #define ED_CTN_H          (36 + ED_CTN_ROWS * 22 + (ED_CTN_ROWS - 1) * MKGUI_BOX_GAP)
 #define ED_BOT_H          MKGUI_STATUSBAR_HEIGHT
 #define ED_PROP_FORM_H    (6 * 24 + 5 * MKGUI_BOX_GAP)
@@ -46,8 +48,8 @@ enum {
 	ED_TB_NEW, ED_TB_OPEN, ED_TB_SAVE, ED_TB_SEP1, ED_TB_GEN, ED_TB_TEST,
 	ED_TB_SEP2, ED_TB_UNDO, ED_TB_REDO,
 	ED_SPLIT_MAIN, ED_SPLIT_RIGHT, ED_TREE, ED_CANVAS_LBL, ED_RIGHT_PANEL,
-	ED_PAL_GROUP, ED_PAL_HBOX, ED_PAL_COL0, ED_PAL_COL1,
-	ED_CTN_GROUP, ED_CTN_HBOX, ED_CTN_COL0, ED_CTN_COL1,
+	ED_PAL_GROUP, ED_PAL_HBOX, ED_PAL_COL0, ED_PAL_COL1, ED_PAL_COL2,
+	ED_CTN_GROUP, ED_CTN_HBOX, ED_CTN_COL0, ED_CTN_COL1, ED_CTN_COL2,
 	ED_PROP_GROUP,
 	ED_PROP_VBOX, ED_PROP_FORM, ED_PROP_ICON_HBOX,
 	ED_PROP_POS_HBOX, ED_PROP_SIZE_HBOX, ED_PROP_WEIGHT_HBOX,
@@ -2393,7 +2395,8 @@ static int32_t ed_measure_container(struct mkgui_ctx *ctx, uint32_t idx, uint32_
 			}
 		}
 		uint32_t rows = (pair_count + 1) / 2;
-		int32_t h = (int32_t)rows * 24 + (rows > 1 ? (int32_t)(rows - 1) * MKGUI_BOX_GAP : 0);
+		int32_t row_h = ctx->font_height + 10;
+		int32_t h = (int32_t)rows * row_h + (rows > 1 ? (int32_t)(rows - 1) * MKGUI_BOX_GAP : 0);
 		return h;
 	}
 
@@ -2407,6 +2410,7 @@ static int32_t ed_measure_container(struct mkgui_ctx *ctx, uint32_t idx, uint32_
 		++visible;
 		int32_t child_main;
 		int32_t child_cross;
+		uint32_t ct = ed.widgets[j].type;
 		if(is_vbox) {
 			child_main = ed.widgets[j].h;
 			child_cross = ed.widgets[j].w;
@@ -2414,9 +2418,17 @@ static int32_t ed_measure_container(struct mkgui_ctx *ctx, uint32_t idx, uint32_
 			child_main = ed.widgets[j].w;
 			child_cross = ed.widgets[j].h;
 		}
-		uint32_t ct = ed.widgets[j].type;
 		if(child_main == 0 && (ed.widgets[j].flags & MKGUI_FIXED) && (ct == MKGUI_VBOX || ct == MKGUI_HBOX || ct == MKGUI_FORM || ct == MKGUI_GROUP || ct == MKGUI_PANEL)) {
 			child_main = ed_measure_container(ctx, j, is_vbox ? 1 : 0);
+		}
+		if(child_main == 0) {
+			child_main = natural_height(ctx, ct);
+		}
+		if(child_cross == 0) {
+			int32_t nh = natural_height(ctx, ct);
+			if(nh > 0) {
+				child_cross = nh;
+			}
 		}
 		main_total += child_main;
 		if(child_cross > cross_max) {
@@ -4688,11 +4700,13 @@ int main(void) {
 		{ MKGUI_HBOX,     ED_PAL_HBOX,   "",                 "", ED_PAL_GROUP,   0, 0, 0, 0 },
 		{ MKGUI_VBOX,     ED_PAL_COL0,   "",                 "", ED_PAL_HBOX,    0, 0, 0, 1 },
 		{ MKGUI_VBOX,     ED_PAL_COL1,   "",                 "", ED_PAL_HBOX,    0, 0, 0, 1 },
+		{ MKGUI_VBOX,     ED_PAL_COL2,   "",                 "", ED_PAL_HBOX,    0, 0, 0, 1 },
 
 		{ MKGUI_GROUP,    ED_CTN_GROUP,   "Containers",       "", ED_RIGHT_PANEL, 0, ED_CTN_H, MKGUI_FIXED, 0 },
 		{ MKGUI_HBOX,     ED_CTN_HBOX,   "",                 "", ED_CTN_GROUP,   0, 0, 0, 0 },
 		{ MKGUI_VBOX,     ED_CTN_COL0,   "",                 "", ED_CTN_HBOX,    0, 0, 0, 1 },
 		{ MKGUI_VBOX,     ED_CTN_COL1,   "",                 "", ED_CTN_HBOX,    0, 0, 0, 1 },
+		{ MKGUI_VBOX,     ED_CTN_COL2,   "",                 "", ED_CTN_HBOX,    0, 0, 0, 1 },
 
 		/* Palette buttons generated below */
 
@@ -4701,7 +4715,7 @@ int main(void) {
 		{ MKGUI_VBOX,     ED_PROP_VBOX,      "",                "", ED_PROP_GROUP, 0, 0, 0, 0 },
 
 		/* Form: label+control pairs */
-		{ MKGUI_FORM,     ED_PROP_FORM,      "",                "", ED_PROP_VBOX, 0, ED_PROP_FORM_H, MKGUI_FIXED, 0 },
+		{ MKGUI_FORM,     ED_PROP_FORM,      "",                "", ED_PROP_VBOX, 0, 0, MKGUI_FIXED, 0 },
 		{ MKGUI_LABEL,    ED_PROP_TYPE_LBL,  "Type:",           "", ED_PROP_FORM, 0, 0, 0, 0 },
 		{ MKGUI_LABEL,    ED_PROP_TYPE_VAL,  "(none)",          "", ED_PROP_FORM, 0, 0, 0, 0 },
 		{ MKGUI_LABEL,    ED_PROP_ID_LBL,    "ID:",             "", ED_PROP_FORM, 0, 0, 0, 0 },
@@ -4823,7 +4837,8 @@ int main(void) {
 		memcpy(pw->label, ed_widgets[i].name, slen);
 		pw->label[slen] = '\0';
 		pw->icon[0] = '\0';
-		pw->parent_id = (i % 2 == 0) ? ED_PAL_COL0 : ED_PAL_COL1;
+		uint32_t col = i % ED_PAL_COLS;
+		pw->parent_id = (col == 0) ? ED_PAL_COL0 : (col == 1) ? ED_PAL_COL1 : ED_PAL_COL2;
 		pw->w = 0;
 		pw->h = 22;
 		pw->flags = MKGUI_FIXED;
@@ -4841,7 +4856,8 @@ int main(void) {
 		memcpy(pw->label, ed_containers[i].name, slen);
 		pw->label[slen] = '\0';
 		pw->icon[0] = '\0';
-		pw->parent_id = (i % 2 == 0) ? ED_CTN_COL0 : ED_CTN_COL1;
+		uint32_t col = i % ED_CTN_COLS;
+		pw->parent_id = (col == 0) ? ED_CTN_COL0 : (col == 1) ? ED_CTN_COL1 : ED_CTN_COL2;
 		pw->w = 0;
 		pw->h = 22;
 		pw->flags = MKGUI_FIXED;

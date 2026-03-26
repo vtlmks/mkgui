@@ -85,18 +85,18 @@ The right panel shows editable properties for the selected widget.
 | Parent | Dropdown to change parent container |
 | Tab#   | Tab order (0-999) |
 
-### Position and size
+### Size and layout
 
 | Field  | Key | Description |
 |--------|-----|-------------|
-| X      | X   | Horizontal position |
-| Y      | Y   | Vertical position |
-| W      | W   | Width |
-| H      | H   | Height |
+| W      | W   | Width hint (0 = fill/auto) |
+| H      | H   | Height hint (0 = natural height from font) |
+| ML/MR  |     | Left/right margins |
+| MT/MB  |     | Top/bottom margins |
 | Weight |     | Flex weight (visible when parent is HBox/VBox) |
 | Align  |     | Cross-axis alignment (visible when parent is HBox/VBox) |
 
-Pressing the letter key (X/Y/W/H/L/I) while a widget is selected jumps focus
+Pressing the letter key (W/H/L/I) while a widget is selected jumps focus
 to that property field for quick editing.
 
 ### Flags
@@ -174,8 +174,6 @@ the checkboxes. Enabled events generate `case` stubs in the output code.
 | Delete           | Delete selected widget |
 | Escape           | Cancel placement / close help popup |
 | F1               | Show help for hovered palette widget |
-| X                | Focus X position field |
-| Y                | Focus Y position field |
 | W                | Focus width field |
 | H                | Focus height field |
 | L                | Focus label field |
@@ -214,14 +212,9 @@ the checkboxes. Enabled events generate `case` stubs in the output code.
 
 ## Layout system
 
-### Anchors
+### Containers
 
-Anchor flags control how a widget responds when its parent resizes:
-
-- **Left+Right**: widget stretches horizontally
-- **Top+Bottom**: widget stretches vertically
-- **Right only**: widget sticks to right edge
-- **Bottom only**: widget sticks to bottom edge
+All layout is container-based. Widgets must be placed inside a container (VBOX, HBOX, FORM, PANEL, TABS, or directly in WINDOW). Non-container widgets that are direct children of WINDOW fill the available content area.
 
 ### HBox / VBox
 
@@ -237,7 +230,7 @@ Flex layout containers. Children are arranged horizontally (HBox) or vertically
 
 Two-column layout: labels on the left, controls on the right.
 
-- Row height defaults to 24px.
+- Row height derives from font size.
 - A Label is auto-inserted when placing a widget into a Form.
 - Control width flexes to fill the right column (w=0).
 
@@ -267,7 +260,7 @@ writes a complete C source file containing:
 2. An `enum` with all widget IDs
 3. Callback stubs (listview row callbacks, itemview label/icon callbacks)
 4. A `main()` function with:
-   - Widget array initialization with types, IDs, labels, positions, anchors
+   - Widget array initialization with types, IDs, labels, sizes, flags, and margins
    - Setup calls for widgets that need them (dropdown items, slider range,
      spinbox range, combobox items, listview columns, statusbar sections,
      progress bar, itemview, scrollbar, treeview)

@@ -1415,7 +1415,8 @@ static int32_t measure_container(struct mkgui_ctx *ctx, uint32_t idx, uint32_t a
 			++pair_count;
 		}
 		uint32_t rows = (pair_count + 1) / 2;
-		int32_t h = (int32_t)rows * 24 + (rows > 1 ? (int32_t)(rows - 1) * MKGUI_BOX_GAP : 0);
+		int32_t row_h = ctx->font_height + 10;
+		int32_t h = (int32_t)rows * row_h + (rows > 1 ? (int32_t)(rows - 1) * MKGUI_BOX_GAP : 0);
 		return h;
 	}
 
@@ -1429,6 +1430,7 @@ static int32_t measure_container(struct mkgui_ctx *ctx, uint32_t idx, uint32_t a
 		++visible;
 		int32_t child_main;
 		int32_t child_cross;
+		uint32_t ct = ctx->widgets[j].type;
 		if(is_vbox) {
 			child_main = ctx->widgets[j].h;
 			child_cross = ctx->widgets[j].w;
@@ -1436,9 +1438,17 @@ static int32_t measure_container(struct mkgui_ctx *ctx, uint32_t idx, uint32_t a
 			child_main = ctx->widgets[j].w;
 			child_cross = ctx->widgets[j].h;
 		}
-		uint32_t ct = ctx->widgets[j].type;
 		if(child_main == 0 && (ctx->widgets[j].flags & MKGUI_FIXED) && (ct == MKGUI_VBOX || ct == MKGUI_HBOX || ct == MKGUI_FORM || ct == MKGUI_GROUP || ct == MKGUI_PANEL)) {
 			child_main = measure_container(ctx, j, is_vbox ? 1 : 0);
+		}
+		if(child_main == 0) {
+			child_main = natural_height(ctx, ct);
+		}
+		if(child_cross == 0) {
+			int32_t nh = natural_height(ctx, ct);
+			if(nh > 0) {
+				child_cross = nh;
+			}
 		}
 		main_total += child_main;
 		if(child_cross > cross_max) {

@@ -614,7 +614,7 @@ int main(void) {
 
 		/* Controls: left column */
 		{ MKGUI_VBOX,     ID_CTL_LVBOX, "",                  "", ID_CTL_HBOX, 0, 0, 0, 1 },
-		{ MKGUI_GROUP,    ID_GRP_SETTINGS, "Settings",       "", ID_CTL_LVBOX, 0, 175, MKGUI_FIXED, 0 },
+		{ MKGUI_GROUP,    ID_GRP_SETTINGS, "Settings",       "", ID_CTL_LVBOX, 0, 0, MKGUI_FIXED, 0 },
 		{ MKGUI_FORM,     ID_CTL_FORM,  "",                  "", ID_GRP_SETTINGS, 0, 0, 0, 0 },
 		{ MKGUI_LABEL,    ID_LBL_NAME,  "Name:",             "", ID_CTL_FORM, 0, 0, 0, 0 },
 		{ MKGUI_INPUT,    ID_INPUT1,    "",                  "", ID_CTL_FORM, 0, 0, 0, 0 },
@@ -627,7 +627,7 @@ int main(void) {
 		{ MKGUI_LABEL,    ID_LBL_VOLUME,"Volume:",           "", ID_CTL_FORM, 0, 0, 0, 0 },
 		{ MKGUI_SLIDER,   ID_SLIDER1,   "",                  "", ID_CTL_FORM, 0, 0, 0, 0 },
 
-		{ MKGUI_GROUP,    ID_GRP_RADIO, "Priority",          "", ID_CTL_LVBOX, 0, 56, MKGUI_FIXED, 0 },
+		{ MKGUI_GROUP,    ID_GRP_RADIO, "Priority",          "", ID_CTL_LVBOX, 0, 0, MKGUI_FIXED, 0 },
 		{ MKGUI_HBOX,     ID_RADIO_HBOX,"",                  "", ID_GRP_RADIO, 0, 0, 0, 0 },
 		{ MKGUI_RADIO,    ID_RADIO1,    "Low",               "", ID_RADIO_HBOX, 0, 0, MKGUI_CHECKED, 1 },
 		{ MKGUI_RADIO,    ID_RADIO2,    "Medium",            "", ID_RADIO_HBOX, 0, 0, 0, 1 },
