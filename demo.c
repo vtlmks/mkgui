@@ -47,6 +47,13 @@ enum {
 	ID_LBL_DATE, ID_DATEPICKER1,
 	ID_LBL_IP, ID_IPINPUT1,
 	ID_LBL_TBMODE, ID_TBMODE_DROP,
+	ID_LBL_COLOR, ID_BTN_COLOR,
+	ID_DIVIDER1,
+	ID_GRP_COLLAPSIBLE,
+	ID_COLL_LBL,
+	ID_LINK1,
+	ID_LBL_WRAP,
+	ID_LBL_AMOUNT, ID_AMOUNT_INPUT,
 
 	/* Tree / Text tab */
 	ID_TREE_SPLIT, ID_TREE_LVBOX, ID_TREE_LBL, ID_TREEVIEW1,
@@ -387,7 +394,15 @@ static void demo_event(struct mkgui_ctx *ctx, struct mkgui_event *ev, void *user
 		} break;
 
 		case MKGUI_EVENT_CLICK: {
-			if(ev->id == ID_BUTTON1) {
+			if(ev->id == ID_BTN_COLOR) {
+				uint32_t color = 0;
+				if(mkgui_color_dialog(ctx, 0x3366cc, &color)) {
+					char buf[64];
+					snprintf(buf, sizeof(buf), "Color: #%06x", color);
+					mkgui_statusbar_set(ctx, ID_STATUSBAR, 0, buf);
+				}
+
+			} else if(ev->id == ID_BUTTON1) {
 				mkgui_statusbar_set(ctx, ID_STATUSBAR, 0, "Applied!");
 
 			} else if(ev->id == ID_TB_NEW || ev->id == ID_TB_OPEN || ev->id == ID_TB_SAVE) {
@@ -663,6 +678,17 @@ int main(void) {
 		{ MKGUI_IPINPUT,  ID_IPINPUT1,  "",                  "", ID_EXTRA_FORM, 0, 0, 0, 0, 0 },
 		{ MKGUI_LABEL,    ID_LBL_TBMODE,"Toolbar:",          "", ID_EXTRA_FORM, 0, 0, 0, 0, 0 },
 		{ MKGUI_DROPDOWN, ID_TBMODE_DROP,"",                 "", ID_EXTRA_FORM, 0, 0, 0, 0, 0 },
+		{ MKGUI_LABEL,    ID_LBL_AMOUNT,"Amount:",           "", ID_EXTRA_FORM, 0, 0, 0, 0, 0 },
+		{ MKGUI_INPUT,    ID_AMOUNT_INPUT,"",                "", ID_EXTRA_FORM, 0, 0, 0, MKGUI_NUMERIC, 0 },
+		{ MKGUI_LABEL,    ID_LBL_COLOR, "Color:",            "", ID_EXTRA_FORM, 0, 0, 0, 0, 0 },
+		{ MKGUI_BUTTON,   ID_BTN_COLOR, "Pick Color",  "palette", ID_EXTRA_FORM, 0, 0, 0, 0, 0 },
+
+		{ MKGUI_DIVIDER,  ID_DIVIDER1,  "",                  "", ID_CTL_RVBOX, 0, 0, MKGUI_FIXED, 0, 0 },
+
+		{ MKGUI_GROUP,    ID_GRP_COLLAPSIBLE, "Collapsible", "", ID_CTL_RVBOX, 0, 0, 0, 0, 1 },
+		{ MKGUI_VBOX,     ID_COLL_LBL,  "",                  "", ID_GRP_COLLAPSIBLE, 0, 0, 0, 0, 0 },
+		{ MKGUI_LABEL,    ID_LINK1,     "mkgui on GitHub",   "", ID_COLL_LBL, 0, 0, MKGUI_FIXED, MKGUI_LINK, 0 },
+		{ MKGUI_LABEL,    ID_LBL_WRAP,  "This label demonstrates word wrapping. Text flows to the next line when it reaches the edge of the widget.", "", ID_COLL_LBL, 0, 80, MKGUI_FIXED, MKGUI_WRAP, 0 },
 
 		/* ---- Tree / Text tab ---- */
 		{ MKGUI_VSPLIT,   ID_TREE_SPLIT,"",                  "", ID_TAB_TREE, 0, 0, 0, 0, 0 },

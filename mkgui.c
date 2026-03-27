@@ -15,6 +15,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <time.h>
+#include <math.h>
 
 #if defined(__SSE2__)
 #include <emmintrin.h>
@@ -986,6 +987,9 @@ static uint32_t widget_visible(struct mkgui_ctx *ctx, uint32_t idx) {
 					}
 				}
 			}
+			if(parent->type == MKGUI_GROUP && (parent->style & MKGUI_COLLAPSED)) {
+				return 0;
+			}
 			if(parent->type == MKGUI_WINDOW) {
 				break;
 			}
@@ -1009,6 +1013,9 @@ static uint32_t widget_visible(struct mkgui_ctx *ctx, uint32_t idx) {
 						return 0;
 					}
 				}
+			}
+			if(parent->type == MKGUI_GROUP && (parent->style & MKGUI_COLLAPSED)) {
+				return 0;
 			}
 			pid = parent->parent_id;
 		}
@@ -1688,8 +1695,12 @@ static void lc_layout_node(struct mkgui_ctx *ctx, struct layout_ctx *lc, uint32_
 					continue;
 				}
 				++child_count;
-				if(jw->flags & MKGUI_FIXED) {
+				uint32_t treat_fixed = (jw->flags & MKGUI_FIXED) || (jw->type == MKGUI_GROUP && (jw->style & MKGUI_COLLAPSED));
+				if(treat_fixed) {
 					int32_t fh = jw->h;
+					if(jw->type == MKGUI_GROUP && (jw->style & MKGUI_COLLAPSED)) {
+						fh = ctx->font_height + 4;
+					}
 					uint32_t ct = jw->type;
 					if(fh == 0 && (ct == MKGUI_VBOX || ct == MKGUI_HBOX || ct == MKGUI_FORM || ct == MKGUI_GROUP || ct == MKGUI_PANEL)) {
 						fh = lc_measure_container(ctx, lc, j, 1);
@@ -1737,7 +1748,7 @@ static void lc_layout_node(struct mkgui_ctx *ctx, struct layout_ctx *lc, uint32_
 					continue;
 				}
 				int32_t ch;
-				if(jw->flags & MKGUI_FIXED) {
+				if((jw->flags & MKGUI_FIXED) || (jw->type == MKGUI_GROUP && (jw->style & MKGUI_COLLAPSED))) {
 					ch = lc->rects[j].h;
 				} else {
 					uint32_t wt = jw->weight > 0 ? jw->weight : 1;
@@ -2220,9 +2231,11 @@ static int32_t hit_test(struct mkgui_ctx *ctx, int32_t mx, int32_t my) {
 			continue;
 		}
 		if(w->type == MKGUI_GROUP) {
+			int32_t rx = ctx->rects[i].x;
 			int32_t ry = ctx->rects[i].y;
+			int32_t rw = ctx->rects[i].w;
 			int32_t header_h = ctx->font_height + 4;
-			if(my >= ry && my < ry + header_h) {
+			if(mx >= rx && mx < rx + rw && my >= ry && my < ry + header_h) {
 				return i;
 			}
 			continue;
@@ -4143,6 +4156,10 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 		if(ctx->spinboxes[si].repeat_dir) {
 			ctx->anim_active = 1;
 		}
+	}
+
+	if(ctx->parent) {
+		layout_build_index(ctx);
 	}
 
 	while(platform_pending(ctx)) {
@@ -6857,3 +6874,4 @@ MKGUI_API void mkgui_quit(struct mkgui_ctx *ctx) {
 #include "mkgui_dialogs.c"
 #include "mkgui_filedialog.c"
 #include "mkgui_iconbrowser.c"
+#include "mkgui_colorpicker.c"

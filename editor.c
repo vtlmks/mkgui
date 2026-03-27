@@ -85,6 +85,10 @@ enum {
 	ED_PROP_FL_MIXER,
 	ED_PROP_FL_TRUNCATE,
 	ED_PROP_FL_METER_TEXT,
+	ED_PROP_FL_LINK,
+	ED_PROP_FL_WRAP,
+	ED_PROP_FL_COLLAPSED,
+	ED_PROP_FL_NUMERIC,
 	ED_PROP_WEIGHT_LBL, ED_PROP_WEIGHT_SPN,
 	ED_PROP_ALIGN_LBL, ED_PROP_ALIGN_DRP,
 	ED_PROP_ADD_TAB, ED_PROP_REM_TAB,
@@ -852,6 +856,7 @@ enum {
 	ED_VIS_SLIDER_ONLY = (1 << 12),
 	ED_VIS_LABEL       = (1 << 13),
 	ED_VIS_METER       = (1 << 14),
+	ED_VIS_GROUP       = (1 << 15),
 };
 
 enum {
@@ -920,6 +925,10 @@ static struct ed_prop_desc ed_props[] = {
 	{ ED_PK_FLAG,          "Mixer",          offsetof(struct ed_widget, style),         MKGUI_SLIDER_MIXER, 0,      0,    ED_VIS_SLIDER_ONLY,ED_ACT_NONE,        ED_PROP_FL_MIXER,     0,                   0,                 0 },
 	{ ED_PK_FLAG,          "Truncate",       offsetof(struct ed_widget, style),         MKGUI_TRUNCATE,     0,      0,    ED_VIS_LABEL,      ED_ACT_NONE,        ED_PROP_FL_TRUNCATE,  0,                   0,                 0 },
 	{ ED_PK_FLAG,          "Show %",         offsetof(struct ed_widget, style),         MKGUI_METER_TEXT,   0,      0,    ED_VIS_METER,      ED_ACT_NONE,        ED_PROP_FL_METER_TEXT, 0,                   0,                 0 },
+	{ ED_PK_FLAG,          "Link",           offsetof(struct ed_widget, style),         MKGUI_LINK,         0,      0,    ED_VIS_LABEL,      ED_ACT_NONE,        ED_PROP_FL_LINK,      0,                   0,                 0 },
+	{ ED_PK_FLAG,          "Wrap",           offsetof(struct ed_widget, style),         MKGUI_WRAP,         0,      0,    ED_VIS_LABEL,      ED_ACT_NONE,        ED_PROP_FL_WRAP,      0,                   0,                 0 },
+	{ ED_PK_FLAG,          "Collapsed",      offsetof(struct ed_widget, style),         MKGUI_COLLAPSED,    0,      0,    ED_VIS_GROUP,      ED_ACT_NONE,        ED_PROP_FL_COLLAPSED, 0,                   0,                 0 },
+	{ ED_PK_FLAG,          "Numeric",        offsetof(struct ed_widget, style),         MKGUI_NUMERIC,      0,      0,    ED_VIS_INPUT,      ED_ACT_NONE,        ED_PROP_FL_NUMERIC,   0,                   0,                 0 },
 	{ ED_PK_MENU_TREE,     "",                0,                                        0,                  0,      0,    ED_VIS_MENU,      ED_ACT_NONE,         ED_MENU_TREE,         0,                   0,                 0 },
 };
 #define ED_PROP_COUNT (sizeof(ed_props) / sizeof(ed_props[0]))
@@ -959,6 +968,9 @@ static uint32_t ed_compute_vis_mask(struct ed_widget *w) {
 	}
 	if(w->type == MKGUI_LABEL) {
 		mask |= ED_VIS_LABEL;
+	}
+	if(w->type == MKGUI_GROUP) {
+		mask |= ED_VIS_GROUP;
 	}
 	if(w->type == MKGUI_MENU || w->type == MKGUI_MENUITEM) {
 		mask |= ED_VIS_MENU;
@@ -3418,6 +3430,10 @@ static const char *ed_style_to_str(uint32_t style, uint32_t widget_type, char *b
 		{ MKGUI_TAB_CLOSABLE,    "MKGUI_TAB_CLOSABLE" },
 		{ MKGUI_MULTI_SELECT,    "MKGUI_MULTI_SELECT" },
 		{ MKGUI_TRUNCATE,        "MKGUI_TRUNCATE" },
+		{ MKGUI_LINK,            "MKGUI_LINK" },
+		{ MKGUI_COLLAPSED,       "MKGUI_COLLAPSED" },
+		{ MKGUI_WRAP,            "MKGUI_WRAP" },
+		{ MKGUI_NUMERIC,         "MKGUI_NUMERIC" },
 	};
 
 	buf[0] = '\0';
@@ -4267,6 +4283,10 @@ int main(void) {
 		{ MKGUI_CHECKBOX, ED_PROP_FL_MIXER,    "Mixer",         "", ED_PROP_FL_COL1, 0, 20, MKGUI_FIXED, 0, 0 },
 		{ MKGUI_CHECKBOX, ED_PROP_FL_TRUNCATE, "Truncate",      "", ED_PROP_FL_COL2, 0, 20, MKGUI_FIXED, 0, 0 },
 		{ MKGUI_CHECKBOX, ED_PROP_FL_METER_TEXT,"Show %",       "", ED_PROP_FL_COL3, 0, 20, MKGUI_FIXED, 0, 0 },
+		{ MKGUI_CHECKBOX, ED_PROP_FL_LINK,     "Link",          "", ED_PROP_FL_COL0, 0, 20, MKGUI_FIXED, 0, 0 },
+		{ MKGUI_CHECKBOX, ED_PROP_FL_WRAP,     "Wrap",          "", ED_PROP_FL_COL1, 0, 20, MKGUI_FIXED, 0, 0 },
+		{ MKGUI_CHECKBOX, ED_PROP_FL_COLLAPSED,"Collapsed",     "", ED_PROP_FL_COL2, 0, 20, MKGUI_FIXED, 0, 0 },
+		{ MKGUI_CHECKBOX, ED_PROP_FL_NUMERIC,  "Numeric",       "", ED_PROP_FL_COL3, 0, 20, MKGUI_FIXED, 0, 0 },
 
 		/* Cross-axis alignment (visible when parent is HBOX/VBOX) */
 		{ MKGUI_LABEL,    ED_PROP_ALIGN_LBL,  "Align:",         "", ED_PROP_VBOX, 0, 24, MKGUI_HIDDEN | MKGUI_FIXED, 0, 0 },
