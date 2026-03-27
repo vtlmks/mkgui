@@ -214,7 +214,7 @@ static uint32_t handle_slider_key(struct mkgui_ctx *ctx, struct mkgui_event *ev,
 		return 0;
 	}
 
-	dirty_all(ctx);
+	dirty_widget_id(ctx, ctx->focus_id);
 	ev->type = MKGUI_EVENT_SLIDER_CHANGED;
 	ev->id = ctx->focus_id;
 	ev->value = sd->value;
@@ -237,7 +237,7 @@ MKGUI_API void mkgui_slider_setup(struct mkgui_ctx *ctx, uint32_t id, int32_t mi
 	if(sd->value > sd->max_val) {
 		sd->value = sd->max_val;
 	}
-	dirty_all(ctx);
+	dirty_widget_id(ctx, id);
 }
 
 // [=]===^=[ mkgui_slider_get ]=================================[=]
@@ -261,7 +261,7 @@ MKGUI_API void mkgui_slider_set(struct mkgui_ctx *ctx, uint32_t id, int32_t valu
 		value = sd->max_val;
 	}
 	sd->value = value;
-	dirty_all(ctx);
+	dirty_widget_id(ctx, id);
 }
 
 // [=]===^=[ mkgui_slider_get_range ]===============================[=]
@@ -292,7 +292,7 @@ MKGUI_API void mkgui_slider_set_range(struct mkgui_ctx *ctx, uint32_t id, int32_
 	if(sd->value > sd->max_val) {
 		sd->value = sd->max_val;
 	}
-	dirty_all(ctx);
+	dirty_widget_id(ctx, id);
 }
 
 // [=]===^=[ mkgui_slider_set_meter ]=============================[=]
@@ -306,5 +306,5 @@ MKGUI_API void mkgui_slider_set_meter(struct mkgui_ctx *ctx, uint32_t id, float 
 	sd->meter_post = post;
 	sd->meter_pre_color = pre_color;
 	sd->meter_post_color = post_color;
-	dirty_all(ctx);
+	dirty_widget_id(ctx, id);
 }

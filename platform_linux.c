@@ -242,6 +242,10 @@ static void platform_blit(struct mkgui_ctx *ctx) {
 
 // [=]===^=[ platform_blit_region ]================================[=]
 static void platform_blit_region(struct mkgui_ctx *ctx, int32_t x, int32_t y, int32_t w, int32_t h) {
+	if(x < 0) { w += x; x = 0; }
+	if(y < 0) { h += y; y = 0; }
+	if(x + w > ctx->win_w) { w = ctx->win_w - x; }
+	if(y + h > ctx->win_h) { h = ctx->win_h - y; }
 	if(w <= 0 || h <= 0) {
 		return;
 	}

@@ -1696,6 +1696,7 @@ static void lc_layout_node(struct mkgui_ctx *ctx, struct layout_ctx *lc, uint32_
 					}
 					wdist = extra % weight_total;
 				}
+				if(ch < 1) { ch = 1; }
 				int32_t cx_child = px;
 				int32_t cw_child = pw;
 				uint32_t align = jw->flags & MKGUI_ALIGN_MASK;
@@ -1780,6 +1781,7 @@ static void lc_layout_node(struct mkgui_ctx *ctx, struct layout_ctx *lc, uint32_
 					}
 					wdist = extra % weight_total;
 				}
+				if(cw < 1) { cw = 1; }
 				int32_t cy_child = py;
 				int32_t ch_child = ph;
 				uint32_t align = jw->flags & MKGUI_ALIGN_MASK;
@@ -4211,7 +4213,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 							}
 							inp->cursor = input_hit_cursor(ctx, inp, display, ctx->rects[dsi].x, ctx->mouse_x);
 							inp->sel_end = inp->cursor;
-							dirty_all(ctx);
+							dirty_widget(ctx, (uint32_t)dsi);
 							input_scroll_to_cursor(ctx, ctx->drag_select_id);
 						}
 
@@ -4239,7 +4241,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 							}
 							ta->cursor = textarea_hit_pos(ctx, ta, ctx->rects[dsi].x, ctx->rects[dsi].y, ctx->rects[dsi].h, ctx->mouse_x, ctx->mouse_y);
 							ta->sel_end = ta->cursor;
-							dirty_all(ctx);
+							dirty_widget(ctx, (uint32_t)dsi);
 						}
 
 					} else if(dsi >= 0 && ctx->widgets[dsi].type == MKGUI_PATHBAR) {
@@ -4271,7 +4273,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 							}
 							pb->edit_cursor = hit_pos;
 							pb->edit_sel_end = hit_pos;
-							dirty_all(ctx);
+							dirty_widget(ctx, (uint32_t)dsi);
 						}
 					}
 					break;
@@ -4354,7 +4356,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 									bs->scroll_y = max_scroll;
 								}
 							}
-							dirty_all(ctx);
+							dirty_widget(ctx, (uint32_t)dsi);
 						}
 					} else if(dsi >= 0 && ctx->widgets[dsi].type == MKGUI_GRIDVIEW) {
 						gridview_scroll_to_y(ctx, ctx->drag_scrollbar_id, ctx->mouse_y);
@@ -4376,13 +4378,13 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 					struct mkgui_listview_data *lv = find_listv_data(ctx, ctx->drag_col_resize_id);
 					if(lv) {
 						lv->columns[ctx->drag_col_resize_col].width = nw;
-						dirty_all(ctx);
+						dirty_widget_id(ctx, ctx->drag_col_resize_id);
 
 					} else {
 						struct mkgui_gridview_data *gv = find_gridv_data(ctx, ctx->drag_col_resize_id);
 						if(gv) {
 							gv->columns[ctx->drag_col_resize_col].width = nw;
-							dirty_all(ctx);
+							dirty_widget_id(ctx, ctx->drag_col_resize_id);
 						}
 					}
 					break;
@@ -4391,7 +4393,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 				if(ctx->drag_col_id) {
 					int32_t dx = ctx->mouse_x - ctx->drag_col_start_x;
 					if(dx < -3 || dx > 3) {
-						dirty_all(ctx);
+						dirty_widget_id(ctx, ctx->drag_col_id);
 					}
 					int32_t lv_idx = find_widget_idx(ctx, ctx->drag_col_id);
 					if(lv_idx >= 0) {
@@ -4404,10 +4406,10 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 							int32_t content_w = lw - 2 - MKGUI_SCROLLBAR_W;
 							if(ctx->mouse_x < lx + edge) {
 								lv->scroll_x -= scroll_step;
-								dirty_all(ctx);
+								dirty_widget(ctx, (uint32_t)lv_idx);
 							} else if(ctx->mouse_x > lx + lw - edge) {
 								lv->scroll_x += scroll_step;
-								dirty_all(ctx);
+								dirty_widget(ctx, (uint32_t)lv_idx);
 							}
 							listview_clamp_scroll_x(lv, content_w);
 						}
@@ -4463,7 +4465,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 										}
 									}
 								}
-								dirty_all(ctx);
+								dirty_widget(ctx, (uint32_t)pi);
 							}
 						}
 					}
@@ -4544,7 +4546,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 							ev->type = MKGUI_EVENT_DRAG_START;
 							ev->id = tv->widget_id;
 							ev->value = (int32_t)tv->nodes[tv->drag_source].id;
-							dirty_all(ctx);
+							dirty_widget_id(ctx, tv->widget_id);
 							return 1;
 						}
 						if(tv->drag_active) {
@@ -4567,7 +4569,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 								} else {
 									tv->drag_target = -1;
 								}
-								dirty_all(ctx);
+								dirty_widget(ctx, (uint32_t)tidx);
 							}
 						}
 					}
@@ -4584,7 +4586,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 							ev->type = MKGUI_EVENT_DRAG_START;
 							ev->id = lv->widget_id;
 							ev->value = lv->drag_source;
-							dirty_all(ctx);
+							dirty_widget_id(ctx, lv->widget_id);
 							return 1;
 						}
 						if(lv->drag_active) {
@@ -4596,7 +4598,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 								} else {
 									lv->drag_target = -1;
 								}
-								dirty_all(ctx);
+								dirty_widget(ctx, (uint32_t)lidx);
 							}
 						}
 					}
@@ -4613,7 +4615,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 							ev->type = MKGUI_EVENT_DRAG_START;
 							ev->id = gv->widget_id;
 							ev->value = gv->drag_source;
-							dirty_all(ctx);
+							dirty_widget_id(ctx, gv->widget_id);
 							return 1;
 						}
 						if(gv->drag_active) {
@@ -4625,7 +4627,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 								} else {
 									gv->drag_target = -1;
 								}
-								dirty_all(ctx);
+								dirty_widget(ctx, (uint32_t)gidx);
 							}
 						}
 					}
@@ -4637,7 +4639,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 						int32_t hb = spinbox_btn_hit(ctx, (uint32_t)hi, ctx->mouse_x, ctx->mouse_y);
 						if(hb != sd->hover_btn) {
 							sd->hover_btn = hb;
-							dirty_all(ctx);
+							dirty_widget(ctx, (uint32_t)hi);
 						}
 					}
 				}
@@ -4932,12 +4934,12 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 											lv->multi_sel[0] = row;
 											lv->multi_sel_count = 1;
 											lv->selected_row = row;
-											dirty_all(ctx);
+											dirty_widget(ctx, (uint32_t)hi);
 										}
 									} else {
 										if(lv->selected_row != row) {
 											lv->selected_row = row;
-											dirty_all(ctx);
+											dirty_widget(ctx, (uint32_t)hi);
 										}
 									}
 								}
@@ -4968,7 +4970,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 								} else if(gv->selected_row != row) {
 									gv->selected_row = row;
 									gv->selected_col = col;
-									dirty_all(ctx);
+									dirty_widget(ctx, (uint32_t)hi);
 								}
 								ev->type = MKGUI_EVENT_CONTEXT;
 								ev->id = hw->id;
@@ -4983,7 +4985,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 								int32_t row = richlist_row_hit(ctx, (uint32_t)hi, ctx->mouse_y);
 								if(row >= 0 && rl->selected_row != row) {
 									rl->selected_row = row;
-									dirty_all(ctx);
+									dirty_widget(ctx, (uint32_t)hi);
 								}
 								ev->type = MKGUI_EVENT_CONTEXT;
 								ev->id = hw->id;
@@ -5011,7 +5013,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 								}
 								if(node_id >= 0 && tv->selected_node != node_id) {
 									tv->selected_node = node_id;
-									dirty_all(ctx);
+									dirty_widget(ctx, (uint32_t)hi);
 								}
 								ev->type = MKGUI_EVENT_CONTEXT;
 								ev->id = hw->id;
@@ -5026,7 +5028,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 								int32_t item = itemview_hit_item(ctx, (uint32_t)hi, iv, ctx->mouse_x, ctx->mouse_y);
 								if(item >= 0 && iv->selected != item) {
 									iv->selected = item;
-									dirty_all(ctx);
+									dirty_widget(ctx, (uint32_t)hi);
 								}
 								ev->type = MKGUI_EVENT_CONTEXT;
 								ev->id = hw->id;
@@ -5073,7 +5075,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 									lv->scroll_y = max_scroll;
 								}
 							}
-							dirty_all(ctx);
+							dirty_widget(ctx, (uint32_t)hi);
 						}
 
 					} else if(hi >= 0 && ctx->widgets[hi].type == MKGUI_GRIDVIEW) {
@@ -5083,7 +5085,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 							int32_t hh = gv->header_height > 0 ? gv->header_height : MKGUI_ROW_HEIGHT;
 							int32_t content_h = ctx->rects[hi].h - hh - 2;
 							gridview_clamp_scroll(gv, content_h);
-							dirty_all(ctx);
+							dirty_widget(ctx, (uint32_t)hi);
 						}
 
 					} else if(hi >= 0 && ctx->widgets[hi].type == MKGUI_RICHLIST) {
@@ -5091,7 +5093,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 						if(rl) {
 							rl->scroll_y += delta;
 							richlist_clamp_scroll(rl, ctx->rects[hi].h - 2);
-							dirty_all(ctx);
+							dirty_widget(ctx, (uint32_t)hi);
 						}
 
 					} else if(hi >= 0 && ctx->widgets[hi].type == MKGUI_TREEVIEW) {
@@ -5099,7 +5101,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 						if(tv) {
 							tv->scroll_y += delta;
 							treeview_clamp_scroll(ctx, ctx->widgets[hi].id);
-							dirty_all(ctx);
+							dirty_widget(ctx, (uint32_t)hi);
 						}
 
 					} else if(hi >= 0 && ctx->widgets[hi].type == MKGUI_SPINBOX) {
@@ -5126,7 +5128,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 							}
 							if(sel != dd->selected) {
 								dd->selected = sel;
-								dirty_all(ctx);
+								dirty_widget(ctx, (uint32_t)hi);
 								ev->type = MKGUI_EVENT_DROPDOWN_CHANGED;
 								ev->id = ctx->widgets[hi].id;
 								ev->value = sel;
@@ -5150,7 +5152,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 							if(sd->value > sd->max_val) {
 								sd->value = sd->max_val;
 							}
-							dirty_all(ctx);
+							dirty_widget(ctx, (uint32_t)hi);
 							ev->type = MKGUI_EVENT_SLIDER_CHANGED;
 							ev->id = ctx->widgets[hi].id;
 							ev->value = sd->value;
@@ -5173,7 +5175,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 							if(ta->scroll_y > max_scroll) {
 								ta->scroll_y = max_scroll;
 							}
-							dirty_all(ctx);
+							dirty_widget(ctx, (uint32_t)hi);
 						}
 
 					} else if(hi >= 0 && ctx->widgets[hi].type == MKGUI_ITEMVIEW) {
@@ -5183,7 +5185,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 							int32_t ca_x, ca_y, ca_w, ca_h;
 							itemview_content_area(iv, ctx->rects[hi].x, ctx->rects[hi].y, ctx->rects[hi].w, ctx->rects[hi].h, &ca_x, &ca_y, &ca_w, &ca_h);
 							itemview_clamp_scroll(iv, ca_w, ca_h);
-							dirty_all(ctx);
+							dirty_widget(ctx, (uint32_t)hi);
 						}
 
 					} else if(hi >= 0 && ctx->widgets[hi].type == MKGUI_SCROLLBAR) {
@@ -5243,7 +5245,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 											bs->scroll_y = max_scroll;
 										}
 									}
-									dirty_all(ctx);
+									dirty_widget(ctx, (uint32_t)si);
 								}
 								break;
 							}
@@ -5262,7 +5264,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 							lv->scroll_x += delta;
 							int32_t content_w = ctx->rects[hi].w - 2 - MKGUI_SCROLLBAR_W;
 							listview_clamp_scroll_x(lv, content_w);
-							dirty_all(ctx);
+							dirty_widget(ctx, (uint32_t)hi);
 						}
 
 					} else {
@@ -5286,7 +5288,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 									if(bs->scroll_x > max_scroll) {
 										bs->scroll_x = max_scroll;
 									}
-									dirty_all(ctx);
+									dirty_widget(ctx, (uint32_t)si);
 								}
 								break;
 							}
@@ -5377,7 +5379,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 									bs->scroll_y = max_scroll;
 								}
 							}
-							dirty_all(ctx);
+							dirty_widget(ctx, (uint32_t)bi);
 							break;
 						}
 					}
@@ -5439,7 +5441,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 								input_clear_selection(inp);
 								ctx->drag_select_id = hw->id;
 							}
-							dirty_all(ctx);
+							dirty_widget(ctx, (uint32_t)hi);
 							input_scroll_to_cursor(ctx, hw->id);
 						}
 					}
@@ -5482,7 +5484,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 							ta->cursor = textarea_hit_pos(ctx, ta, ctx->rects[hi].x, ctx->rects[hi].y, ctx->rects[hi].h, ctx->mouse_x, ctx->mouse_y);
 							textarea_clear_selection(ta);
 							ctx->drag_select_id = hw->id;
-							dirty_all(ctx);
+							dirty_widget(ctx, (uint32_t)hi);
 						}
 					}
 
@@ -5521,7 +5523,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 								int32_t cw = ctx->rects[hi].w - 2 - MKGUI_SCROLLBAR_W;
 								hlv->scroll_x += (hsb_hit == 2 ? -1 : 1) * (cw / 2);
 								listview_clamp_scroll_x(hlv, cw);
-								dirty_all(ctx);
+								dirty_widget(ctx, (uint32_t)hi);
 							}
 
 						} else {
@@ -5586,7 +5588,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 												ev->value = row;
 												ev->col = col;
 												ctx->dblclick_id = 0;
-												dirty_all(ctx);
+												dirty_widget(ctx, (uint32_t)hi);
 												return 1;
 											}
 											lv->drag_source = row;
@@ -5597,7 +5599,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 											ev->id = hw->id;
 											ev->value = row;
 											ev->col = col;
-											dirty_all(ctx);
+											dirty_widget(ctx, (uint32_t)hi);
 											return 1;
 										}
 									}
@@ -5620,7 +5622,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 								int32_t gcontent_h = ctx->rects[hi].h - ghh - 2;
 								gv->scroll_y += (gv_sb_hit == 2 ? -1 : 1) * gcontent_h;
 								gridview_clamp_scroll(gv, gcontent_h);
-								dirty_all(ctx);
+								dirty_widget(ctx, (uint32_t)hi);
 							}
 
 						} else {
@@ -5667,7 +5669,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 												ev->id = hw->id;
 												ev->value = grow;
 												ev->col = gcol;
-												dirty_all(ctx);
+												dirty_widget(ctx, (uint32_t)hi);
 												return 1;
 											}
 										}
@@ -5675,7 +5677,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 										ev->id = hw->id;
 										ev->value = grow;
 										ev->col = gcol;
-										dirty_all(ctx);
+										dirty_widget(ctx, (uint32_t)hi);
 										return 1;
 									}
 								}
@@ -5695,7 +5697,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 								int32_t content_h = ctx->rects[hi].h - 2;
 								rl->scroll_y += (rl_sb_hit == 2 ? -1 : 1) * content_h;
 								richlist_clamp_scroll(rl, content_h);
-								dirty_all(ctx);
+								dirty_widget(ctx, (uint32_t)hi);
 							}
 
 						} else {
@@ -5709,7 +5711,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 									ctx->dblclick_row = row;
 									ctx->dblclick_time = now;
 									rl->selected_row = row;
-									dirty_all(ctx);
+									dirty_widget(ctx, (uint32_t)hi);
 									if(is_dblclick) {
 										ctx->dblclick_id = 0;
 										ev->type = MKGUI_EVENT_RICHLIST_DBLCLICK;
@@ -5754,7 +5756,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 									}
 									ev->id = hw->id;
 									ev->value = item;
-									dirty_all(ctx);
+									dirty_widget(ctx, (uint32_t)hi);
 									return 1;
 								}
 							}
@@ -5848,7 +5850,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 									tv->drag_pos = 0;
 									tv->drag_active = 0;
 									tv->drag_start_y = ctx->mouse_y;
-									dirty_all(ctx);
+									dirty_widget(ctx, (uint32_t)hi);
 									if(is_dblclick) {
 										ev->type = MKGUI_EVENT_TREEVIEW_DBLCLICK;
 										ctx->dblclick_id = 0;
@@ -5879,7 +5881,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 								sd->select_all = 1;
 								snprintf(sd->edit_buf, sizeof(sd->edit_buf), "%d", sd->value);
 								sd->edit_len = (uint32_t)strlen(sd->edit_buf);
-								dirty_all(ctx);
+								dirty_widget(ctx, (uint32_t)hi);
 							}
 						}
 					}
@@ -5921,7 +5923,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 					if(tv->drag_active) {
 						ev->type = MKGUI_EVENT_DRAG_END;
 						ev->id = tv->widget_id;
-						dirty_all(ctx);
+						dirty_widget_id(ctx, tv->widget_id);
 					}
 					tv->drag_active = 0;
 					tv->drag_source = -1;
@@ -5945,7 +5947,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 					if(lv->drag_active) {
 						ev->type = MKGUI_EVENT_DRAG_END;
 						ev->id = lv->widget_id;
-						dirty_all(ctx);
+						dirty_widget_id(ctx, lv->widget_id);
 					}
 					lv->drag_active = 0;
 					lv->drag_source = -1;
@@ -5969,7 +5971,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 					if(gv->drag_active) {
 						ev->type = MKGUI_EVENT_DRAG_END;
 						ev->id = gv->widget_id;
-						dirty_all(ctx);
+						dirty_widget_id(ctx, gv->widget_id);
 					}
 					gv->drag_active = 0;
 					gv->drag_source = -1;
@@ -5979,8 +5981,9 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 				ctx->drag_select_id = 0;
 
 				if(ctx->drag_col_resize_id) {
+					uint32_t dcr_id = ctx->drag_col_resize_id;
 					ctx->drag_col_resize_id = 0;
-					dirty_all(ctx);
+					dirty_widget_id(ctx, dcr_id);
 					break;
 				}
 
@@ -5990,7 +5993,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 					int32_t dx = pev.x - ctx->drag_col_start_x;
 					ctx->drag_col_id = 0;
 					ctx->drag_col_src = -1;
-					dirty_all(ctx);
+					dirty_widget_id(ctx, dcid);
 
 					struct mkgui_listview_data *lv = find_listv_data(ctx, dcid);
 					if(lv) {
@@ -6042,13 +6045,13 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 						ev->id = ctx->drag_scrollbar_id;
 						ev->value = sbd ? sbd->value : 0;
 						ctx->drag_scrollbar_id = 0;
-						dirty_all(ctx);
+						dirty_widget(ctx, (uint32_t)dsi);
 						return 1;
 					}
 				}
 				ctx->drag_scrollbar_id = 0;
 				if(was_press) {
-					dirty_all(ctx);
+					dirty_widget_id(ctx, was_press);
 				}
 
 				if(was_press) {

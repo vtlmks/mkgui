@@ -252,7 +252,7 @@ MKGUI_API void mkgui_meter_setup(struct mkgui_ctx *ctx, uint32_t id, int32_t max
 		md->value = 0;
 		md->zone_t1 = max_val * 75 / 100;
 		md->zone_t2 = max_val * 90 / 100;
-		dirty_all(ctx);
+		dirty_widget_id(ctx, id);
 	}
 }
 
@@ -268,7 +268,7 @@ MKGUI_API void mkgui_meter_set(struct mkgui_ctx *ctx, uint32_t id, int32_t value
 		if(md->value > md->max_val) {
 			md->value = md->max_val;
 		}
-		dirty_all(ctx);
+		dirty_widget_id(ctx, id);
 	}
 }
 
@@ -290,7 +290,7 @@ MKGUI_API void mkgui_meter_set_range(struct mkgui_ctx *ctx, uint32_t id, int32_t
 	if(md->value > md->max_val) {
 		md->value = md->max_val;
 	}
-	dirty_all(ctx);
+	dirty_widget_id(ctx, id);
 }
 
 // [=]===^=[ mkgui_meter_get_range ]================================[=]
@@ -314,5 +314,5 @@ MKGUI_API void mkgui_meter_set_zones(struct mkgui_ctx *ctx, uint32_t id, int32_t
 	md->zone_c1 = c1;
 	md->zone_c2 = c2;
 	md->zone_c3 = c3;
-	dirty_all(ctx);
+	dirty_widget_id(ctx, id);
 }

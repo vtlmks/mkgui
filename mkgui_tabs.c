@@ -231,7 +231,7 @@ MKGUI_API void mkgui_tabs_set_text(struct mkgui_ctx *ctx, uint32_t tabs_id, uint
 	}
 	strncpy(w->label, text, MKGUI_MAX_TEXT - 1);
 	w->label[MKGUI_MAX_TEXT - 1] = '\0';
-	dirty_all(ctx);
+	dirty_widget_id(ctx, tabs_id);
 }
 
 // [=]===^=[ mkgui_tabs_get_text ]==================================[=]

@@ -121,7 +121,7 @@ MKGUI_API void mkgui_progress_setup(struct mkgui_ctx *ctx, uint32_t id, int32_t 
 	if(pd) {
 		pd->max_val = max_val;
 		pd->value = 0;
-		dirty_all(ctx);
+		dirty_widget_id(ctx, id);
 	}
 }
 
@@ -137,7 +137,7 @@ MKGUI_API void mkgui_progress_set(struct mkgui_ctx *ctx, uint32_t id, int32_t va
 		if(pd->value > pd->max_val) {
 			pd->value = pd->max_val;
 		}
-		dirty_all(ctx);
+		dirty_widget_id(ctx, id);
 	}
 }
 
@@ -159,7 +159,7 @@ MKGUI_API void mkgui_progress_set_range(struct mkgui_ctx *ctx, uint32_t id, int3
 	if(pd->value > pd->max_val) {
 		pd->value = pd->max_val;
 	}
-	dirty_all(ctx);
+	dirty_widget_id(ctx, id);
 }
 
 // [=]===^=[ mkgui_progress_get_range ]=============================[=]
@@ -177,6 +177,6 @@ MKGUI_API void mkgui_progress_set_color(struct mkgui_ctx *ctx, uint32_t id, uint
 	struct mkgui_progress_data *pd = find_progress_data(ctx, id);
 	if(pd) {
 		pd->color = color;
-		dirty_all(ctx);
+		dirty_widget_id(ctx, id);
 	}
 }
