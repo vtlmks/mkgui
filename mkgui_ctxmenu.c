@@ -1,10 +1,6 @@
 // Copyright (c) 2026, Peter Fors
 // SPDX-License-Identifier: MIT
 
-#define MKGUI_CTXMENU_SEP_HEIGHT 10
-#define MKGUI_CTXMENU_PAD        4
-#define MKGUI_CTXMENU_ICON_W     20
-
 // [=]===^=[ ctxmenu_item_count_nonsep ]============================[=]
 static uint32_t ctxmenu_item_count_nonsep(struct mkgui_ctx *ctx) {
 	uint32_t count = 0;
@@ -18,17 +14,22 @@ static uint32_t ctxmenu_item_count_nonsep(struct mkgui_ctx *ctx) {
 
 // [=]===^=[ ctxmenu_metrics ]=====================================[=]
 static void ctxmenu_metrics(struct mkgui_ctx *ctx, int32_t *out_w, int32_t *out_h) {
-	int32_t max_w = 120;
+	int32_t sep_h = sc(ctx, 10);
+	int32_t pad = sc(ctx, 4);
+	int32_t icon_w = sc(ctx, 20);
+	int32_t rpad = sc(ctx, 8);
+	int32_t min_w = sc(ctx, 120);
+	int32_t max_w = min_w;
 	int32_t total_h = 0;
 	uint32_t has_icon = 0;
 
 	for(uint32_t i = 0; i < ctx->ctxmenu_count; ++i) {
 		struct mkgui_ctxmenu_item *it = &ctx->ctxmenu_items[i];
 		if(it->flags & MKGUI_SEPARATOR) {
-			total_h += MKGUI_CTXMENU_SEP_HEIGHT;
+			total_h += sep_h;
 		} else {
-			total_h += MKGUI_ROW_HEIGHT;
-			int32_t tw = text_width(ctx, it->label) + MKGUI_CTXMENU_ICON_W + MKGUI_CTXMENU_PAD * 2 + 8;
+			total_h += ctx->row_height;
+			int32_t tw = text_width(ctx, it->label) + icon_w + pad * 2 + rpad;
 			if(tw > max_w) {
 				max_w = tw;
 			}
@@ -44,11 +45,12 @@ static void ctxmenu_metrics(struct mkgui_ctx *ctx, int32_t *out_w, int32_t *out_
 
 // [=]===^=[ ctxmenu_hit_item ]====================================[=]
 static int32_t ctxmenu_hit_item(struct mkgui_ctx *ctx, int32_t local_y) {
+	int32_t sep_h = sc(ctx, 10);
 	int32_t iy = 1;
 	int32_t idx = 0;
 	for(uint32_t i = 0; i < ctx->ctxmenu_count; ++i) {
 		struct mkgui_ctxmenu_item *it = &ctx->ctxmenu_items[i];
-		int32_t rh = (it->flags & MKGUI_SEPARATOR) ? MKGUI_CTXMENU_SEP_HEIGHT : MKGUI_ROW_HEIGHT;
+		int32_t rh = (it->flags & MKGUI_SEPARATOR) ? sep_h : ctx->row_height;
 		if(local_y >= iy && local_y < iy + rh) {
 			if(it->flags & MKGUI_SEPARATOR) {
 				return -1;
@@ -98,24 +100,35 @@ static void render_ctxmenu_popup(struct mkgui_ctx *ctx, struct mkgui_popup *p, i
 
 	draw_rounded_rect(p->pixels, p->w, p->h, 0, 0, p->w, p->h, ctx->theme.menu_bg, ctx->theme.widget_border, ctx->theme.corner_radius);
 
+	int32_t sep_h = sc(ctx, 10);
+	int32_t pad = sc(ctx, 4);
+	int32_t icon_w = sc(ctx, 20);
+	int32_t check_off = sc(ctx, 2);
+	int32_t check_sz = sc(ctx, 9);
+	int32_t check_half = sc(ctx, 4);
+	int32_t radio_off = sc(ctx, 6);
+	int32_t radio_r_out = sc(ctx, 5);
+	int32_t radio_r_mid = sc(ctx, 4);
+	int32_t radio_r_in = sc(ctx, 3);
+
 	int32_t iy = 1;
 	for(uint32_t i = 0; i < ctx->ctxmenu_count; ++i) {
 		struct mkgui_ctxmenu_item *it = &ctx->ctxmenu_items[i];
 
 		if(it->flags & MKGUI_SEPARATOR) {
-			draw_hline(p->pixels, p->w, p->h, MKGUI_CTXMENU_PAD + 1, iy + MKGUI_CTXMENU_SEP_HEIGHT / 2, p->w - MKGUI_CTXMENU_PAD * 2 - 2, ctx->theme.widget_border);
-			iy += MKGUI_CTXMENU_SEP_HEIGHT;
+			draw_hline(p->pixels, p->w, p->h, pad + 1, iy + sep_h / 2, p->w - pad * 2 - 2, ctx->theme.widget_border);
+			iy += sep_h;
 
 		} else {
 			uint32_t bg = ((int32_t)i == hover_item) ? ctx->theme.menu_hover : ctx->theme.menu_bg;
 			uint32_t tc = (it->flags & MKGUI_DISABLED) ? ctx->theme.text_disabled : ctx->theme.text;
 
 			if((int32_t)i == hover_item && !(it->flags & MKGUI_DISABLED)) {
-				draw_rect_fill(p->pixels, p->w, p->h, MKGUI_CTXMENU_PAD, iy, p->w - MKGUI_CTXMENU_PAD * 2, MKGUI_ROW_HEIGHT, bg);
+				draw_rect_fill(p->pixels, p->w, p->h, pad, iy, p->w - pad * 2, ctx->row_height, bg);
 			}
 
-			int32_t ty = iy + (MKGUI_ROW_HEIGHT - ctx->font_height) / 2;
-			int32_t tx = MKGUI_CTXMENU_ICON_W + MKGUI_CTXMENU_PAD;
+			int32_t ty = iy + (ctx->row_height - ctx->font_height) / 2;
+			int32_t tx = icon_w + pad;
 			push_text_clip(p->x + tx, ty + p->y, it->label, tc, p->x + 1, p->y + 1, p->x + p->w - 1, p->y + p->h - 1);
 
 			int32_t icon_idx = -1;
@@ -124,13 +137,13 @@ static void render_ctxmenu_popup(struct mkgui_ctx *ctx, struct mkgui_popup *p, i
 			}
 
 			if(icon_idx >= 0) {
-				int32_t iy2 = iy + (MKGUI_ROW_HEIGHT - icons[icon_idx].h) / 2;
-				draw_icon_popup(p, &icons[icon_idx], MKGUI_CTXMENU_PAD, iy2);
+				int32_t iy2 = iy + (ctx->row_height - icons[icon_idx].h) / 2;
+				draw_icon_popup(p, &icons[icon_idx], pad, iy2);
 
 			} else if(it->flags & MKGUI_MENU_CHECK) {
-				int32_t bx = MKGUI_CTXMENU_PAD + 2;
-				int32_t by = iy + MKGUI_ROW_HEIGHT / 2 - 4;
-				draw_rect_border(p->pixels, p->w, p->h, bx, by, 9, 9, tc);
+				int32_t bx = pad + check_off;
+				int32_t by = iy + ctx->row_height / 2 - check_half;
+				draw_rect_border(p->pixels, p->w, p->h, bx, by, check_sz, check_sz, tc);
 				if(it->flags & MKGUI_CHECKED) {
 					draw_pixel(p->pixels, p->w, p->h, bx + 2, by + 4, tc);
 					draw_pixel(p->pixels, p->w, p->h, bx + 3, by + 5, tc);
@@ -146,16 +159,16 @@ static void render_ctxmenu_popup(struct mkgui_ctx *ctx, struct mkgui_popup *p, i
 				}
 
 			} else if(it->flags & MKGUI_MENU_RADIO) {
-				int32_t cx = MKGUI_CTXMENU_PAD + 6;
-				int32_t cy = iy + MKGUI_ROW_HEIGHT / 2;
+				int32_t cx = pad + radio_off;
+				int32_t cy = iy + ctx->row_height / 2;
 				uint32_t rbg = ((int32_t)i == hover_item && !(it->flags & MKGUI_DISABLED)) ? bg : ctx->theme.menu_bg;
-				draw_aa_circle_ring(p->pixels, p->w, p->h, cx, cy, 5, 4, rbg, tc);
+				draw_aa_circle_ring(p->pixels, p->w, p->h, cx, cy, radio_r_out, radio_r_mid, rbg, tc);
 				if(it->flags & MKGUI_CHECKED) {
-					draw_aa_circle_fill(p->pixels, p->w, p->h, cx, cy, 3, tc);
+					draw_aa_circle_fill(p->pixels, p->w, p->h, cx, cy, radio_r_in, tc);
 				}
 			}
 
-			iy += MKGUI_ROW_HEIGHT;
+			iy += ctx->row_height;
 		}
 	}
 

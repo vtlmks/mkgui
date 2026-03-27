@@ -50,7 +50,7 @@ static int32_t listview_header_hit(struct mkgui_ctx *ctx, uint32_t idx, int32_t 
 		return -1;
 	}
 
-	int32_t hh = lv->header_height > 0 ? lv->header_height : MKGUI_ROW_HEIGHT;
+	int32_t hh = lv->header_height > 0 ? lv->header_height : ctx->row_height;
 	if(my < ry || my >= ry + hh) {
 		return -1;
 	}
@@ -76,15 +76,16 @@ static int32_t listview_divider_hit(struct mkgui_ctx *ctx, uint32_t idx, int32_t
 		return -1;
 	}
 
-	int32_t hh = lv->header_height > 0 ? lv->header_height : MKGUI_ROW_HEIGHT;
+	int32_t hh = lv->header_height > 0 ? lv->header_height : ctx->row_height;
 	if(my < ry || my >= ry + hh) {
 		return -1;
 	}
 
+	int32_t div_hit = sc(ctx, 3);
 	int32_t cx = rx - lv->scroll_x;
 	for(uint32_t d = 0; d < lv->col_count; ++d) {
 		cx += lv->columns[lv->col_order[d]].width;
-		if(mx >= cx - 3 && mx <= cx + 3) {
+		if(mx >= cx - div_hit && mx <= cx + div_hit) {
 			return (int32_t)d;
 		}
 	}
@@ -136,6 +137,7 @@ static void format_date(const char *timestamp_str, char *buf, uint32_t buf_size)
 
 // [=]===^=[ render_cell ]========================================[=]
 static void render_cell(struct mkgui_ctx *ctx, struct mkgui_listview_data *lv, uint32_t col, const char *cell_buf, int32_t cx, int32_t ty, int32_t col_w, int32_t clip_left, int32_t clip_right, int32_t clip_top, int32_t clip_bottom, uint32_t tc, int32_t row_y) {
+	int32_t cell_pad = sc(ctx, 4);
 	switch(lv->columns[col].cell_type) {
 		case MKGUI_CELL_PROGRESS: {
 			int32_t val = 0;
@@ -156,10 +158,11 @@ static void render_cell(struct mkgui_ctx *ctx, struct mkgui_listview_data *lv, u
 			if(val > max) {
 				val = max;
 			}
-			int32_t bar_x = cx + 4;
-			int32_t bar_w = col_w - 8;
-			int32_t bar_h = MKGUI_ROW_HEIGHT - 6;
-			int32_t bar_y = row_y + 3;
+			int32_t bar_pad = sc(ctx, 3);
+			int32_t bar_x = cx + cell_pad;
+			int32_t bar_w = col_w - cell_pad * 2;
+			int32_t bar_h = ctx->row_height - bar_pad * 2;
+			int32_t bar_y = row_y + bar_pad;
 			if(bar_w > 0 && bar_h > 0) {
 				int32_t dx = bar_x < clip_left ? clip_left : bar_x;
 				int32_t dr = bar_x + bar_w > clip_right ? clip_right : bar_x + bar_w;
@@ -195,14 +198,14 @@ static void render_cell(struct mkgui_ctx *ctx, struct mkgui_listview_data *lv, u
 				icon_name[len] = '\0';
 				int32_t ii = icon_resolve(icon_name);
 				if(ii >= 0) {
-					int32_t icon_y = row_y + (MKGUI_ROW_HEIGHT - icons[ii].h) / 2;
-					draw_icon(ctx->pixels, ctx->win_w, ctx->win_h, &icons[ii], cx + 4, icon_y, clip_left, clip_top, clip_right, clip_bottom);
-					push_text_clip(cx + 4 + icons[ii].w + 4, ty, tab + 1, tc, clip_left, clip_top, clip_right, clip_bottom);
+					int32_t icon_y = row_y + (ctx->row_height - icons[ii].h) / 2;
+					draw_icon(ctx->pixels, ctx->win_w, ctx->win_h, &icons[ii], cx + cell_pad, icon_y, clip_left, clip_top, clip_right, clip_bottom);
+					push_text_clip(cx + cell_pad + icons[ii].w + cell_pad, ty, tab + 1, tc, clip_left, clip_top, clip_right, clip_bottom);
 				} else {
-					push_text_clip(cx + 4, ty, tab + 1, tc, clip_left, clip_top, clip_right, clip_bottom);
+					push_text_clip(cx + cell_pad, ty, tab + 1, tc, clip_left, clip_top, clip_right, clip_bottom);
 				}
 			} else {
-				push_text_clip(cx + 4, ty, cell_buf, tc, clip_left, clip_top, clip_right, clip_bottom);
+				push_text_clip(cx + cell_pad, ty, cell_buf, tc, clip_left, clip_top, clip_right, clip_bottom);
 			}
 		} break;
 
@@ -211,35 +214,37 @@ static void render_cell(struct mkgui_ctx *ctx, struct mkgui_listview_data *lv, u
 			int64_t bytes = strtoll(cell_buf, NULL, 10);
 			format_size(bytes, fmt, sizeof(fmt));
 			int32_t tw = text_width(ctx, fmt);
-			int32_t tx = cx + col_w - tw - 4;
+			int32_t tx = cx + col_w - tw - cell_pad;
 			push_text_clip(tx, ty, fmt, tc, clip_left, clip_top, clip_right, clip_bottom);
 		} break;
 
 		case MKGUI_CELL_DATE: {
 			char fmt[32];
 			format_date(cell_buf, fmt, sizeof(fmt));
-			push_text_clip(cx + 4, ty, fmt, tc, clip_left, clip_top, clip_right, clip_bottom);
+			push_text_clip(cx + cell_pad, ty, fmt, tc, clip_left, clip_top, clip_right, clip_bottom);
 		} break;
 
 		case MKGUI_CELL_CHECKBOX: {
 			uint32_t checked = (cell_buf[0] == '1');
-			int32_t box_size = 14;
+			int32_t box_size = sc(ctx, 14);
 			int32_t bx = cx + (col_w - box_size) / 2;
-			int32_t by = row_y + (MKGUI_ROW_HEIGHT - box_size) / 2;
+			int32_t by = row_y + (ctx->row_height - box_size) / 2;
 			if(bx + box_size > clip_left && bx < clip_right && by + box_size > clip_top && by < clip_bottom) {
 				uint32_t bg = checked ? ctx->theme.splitter : ctx->theme.input_bg;
 				draw_patch(ctx, MKGUI_STYLE_SUNKEN, bx, by, box_size, box_size, bg, ctx->theme.widget_border);
 				if(checked) {
 					int32_t ccx = bx + box_size / 2;
 					int32_t ccy = by + box_size / 2;
-					draw_aa_line(ctx->pixels, ctx->win_w, ctx->win_h, ccx - 3, ccy - 1, ccx - 1, ccy + 2, ctx->theme.sel_text, 2);
-					draw_aa_line(ctx->pixels, ctx->win_w, ctx->win_h, ccx - 1, ccy + 2, ccx + 4, ccy - 3, ctx->theme.sel_text, 2);
+					int32_t ck1 = sc(ctx, 3);
+					int32_t ck2 = sc(ctx, 2);
+					draw_aa_line(ctx->pixels, ctx->win_w, ctx->win_h, ccx - ck1, ccy - 1, ccx - 1, ccy + ck2, ctx->theme.sel_text, 2);
+					draw_aa_line(ctx->pixels, ctx->win_w, ctx->win_h, ccx - 1, ccy + ck2, ccx + cell_pad, ccy - ck1, ctx->theme.sel_text, 2);
 				}
 			}
 		} break;
 
 		default: {
-			push_text_clip(cx + 4, ty, cell_buf, tc, clip_left, clip_top, clip_right, clip_bottom);
+			push_text_clip(cx + cell_pad, ty, cell_buf, tc, clip_left, clip_top, clip_right, clip_bottom);
 		} break;
 	}
 }
@@ -251,6 +256,7 @@ static void listview_autosize_col(struct mkgui_ctx *ctx, struct mkgui_listview_d
 	}
 
 	int32_t max_w = text_width(ctx, lv->columns[col].label);
+	int32_t cell_pad = sc(ctx, 4);
 
 	char buf[MKGUI_MAX_TEXT];
 	for(uint32_t row = 0; row < lv->row_count; ++row) {
@@ -261,7 +267,7 @@ static void listview_autosize_col(struct mkgui_ctx *ctx, struct mkgui_listview_d
 		switch(lv->columns[col].cell_type) {
 			case MKGUI_CELL_ICON_TEXT: {
 				const char *tab = strchr(buf, '\t');
-				cell_w = text_width(ctx, tab ? tab + 1 : buf) + MKGUI_ICON_SIZE + 4;
+				cell_w = text_width(ctx, tab ? tab + 1 : buf) + ctx->icon_size + cell_pad;
 			} break;
 
 			case MKGUI_CELL_SIZE: {
@@ -277,7 +283,7 @@ static void listview_autosize_col(struct mkgui_ctx *ctx, struct mkgui_listview_d
 			} break;
 
 			case MKGUI_CELL_CHECKBOX: {
-				cell_w = 14;
+				cell_w = sc(ctx, 14);
 			} break;
 
 			case MKGUI_CELL_PROGRESS: {
@@ -293,7 +299,7 @@ static void listview_autosize_col(struct mkgui_ctx *ctx, struct mkgui_listview_d
 		}
 	}
 
-	lv->columns[col].width = max_w + 12;
+	lv->columns[col].width = max_w + sc(ctx, 12);
 	dirty_all(ctx);
 }
 
@@ -307,8 +313,8 @@ static int32_t listview_total_col_w(struct mkgui_listview_data *lv) {
 }
 
 // [=]===^=[ listview_clamp_scroll_y ]=============================[=]
-static void listview_clamp_scroll_y(struct mkgui_listview_data *lv, int32_t content_h) {
-	int32_t total = (int32_t)lv->row_count * MKGUI_ROW_HEIGHT;
+static void listview_clamp_scroll_y(struct mkgui_ctx *ctx, struct mkgui_listview_data *lv, int32_t content_h) {
+	int32_t total = (int32_t)lv->row_count * ctx->row_height;
 	int32_t max_scroll = total - content_h;
 	if(max_scroll < 0) {
 		max_scroll = 0;
@@ -352,8 +358,8 @@ static void render_listview(struct mkgui_ctx *ctx, uint32_t idx) {
 	uint32_t focused = (ctx->focus_id == w->id);
 	draw_patch(ctx, MKGUI_STYLE_SUNKEN, rx, ry, rw, rh, ctx->theme.input_bg, focused ? ctx->theme.splitter : ctx->theme.widget_border);
 
-	int32_t hh = lv->header_height > 0 ? lv->header_height : MKGUI_ROW_HEIGHT;
-	int32_t content_w = rw - 2 - MKGUI_SCROLLBAR_W;
+	int32_t hh = lv->header_height > 0 ? lv->header_height : ctx->row_height;
+	int32_t content_w = rw - 2 - ctx->scrollbar_w;
 	int32_t clip_left = rx + 1;
 	int32_t clip_right = rx + 1 + content_w;
 	int32_t total_col_w = listview_total_col_w(lv);
@@ -362,14 +368,20 @@ static void render_listview(struct mkgui_ctx *ctx, uint32_t idx) {
 	int32_t content_y = ry + hh + 1;
 	int32_t content_h = rh - hh - 2;
 	if(needs_hscroll) {
-		content_h -= MKGUI_SCROLLBAR_W;
+		content_h -= ctx->scrollbar_w;
 	}
 
 	listview_clamp_scroll_x(lv, content_w);
-	listview_clamp_scroll_y(lv, content_h);
+	listview_clamp_scroll_y(ctx, lv, content_h);
 	int32_t sx = lv->scroll_x;
 
 	draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, rx + 1, ry + 1, content_w, hh, ctx->theme.header_bg);
+
+	int32_t hdr_pad = sc(ctx, 4);
+	int32_t sort_icon_w = sc(ctx, 12);
+	int32_t sort_arr_w = sc(ctx, 7);
+	int32_t sort_arr_h = sc(ctx, 4);
+	int32_t sort_arr_off = sc(ctx, 2);
 
 	int32_t cx = rx + 1 - sx;
 	for(uint32_t d = 0; d < lv->col_count; ++d) {
@@ -385,19 +397,19 @@ static void render_listview(struct mkgui_ctx *ctx, uint32_t idx) {
 		}
 		if(col_left < col_right) {
 			int32_t ty = ry + (hh - ctx->font_height) / 2;
-			push_text_clip(cx + 4, ty, lv->columns[c].label, ctx->theme.text, col_left, ry, col_right, ry + hh);
+			push_text_clip(cx + hdr_pad, ty, lv->columns[c].label, ctx->theme.text, col_left, ry, col_right, ry + hh);
 
 			if(lv->sort_col == (int32_t)c) {
-				int32_t ax = cx + cw - 12;
+				int32_t ax = cx + cw - sort_icon_w;
 				int32_t ay = ry + hh / 2;
-				if(ax >= clip_left && ax + 7 <= clip_right) {
+				if(ax >= clip_left && ax + sort_arr_w <= clip_right) {
 					if(lv->sort_dir > 0) {
-						for(uint32_t j = 0; j < 4; ++j) {
-							draw_hline(ctx->pixels, ctx->win_w, ctx->win_h, ax + (int32_t)j, ay - (int32_t)j + 2, 7 - (int32_t)j * 2, ctx->theme.text);
+						for(uint32_t j = 0; j < (uint32_t)sort_arr_h; ++j) {
+							draw_hline(ctx->pixels, ctx->win_w, ctx->win_h, ax + (int32_t)j, ay - (int32_t)j + sort_arr_off, sort_arr_w - (int32_t)j * 2, ctx->theme.text);
 						}
 					} else {
-						for(uint32_t j = 0; j < 4; ++j) {
-							draw_hline(ctx->pixels, ctx->win_w, ctx->win_h, ax + (int32_t)j, ay + (int32_t)j - 2, 7 - (int32_t)j * 2, ctx->theme.text);
+						for(uint32_t j = 0; j < (uint32_t)sort_arr_h; ++j) {
+							draw_hline(ctx->pixels, ctx->win_w, ctx->win_h, ax + (int32_t)j, ay + (int32_t)j - sort_arr_off, sort_arr_w - (int32_t)j * 2, ctx->theme.text);
 						}
 					}
 				}
@@ -419,13 +431,14 @@ static void render_listview(struct mkgui_ctx *ctx, uint32_t idx) {
 				ix += lv->columns[lv->col_order[d]].width;
 			}
 			if(ix >= clip_left && ix <= clip_right) {
-				draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, ix - 1, ry + 1, 3, hh, ctx->theme.splitter);
+				int32_t ind_w = sc(ctx, 3);
+				draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, ix - 1, ry + 1, ind_w, hh, ctx->theme.splitter);
 			}
 		}
 	}
 
-	int32_t visible_rows = content_h / MKGUI_ROW_HEIGHT;
-	int32_t first_row = lv->scroll_y / MKGUI_ROW_HEIGHT;
+	int32_t visible_rows = content_h / ctx->row_height;
+	int32_t first_row = lv->scroll_y / ctx->row_height;
 
 	int32_t clip_top = content_y;
 	int32_t clip_bottom = content_y + content_h;
@@ -433,14 +446,14 @@ static void render_listview(struct mkgui_ctx *ctx, uint32_t idx) {
 	char cell_buf[MKGUI_MAX_TEXT];
 	for(uint32_t r = 0; r <= (uint32_t)(visible_rows + 1) && (first_row + (int32_t)r) < (int32_t)lv->row_count; ++r) {
 		int32_t row_idx = first_row + (int32_t)r;
-		int32_t row_y = content_y + (int32_t)r * MKGUI_ROW_HEIGHT - (lv->scroll_y % MKGUI_ROW_HEIGHT);
+		int32_t row_y = content_y + (int32_t)r * ctx->row_height - (lv->scroll_y % ctx->row_height);
 
-		if(row_y >= clip_bottom || row_y + MKGUI_ROW_HEIGHT <= clip_top) {
+		if(row_y >= clip_bottom || row_y + ctx->row_height <= clip_top) {
 			continue;
 		}
 
 		int32_t draw_y = row_y < clip_top ? clip_top : row_y;
-		int32_t draw_end = row_y + MKGUI_ROW_HEIGHT;
+		int32_t draw_end = row_y + ctx->row_height;
 		if(draw_end > clip_bottom) {
 			draw_end = clip_bottom;
 		}
@@ -458,7 +471,7 @@ static void render_listview(struct mkgui_ctx *ctx, uint32_t idx) {
 		}
 		draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, rx + 1, draw_y, content_w, draw_h, row_bg);
 
-		int32_t ty = row_y + (MKGUI_ROW_HEIGHT - ctx->font_height) / 2;
+		int32_t ty = row_y + (ctx->row_height - ctx->font_height) / 2;
 		cx = rx + 1 - sx;
 		for(uint32_t d = 0; d < lv->col_count; ++d) {
 			uint32_t c = lv->col_order[d];
@@ -488,32 +501,35 @@ static void render_listview(struct mkgui_ctx *ctx, uint32_t idx) {
 		}
 	}
 
+	int32_t sb_inset = sc(ctx, 2);
+	int32_t min_thumb = sc(ctx, 20);
+
 	if(lv->row_count > 0) {
-		int32_t sb_x = rx + rw - MKGUI_SCROLLBAR_W - 1;
+		int32_t sb_x = rx + rw - ctx->scrollbar_w - 1;
 		int32_t sb_y = content_y;
 		int32_t sb_h = content_h;
-		draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, sb_x, sb_y, MKGUI_SCROLLBAR_W, sb_h, ctx->theme.scrollbar_bg);
+		draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, sb_x, sb_y, ctx->scrollbar_w, sb_h, ctx->theme.scrollbar_bg);
 
-		int32_t total_h = (int32_t)lv->row_count * MKGUI_ROW_HEIGHT;
+		int32_t total_h = (int32_t)lv->row_count * ctx->row_height;
 		if(total_h > sb_h) {
 			int32_t thumb_h = sb_h * sb_h / total_h;
-			if(thumb_h < 20) {
-				thumb_h = 20;
+			if(thumb_h < min_thumb) {
+				thumb_h = min_thumb;
 			}
 			int32_t thumb_y = sb_y + (int32_t)((int64_t)lv->scroll_y * (sb_h - thumb_h) / (total_h - sb_h));
 			uint32_t thumb_color = (ctx->drag_scrollbar_id == w->id && !ctx->drag_scrollbar_horiz) ? ctx->theme.widget_hover : ctx->theme.scrollbar_thumb;
-			draw_rounded_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, sb_x + 2, thumb_y, MKGUI_SCROLLBAR_W - 4, thumb_h, thumb_color, ctx->theme.corner_radius);
+			draw_rounded_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, sb_x + sb_inset, thumb_y, ctx->scrollbar_w - sb_inset * 2, thumb_h, thumb_color, ctx->theme.corner_radius);
 		}
 	}
 
 	if(needs_hscroll) {
 		int32_t hsb_x = rx + 1;
-		int32_t hsb_y = ry + rh - MKGUI_SCROLLBAR_W - 1;
+		int32_t hsb_y = ry + rh - ctx->scrollbar_w - 1;
 		int32_t hsb_w = content_w;
-		draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, hsb_x, hsb_y, hsb_w, MKGUI_SCROLLBAR_W, ctx->theme.scrollbar_bg);
+		draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, hsb_x, hsb_y, hsb_w, ctx->scrollbar_w, ctx->theme.scrollbar_bg);
 		int32_t thumb_w = (int32_t)((int64_t)hsb_w * content_w / total_col_w);
-		if(thumb_w < 20) {
-			thumb_w = 20;
+		if(thumb_w < min_thumb) {
+			thumb_w = min_thumb;
 		}
 		int32_t max_sx = total_col_w - content_w;
 		int32_t thumb_x = hsb_x;
@@ -521,17 +537,17 @@ static void render_listview(struct mkgui_ctx *ctx, uint32_t idx) {
 			thumb_x = hsb_x + (int32_t)((int64_t)sx * (hsb_w - thumb_w) / max_sx);
 		}
 		uint32_t hthumb_color = (ctx->drag_scrollbar_id == w->id && ctx->drag_scrollbar_horiz) ? ctx->theme.widget_hover : ctx->theme.scrollbar_thumb;
-		draw_rounded_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, thumb_x, hsb_y + 2, thumb_w, MKGUI_SCROLLBAR_W - 4, hthumb_color, ctx->theme.corner_radius);
+		draw_rounded_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, thumb_x, hsb_y + sb_inset, thumb_w, ctx->scrollbar_w - sb_inset * 2, hthumb_color, ctx->theme.corner_radius);
 	}
 
 	if(lv->drag_active && lv->drag_target >= 0) {
-		int32_t dhh = lv->header_height > 0 ? lv->header_height : MKGUI_ROW_HEIGHT;
+		int32_t dhh = lv->header_height > 0 ? lv->header_height : ctx->row_height;
 		int32_t dcy = ry + dhh + 1;
 		int32_t tgt_y;
 		if(lv->drag_target > lv->drag_source) {
-			tgt_y = dcy + (lv->drag_target + 1) * MKGUI_ROW_HEIGHT - lv->scroll_y;
+			tgt_y = dcy + (lv->drag_target + 1) * ctx->row_height - lv->scroll_y;
 		} else {
-			tgt_y = dcy + lv->drag_target * MKGUI_ROW_HEIGHT - lv->scroll_y;
+			tgt_y = dcy + lv->drag_target * ctx->row_height - lv->scroll_y;
 		}
 		if(tgt_y >= dcy && tgt_y <= ry + rh) {
 			draw_hline(ctx->pixels, ctx->win_w, ctx->win_h, rx + 1, tgt_y - 1, content_w, ctx->theme.accent);
@@ -553,23 +569,23 @@ static int32_t listview_row_hit(struct mkgui_ctx *ctx, uint32_t idx, int32_t mx,
 		return -1;
 	}
 
-	int32_t hh = lv->header_height > 0 ? lv->header_height : MKGUI_ROW_HEIGHT;
+	int32_t hh = lv->header_height > 0 ? lv->header_height : ctx->row_height;
 	int32_t content_y = ry + hh + 1;
-	int32_t sb_x = rx + rw - MKGUI_SCROLLBAR_W - 1;
+	int32_t sb_x = rx + rw - ctx->scrollbar_w - 1;
 
 	if(mx >= sb_x) {
 		return -1;
 	}
 	int32_t content_h_bottom = ry + rh;
-	int32_t tcw = rw - 2 - MKGUI_SCROLLBAR_W;
+	int32_t tcw = rw - 2 - ctx->scrollbar_w;
 	if(listview_total_col_w(lv) > tcw) {
-		content_h_bottom -= MKGUI_SCROLLBAR_W;
+		content_h_bottom -= ctx->scrollbar_w;
 	}
 	if(my < content_y || my >= content_h_bottom) {
 		return -1;
 	}
 
-	int32_t row = (my - content_y + lv->scroll_y) / MKGUI_ROW_HEIGHT;
+	int32_t row = (my - content_y + lv->scroll_y) / ctx->row_height;
 	if(row < 0 || row >= (int32_t)lv->row_count) {
 		return -1;
 	}
@@ -608,27 +624,28 @@ static uint32_t listview_scrollbar_hit(struct mkgui_ctx *ctx, uint32_t idx, int3
 		return 0;
 	}
 
-	int32_t hh = lv->header_height > 0 ? lv->header_height : MKGUI_ROW_HEIGHT;
-	int32_t sb_x = rx + rw - MKGUI_SCROLLBAR_W - 1;
+	int32_t hh = lv->header_height > 0 ? lv->header_height : ctx->row_height;
+	int32_t sb_x = rx + rw - ctx->scrollbar_w - 1;
 	int32_t sb_y = ry + hh + 1;
 	int32_t sb_h = rh - hh - 2;
-	int32_t content_w = rw - 2 - MKGUI_SCROLLBAR_W;
+	int32_t content_w = rw - 2 - ctx->scrollbar_w;
 	if(listview_total_col_w(lv) > content_w) {
-		sb_h -= MKGUI_SCROLLBAR_W;
+		sb_h -= ctx->scrollbar_w;
 	}
 
-	if(mx < sb_x || mx >= sb_x + MKGUI_SCROLLBAR_W || my < sb_y || my >= sb_y + sb_h) {
+	if(mx < sb_x || mx >= sb_x + ctx->scrollbar_w || my < sb_y || my >= sb_y + sb_h) {
 		return 0;
 	}
 
-	int32_t total_h = (int32_t)lv->row_count * MKGUI_ROW_HEIGHT;
+	int32_t total_h = (int32_t)lv->row_count * ctx->row_height;
 	if(total_h <= sb_h) {
 		return 1;
 	}
 
+	int32_t min_thumb = sc(ctx, 20);
 	int32_t thumb_h = sb_h * sb_h / total_h;
-	if(thumb_h < 20) {
-		thumb_h = 20;
+	if(thumb_h < min_thumb) {
+		thumb_h = min_thumb;
 	}
 	int32_t max_scroll = total_h - sb_h;
 	int32_t thumb_y = sb_y + (int32_t)((int64_t)lv->scroll_y * (sb_h - thumb_h) / max_scroll);
@@ -652,22 +669,23 @@ static int32_t listview_thumb_offset(struct mkgui_ctx *ctx, uint32_t idx, int32_
 	int32_t rw = ctx->rects[idx].w;
 	int32_t ry = ctx->rects[idx].y;
 	int32_t rh = ctx->rects[idx].h;
-	int32_t hh = lv->header_height > 0 ? lv->header_height : MKGUI_ROW_HEIGHT;
+	int32_t hh = lv->header_height > 0 ? lv->header_height : ctx->row_height;
 	int32_t sb_y = ry + hh + 1;
 	int32_t sb_h = rh - hh - 2;
-	int32_t cw = rw - 2 - MKGUI_SCROLLBAR_W;
+	int32_t cw = rw - 2 - ctx->scrollbar_w;
 	if(listview_total_col_w(lv) > cw) {
-		sb_h -= MKGUI_SCROLLBAR_W;
+		sb_h -= ctx->scrollbar_w;
 	}
 
-	int32_t total_h = (int32_t)lv->row_count * MKGUI_ROW_HEIGHT;
+	int32_t total_h = (int32_t)lv->row_count * ctx->row_height;
 	if(total_h <= sb_h) {
 		return 0;
 	}
 
+	int32_t min_thumb = sc(ctx, 20);
 	int32_t thumb_h = sb_h * sb_h / total_h;
-	if(thumb_h < 20) {
-		thumb_h = 20;
+	if(thumb_h < min_thumb) {
+		thumb_h = min_thumb;
 	}
 	int32_t max_scroll = total_h - sb_h;
 	int32_t thumb_y = sb_y + (int32_t)((int64_t)lv->scroll_y * (sb_h - thumb_h) / max_scroll);
@@ -683,14 +701,14 @@ static void listview_page_scroll(struct mkgui_ctx *ctx, uint32_t idx, int32_t di
 
 	int32_t rw = ctx->rects[idx].w;
 	int32_t rh = ctx->rects[idx].h;
-	int32_t hh = lv->header_height > 0 ? lv->header_height : MKGUI_ROW_HEIGHT;
+	int32_t hh = lv->header_height > 0 ? lv->header_height : ctx->row_height;
 	int32_t content_h = rh - hh - 2;
-	int32_t cw = rw - 2 - MKGUI_SCROLLBAR_W;
+	int32_t cw = rw - 2 - ctx->scrollbar_w;
 	if(listview_total_col_w(lv) > cw) {
-		content_h -= MKGUI_SCROLLBAR_W;
+		content_h -= ctx->scrollbar_w;
 	}
 
-	int32_t total_h = (int32_t)lv->row_count * MKGUI_ROW_HEIGHT;
+	int32_t total_h = (int32_t)lv->row_count * ctx->row_height;
 	int32_t max_scroll = total_h - content_h;
 	if(max_scroll < 0) {
 		max_scroll = 0;
@@ -722,15 +740,15 @@ static void listview_scroll_to_y(struct mkgui_ctx *ctx, uint32_t widget_id, int3
 	int32_t rw = ctx->rects[idx].w;
 	int32_t ry = ctx->rects[idx].y;
 	int32_t rh = ctx->rects[idx].h;
-	int32_t hh = lv->header_height > 0 ? lv->header_height : MKGUI_ROW_HEIGHT;
+	int32_t hh = lv->header_height > 0 ? lv->header_height : ctx->row_height;
 	int32_t content_y = ry + hh + 1;
 	int32_t content_h = rh - hh - 2;
-	int32_t cw = rw - 2 - MKGUI_SCROLLBAR_W;
+	int32_t cw = rw - 2 - ctx->scrollbar_w;
 	if(listview_total_col_w(lv) > cw) {
-		content_h -= MKGUI_SCROLLBAR_W;
+		content_h -= ctx->scrollbar_w;
 	}
 
-	int32_t total_h = (int32_t)lv->row_count * MKGUI_ROW_HEIGHT;
+	int32_t total_h = (int32_t)lv->row_count * ctx->row_height;
 	int32_t max_scroll = total_h - content_h;
 	if(max_scroll < 0) {
 		max_scroll = 0;
@@ -739,9 +757,10 @@ static void listview_scroll_to_y(struct mkgui_ctx *ctx, uint32_t widget_id, int3
 		return;
 	}
 
+	int32_t min_thumb = sc(ctx, 20);
 	int32_t thumb_h = content_h * content_h / total_h;
-	if(thumb_h < 20) {
-		thumb_h = 20;
+	if(thumb_h < min_thumb) {
+		thumb_h = min_thumb;
 	}
 	int32_t track = content_h - thumb_h;
 	if(track <= 0) {
@@ -771,23 +790,24 @@ static uint32_t listview_hscrollbar_hit(struct mkgui_ctx *ctx, uint32_t idx, int
 		return 0;
 	}
 
-	int32_t content_w = rw - 2 - MKGUI_SCROLLBAR_W;
+	int32_t content_w = rw - 2 - ctx->scrollbar_w;
 	int32_t total_col_w = listview_total_col_w(lv);
 	if(total_col_w <= content_w) {
 		return 0;
 	}
 
 	int32_t hsb_x = rx + 1;
-	int32_t hsb_y = ry + rh - MKGUI_SCROLLBAR_W - 1;
+	int32_t hsb_y = ry + rh - ctx->scrollbar_w - 1;
 	int32_t hsb_w = content_w;
 
-	if(mx < hsb_x || mx >= hsb_x + hsb_w || my < hsb_y || my >= hsb_y + MKGUI_SCROLLBAR_W) {
+	if(mx < hsb_x || mx >= hsb_x + hsb_w || my < hsb_y || my >= hsb_y + ctx->scrollbar_w) {
 		return 0;
 	}
 
+	int32_t min_thumb = sc(ctx, 20);
 	int32_t thumb_w = (int32_t)((int64_t)hsb_w * content_w / total_col_w);
-	if(thumb_w < 20) {
-		thumb_w = 20;
+	if(thumb_w < min_thumb) {
+		thumb_w = min_thumb;
 	}
 	int32_t max_sx = total_col_w - content_w;
 	int32_t thumb_x = hsb_x;
@@ -813,17 +833,18 @@ static int32_t listview_hthumb_offset(struct mkgui_ctx *ctx, uint32_t idx, int32
 
 	int32_t rx = ctx->rects[idx].x;
 	int32_t rw = ctx->rects[idx].w;
-	int32_t content_w = rw - 2 - MKGUI_SCROLLBAR_W;
+	int32_t content_w = rw - 2 - ctx->scrollbar_w;
 	int32_t total_col_w = listview_total_col_w(lv);
 	if(total_col_w <= content_w) {
 		return 0;
 	}
 
+	int32_t min_thumb = sc(ctx, 20);
 	int32_t hsb_x = rx + 1;
 	int32_t hsb_w = content_w;
 	int32_t thumb_w = (int32_t)((int64_t)hsb_w * content_w / total_col_w);
-	if(thumb_w < 20) {
-		thumb_w = 20;
+	if(thumb_w < min_thumb) {
+		thumb_w = min_thumb;
 	}
 	int32_t max_sx = total_col_w - content_w;
 	int32_t thumb_x = hsb_x + (int32_t)((int64_t)lv->scroll_x * (hsb_w - thumb_w) / max_sx);
@@ -844,18 +865,19 @@ static void listview_scroll_to_x(struct mkgui_ctx *ctx, uint32_t widget_id, int3
 
 	int32_t rx = ctx->rects[idx].x;
 	int32_t rw = ctx->rects[idx].w;
-	int32_t content_w = rw - 2 - MKGUI_SCROLLBAR_W;
+	int32_t content_w = rw - 2 - ctx->scrollbar_w;
 	int32_t total_col_w = listview_total_col_w(lv);
 	int32_t max_sx = total_col_w - content_w;
 	if(max_sx <= 0) {
 		return;
 	}
 
+	int32_t min_thumb = sc(ctx, 20);
 	int32_t hsb_x = rx + 1;
 	int32_t hsb_w = content_w;
 	int32_t thumb_w = (int32_t)((int64_t)hsb_w * content_w / total_col_w);
-	if(thumb_w < 20) {
-		thumb_w = 20;
+	if(thumb_w < min_thumb) {
+		thumb_w = min_thumb;
 	}
 	int32_t track = hsb_w - thumb_w;
 	if(track <= 0) {
@@ -885,10 +907,10 @@ static uint32_t handle_listview_key(struct mkgui_ctx *ctx, struct mkgui_event *e
 	}
 
 	int32_t rh = ctx->rects[idx].h;
-	int32_t hh = lv->header_height > 0 ? lv->header_height : MKGUI_ROW_HEIGHT;
+	int32_t hh = lv->header_height > 0 ? lv->header_height : ctx->row_height;
 	int32_t content_h = rh - hh - 2;
-	int32_t visible_rows = content_h / MKGUI_ROW_HEIGHT;
-	int32_t total_h = (int32_t)lv->row_count * MKGUI_ROW_HEIGHT;
+	int32_t visible_rows = content_h / ctx->row_height;
+	int32_t total_h = (int32_t)lv->row_count * ctx->row_height;
 	int32_t max_scroll = total_h - content_h;
 	if(max_scroll < 0) {
 		max_scroll = 0;
@@ -907,7 +929,7 @@ static uint32_t handle_listview_key(struct mkgui_ctx *ctx, struct mkgui_event *e
 	if(ks == MKGUI_KEY_UP) {
 		if(lv->selected_row > 0) {
 			--lv->selected_row;
-			int32_t row_y = lv->selected_row * MKGUI_ROW_HEIGHT;
+			int32_t row_y = lv->selected_row * ctx->row_height;
 			if(row_y < lv->scroll_y) {
 				lv->scroll_y = row_y;
 			}
@@ -921,7 +943,7 @@ static uint32_t handle_listview_key(struct mkgui_ctx *ctx, struct mkgui_event *e
 	} else if(ks == MKGUI_KEY_DOWN) {
 		if(lv->selected_row < (int32_t)lv->row_count - 1) {
 			++lv->selected_row;
-			int32_t row_bottom = (lv->selected_row + 1) * MKGUI_ROW_HEIGHT;
+			int32_t row_bottom = (lv->selected_row + 1) * ctx->row_height;
 			if(row_bottom > lv->scroll_y + content_h) {
 				lv->scroll_y = row_bottom - content_h;
 			}
@@ -937,7 +959,7 @@ static uint32_t handle_listview_key(struct mkgui_ctx *ctx, struct mkgui_event *e
 		if(lv->selected_row < 0) {
 			lv->selected_row = 0;
 		}
-		lv->scroll_y = lv->selected_row * MKGUI_ROW_HEIGHT;
+		lv->scroll_y = lv->selected_row * ctx->row_height;
 		if(lv->scroll_y > max_scroll) {
 			lv->scroll_y = max_scroll;
 		}
@@ -952,7 +974,7 @@ static uint32_t handle_listview_key(struct mkgui_ctx *ctx, struct mkgui_event *e
 		if(lv->selected_row >= (int32_t)lv->row_count) {
 			lv->selected_row = (int32_t)lv->row_count - 1;
 		}
-		int32_t row_bottom = (lv->selected_row + 1) * MKGUI_ROW_HEIGHT;
+		int32_t row_bottom = (lv->selected_row + 1) * ctx->row_height;
 		if(row_bottom > lv->scroll_y + content_h) {
 			lv->scroll_y = row_bottom - content_h;
 		}
@@ -1019,7 +1041,7 @@ MKGUI_API void mkgui_listview_setup(struct mkgui_ctx *ctx, uint32_t id, uint32_t
 	lv->sort_dir = 1;
 	lv->drag_source = -1;
 	lv->drag_target = -1;
-	lv->header_height = MKGUI_ROW_HEIGHT;
+	lv->header_height = ctx->row_height;
 	for(uint32_t i = 0; i < lv->col_count; ++i) {
 		lv->col_order[i] = i;
 	}
@@ -1117,8 +1139,9 @@ MKGUI_API void mkgui_listview_set_col_width(struct mkgui_ctx *ctx, uint32_t id, 
 	if(!lv || col >= lv->col_count) {
 		return;
 	}
-	if(width < 20) {
-		width = 20;
+	int32_t min_col_w = sc(ctx, 20);
+	if(width < min_col_w) {
+		width = min_col_w;
 	}
 	lv->columns[col].width = width;
 	dirty_all(ctx);
@@ -1151,10 +1174,10 @@ MKGUI_API void mkgui_listview_visible_range(struct mkgui_ctx *ctx, uint32_t id, 
 		return;
 	}
 	int32_t rh = ctx->rects[idx].h;
-	int32_t hh = lv->header_height > 0 ? lv->header_height : MKGUI_ROW_HEIGHT;
+	int32_t hh = lv->header_height > 0 ? lv->header_height : ctx->row_height;
 	int32_t content_h = rh - hh - 2;
-	*first = lv->scroll_y / MKGUI_ROW_HEIGHT;
-	*last = (lv->scroll_y + content_h - 1) / MKGUI_ROW_HEIGHT;
+	*first = lv->scroll_y / ctx->row_height;
+	*last = (lv->scroll_y + content_h - 1) / ctx->row_height;
 	if(*last >= (int32_t)lv->row_count) {
 		*last = (int32_t)lv->row_count - 1;
 	}
@@ -1188,14 +1211,14 @@ MKGUI_API void mkgui_listview_scroll_to(struct mkgui_ctx *ctx, uint32_t id, int3
 		return;
 	}
 	int32_t rh = ctx->rects[idx].h;
-	int32_t hh = lv->header_height > 0 ? lv->header_height : MKGUI_ROW_HEIGHT;
+	int32_t hh = lv->header_height > 0 ? lv->header_height : ctx->row_height;
 	int32_t content_h = rh - hh - 2;
-	int32_t row_y = row * MKGUI_ROW_HEIGHT;
+	int32_t row_y = row * ctx->row_height;
 	if(row_y < lv->scroll_y) {
 		lv->scroll_y = row_y;
 	}
-	if(row_y + MKGUI_ROW_HEIGHT > lv->scroll_y + content_h) {
-		lv->scroll_y = row_y + MKGUI_ROW_HEIGHT - content_h;
+	if(row_y + ctx->row_height > lv->scroll_y + content_h) {
+		lv->scroll_y = row_y + ctx->row_height - content_h;
 	}
 	if(lv->scroll_y < 0) {
 		lv->scroll_y = 0;

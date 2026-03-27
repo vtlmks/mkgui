@@ -69,7 +69,7 @@ static void input_scroll_to_cursor(struct mkgui_ctx *ctx, uint32_t widget_id) {
 		return;
 	}
 	int32_t rw = ctx->rects[widx].w;
-	int32_t pad = 4;
+	int32_t pad = sc(ctx, 4);
 	int32_t visible = rw - pad * 2;
 	if(visible < 1) {
 		return;
@@ -115,7 +115,7 @@ static void input_scroll_to_cursor(struct mkgui_ctx *ctx, uint32_t widget_id) {
 
 // [=]===^=[ input_hit_cursor ]=======================================[=]
 static uint32_t input_hit_cursor(struct mkgui_ctx *ctx, struct mkgui_input_data *inp, const char *display, int32_t rx, int32_t mx) {
-	int32_t base_x = rx + 4 - inp->scroll_x;
+	int32_t base_x = rx + sc(ctx, 4) - inp->scroll_x;
 	uint32_t len = (uint32_t)strlen(display);
 	char tmp[MKGUI_MAX_TEXT];
 	for(uint32_t i = 0; i <= len; ++i) {
@@ -164,7 +164,7 @@ static void render_input(struct mkgui_ctx *ctx, uint32_t idx) {
 	}
 	int32_t ty = ry + (rh - ctx->font_height) / 2;
 	uint32_t tc = (w->flags & MKGUI_DISABLED) ? ctx->theme.text_disabled : ctx->theme.text;
-	int32_t tx = rx + 4 - inp->scroll_x;
+	int32_t tx = rx + sc(ctx, 4) - inp->scroll_x;
 
 	if(focused && input_has_selection(inp)) {
 		uint32_t lo, hi;
@@ -182,7 +182,7 @@ static void render_input(struct mkgui_ctx *ctx, uint32_t idx) {
 		int32_t cx1 = sel_x1 < rx + 1 ? rx + 1 : sel_x1;
 		int32_t cx2 = sel_x2 > rx + rw - 1 ? rx + rw - 1 : sel_x2;
 		if(cx2 > cx1) {
-			draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, cx1, ry + 2, cx2 - cx1, rh - 4, ctx->theme.selection);
+			draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, cx1, ry + sc(ctx, 2), cx2 - cx1, rh - sc(ctx, 4), ctx->theme.selection);
 		}
 
 		push_text_clip(tx, ty, display, tc, rx + 1, ry + 1, rx + rw - 1, ry + rh - 1);
@@ -211,7 +211,7 @@ static void render_input(struct mkgui_ctx *ctx, uint32_t idx) {
 		tmp[cpos] = '\0';
 		int32_t cx = tx + text_width(ctx, tmp);
 		if(cx >= rx + 1 && cx <= rx + rw - 1) {
-			draw_vline(ctx->pixels, ctx->win_w, ctx->win_h, cx, ry + 2, rh - 4, ctx->theme.text);
+			draw_vline(ctx->pixels, ctx->win_w, ctx->win_h, cx, ry + sc(ctx, 2), rh - sc(ctx, 4), ctx->theme.text);
 		}
 	}
 }

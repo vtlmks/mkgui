@@ -70,7 +70,7 @@ static void draw_rect_fill(uint32_t *buf, int32_t bw, int32_t bh, int32_t x, int
 	}
 }
 
-#define MKGUI_MAX_CORNER_RADIUS 16
+#define MKGUI_MAX_CORNER_RADIUS 48
 
 // [=]===^=[ rounded_rect_insets ]=================================[=]
 static void rounded_rect_insets(int32_t radius, int32_t *out) {

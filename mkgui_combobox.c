@@ -1,7 +1,6 @@
 // Copyright (c) 2026, Peter Fors
 // SPDX-License-Identifier: MIT
 
-#define MKGUI_COMBOBOX_BTN_W 24
 #define MKGUI_COMBOBOX_MAX_VISIBLE 12
 
 // [=]===^=[ combobox_filter ]=====================================[=]
@@ -73,7 +72,7 @@ static void combobox_select_all(struct mkgui_combobox_data *cb) {
 
 // [=]===^=[ combobox_hit_cursor ]=================================[=]
 static uint32_t combobox_hit_cursor(struct mkgui_ctx *ctx, struct mkgui_combobox_data *cb, int32_t rx, int32_t mx) {
-	int32_t base_x = rx + 4 - cb->scroll_x;
+	int32_t base_x = rx + sc(ctx, 4) - cb->scroll_x;
 	uint32_t len = (uint32_t)strlen(cb->text);
 	char tmp[MKGUI_MAX_TEXT];
 	for(uint32_t i = 0; i <= len; ++i) {
@@ -105,8 +104,8 @@ static void combobox_scroll_to_cursor(struct mkgui_ctx *ctx, uint32_t widget_id)
 		return;
 	}
 	int32_t rw = ctx->rects[widx].w;
-	int32_t pad = 4;
-	int32_t visible = rw - MKGUI_COMBOBOX_BTN_W - pad * 2;
+	int32_t pad = sc(ctx, 4);
+	int32_t visible = rw - sc(ctx, 24) - pad * 2;
 	if(visible < 1) {
 		return;
 	}
@@ -145,19 +144,23 @@ static void render_combobox(struct mkgui_ctx *ctx, uint32_t idx) {
 	int32_t rw = ctx->rects[idx].w;
 	int32_t rh = ctx->rects[idx].h;
 
+	int32_t btn_w = sc(ctx, 24);
+	int32_t text_pad = sc(ctx, 4);
+	int32_t inset2 = sc(ctx, 2);
+
 	uint32_t disabled = (w->flags & MKGUI_DISABLED);
 	uint32_t focused = (ctx->focus_id == w->id);
 	uint32_t border = focused ? ctx->theme.splitter : ctx->theme.widget_border;
 
-	int32_t text_w = rw - MKGUI_COMBOBOX_BTN_W;
+	int32_t text_w = rw - btn_w;
 	draw_patch(ctx, MKGUI_STYLE_SUNKEN, rx, ry, text_w, rh, ctx->theme.input_bg, border);
 
 	uint32_t hovered = (!disabled && ctx->hover_id == w->id);
 	uint32_t btn_bg = hovered ? ctx->theme.widget_hover : ctx->theme.widget_bg;
-	draw_patch(ctx, MKGUI_STYLE_RAISED, rx + text_w, ry, MKGUI_COMBOBOX_BTN_W, rh, btn_bg, border);
+	draw_patch(ctx, MKGUI_STYLE_RAISED, rx + text_w, ry, btn_w, rh, btn_bg, border);
 
 	uint32_t tc = disabled ? ctx->theme.text_disabled : ctx->theme.text;
-	int32_t ax = rx + text_w + (MKGUI_COMBOBOX_BTN_W - 9) / 2;
+	int32_t ax = rx + text_w + (btn_w - 9) / 2;
 	int32_t ay = ry + rh / 2 - 2;
 	for(uint32_t j = 0; j < 5; ++j) {
 		draw_hline(ctx->pixels, ctx->win_w, ctx->win_h, ax + (int32_t)j, ay + (int32_t)j, 9 - (int32_t)j * 2, tc);
@@ -170,7 +173,7 @@ static void render_combobox(struct mkgui_ctx *ctx, uint32_t idx) {
 
 	const char *display = cb->text;
 	int32_t ty = ry + (rh - ctx->font_height) / 2;
-	int32_t tx = rx + 4 - cb->scroll_x;
+	int32_t tx = rx + text_pad - cb->scroll_x;
 
 	if(focused && cb->sel_start != cb->sel_end) {
 		uint32_t lo = cb->sel_start < cb->sel_end ? cb->sel_start : cb->sel_end;
@@ -188,7 +191,7 @@ static void render_combobox(struct mkgui_ctx *ctx, uint32_t idx) {
 		int32_t cx1 = sel_x1 < rx + 1 ? rx + 1 : sel_x1;
 		int32_t cx2 = sel_x2 > rx + text_w - 1 ? rx + text_w - 1 : sel_x2;
 		if(cx2 > cx1) {
-			draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, cx1, ry + 2, cx2 - cx1, rh - 4, ctx->theme.selection);
+			draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, cx1, ry + inset2, cx2 - cx1, rh - inset2 * 2, ctx->theme.selection);
 		}
 
 		push_text_clip(tx, ty, display, tc, rx + 1, ry + 1, rx + text_w - 1, ry + rh - 1);
@@ -213,7 +216,7 @@ static void render_combobox(struct mkgui_ctx *ctx, uint32_t idx) {
 		tmp[cpos] = '\0';
 		int32_t cx = tx + text_width(ctx, tmp);
 		if(cx >= rx + 1 && cx <= rx + text_w - 1) {
-			draw_vline(ctx->pixels, ctx->win_w, ctx->win_h, cx, ry + 2, rh - 4, ctx->theme.text);
+			draw_vline(ctx->pixels, ctx->win_w, ctx->win_h, cx, ry + inset2, rh - inset2 * 2, ctx->theme.text);
 		}
 	}
 }
@@ -232,8 +235,8 @@ static void render_combobox_popup(struct mkgui_ctx *ctx, struct mkgui_popup *p, 
 	draw_rounded_rect(p->pixels, p->w, p->h, 0, 0, p->w, p->h, ctx->theme.menu_bg, ctx->theme.widget_border, ctx->theme.corner_radius);
 
 	for(uint32_t i = 0; i < cb->filter_count; ++i) {
-		int32_t iy = 1 + (int32_t)i * MKGUI_ROW_HEIGHT - cb->scroll_y;
-		if(iy + MKGUI_ROW_HEIGHT <= 0 || iy >= p->h) {
+		int32_t iy = 1 + (int32_t)i * ctx->row_height - cb->scroll_y;
+		if(iy + ctx->row_height <= 0 || iy >= p->h) {
 			continue;
 		}
 		uint32_t bg;
@@ -244,11 +247,11 @@ static void render_combobox_popup(struct mkgui_ctx *ctx, struct mkgui_popup *p, 
 		} else {
 			bg = ctx->theme.menu_bg;
 		}
-		draw_rect_fill(p->pixels, p->w, p->h, 1, iy, p->w - 2, MKGUI_ROW_HEIGHT, bg);
-		int32_t ty = iy + (MKGUI_ROW_HEIGHT - ctx->font_height) / 2;
+		draw_rect_fill(p->pixels, p->w, p->h, 1, iy, p->w - 2, ctx->row_height, bg);
+		int32_t ty = iy + (ctx->row_height - ctx->font_height) / 2;
 		uint32_t tc = ((int32_t)i == cb->highlight) ? ctx->theme.sel_text : ctx->theme.text;
 		uint32_t real_idx = cb->filter_map[i];
-		push_text_clip(p->x + 5, ty + p->y, cb->items[real_idx], tc, p->x + 1, p->y + 1, p->x + p->w - 1, p->y + p->h - 1);
+		push_text_clip(p->x + sc(ctx, 5), ty + p->y, cb->items[real_idx], tc, p->x + 1, p->y + 1, p->x + p->w - 1, p->y + p->h - 1);
 	}
 
 	render_clip_x1 = saved_clip_x1;
@@ -290,8 +293,8 @@ static void combobox_open_popup(struct mkgui_ctx *ctx, uint32_t widget_id, uint3
 	platform_translate_coords(ctx, ctx->rects[widx].x, ctx->rects[widx].y + ctx->rects[widx].h, &abs_x, &abs_y);
 
 	int32_t pw = ctx->rects[widx].w;
-	int32_t ph = (int32_t)cb->filter_count * MKGUI_ROW_HEIGHT + 2;
-	int32_t max_ph = MKGUI_COMBOBOX_MAX_VISIBLE * MKGUI_ROW_HEIGHT + 2;
+	int32_t ph = (int32_t)cb->filter_count * ctx->row_height + 2;
+	int32_t max_ph = MKGUI_COMBOBOX_MAX_VISIBLE * ctx->row_height + 2;
 	if(ph > max_ph) {
 		ph = max_ph;
 	}
@@ -325,7 +328,7 @@ static void handle_combobox_click(struct mkgui_ctx *ctx, struct mkgui_event *ev,
 	}
 	int32_t rx = ctx->rects[widx].x;
 	int32_t rw = ctx->rects[widx].w;
-	int32_t btn_x = rx + rw - MKGUI_COMBOBOX_BTN_W;
+	int32_t btn_x = rx + rw - sc(ctx, 24);
 
 	if(ctx->mouse_x >= btn_x) {
 		if(cb->popup_open) {

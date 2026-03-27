@@ -25,13 +25,13 @@ static void render_button(struct mkgui_ctx *ctx, uint32_t idx) {
 	int32_t ii = widget_icon_idx(w);
 	uint32_t has_icon = (ii >= 0);
 	int32_t tw = text_width(ctx, w->label);
-	int32_t icon_w = has_icon ? (icons[ii].w + (w->label[0] ? 4 : 0)) : 0;
+	int32_t icon_w = has_icon ? (icons[ii].w + (w->label[0] ? sc(ctx, 4) : 0)) : 0;
 	int32_t content_w = icon_w + (w->label[0] ? tw : 0);
 	int32_t cx = rx + (rw - content_w) / 2;
 	if(has_icon) {
 		int32_t iy = ry + (rh - icons[ii].h) / 2;
 		draw_icon(ctx->pixels, ctx->win_w, ctx->win_h, &icons[ii], cx, iy, rx + 1, ry + 1, rx + rw - 1, ry + rh - 1);
-		cx += icons[ii].w + 4;
+		cx += icons[ii].w + sc(ctx, 4);
 	}
 	if(w->label[0]) {
 		int32_t ty = ry + (rh - ctx->font_height) / 2;

@@ -26,8 +26,8 @@ static void render_progress(struct mkgui_ctx *ctx, uint32_t idx) {
 
 		if(pd->value > 0 && pd->value < pd->max_val) {
 			int32_t shimmer_w = fill_w / 4;
-			if(shimmer_w < 16) {
-				shimmer_w = 16;
+			if(shimmer_w < sc(ctx, 16)) {
+				shimmer_w = sc(ctx, 16);
 			}
 			double phase = ctx->anim_time * 0.4;
 			phase -= (double)(int32_t)phase;

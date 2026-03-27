@@ -1,8 +1,8 @@
 // Copyright (c) 2026, Peter Fors
 // SPDX-License-Identifier: MIT
 
-#define MKGUI_TREE_INDENT 18
-#define MKGUI_TREE_ARROW_SIZE 6
+#define MKGUI_TREE_INDENT_PX 18
+#define MKGUI_TREE_ARROW_SIZE_PX 6
 
 #define TV_IDX_HASH_SIZE 1024
 #define TV_IDX_HASH_MASK (TV_IDX_HASH_SIZE - 1)
@@ -130,6 +130,11 @@ static void render_treeview(struct mkgui_ctx *ctx, uint32_t idx) {
 	}
 	tv_idx_build(tv);
 
+	int32_t tree_indent = sc(ctx, MKGUI_TREE_INDENT_PX);
+	int32_t arrow_size = sc(ctx, MKGUI_TREE_ARROW_SIZE_PX);
+	int32_t tree_pad = sc(ctx, 4);
+	int32_t icon_gap = sc(ctx, 2);
+
 	int32_t clip_top = ry + 1;
 	int32_t clip_bottom = ry + rh - 1;
 	int32_t view_h = rh - 2;
@@ -140,7 +145,7 @@ static void render_treeview(struct mkgui_ctx *ctx, uint32_t idx) {
 			++vis_count;
 		}
 	}
-	int32_t max_scroll = (int32_t)vis_count * MKGUI_ROW_HEIGHT - view_h;
+	int32_t max_scroll = (int32_t)vis_count * ctx->row_height - view_h;
 	if(max_scroll < 0) {
 		max_scroll = 0;
 	}
@@ -162,8 +167,8 @@ static void render_treeview(struct mkgui_ctx *ctx, uint32_t idx) {
 		}
 
 		int32_t row_y = draw_y;
-		int32_t row_end = draw_y + MKGUI_ROW_HEIGHT;
-		draw_y += MKGUI_ROW_HEIGHT;
+		int32_t row_end = draw_y + ctx->row_height;
+		draw_y += ctx->row_height;
 
 		uint32_t depth = treeview_node_depth(tv, i);
 		uint32_t is_last = treeview_is_last_visible_child(tv, i);
@@ -183,24 +188,24 @@ static void render_treeview(struct mkgui_ctx *ctx, uint32_t idx) {
 			continue;
 		}
 
-		int32_t indent = (int32_t)(depth * MKGUI_TREE_INDENT);
+		int32_t indent = (int32_t)depth * tree_indent;
 
 		if(depth > 0) {
 			for(uint32_t d = 0; d + 1 < depth; ++d) {
 				if(line_active[d]) {
-					int32_t lx = rx + 4 + (int32_t)(d * MKGUI_TREE_INDENT) + MKGUI_TREE_INDENT / 2;
-					draw_vline(ctx->pixels, ctx->win_w, ctx->win_h, lx, row_y, MKGUI_ROW_HEIGHT, line_color);
+					int32_t lx = rx + tree_pad + (int32_t)d * tree_indent + tree_indent / 2;
+					draw_vline(ctx->pixels, ctx->win_w, ctx->win_h, lx, row_y, ctx->row_height, line_color);
 				}
 			}
 
-			int32_t lx = rx + 4 + (int32_t)((depth - 1) * MKGUI_TREE_INDENT) + MKGUI_TREE_INDENT / 2;
-			int32_t cy = row_y + MKGUI_ROW_HEIGHT / 2;
+			int32_t lx = rx + tree_pad + (int32_t)(depth - 1) * tree_indent + tree_indent / 2;
+			int32_t cy = row_y + ctx->row_height / 2;
 			if(is_last) {
-				draw_vline(ctx->pixels, ctx->win_w, ctx->win_h, lx, row_y, MKGUI_ROW_HEIGHT / 2 + 1, line_color);
+				draw_vline(ctx->pixels, ctx->win_w, ctx->win_h, lx, row_y, ctx->row_height / 2 + 1, line_color);
 			} else {
-				draw_vline(ctx->pixels, ctx->win_w, ctx->win_h, lx, row_y, MKGUI_ROW_HEIGHT, line_color);
+				draw_vline(ctx->pixels, ctx->win_w, ctx->win_h, lx, row_y, ctx->row_height, line_color);
 			}
-			int32_t hlen = tv->nodes[i].has_children ? MKGUI_TREE_INDENT / 2 - 1 : MKGUI_TREE_INDENT + MKGUI_TREE_INDENT / 2 - 1;
+			int32_t hlen = tv->nodes[i].has_children ? tree_indent / 2 - 1 : tree_indent + tree_indent / 2 - 1;
 			draw_hline(ctx->pixels, ctx->win_w, ctx->win_h, lx + 1, cy, hlen, line_color);
 		}
 
@@ -211,31 +216,31 @@ static void render_treeview(struct mkgui_ctx *ctx, uint32_t idx) {
 		}
 
 		if(tv->nodes[i].has_children) {
-			int32_t ax = rx + 4 + indent;
-			int32_t ay = row_y + MKGUI_ROW_HEIGHT / 2;
+			int32_t ax = rx + tree_pad + indent;
+			int32_t ay = row_y + ctx->row_height / 2;
 
 			if(ay >= clip_top && ay < clip_bottom) {
 				if(tv->nodes[i].expanded) {
-					for(uint32_t j = 0; j < MKGUI_TREE_ARROW_SIZE; ++j) {
-						draw_hline(ctx->pixels, ctx->win_w, ctx->win_h, ax + (int32_t)j, ay - MKGUI_TREE_ARROW_SIZE / 2 + (int32_t)j, MKGUI_TREE_ARROW_SIZE - (int32_t)j, ctx->theme.text);
+					for(uint32_t j = 0; j < (uint32_t)arrow_size; ++j) {
+						draw_hline(ctx->pixels, ctx->win_w, ctx->win_h, ax + (int32_t)j, ay - arrow_size / 2 + (int32_t)j, arrow_size - (int32_t)j, ctx->theme.text);
 					}
 
 				} else {
-					for(uint32_t j = 0; j < MKGUI_TREE_ARROW_SIZE; ++j) {
-						draw_vline(ctx->pixels, ctx->win_w, ctx->win_h, ax + (int32_t)j, ay - MKGUI_TREE_ARROW_SIZE / 2 + (int32_t)j, MKGUI_TREE_ARROW_SIZE - (int32_t)j * 2, ctx->theme.text);
+					for(uint32_t j = 0; j < (uint32_t)arrow_size; ++j) {
+						draw_vline(ctx->pixels, ctx->win_w, ctx->win_h, ax + (int32_t)j, ay - arrow_size / 2 + (int32_t)j, arrow_size - (int32_t)j * 2, ctx->theme.text);
 					}
 				}
 			}
 		}
 
-		int32_t text_x = rx + 4 + indent + MKGUI_TREE_INDENT;
+		int32_t text_x = rx + tree_pad + indent + tree_indent;
 		if(tv->nodes[i].icon_idx >= 0 && tv->nodes[i].icon_idx < (int32_t)icon_count) {
 			int32_t ti = tv->nodes[i].icon_idx;
-			int32_t iy = row_y + (MKGUI_ROW_HEIGHT - icons[ti].h) / 2;
+			int32_t iy = row_y + (ctx->row_height - icons[ti].h) / 2;
 			draw_icon(ctx->pixels, ctx->win_w, ctx->win_h, &icons[ti], text_x, iy, rx + 1, clip_top, rx + rw - 1, clip_bottom);
-			text_x += icons[ti].w + 2;
+			text_x += icons[ti].w + icon_gap;
 		}
-		int32_t ty = row_y + (MKGUI_ROW_HEIGHT - ctx->font_height) / 2;
+		int32_t ty = row_y + (ctx->row_height - ctx->font_height) / 2;
 		if(ty >= clip_top && ty + ctx->font_height <= clip_bottom) {
 			uint32_t tc = ((int32_t)tv->nodes[i].id == tv->selected_node) ? ctx->theme.sel_text : ((w->flags & MKGUI_DISABLED) ? ctx->theme.text_disabled : ctx->theme.text);
 			push_text_clip(text_x, ty, tv->nodes[i].label, tc, rx + 1, clip_top, rx + rw - 1, clip_bottom);
@@ -244,7 +249,7 @@ static void render_treeview(struct mkgui_ctx *ctx, uint32_t idx) {
 
 	if(tv->drag_active && tv->drag_target >= 0 && (uint32_t)tv->drag_target < tv->node_count) {
 		uint32_t depth = treeview_node_depth(tv, (uint32_t)tv->drag_target);
-		int32_t indent = (int32_t)(depth * MKGUI_TREE_INDENT) + MKGUI_TREE_INDENT + 4;
+		int32_t indent = (int32_t)depth * tree_indent + tree_indent + tree_pad;
 		int32_t vis = 0;
 		for(uint32_t i = 0; i < (uint32_t)tv->drag_target; ++i) {
 			if(treeview_node_visible(tv, i)) {
@@ -252,19 +257,20 @@ static void render_treeview(struct mkgui_ctx *ctx, uint32_t idx) {
 			}
 		}
 		if(treeview_node_visible(tv, (uint32_t)tv->drag_target)) {
+			int32_t dot_sz = sc(ctx, 5);
 			int32_t line_y;
 			if(tv->drag_pos == 0) {
-				line_y = ry + 1 - tv->scroll_y + vis * MKGUI_ROW_HEIGHT;
+				line_y = ry + 1 - tv->scroll_y + vis * ctx->row_height;
 			} else if(tv->drag_pos == 2) {
-				indent = (int32_t)((depth + 1) * MKGUI_TREE_INDENT) + MKGUI_TREE_INDENT + 4;
-				line_y = ry + 1 - tv->scroll_y + vis * MKGUI_ROW_HEIGHT + MKGUI_ROW_HEIGHT / 2;
+				indent = (int32_t)(depth + 1) * tree_indent + tree_indent + tree_pad;
+				line_y = ry + 1 - tv->scroll_y + vis * ctx->row_height + ctx->row_height / 2;
 			} else {
-				line_y = ry + 1 - tv->scroll_y + (vis + 1) * MKGUI_ROW_HEIGHT;
+				line_y = ry + 1 - tv->scroll_y + (vis + 1) * ctx->row_height;
 			}
 			if(line_y >= clip_top && line_y < clip_bottom) {
 				draw_hline(ctx->pixels, ctx->win_w, ctx->win_h, rx + indent, line_y, rw - indent - 2, ctx->theme.accent);
 				draw_hline(ctx->pixels, ctx->win_w, ctx->win_h, rx + indent, line_y - 1, rw - indent - 2, ctx->theme.accent);
-				draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, rx + indent - 2, line_y - 2, 5, 5, ctx->theme.accent);
+				draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, rx + indent - 2, line_y - 2, dot_sz, dot_sz, ctx->theme.accent);
 			}
 		}
 	}
@@ -292,7 +298,7 @@ static void treeview_clamp_scroll(struct mkgui_ctx *ctx, uint32_t widget_id) {
 	if(idx < 0) {
 		return;
 	}
-	int32_t content_h = (int32_t)treeview_visible_count(tv) * MKGUI_ROW_HEIGHT;
+	int32_t content_h = (int32_t)treeview_visible_count(tv) * ctx->row_height;
 	int32_t view_h = ctx->rects[idx].h - 2;
 	int32_t max_scroll = content_h - view_h;
 	if(max_scroll < 0) {
@@ -317,7 +323,7 @@ static int32_t treeview_row_hit(struct mkgui_ctx *ctx, uint32_t widget_idx, int3
 	tv_idx_build(tv);
 	int32_t ry = ctx->rects[widget_idx].y;
 	int32_t local_y = my - ry - 1 + tv->scroll_y;
-	int32_t vis_row = local_y / MKGUI_ROW_HEIGHT;
+	int32_t vis_row = local_y / ctx->row_height;
 
 	int32_t count = 0;
 	for(uint32_t i = 0; i < tv->node_count; ++i) {
@@ -343,10 +349,12 @@ static uint32_t treeview_arrow_hit(struct mkgui_ctx *ctx, uint32_t widget_idx, i
 		return 0;
 	}
 	tv_idx_build(tv);
+	int32_t tree_indent = sc(ctx, MKGUI_TREE_INDENT_PX);
+	int32_t tree_pad = sc(ctx, 4);
 	uint32_t depth = treeview_node_depth(tv, (uint32_t)node_idx);
 	int32_t rx = ctx->rects[widget_idx].x;
-	int32_t arrow_x = rx + 4 + (int32_t)(depth * MKGUI_TREE_INDENT);
-	return (mx >= arrow_x && mx < arrow_x + MKGUI_TREE_INDENT);
+	int32_t arrow_x = rx + tree_pad + (int32_t)depth * tree_indent;
+	return (mx >= arrow_x && mx < arrow_x + tree_indent);
 }
 
 // [=]===^=[ handle_treeview_key ]================================[=]
@@ -426,7 +434,7 @@ static uint32_t handle_treeview_key(struct mkgui_ctx *ctx, struct mkgui_event *e
 			return 0;
 		}
 		int32_t idx = find_widget_idx(ctx, ctx->focus_id);
-		int32_t page = idx >= 0 ? (ctx->rects[idx].h - 2) / MKGUI_ROW_HEIGHT : 10;
+		int32_t page = idx >= 0 ? (ctx->rects[idx].h - 2) / ctx->row_height : 10;
 		if(page < 1) {
 			page = 1;
 		}
@@ -783,12 +791,12 @@ MKGUI_API void mkgui_treeview_scroll_to(struct mkgui_ctx *ctx, uint32_t widget_i
 		}
 		if(tv->nodes[i].id == node_id) {
 			int32_t rh = ctx->rects[widx].h;
-			int32_t node_y = (int32_t)vis_row * MKGUI_ROW_HEIGHT;
+			int32_t node_y = (int32_t)vis_row * ctx->row_height;
 			if(node_y < tv->scroll_y) {
 				tv->scroll_y = node_y;
 			}
-			if(node_y + MKGUI_ROW_HEIGHT > tv->scroll_y + rh) {
-				tv->scroll_y = node_y + MKGUI_ROW_HEIGHT - rh;
+			if(node_y + ctx->row_height > tv->scroll_y + rh) {
+				tv->scroll_y = node_y + ctx->row_height - rh;
 			}
 			dirty_all(ctx);
 			return;

@@ -19,11 +19,11 @@ static void render_split(struct mkgui_ctx *ctx, uint32_t idx) {
 
 	if(w->type == MKGUI_HSPLIT) {
 		int32_t split_y = ry + (int32_t)(rh * ratio);
-		draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, rx, split_y, rw, MKGUI_SPLIT_THICK, color);
+		draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, rx, split_y, rw, ctx->split_thick, color);
 
 	} else {
 		int32_t split_x = rx + (int32_t)(rw * ratio);
-		draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, split_x, ry, MKGUI_SPLIT_THICK, rh, color);
+		draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, split_x, ry, ctx->split_thick, rh, color);
 	}
 }
 
@@ -64,10 +64,10 @@ static uint32_t split_bar_hit(struct mkgui_ctx *ctx, uint32_t idx, int32_t mx, i
 
 	if(w->type == MKGUI_HSPLIT) {
 		int32_t split_y = ry + (int32_t)(rh * ratio);
-		return (mx >= rx && mx < rx + rw && my >= split_y && my < split_y + MKGUI_SPLIT_THICK);
+		return (mx >= rx && mx < rx + rw && my >= split_y && my < split_y + ctx->split_thick);
 
 	} else {
 		int32_t split_x = rx + (int32_t)(rw * ratio);
-		return (mx >= split_x && mx < split_x + MKGUI_SPLIT_THICK && my >= ry && my < ry + rh);
+		return (mx >= split_x && mx < split_x + ctx->split_thick && my >= ry && my < ry + rh);
 	}
 }

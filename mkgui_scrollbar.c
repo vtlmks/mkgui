@@ -77,9 +77,10 @@ static void scrollbar_thumb_rect(struct mkgui_ctx *ctx, uint32_t idx, struct mkg
 	if(total < 1) {
 		total = 1;
 	}
+	int32_t min_thumb = sc(ctx, 20);
 	int32_t thumb = track * sb->page_size / total;
-	if(thumb < 20) {
-		thumb = 20;
+	if(thumb < min_thumb) {
+		thumb = min_thumb;
 	}
 	if(thumb > track) {
 		thumb = track;
@@ -130,10 +131,11 @@ static void render_scrollbar(struct mkgui_ctx *ctx, uint32_t idx) {
 	}
 
 	int32_t r = ctx->theme.corner_radius;
+	int32_t inset = sc(ctx, 2);
 	if(horizontal) {
-		draw_rounded_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, thumb_pos, ry + 2, thumb_len, rh - 4, thumb_color, r);
+		draw_rounded_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, thumb_pos, ry + inset, thumb_len, rh - inset * 2, thumb_color, r);
 	} else {
-		draw_rounded_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, rx + 2, thumb_pos, rw - 4, thumb_len, thumb_color, r);
+		draw_rounded_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, rx + inset, thumb_pos, rw - inset * 2, thumb_len, thumb_color, r);
 	}
 }
 
@@ -190,9 +192,10 @@ static void scrollbar_drag_to(struct mkgui_ctx *ctx, uint32_t id, int32_t mx, in
 	if(total < 1) {
 		total = 1;
 	}
+	int32_t min_thumb = sc(ctx, 20);
 	int32_t thumb = track * sb->page_size / total;
-	if(thumb < 20) {
-		thumb = 20;
+	if(thumb < min_thumb) {
+		thumb = min_thumb;
 	}
 	if(thumb > track) {
 		thumb = track;

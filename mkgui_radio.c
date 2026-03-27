@@ -133,9 +133,9 @@ static void render_radio(struct mkgui_ctx *ctx, uint32_t idx) {
 	int32_t rh = ctx->rects[idx].h;
 
 	int32_t cy = ry + rh / 2;
-	int32_t cx = rx + 9;
-	int32_t outer_r = 7;
-	int32_t inner_r = 6;
+	int32_t cx = rx + sc(ctx, 9);
+	int32_t outer_r = sc(ctx, 7);
+	int32_t inner_r = sc(ctx, 6);
 
 	uint32_t disabled = (w->flags & MKGUI_DISABLED);
 	uint32_t hovered = (!disabled && ctx->hover_id == w->id);
@@ -146,13 +146,13 @@ static void render_radio(struct mkgui_ctx *ctx, uint32_t idx) {
 
 	if(w->style & MKGUI_CHECKED) {
 		uint32_t dot_color = disabled ? ctx->theme.widget_border : ctx->theme.splitter;
-		draw_aa_circle_fill(ctx->pixels, ctx->win_w, ctx->win_h, cx, cy, 4, dot_color);
+		draw_aa_circle_fill(ctx->pixels, ctx->win_w, ctx->win_h, cx, cy, sc(ctx, 4), dot_color);
 	}
 
 	int32_t rw = ctx->rects[idx].w;
 	int32_t ty = ry + (rh - ctx->font_height) / 2;
 	uint32_t tc = disabled ? ctx->theme.text_disabled : ctx->theme.text;
-	push_text_clip(rx + 22, ty, w->label, tc, rx, ry, rx + rw, ry + rh);
+	push_text_clip(rx + sc(ctx, 22), ty, w->label, tc, rx, ry, rx + rw, ry + rh);
 }
 
 // [=]===^=[ handle_radio_click ]=================================[=]

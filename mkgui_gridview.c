@@ -45,8 +45,8 @@ static int32_t gridview_col_at_x(struct mkgui_gridview_data *gv, int32_t x, int3
 }
 
 // [=]===^=[ gridview_clamp_scroll ]==============================[=]
-static void gridview_clamp_scroll(struct mkgui_gridview_data *gv, int32_t content_h) {
-	int32_t total = (int32_t)gv->row_count * MKGUI_ROW_HEIGHT;
+static void gridview_clamp_scroll(struct mkgui_ctx *ctx, struct mkgui_gridview_data *gv, int32_t content_h) {
+	int32_t total = (int32_t)gv->row_count * ctx->row_height;
 	int32_t max_scroll = total - content_h;
 	if(max_scroll < 0) {
 		max_scroll = 0;
@@ -62,7 +62,7 @@ static void gridview_clamp_scroll(struct mkgui_gridview_data *gv, int32_t conten
 // [=]===^=[ gridview_draw_checkbox ]=============================[=]
 static void gridview_draw_checkbox(struct mkgui_ctx *ctx, int32_t bx, int32_t by, uint32_t checked,
 	int32_t clip_left, int32_t clip_top, int32_t clip_right, int32_t clip_bottom) {
-	int32_t box_size = 14;
+	int32_t box_size = sc(ctx, 14);
 	if(bx + box_size <= clip_left || bx >= clip_right || by + box_size <= clip_top || by >= clip_bottom) {
 		return;
 	}
@@ -71,8 +71,11 @@ static void gridview_draw_checkbox(struct mkgui_ctx *ctx, int32_t bx, int32_t by
 	if(checked) {
 		int32_t ccx = bx + box_size / 2;
 		int32_t ccy = by + box_size / 2;
-		draw_aa_line(ctx->pixels, ctx->win_w, ctx->win_h, ccx - 3, ccy - 1, ccx - 1, ccy + 2, ctx->theme.sel_text, 2);
-		draw_aa_line(ctx->pixels, ctx->win_w, ctx->win_h, ccx - 1, ccy + 2, ccx + 4, ccy - 3, ctx->theme.sel_text, 2);
+		int32_t ck1 = sc(ctx, 3);
+		int32_t ck2 = sc(ctx, 2);
+		int32_t ck3 = sc(ctx, 4);
+		draw_aa_line(ctx->pixels, ctx->win_w, ctx->win_h, ccx - ck1, ccy - 1, ccx - 1, ccy + ck2, ctx->theme.sel_text, 2);
+		draw_aa_line(ctx->pixels, ctx->win_w, ctx->win_h, ccx - 1, ccy + ck2, ccx + ck3, ccy - ck1, ctx->theme.sel_text, 2);
 	}
 }
 
@@ -92,20 +95,21 @@ static void render_gridview(struct mkgui_ctx *ctx, uint32_t idx) {
 	uint32_t focused = (ctx->focus_id == w->id);
 	draw_patch(ctx, MKGUI_STYLE_SUNKEN, rx, ry, rw, rh, ctx->theme.input_bg, focused ? ctx->theme.splitter : ctx->theme.widget_border);
 
-	int32_t hh = gv->header_height > 0 ? gv->header_height : MKGUI_ROW_HEIGHT;
-	int32_t content_w = rw - 2 - MKGUI_SCROLLBAR_W;
+	int32_t hh = gv->header_height > 0 ? gv->header_height : ctx->row_height;
+	int32_t content_w = rw - 2 - ctx->scrollbar_w;
 	int32_t clip_left = rx + 1;
 	int32_t clip_right = rx + 1 + content_w;
 
 	int32_t content_y = ry + hh + 1;
 	int32_t content_h = rh - hh - 2;
 
-	gridview_clamp_scroll(gv, content_h);
+	gridview_clamp_scroll(ctx, gv, content_h);
 
 	draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, rx + 1, ry + 1, content_w, hh, ctx->theme.header_bg);
 
 	uint32_t grid_line_color = blend_pixel(ctx->theme.input_bg, ctx->theme.widget_border, 80);
 
+	int32_t cell_pad = sc(ctx, 4);
 	int32_t cx = rx + 1;
 	for(uint32_t c = 0; c < gv->col_count; ++c) {
 		int32_t cw = gv->columns[c].width;
@@ -119,7 +123,7 @@ static void render_gridview(struct mkgui_ctx *ctx, uint32_t idx) {
 		}
 		if(col_left < col_right) {
 			int32_t ty = ry + (hh - ctx->font_height) / 2;
-			push_text_clip(cx + 4, ty, gv->columns[c].label, ctx->theme.text, col_left, ry, col_right, ry + hh);
+			push_text_clip(cx + cell_pad, ty, gv->columns[c].label, ctx->theme.text, col_left, ry, col_right, ry + hh);
 		}
 		cx += cw;
 		if(cx > clip_left && cx < clip_right) {
@@ -128,8 +132,8 @@ static void render_gridview(struct mkgui_ctx *ctx, uint32_t idx) {
 	}
 	draw_hline(ctx->pixels, ctx->win_w, ctx->win_h, rx + 1, ry + hh, content_w, ctx->theme.widget_border);
 
-	int32_t visible_rows = content_h / MKGUI_ROW_HEIGHT;
-	int32_t first_row = gv->scroll_y / MKGUI_ROW_HEIGHT;
+	int32_t visible_rows = content_h / ctx->row_height;
+	int32_t first_row = gv->scroll_y / ctx->row_height;
 
 	int32_t clip_top = content_y;
 	int32_t clip_bottom = content_y + content_h;
@@ -154,14 +158,14 @@ static void render_gridview(struct mkgui_ctx *ctx, uint32_t idx) {
 	char cell_buf[MKGUI_MAX_TEXT];
 	for(uint32_t r = 0; r <= (uint32_t)(visible_rows + 1) && (first_row + (int32_t)r) < (int32_t)gv->row_count; ++r) {
 		int32_t row_idx = first_row + (int32_t)r;
-		int32_t row_y = content_y + (int32_t)r * MKGUI_ROW_HEIGHT - (gv->scroll_y % MKGUI_ROW_HEIGHT);
+		int32_t row_y = content_y + (int32_t)r * ctx->row_height - (gv->scroll_y % ctx->row_height);
 
-		if(row_y >= clip_bottom || row_y + MKGUI_ROW_HEIGHT <= clip_top) {
+		if(row_y >= clip_bottom || row_y + ctx->row_height <= clip_top) {
 			continue;
 		}
 
 		int32_t draw_y = row_y < clip_top ? clip_top : row_y;
-		int32_t draw_end = row_y + MKGUI_ROW_HEIGHT;
+		int32_t draw_end = row_y + ctx->row_height;
 		if(draw_end > clip_bottom) {
 			draw_end = clip_bottom;
 		}
@@ -174,7 +178,7 @@ static void render_gridview(struct mkgui_ctx *ctx, uint32_t idx) {
 		}
 		draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, rx + 1, draw_y, content_w, draw_h, row_bg);
 
-		int32_t ty = row_y + (MKGUI_ROW_HEIGHT - ctx->font_height) / 2;
+		int32_t ty = row_y + (ctx->row_height - ctx->font_height) / 2;
 		cx = rx + 1;
 		for(uint32_t c = 0; c < gv->col_count; ++c) {
 			int32_t col_w = gv->columns[c].width;
@@ -197,24 +201,23 @@ static void render_gridview(struct mkgui_ctx *ctx, uint32_t idx) {
 
 			uint32_t tc = is_selected ? ctx->theme.sel_text : ((w->flags & MKGUI_DISABLED) ? ctx->theme.text_disabled : ctx->theme.text);
 
+			int32_t box_size = sc(ctx, 14);
 			switch(gv->columns[c].col_type) {
 				case MKGUI_GRID_CHECK: {
-					int32_t box_size = 14;
 					int32_t bx = cx + (col_w - box_size) / 2;
-					int32_t by = row_y + (MKGUI_ROW_HEIGHT - box_size) / 2;
+					int32_t by = row_y + (ctx->row_height - box_size) / 2;
 					gridview_draw_checkbox(ctx, bx, by, gridview_get_bit(gv, (uint32_t)row_idx, c), cell_cl, clip_top, cell_cr, clip_bottom);
 				} break;
 
 				case MKGUI_GRID_CHECK_TEXT: {
-					int32_t box_size = 14;
-					int32_t bx = cx + 4;
-					int32_t by = row_y + (MKGUI_ROW_HEIGHT - box_size) / 2;
+					int32_t bx = cx + cell_pad;
+					int32_t by = row_y + (ctx->row_height - box_size) / 2;
 					gridview_draw_checkbox(ctx, bx, by, gridview_get_bit(gv, (uint32_t)row_idx, c), cell_cl, clip_top, cell_cr, clip_bottom);
 					cell_buf[0] = '\0';
 					if(gv->cell_cb) {
 						gv->cell_cb((uint32_t)row_idx, c, cell_buf, sizeof(cell_buf), gv->userdata);
 					}
-					push_text_clip(bx + box_size + 4, ty, cell_buf, tc, cell_cl, clip_top, cell_cr, clip_bottom);
+					push_text_clip(bx + box_size + cell_pad, ty, cell_buf, tc, cell_cl, clip_top, cell_cr, clip_bottom);
 				} break;
 
 				default: {
@@ -222,7 +225,7 @@ static void render_gridview(struct mkgui_ctx *ctx, uint32_t idx) {
 					if(gv->cell_cb) {
 						gv->cell_cb((uint32_t)row_idx, c, cell_buf, sizeof(cell_buf), gv->userdata);
 					}
-					push_text_clip(cx + 4, ty, cell_buf, tc, cell_cl, clip_top, cell_cr, clip_bottom);
+					push_text_clip(cx + cell_pad, ty, cell_buf, tc, cell_cl, clip_top, cell_cr, clip_bottom);
 				} break;
 			}
 
@@ -232,7 +235,7 @@ static void render_gridview(struct mkgui_ctx *ctx, uint32_t idx) {
 			}
 		}
 
-		int32_t line_y = row_y + MKGUI_ROW_HEIGHT - 1;
+		int32_t line_y = row_y + ctx->row_height - 1;
 		if(line_y >= clip_top && line_y < clip_bottom) {
 			draw_hline(ctx->pixels, ctx->win_w, ctx->win_h, rx + 1, line_y, content_w, grid_line_color);
 		}
@@ -244,31 +247,33 @@ static void render_gridview(struct mkgui_ctx *ctx, uint32_t idx) {
 	render_clip_y2 = saved_clip_y2;
 
 	if(gv->row_count > 0) {
-		int32_t sb_x = rx + rw - MKGUI_SCROLLBAR_W - 1;
+		int32_t sb_x = rx + rw - ctx->scrollbar_w - 1;
 		int32_t sb_y = content_y;
 		int32_t sb_h = content_h;
-		draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, sb_x, sb_y, MKGUI_SCROLLBAR_W, sb_h, ctx->theme.scrollbar_bg);
+		draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, sb_x, sb_y, ctx->scrollbar_w, sb_h, ctx->theme.scrollbar_bg);
 
-		int32_t total_h = (int32_t)gv->row_count * MKGUI_ROW_HEIGHT;
+		int32_t total_h = (int32_t)gv->row_count * ctx->row_height;
 		if(total_h > sb_h) {
+			int32_t min_thumb = sc(ctx, 20);
 			int32_t thumb_h = sb_h * sb_h / total_h;
-			if(thumb_h < 20) {
-				thumb_h = 20;
+			if(thumb_h < min_thumb) {
+				thumb_h = min_thumb;
 			}
 			int32_t thumb_y = sb_y + (int32_t)((int64_t)gv->scroll_y * (sb_h - thumb_h) / (total_h - sb_h));
 			uint32_t thumb_color = (ctx->drag_scrollbar_id == w->id) ? ctx->theme.widget_hover : ctx->theme.scrollbar_thumb;
-			draw_rounded_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, sb_x + 2, thumb_y, MKGUI_SCROLLBAR_W - 4, thumb_h, thumb_color, ctx->theme.corner_radius);
+			int32_t sb_inset = sc(ctx, 2);
+			draw_rounded_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, sb_x + sb_inset, thumb_y, ctx->scrollbar_w - sb_inset * 2, thumb_h, thumb_color, ctx->theme.corner_radius);
 		}
 	}
 
 	if(gv->drag_active && gv->drag_target >= 0) {
-		int32_t dhh = gv->header_height > 0 ? gv->header_height : MKGUI_ROW_HEIGHT;
+		int32_t dhh = gv->header_height > 0 ? gv->header_height : ctx->row_height;
 		int32_t dcy = ry + dhh + 1;
 		int32_t tgt_y;
 		if(gv->drag_target > gv->drag_source) {
-			tgt_y = dcy + (gv->drag_target + 1) * MKGUI_ROW_HEIGHT - gv->scroll_y;
+			tgt_y = dcy + (gv->drag_target + 1) * ctx->row_height - gv->scroll_y;
 		} else {
-			tgt_y = dcy + gv->drag_target * MKGUI_ROW_HEIGHT - gv->scroll_y;
+			tgt_y = dcy + gv->drag_target * ctx->row_height - gv->scroll_y;
 		}
 		if(tgt_y >= dcy && tgt_y <= ry + rh) {
 			draw_hline(ctx->pixels, ctx->win_w, ctx->win_h, rx + 1, tgt_y - 1, content_w, ctx->theme.accent);
@@ -287,7 +292,7 @@ static int32_t gridview_row_hit(struct mkgui_ctx *ctx, uint32_t idx, int32_t my)
 		return -1;
 	}
 
-	int32_t hh = gv->header_height > 0 ? gv->header_height : MKGUI_ROW_HEIGHT;
+	int32_t hh = gv->header_height > 0 ? gv->header_height : ctx->row_height;
 	int32_t content_y = ry + hh + 1;
 	int32_t content_bottom = ry + rh;
 
@@ -295,7 +300,7 @@ static int32_t gridview_row_hit(struct mkgui_ctx *ctx, uint32_t idx, int32_t my)
 		return -1;
 	}
 
-	int32_t row = (my - content_y + gv->scroll_y) / MKGUI_ROW_HEIGHT;
+	int32_t row = (my - content_y + gv->scroll_y) / ctx->row_height;
 	if(row < 0 || row >= (int32_t)gv->row_count) {
 		return -1;
 	}
@@ -309,13 +314,15 @@ static void gridview_autosize_col(struct mkgui_ctx *ctx, struct mkgui_gridview_d
 	}
 
 	int32_t max_w = text_width(ctx, gv->columns[col].label);
+	int32_t box_sz = sc(ctx, 14);
+	int32_t pad = sc(ctx, 4);
 
 	char buf[MKGUI_MAX_TEXT];
 	for(uint32_t row = 0; row < gv->row_count; ++row) {
 		int32_t cell_w = 0;
 		switch(gv->columns[col].col_type) {
 			case MKGUI_GRID_CHECK: {
-				cell_w = 14;
+				cell_w = box_sz;
 			} break;
 
 			case MKGUI_GRID_CHECK_TEXT: {
@@ -323,7 +330,7 @@ static void gridview_autosize_col(struct mkgui_ctx *ctx, struct mkgui_gridview_d
 				if(gv->cell_cb) {
 					gv->cell_cb(row, col, buf, sizeof(buf), gv->userdata);
 				}
-				cell_w = 14 + 4 + text_width(ctx, buf);
+				cell_w = box_sz + pad + text_width(ctx, buf);
 			} break;
 
 			default: {
@@ -339,7 +346,7 @@ static void gridview_autosize_col(struct mkgui_ctx *ctx, struct mkgui_gridview_d
 		}
 	}
 
-	gv->columns[col].width = max_w + 12;
+	gv->columns[col].width = max_w + sc(ctx, 12);
 	dirty_all(ctx);
 }
 
@@ -353,15 +360,16 @@ static int32_t gridview_divider_hit(struct mkgui_ctx *ctx, uint32_t idx, int32_t
 		return -1;
 	}
 
-	int32_t hh = gv->header_height > 0 ? gv->header_height : MKGUI_ROW_HEIGHT;
+	int32_t hh = gv->header_height > 0 ? gv->header_height : ctx->row_height;
 	if(my < ry || my >= ry + hh) {
 		return -1;
 	}
 
+	int32_t div_hit = sc(ctx, 3);
 	int32_t cx = rx + 1;
 	for(uint32_t c = 0; c < gv->col_count; ++c) {
 		cx += gv->columns[c].width;
-		if(mx >= cx - 3 && mx <= cx + 3) {
+		if(mx >= cx - div_hit && mx <= cx + div_hit) {
 			return (int32_t)c;
 		}
 	}
@@ -381,23 +389,24 @@ static uint32_t gridview_scrollbar_hit(struct mkgui_ctx *ctx, uint32_t idx, int3
 	int32_t rw = ctx->rects[idx].w;
 	int32_t rh = ctx->rects[idx].h;
 
-	int32_t hh = gv->header_height > 0 ? gv->header_height : MKGUI_ROW_HEIGHT;
-	int32_t sb_x = rx + rw - MKGUI_SCROLLBAR_W - 1;
+	int32_t hh = gv->header_height > 0 ? gv->header_height : ctx->row_height;
+	int32_t sb_x = rx + rw - ctx->scrollbar_w - 1;
 	int32_t sb_y = ry + hh + 1;
 	int32_t sb_h = rh - hh - 2;
 
-	if(mx < sb_x || mx >= sb_x + MKGUI_SCROLLBAR_W || my < sb_y || my >= sb_y + sb_h) {
+	if(mx < sb_x || mx >= sb_x + ctx->scrollbar_w || my < sb_y || my >= sb_y + sb_h) {
 		return 0;
 	}
 
-	int32_t total_h = (int32_t)gv->row_count * MKGUI_ROW_HEIGHT;
+	int32_t total_h = (int32_t)gv->row_count * ctx->row_height;
 	if(total_h <= sb_h) {
 		return 0;
 	}
 
+	int32_t min_thumb = sc(ctx, 20);
 	int32_t thumb_h = sb_h * sb_h / total_h;
-	if(thumb_h < 20) {
-		thumb_h = 20;
+	if(thumb_h < min_thumb) {
+		thumb_h = min_thumb;
 	}
 	int32_t thumb_y = sb_y + (int32_t)((int64_t)gv->scroll_y * (sb_h - thumb_h) / (total_h - sb_h));
 
@@ -417,14 +426,15 @@ static int32_t gridview_thumb_offset(struct mkgui_ctx *ctx, uint32_t idx, int32_
 
 	int32_t ry = ctx->rects[idx].y;
 	int32_t rh = ctx->rects[idx].h;
-	int32_t hh = gv->header_height > 0 ? gv->header_height : MKGUI_ROW_HEIGHT;
+	int32_t hh = gv->header_height > 0 ? gv->header_height : ctx->row_height;
 	int32_t sb_y = ry + hh + 1;
 	int32_t sb_h = rh - hh - 2;
 
-	int32_t total_h = (int32_t)gv->row_count * MKGUI_ROW_HEIGHT;
+	int32_t total_h = (int32_t)gv->row_count * ctx->row_height;
+	int32_t min_thumb = sc(ctx, 20);
 	int32_t thumb_h = sb_h * sb_h / total_h;
-	if(thumb_h < 20) {
-		thumb_h = 20;
+	if(thumb_h < min_thumb) {
+		thumb_h = min_thumb;
 	}
 	int32_t thumb_y = sb_y + (int32_t)((int64_t)gv->scroll_y * (sb_h - thumb_h) / (total_h - sb_h));
 	return my - thumb_y;
@@ -443,17 +453,18 @@ static void gridview_scroll_to_y(struct mkgui_ctx *ctx, uint32_t id, int32_t my)
 
 	int32_t ry = ctx->rects[idx].y;
 	int32_t rh = ctx->rects[idx].h;
-	int32_t hh = gv->header_height > 0 ? gv->header_height : MKGUI_ROW_HEIGHT;
+	int32_t hh = gv->header_height > 0 ? gv->header_height : ctx->row_height;
 	int32_t sb_y = ry + hh + 1;
 	int32_t sb_h = rh - hh - 2;
 
-	int32_t total_h = (int32_t)gv->row_count * MKGUI_ROW_HEIGHT;
+	int32_t total_h = (int32_t)gv->row_count * ctx->row_height;
 	if(total_h <= sb_h) {
 		return;
 	}
+	int32_t min_thumb = sc(ctx, 20);
 	int32_t thumb_h = sb_h * sb_h / total_h;
-	if(thumb_h < 20) {
-		thumb_h = 20;
+	if(thumb_h < min_thumb) {
+		thumb_h = min_thumb;
 	}
 
 	int32_t usable = sb_h - thumb_h;
@@ -485,9 +496,9 @@ static uint32_t handle_gridview_key(struct mkgui_ctx *ctx, struct mkgui_event *e
 		return 0;
 	}
 	int32_t rh = ctx->rects[idx].h;
-	int32_t hh = gv->header_height > 0 ? gv->header_height : MKGUI_ROW_HEIGHT;
+	int32_t hh = gv->header_height > 0 ? gv->header_height : ctx->row_height;
 	int32_t content_h = rh - hh - 2;
-	int32_t page = content_h / MKGUI_ROW_HEIGHT;
+	int32_t page = content_h / ctx->row_height;
 	if(page < 1) {
 		page = 1;
 	}
@@ -553,14 +564,14 @@ static uint32_t handle_gridview_key(struct mkgui_ctx *ctx, struct mkgui_event *e
 		return 0;
 	}
 
-	int32_t row_y = gv->selected_row * MKGUI_ROW_HEIGHT;
+	int32_t row_y = gv->selected_row * ctx->row_height;
 	if(row_y < gv->scroll_y) {
 		gv->scroll_y = row_y;
 	}
-	if(row_y + MKGUI_ROW_HEIGHT > gv->scroll_y + content_h) {
-		gv->scroll_y = row_y + MKGUI_ROW_HEIGHT - content_h;
+	if(row_y + ctx->row_height > gv->scroll_y + content_h) {
+		gv->scroll_y = row_y + ctx->row_height - content_h;
 	}
-	gridview_clamp_scroll(gv, content_h);
+	gridview_clamp_scroll(ctx, gv, content_h);
 	dirty_all(ctx);
 	ev->type = MKGUI_EVENT_GRID_CLICK;
 	ev->id = ctx->focus_id;
@@ -708,14 +719,14 @@ MKGUI_API void mkgui_gridview_scroll_to(struct mkgui_ctx *ctx, uint32_t id, int3
 		return;
 	}
 	int32_t rh = ctx->rects[idx].h;
-	int32_t hh = gv->header_height > 0 ? gv->header_height : MKGUI_ROW_HEIGHT;
+	int32_t hh = gv->header_height > 0 ? gv->header_height : ctx->row_height;
 	int32_t content_h = rh - hh - 2;
-	int32_t row_y = row * MKGUI_ROW_HEIGHT;
+	int32_t row_y = row * ctx->row_height;
 	if(row_y < gv->scroll_y) {
 		gv->scroll_y = row_y;
 	}
-	if(row_y + MKGUI_ROW_HEIGHT > gv->scroll_y + content_h) {
-		gv->scroll_y = row_y + MKGUI_ROW_HEIGHT - content_h;
+	if(row_y + ctx->row_height > gv->scroll_y + content_h) {
+		gv->scroll_y = row_y + ctx->row_height - content_h;
 	}
 	if(gv->scroll_y < 0) {
 		gv->scroll_y = 0;

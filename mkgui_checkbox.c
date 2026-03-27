@@ -74,7 +74,7 @@ static void render_checkbox(struct mkgui_ctx *ctx, uint32_t idx) {
 	int32_t ry = ctx->rects[idx].y;
 	int32_t rh = ctx->rects[idx].h;
 
-	int32_t box_size = 16;
+	int32_t box_size = sc(ctx, 16);
 	int32_t by = ry + (rh - box_size) / 2;
 
 	uint32_t disabled = (w->flags & MKGUI_DISABLED);
@@ -89,14 +89,14 @@ static void render_checkbox(struct mkgui_ctx *ctx, uint32_t idx) {
 		int32_t cx = rx + box_size / 2;
 		int32_t cy = by + box_size / 2;
 		uint32_t check_color = disabled ? ctx->theme.text_disabled : ctx->theme.sel_text;
-		draw_aa_line(ctx->pixels, ctx->win_w, ctx->win_h, cx - 4, cy - 1, cx - 1, cy + 3, check_color, 2);
-		draw_aa_line(ctx->pixels, ctx->win_w, ctx->win_h, cx - 1, cy + 3, cx + 5, cy - 4, check_color, 2);
+		draw_aa_line(ctx->pixels, ctx->win_w, ctx->win_h, cx - sc(ctx, 4), cy - sc(ctx, 1), cx - sc(ctx, 1), cy + sc(ctx, 3), check_color, sc(ctx, 2));
+		draw_aa_line(ctx->pixels, ctx->win_w, ctx->win_h, cx - sc(ctx, 1), cy + sc(ctx, 3), cx + sc(ctx, 5), cy - sc(ctx, 4), check_color, sc(ctx, 2));
 	}
 
 	int32_t rw = ctx->rects[idx].w;
 	int32_t ty = ry + (rh - ctx->font_height) / 2;
 	uint32_t tc = disabled ? ctx->theme.text_disabled : ctx->theme.text;
-	push_text_clip(rx + box_size + 6, ty, w->label, tc, rx, ry, rx + rw, ry + rh);
+	push_text_clip(rx + box_size + sc(ctx, 6), ty, w->label, tc, rx, ry, rx + rw, ry + rh);
 }
 
 // [=]===^=[ handle_checkbox_key ]===============================[=]

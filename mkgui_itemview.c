@@ -1,18 +1,18 @@
 // Copyright (c) 2026, Peter Fors
 // SPDX-License-Identifier: MIT
 
-#define MKGUI_ITEMVIEW_ICON_CELL_W   88
-#define MKGUI_ITEMVIEW_ICON_CELL_H   80
 #define MKGUI_ITEMVIEW_ICON_LINES    2
-#define MKGUI_ITEMVIEW_THUMB_CELL_W  120
-#define MKGUI_ITEMVIEW_THUMB_CELL_H  110
-#define MKGUI_ITEMVIEW_COMPACT_ROW_H 20
-#define MKGUI_ITEMVIEW_DETAIL_ROW_H  20
-#define MKGUI_ITEMVIEW_THUMB_SIZE    64
-#define MKGUI_ITEMVIEW_HSCROLL_H     14
+#define MKGUI_ITEMVIEW_ICON_CELL_W_PX   88
+#define MKGUI_ITEMVIEW_ICON_CELL_H_PX   80
+#define MKGUI_ITEMVIEW_THUMB_CELL_W_PX  120
+#define MKGUI_ITEMVIEW_THUMB_CELL_H_PX  110
+#define MKGUI_ITEMVIEW_COMPACT_ROW_H_PX 20
+#define MKGUI_ITEMVIEW_DETAIL_ROW_H_PX  20
+#define MKGUI_ITEMVIEW_THUMB_SIZE_PX    64
+#define MKGUI_ITEMVIEW_HSCROLL_H_PX     14
 
 // [=]===^=[ itemview_cell_size ]=================================[=]
-static void itemview_cell_size(struct mkgui_itemview_data *iv, int32_t *cw, int32_t *ch) {
+static void itemview_cell_size(struct mkgui_ctx *ctx, struct mkgui_itemview_data *iv, int32_t *cw, int32_t *ch) {
 	if(iv->cell_w > 0 && iv->cell_h > 0) {
 		*cw = iv->cell_w;
 		*ch = iv->cell_h;
@@ -20,41 +20,41 @@ static void itemview_cell_size(struct mkgui_itemview_data *iv, int32_t *cw, int3
 	}
 	switch(iv->view_mode) {
 		case MKGUI_VIEW_ICON: {
-			*cw = MKGUI_ITEMVIEW_ICON_CELL_W;
-			*ch = MKGUI_ITEMVIEW_ICON_CELL_H;
+			*cw = sc(ctx, MKGUI_ITEMVIEW_ICON_CELL_W_PX);
+			*ch = sc(ctx, MKGUI_ITEMVIEW_ICON_CELL_H_PX);
 		} break;
 
 		case MKGUI_VIEW_THUMBNAIL: {
-			*cw = MKGUI_ITEMVIEW_THUMB_CELL_W;
-			*ch = MKGUI_ITEMVIEW_THUMB_CELL_H;
+			*cw = sc(ctx, MKGUI_ITEMVIEW_THUMB_CELL_W_PX);
+			*ch = sc(ctx, MKGUI_ITEMVIEW_THUMB_CELL_H_PX);
 		} break;
 
 		case MKGUI_VIEW_COMPACT: {
 			*cw = 0;
-			*ch = MKGUI_ITEMVIEW_COMPACT_ROW_H;
+			*ch = sc(ctx, MKGUI_ITEMVIEW_COMPACT_ROW_H_PX);
 		} break;
 
 		case MKGUI_VIEW_DETAIL: {
 			*cw = 0;
-			*ch = MKGUI_ITEMVIEW_DETAIL_ROW_H;
+			*ch = sc(ctx, MKGUI_ITEMVIEW_DETAIL_ROW_H_PX);
 		} break;
 
 		default: {
-			*cw = MKGUI_ITEMVIEW_ICON_CELL_W;
-			*ch = MKGUI_ITEMVIEW_ICON_CELL_H;
+			*cw = sc(ctx, MKGUI_ITEMVIEW_ICON_CELL_W_PX);
+			*ch = sc(ctx, MKGUI_ITEMVIEW_ICON_CELL_H_PX);
 		} break;
 	}
 }
 
 // [=]===^=[ itemview_content_area ]===============================[=]
-static void itemview_content_area(struct mkgui_itemview_data *iv, int32_t rx, int32_t ry, int32_t rw, int32_t rh, int32_t *cx, int32_t *cy, int32_t *cw, int32_t *ch) {
+static void itemview_content_area(struct mkgui_ctx *ctx, struct mkgui_itemview_data *iv, int32_t rx, int32_t ry, int32_t rw, int32_t rh, int32_t *cx, int32_t *cy, int32_t *cw, int32_t *ch) {
 	*cx = rx + 1;
 	*cy = ry + 1;
 	if(iv->view_mode == MKGUI_VIEW_COMPACT) {
 		*cw = rw - 2;
-		*ch = rh - 2 - MKGUI_ITEMVIEW_HSCROLL_H;
+		*ch = rh - 2 - sc(ctx, MKGUI_ITEMVIEW_HSCROLL_H_PX);
 	} else {
-		*cw = rw - 2 - MKGUI_SCROLLBAR_W;
+		*cw = rw - 2 - ctx->scrollbar_w;
 		*ch = rh - 2;
 	}
 }
@@ -69,9 +69,9 @@ static int32_t itemview_grid_cols(int32_t content_w, int32_t cell_w) {
 }
 
 // [=]===^=[ itemview_total_height ]===============================[=]
-static int32_t itemview_total_height(struct mkgui_itemview_data *iv, int32_t content_w) {
+static int32_t itemview_total_height(struct mkgui_ctx *ctx, struct mkgui_itemview_data *iv, int32_t content_w) {
 	int32_t cw, ch;
-	itemview_cell_size(iv, &cw, &ch);
+	itemview_cell_size(ctx, iv, &cw, &ch);
 
 	if(iv->view_mode == MKGUI_VIEW_DETAIL) {
 		return (int32_t)iv->item_count * ch;
@@ -87,24 +87,24 @@ static int32_t itemview_total_height(struct mkgui_itemview_data *iv, int32_t con
 }
 
 // [=]===^=[ itemview_compact_total_w ]============================[=]
-static int32_t itemview_compact_total_w(struct mkgui_itemview_data *iv, int32_t content_h) {
-	int32_t row_h = MKGUI_ITEMVIEW_COMPACT_ROW_H;
+static int32_t itemview_compact_total_w(struct mkgui_ctx *ctx, struct mkgui_itemview_data *iv, int32_t content_h) {
+	int32_t row_h = sc(ctx, MKGUI_ITEMVIEW_COMPACT_ROW_H_PX);
 	int32_t rows_per_col = content_h / row_h;
 	if(rows_per_col < 1) {
 		rows_per_col = 1;
 	}
-	int32_t col_w = iv->cell_w > 0 ? iv->cell_w : 180;
+	int32_t col_w = iv->cell_w > 0 ? iv->cell_w : sc(ctx, 180);
 	int32_t total_cols = ((int32_t)iv->item_count + rows_per_col - 1) / rows_per_col;
 	return total_cols * col_w;
 }
 
 // [=]===^=[ itemview_clamp_scroll ]===============================[=]
-static void itemview_clamp_scroll(struct mkgui_itemview_data *iv, int32_t content_w, int32_t content_h) {
+static void itemview_clamp_scroll(struct mkgui_ctx *ctx, struct mkgui_itemview_data *iv, int32_t content_w, int32_t content_h) {
 	int32_t max_scroll;
 	if(iv->view_mode == MKGUI_VIEW_COMPACT) {
-		max_scroll = itemview_compact_total_w(iv, content_h) - content_w;
+		max_scroll = itemview_compact_total_w(ctx, iv, content_h) - content_w;
 	} else {
-		max_scroll = itemview_total_height(iv, content_w) - content_h;
+		max_scroll = itemview_total_height(ctx, iv, content_w) - content_h;
 	}
 	if(max_scroll < 0) {
 		max_scroll = 0;
@@ -147,9 +147,9 @@ static void render_itemview_icon(struct mkgui_ctx *ctx, uint32_t idx, struct mkg
 	int32_t rh = ctx->rects[idx].h;
 
 	int32_t cw, ch;
-	itemview_cell_size(iv, &cw, &ch);
+	itemview_cell_size(ctx, iv, &cw, &ch);
 	int32_t ca_x, ca_y, ca_w, ca_h;
-	itemview_content_area(iv, rx, ry, rw, rh, &ca_x, &ca_y, &ca_w, &ca_h);
+	itemview_content_area(ctx, iv, rx, ry, rw, rh, &ca_x, &ca_y, &ca_w, &ca_h);
 	int32_t cols = itemview_grid_cols(ca_w, cw);
 	int32_t pad_x = (ca_w - cols * cw) / 2;
 
@@ -175,25 +175,30 @@ static void render_itemview_icon(struct mkgui_ctx *ctx, uint32_t idx, struct mkg
 				continue;
 			}
 
+			int32_t sel_inset = sc(ctx, 2);
+			int32_t icon_top_pad = sc(ctx, 8);
+			int32_t cell_pad = sc(ctx, 3);
+			int32_t label_gap = sc(ctx, 12);
+
 			if(item == iv->selected) {
-				draw_rounded_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, cx + 2, cy + 2, cw - 4, ch - 4, ctx->theme.selection, ctx->theme.corner_radius);
+				draw_rounded_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, cx + sel_inset, cy + sel_inset, cw - sel_inset * 2, ch - sel_inset * 2, ctx->theme.selection, ctx->theme.corner_radius);
 			}
 
 			int32_t icon_idx = itemview_get_icon_idx(iv, (uint32_t)item);
 			int32_t ic_h = (icon_idx >= 0) ? icons[icon_idx].h : 0;
 			if(icon_idx >= 0) {
 				int32_t ix = cx + (cw - icons[icon_idx].w) / 2;
-				int32_t iy = cy + 8;
+				int32_t iy = cy + icon_top_pad;
 				draw_icon(ctx->pixels, ctx->win_w, ctx->win_h, &icons[icon_idx], ix, iy, ca_x, ca_y, clip_x2, clip_y2);
 			}
 
 			itemview_get_label(iv, (uint32_t)item, label, sizeof(label));
 			if(label[0]) {
-				int32_t max_tw = cw - 6;
-				int32_t cell_cx1 = cx + 3 > ca_x ? cx + 3 : ca_x;
-				int32_t cell_cx2 = cx + cw - 3 < clip_x2 ? cx + cw - 3 : clip_x2;
+				int32_t max_tw = cw - cell_pad * 2;
+				int32_t cell_cx1 = cx + cell_pad > ca_x ? cx + cell_pad : ca_x;
+				int32_t cell_cx2 = cx + cw - cell_pad < clip_x2 ? cx + cw - cell_pad : clip_x2;
 				uint32_t tc = (item == iv->selected) ? ctx->theme.sel_text : ((ctx->widgets[idx].flags & MKGUI_DISABLED) ? ctx->theme.text_disabled : ctx->theme.text);
-				int32_t ty = cy + ic_h + 12;
+				int32_t ty = cy + ic_h + label_gap;
 				const char *p = label;
 				for(uint32_t line = 0; line < MKGUI_ITEMVIEW_ICON_LINES && *p; ++line) {
 					int32_t w = 0;
@@ -247,9 +252,9 @@ static void render_itemview_thumbnail(struct mkgui_ctx *ctx, uint32_t idx, struc
 	int32_t rh = ctx->rects[idx].h;
 
 	int32_t cw, ch;
-	itemview_cell_size(iv, &cw, &ch);
+	itemview_cell_size(ctx, iv, &cw, &ch);
 	int32_t ca_x, ca_y, ca_w, ca_h;
-	itemview_content_area(iv, rx, ry, rw, rh, &ca_x, &ca_y, &ca_w, &ca_h);
+	itemview_content_area(ctx, iv, rx, ry, rw, rh, &ca_x, &ca_y, &ca_w, &ca_h);
 	int32_t cols = itemview_grid_cols(ca_w, cw);
 	int32_t pad_x = (ca_w - cols * cw) / 2;
 
@@ -259,7 +264,7 @@ static void render_itemview_thumbnail(struct mkgui_ctx *ctx, uint32_t idx, struc
 	int32_t first_row = iv->scroll_y / ch;
 	int32_t last_row = (iv->scroll_y + ca_h + ch - 1) / ch;
 
-	int32_t ts = iv->thumb_size > 0 ? iv->thumb_size : MKGUI_ITEMVIEW_THUMB_SIZE;
+	int32_t ts = iv->thumb_size > 0 ? iv->thumb_size : sc(ctx, MKGUI_ITEMVIEW_THUMB_SIZE_PX);
 
 	char label[MKGUI_MAX_TEXT];
 
@@ -277,12 +282,15 @@ static void render_itemview_thumbnail(struct mkgui_ctx *ctx, uint32_t idx, struc
 				continue;
 			}
 
+			int32_t sel_inset = sc(ctx, 2);
+			int32_t thumb_pad = sc(ctx, 4);
+
 			if(item == iv->selected) {
-				draw_rounded_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, cx + 2, cy + 2, cw - 4, ch - 4, ctx->theme.selection, ctx->theme.corner_radius);
+				draw_rounded_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, cx + sel_inset, cy + sel_inset, cw - sel_inset * 2, ch - sel_inset * 2, ctx->theme.selection, ctx->theme.corner_radius);
 			}
 
 			int32_t tx_off = (cw - ts) / 2;
-			int32_t ty_off = 4;
+			int32_t ty_off = thumb_pad;
 			int32_t thumb_x = cx + tx_off;
 			int32_t thumb_y = cy + ty_off;
 
@@ -324,9 +332,9 @@ static void render_itemview_thumbnail(struct mkgui_ctx *ctx, uint32_t idx, struc
 			itemview_get_label(iv, (uint32_t)item, label, sizeof(label));
 			if(label[0]) {
 				int32_t tw = text_width(ctx, label);
-				int32_t max_tw = cw - 4;
+				int32_t max_tw = cw - thumb_pad;
 				int32_t label_x = cx + (cw - (tw < max_tw ? tw : max_tw)) / 2;
-				int32_t label_y = cy + ts + ty_off + 4;
+				int32_t label_y = cy + ts + ty_off + thumb_pad;
 				int32_t cell_clip_r = cx + cw < clip_x2 ? cx + cw : clip_x2;
 				int32_t cell_clip_l = cx > ca_x ? cx : ca_x;
 				uint32_t tc = (item == iv->selected) ? ctx->theme.sel_text : ((ctx->widgets[idx].flags & MKGUI_DISABLED) ? ctx->theme.text_disabled : ctx->theme.text);
@@ -344,17 +352,17 @@ static void render_itemview_compact(struct mkgui_ctx *ctx, uint32_t idx, struct 
 	int32_t rh = ctx->rects[idx].h;
 
 	int32_t ca_x, ca_y, ca_w, ca_h;
-	itemview_content_area(iv, rx, ry, rw, rh, &ca_x, &ca_y, &ca_w, &ca_h);
+	itemview_content_area(ctx, iv, rx, ry, rw, rh, &ca_x, &ca_y, &ca_w, &ca_h);
 	int32_t clip_x2 = ca_x + ca_w;
 	int32_t clip_y2 = ca_y + ca_h;
 
-	int32_t row_h = MKGUI_ITEMVIEW_COMPACT_ROW_H;
+	int32_t row_h = sc(ctx, MKGUI_ITEMVIEW_COMPACT_ROW_H_PX);
 	int32_t rows_per_col = ca_h / row_h;
 	if(rows_per_col < 1) {
 		rows_per_col = 1;
 	}
 
-	int32_t col_w = iv->cell_w > 0 ? iv->cell_w : 180;
+	int32_t col_w = iv->cell_w > 0 ? iv->cell_w : sc(ctx, 180);
 	int32_t visible_cols = ca_w / col_w + 2;
 	int32_t total_cols = ((int32_t)iv->item_count + rows_per_col - 1) / rows_per_col;
 	int32_t first_col_off = iv->scroll_y / col_w;
@@ -382,12 +390,13 @@ static void render_itemview_compact(struct mkgui_ctx *ctx, uint32_t idx, struct 
 				draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, col_x, cy, col_w, row_h, ctx->theme.selection);
 			}
 
-			int32_t tx = col_x + 4;
+			int32_t item_pad = sc(ctx, 4);
+			int32_t tx = col_x + item_pad;
 			int32_t icon_idx = itemview_get_icon_idx(iv, (uint32_t)item);
 			if(icon_idx >= 0) {
 				int32_t iy = cy + (row_h - icons[icon_idx].h) / 2;
 				draw_icon(ctx->pixels, ctx->win_w, ctx->win_h, &icons[icon_idx], tx, iy, ca_x, ca_y, clip_x2, clip_y2);
-				tx += icons[icon_idx].w + 4;
+				tx += icons[icon_idx].w + item_pad;
 			}
 
 			itemview_get_label(iv, (uint32_t)item, label, sizeof(label));
@@ -412,12 +421,13 @@ static void render_itemview_detail(struct mkgui_ctx *ctx, uint32_t idx, struct m
 	int32_t rh = ctx->rects[idx].h;
 
 	int32_t ca_x, ca_y, ca_w, ca_h;
-	itemview_content_area(iv, rx, ry, rw, rh, &ca_x, &ca_y, &ca_w, &ca_h);
+	itemview_content_area(ctx, iv, rx, ry, rw, rh, &ca_x, &ca_y, &ca_w, &ca_h);
 	int32_t clip_y2 = ca_y + ca_h;
 
-	int32_t row_h = MKGUI_ITEMVIEW_DETAIL_ROW_H;
+	int32_t row_h = sc(ctx, MKGUI_ITEMVIEW_DETAIL_ROW_H_PX);
 	int32_t first_row = iv->scroll_y / row_h;
 	int32_t visible = ca_h / row_h + 2;
+	int32_t item_pad = sc(ctx, 4);
 
 	char label[MKGUI_MAX_TEXT];
 
@@ -438,12 +448,12 @@ static void render_itemview_detail(struct mkgui_ctx *ctx, uint32_t idx, struct m
 		}
 		draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, ca_x, cy, ca_w, row_h, row_bg);
 
-		int32_t tx = ca_x + 4;
+		int32_t tx = ca_x + item_pad;
 		int32_t icon_idx = itemview_get_icon_idx(iv, (uint32_t)item);
 		if(icon_idx >= 0) {
 			int32_t iy = cy + (row_h - icons[icon_idx].h) / 2;
 			draw_icon(ctx->pixels, ctx->win_w, ctx->win_h, &icons[icon_idx], tx, iy, ca_x, ca_y, ca_x + ca_w, clip_y2);
-			tx += icons[icon_idx].w + 4;
+			tx += icons[icon_idx].w + item_pad;
 		}
 
 		itemview_get_label(iv, (uint32_t)item, label, sizeof(label));
@@ -464,18 +474,20 @@ static void render_itemview_scrollbar(struct mkgui_ctx *ctx, uint32_t idx, struc
 
 	if(iv->view_mode == MKGUI_VIEW_COMPACT) {
 		int32_t ca_x, ca_y, ca_w, ca_h;
-		itemview_content_area(iv, rx, ry, rw, rh, &ca_x, &ca_y, &ca_w, &ca_h);
+		itemview_content_area(ctx, iv, rx, ry, rw, rh, &ca_x, &ca_y, &ca_w, &ca_h);
 		int32_t sb_x = ca_x;
 		int32_t sb_y = ca_y + ca_h;
 		int32_t sb_w = ca_w;
-		int32_t sb_h = MKGUI_ITEMVIEW_HSCROLL_H;
+		int32_t sb_h = sc(ctx, MKGUI_ITEMVIEW_HSCROLL_H_PX);
+		int32_t sb_inset = sc(ctx, 2);
+		int32_t min_thumb = sc(ctx, 20);
 		draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, sb_x, sb_y, sb_w, sb_h, ctx->theme.scrollbar_bg);
 
-		int32_t total_w = itemview_compact_total_w(iv, ca_h);
+		int32_t total_w = itemview_compact_total_w(ctx, iv, ca_h);
 		if(total_w > ca_w) {
 			int32_t thumb_w = sb_w * ca_w / total_w;
-			if(thumb_w < 20) {
-				thumb_w = 20;
+			if(thumb_w < min_thumb) {
+				thumb_w = min_thumb;
 			}
 			int32_t max_scroll = total_w - ca_w;
 			if(max_scroll < 1) {
@@ -483,21 +495,23 @@ static void render_itemview_scrollbar(struct mkgui_ctx *ctx, uint32_t idx, struc
 			}
 			int32_t thumb_x = sb_x + (int32_t)((int64_t)iv->scroll_y * (sb_w - thumb_w) / max_scroll);
 			uint32_t thumb_color = (ctx->drag_scrollbar_id == ctx->widgets[idx].id) ? ctx->theme.widget_hover : ctx->theme.scrollbar_thumb;
-			draw_rounded_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, thumb_x, sb_y + 2, thumb_w, sb_h - 4, thumb_color, ctx->theme.corner_radius);
+			draw_rounded_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, thumb_x, sb_y + sb_inset, thumb_w, sb_h - sb_inset * 2, thumb_color, ctx->theme.corner_radius);
 		}
 	} else {
 		int32_t ca_x, ca_y, ca_w, ca_h;
-		itemview_content_area(iv, rx, ry, rw, rh, &ca_x, &ca_y, &ca_w, &ca_h);
+		itemview_content_area(ctx, iv, rx, ry, rw, rh, &ca_x, &ca_y, &ca_w, &ca_h);
 		int32_t sb_x = ca_x + ca_w;
 		int32_t sb_y = ca_y;
 		int32_t sb_h = ca_h;
-		draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, sb_x, sb_y, MKGUI_SCROLLBAR_W, sb_h, ctx->theme.scrollbar_bg);
+		draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, sb_x, sb_y, ctx->scrollbar_w, sb_h, ctx->theme.scrollbar_bg);
 
-		int32_t total = itemview_total_height(iv, ca_w);
+		int32_t sb_inset = sc(ctx, 2);
+		int32_t min_thumb = sc(ctx, 20);
+		int32_t total = itemview_total_height(ctx, iv, ca_w);
 		if(total > ca_h) {
 			int32_t thumb_h = sb_h * ca_h / total;
-			if(thumb_h < 20) {
-				thumb_h = 20;
+			if(thumb_h < min_thumb) {
+				thumb_h = min_thumb;
 			}
 			int32_t max_scroll = total - ca_h;
 			if(max_scroll < 1) {
@@ -505,7 +519,7 @@ static void render_itemview_scrollbar(struct mkgui_ctx *ctx, uint32_t idx, struc
 			}
 			int32_t thumb_y = sb_y + (int32_t)((int64_t)iv->scroll_y * (sb_h - thumb_h) / max_scroll);
 			uint32_t thumb_color = (ctx->drag_scrollbar_id == ctx->widgets[idx].id) ? ctx->theme.widget_hover : ctx->theme.scrollbar_thumb;
-			draw_rounded_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, sb_x + 2, thumb_y, MKGUI_SCROLLBAR_W - 4, thumb_h, thumb_color, ctx->theme.corner_radius);
+			draw_rounded_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, sb_x + sb_inset, thumb_y, ctx->scrollbar_w - sb_inset * 2, thumb_h, thumb_color, ctx->theme.corner_radius);
 		}
 	}
 }
@@ -530,8 +544,8 @@ static void render_itemview(struct mkgui_ctx *ctx, uint32_t idx) {
 	int32_t save_cx2 = render_clip_x2, save_cy2 = render_clip_y2;
 
 	int32_t ca_x, ca_y, ca_w, ca_h;
-	itemview_content_area(iv, rx, ry, rw, rh, &ca_x, &ca_y, &ca_w, &ca_h);
-	itemview_clamp_scroll(iv, ca_w, ca_h);
+	itemview_content_area(ctx, iv, rx, ry, rw, rh, &ca_x, &ca_y, &ca_w, &ca_h);
+	itemview_clamp_scroll(ctx, iv, ca_w, ca_h);
 	if(ca_x > render_clip_x1) {
 		render_clip_x1 = ca_x;
 	}
@@ -587,20 +601,21 @@ static uint32_t itemview_scrollbar_hit(struct mkgui_ctx *ctx, uint32_t idx, int3
 	int32_t rw = ctx->rects[idx].w;
 	int32_t rh = ctx->rects[idx].h;
 	int32_t ca_x, ca_y, ca_w, ca_h;
-	itemview_content_area(iv, rx, ry, rw, rh, &ca_x, &ca_y, &ca_w, &ca_h);
+	itemview_content_area(ctx, iv, rx, ry, rw, rh, &ca_x, &ca_y, &ca_w, &ca_h);
 
+	int32_t min_thumb = sc(ctx, 20);
 	if(iv->view_mode == MKGUI_VIEW_COMPACT) {
 		int32_t sb_y = ca_y + ca_h;
-		if(mx < ca_x || mx >= ca_x + ca_w || my < sb_y || my >= sb_y + MKGUI_ITEMVIEW_HSCROLL_H) {
+		if(mx < ca_x || mx >= ca_x + ca_w || my < sb_y || my >= sb_y + sc(ctx, MKGUI_ITEMVIEW_HSCROLL_H_PX)) {
 			return 0;
 		}
-		int32_t total_w = itemview_compact_total_w(iv, ca_h);
+		int32_t total_w = itemview_compact_total_w(ctx, iv, ca_h);
 		if(total_w <= ca_w) {
 			return 1;
 		}
 		int32_t thumb_w = ca_w * ca_w / total_w;
-		if(thumb_w < 20) {
-			thumb_w = 20;
+		if(thumb_w < min_thumb) {
+			thumb_w = min_thumb;
 		}
 		int32_t max_scroll = total_w - ca_w;
 		int32_t thumb_x = ca_x + (int32_t)((int64_t)iv->scroll_y * (ca_w - thumb_w) / max_scroll);
@@ -613,16 +628,16 @@ static uint32_t itemview_scrollbar_hit(struct mkgui_ctx *ctx, uint32_t idx, int3
 		return 1;
 	} else {
 		int32_t sb_x = ca_x + ca_w;
-		if(mx < sb_x || mx >= sb_x + MKGUI_SCROLLBAR_W || my < ca_y || my >= ca_y + ca_h) {
+		if(mx < sb_x || mx >= sb_x + ctx->scrollbar_w || my < ca_y || my >= ca_y + ca_h) {
 			return 0;
 		}
-		int32_t total = itemview_total_height(iv, ca_w);
+		int32_t total = itemview_total_height(ctx, iv, ca_w);
 		if(total <= ca_h) {
 			return 1;
 		}
 		int32_t thumb_h = ca_h * ca_h / total;
-		if(thumb_h < 20) {
-			thumb_h = 20;
+		if(thumb_h < min_thumb) {
+			thumb_h = min_thumb;
 		}
 		int32_t max_scroll = total - ca_h;
 		int32_t thumb_y = ca_y + (int32_t)((int64_t)iv->scroll_y * (ca_h - thumb_h) / max_scroll);
@@ -648,28 +663,29 @@ static int32_t itemview_thumb_offset(struct mkgui_ctx *ctx, uint32_t idx, int32_
 	int32_t rw = ctx->rects[idx].w;
 	int32_t rh = ctx->rects[idx].h;
 	int32_t ca_x, ca_y, ca_w, ca_h;
-	itemview_content_area(iv, rx, ry, rw, rh, &ca_x, &ca_y, &ca_w, &ca_h);
+	itemview_content_area(ctx, iv, rx, ry, rw, rh, &ca_x, &ca_y, &ca_w, &ca_h);
 
+	int32_t min_thumb = sc(ctx, 20);
 	if(iv->view_mode == MKGUI_VIEW_COMPACT) {
-		int32_t total_w = itemview_compact_total_w(iv, ca_h);
+		int32_t total_w = itemview_compact_total_w(ctx, iv, ca_h);
 		if(total_w <= ca_w) {
 			return 0;
 		}
 		int32_t thumb_w = ca_w * ca_w / total_w;
-		if(thumb_w < 20) {
-			thumb_w = 20;
+		if(thumb_w < min_thumb) {
+			thumb_w = min_thumb;
 		}
 		int32_t max_scroll = total_w - ca_w;
 		int32_t thumb_x = ca_x + (int32_t)((int64_t)iv->scroll_y * (ca_w - thumb_w) / max_scroll);
 		return mx - thumb_x;
 	} else {
-		int32_t total = itemview_total_height(iv, ca_w);
+		int32_t total = itemview_total_height(ctx, iv, ca_w);
 		if(total <= ca_h) {
 			return 0;
 		}
 		int32_t thumb_h = ca_h * ca_h / total;
-		if(thumb_h < 20) {
-			thumb_h = 20;
+		if(thumb_h < min_thumb) {
+			thumb_h = min_thumb;
 		}
 		int32_t max_scroll = total - ca_h;
 		int32_t thumb_y = ca_y + (int32_t)((int64_t)iv->scroll_y * (ca_h - thumb_h) / max_scroll);
@@ -689,14 +705,14 @@ static void itemview_page_scroll(struct mkgui_ctx *ctx, uint32_t idx, int32_t di
 	int32_t rw = ctx->rects[idx].w;
 	int32_t rh = ctx->rects[idx].h;
 	int32_t ca_x, ca_y, ca_w, ca_h;
-	itemview_content_area(iv, rx, ry, rw, rh, &ca_x, &ca_y, &ca_w, &ca_h);
+	itemview_content_area(ctx, iv, rx, ry, rw, rh, &ca_x, &ca_y, &ca_w, &ca_h);
 
 	if(iv->view_mode == MKGUI_VIEW_COMPACT) {
 		iv->scroll_y += direction * ca_w;
 	} else {
 		iv->scroll_y += direction * ca_h;
 	}
-	itemview_clamp_scroll(iv, ca_w, ca_h);
+	itemview_clamp_scroll(ctx, iv, ca_w, ca_h);
 	dirty_all(ctx);
 }
 
@@ -718,18 +734,19 @@ static void itemview_scroll_to_mouse(struct mkgui_ctx *ctx, uint32_t widget_id, 
 	int32_t rh = ctx->rects[idx].h;
 
 	int32_t ca_x, ca_y, ca_w, ca_h;
-	itemview_content_area(iv, rx, ry, rw, rh, &ca_x, &ca_y, &ca_w, &ca_h);
+	itemview_content_area(ctx, iv, rx, ry, rw, rh, &ca_x, &ca_y, &ca_w, &ca_h);
 
+	int32_t min_thumb = sc(ctx, 20);
 	if(iv->view_mode == MKGUI_VIEW_COMPACT) {
-		int32_t total_w = itemview_compact_total_w(iv, ca_h);
+		int32_t total_w = itemview_compact_total_w(ctx, iv, ca_h);
 		int32_t max_scroll = total_w - ca_w;
 		if(max_scroll <= 0) {
 			return;
 		}
 		int32_t sb_w = ca_w;
 		int32_t thumb_w = sb_w * ca_w / total_w;
-		if(thumb_w < 20) {
-			thumb_w = 20;
+		if(thumb_w < min_thumb) {
+			thumb_w = min_thumb;
 		}
 		int32_t track = sb_w - thumb_w;
 		if(track <= 0) {
@@ -744,14 +761,14 @@ static void itemview_scroll_to_mouse(struct mkgui_ctx *ctx, uint32_t widget_id, 
 		}
 		iv->scroll_y = (int32_t)(frac * (float)max_scroll);
 	} else {
-		int32_t total = itemview_total_height(iv, ca_w);
+		int32_t total = itemview_total_height(ctx, iv, ca_w);
 		int32_t max_scroll = total - ca_h;
 		if(max_scroll <= 0) {
 			return;
 		}
 		int32_t thumb_h = ca_h * ca_h / total;
-		if(thumb_h < 20) {
-			thumb_h = 20;
+		if(thumb_h < min_thumb) {
+			thumb_h = min_thumb;
 		}
 		int32_t track = ca_h - thumb_h;
 		if(track <= 0) {
@@ -767,7 +784,7 @@ static void itemview_scroll_to_mouse(struct mkgui_ctx *ctx, uint32_t widget_id, 
 		iv->scroll_y = (int32_t)(frac * (float)max_scroll);
 	}
 
-	itemview_clamp_scroll(iv, ca_w, ca_h);
+	itemview_clamp_scroll(ctx, iv, ca_w, ca_h);
 	dirty_all(ctx);
 }
 
@@ -779,14 +796,14 @@ static int32_t itemview_hit_item(struct mkgui_ctx *ctx, uint32_t idx, struct mkg
 	int32_t rh = ctx->rects[idx].h;
 
 	int32_t ca_x, ca_y, ca_w, ca_h;
-	itemview_content_area(iv, rx, ry, rw, rh, &ca_x, &ca_y, &ca_w, &ca_h);
+	itemview_content_area(ctx, iv, rx, ry, rw, rh, &ca_x, &ca_y, &ca_w, &ca_h);
 
 	if(mx < ca_x || mx >= ca_x + ca_w || my < ca_y || my >= ca_y + ca_h) {
 		return -1;
 	}
 
 	int32_t cw, ch;
-	itemview_cell_size(iv, &cw, &ch);
+	itemview_cell_size(ctx, iv, &cw, &ch);
 
 	if(iv->view_mode == MKGUI_VIEW_DETAIL) {
 		int32_t row = (my - ca_y + iv->scroll_y) / ch;
@@ -797,12 +814,12 @@ static int32_t itemview_hit_item(struct mkgui_ctx *ctx, uint32_t idx, struct mkg
 	}
 
 	if(iv->view_mode == MKGUI_VIEW_COMPACT) {
-		int32_t row_h = MKGUI_ITEMVIEW_COMPACT_ROW_H;
+		int32_t row_h = sc(ctx, MKGUI_ITEMVIEW_COMPACT_ROW_H_PX);
 		int32_t rows_per_col = ca_h / row_h;
 		if(rows_per_col < 1) {
 			rows_per_col = 1;
 		}
-		int32_t col_w = iv->cell_w > 0 ? iv->cell_w : 180;
+		int32_t col_w = iv->cell_w > 0 ? iv->cell_w : sc(ctx, 180);
 		int32_t c = (mx - ca_x + iv->scroll_y) / col_w;
 		int32_t r = (my - ca_y) / row_h;
 		int32_t item = c * rows_per_col + r;
@@ -839,17 +856,17 @@ static uint32_t handle_itemview_key(struct mkgui_ctx *ctx, struct mkgui_itemview
 	int32_t rh = ctx->rects[widget_idx].h;
 
 	int32_t ca_x, ca_y, ca_w, ca_h;
-	itemview_content_area(iv, rx, ry, rw, rh, &ca_x, &ca_y, &ca_w, &ca_h);
+	itemview_content_area(ctx, iv, rx, ry, rw, rh, &ca_x, &ca_y, &ca_w, &ca_h);
 	(void)ca_x;
 	(void)ca_y;
 
 	int32_t cw, ch;
-	itemview_cell_size(iv, &cw, &ch);
+	itemview_cell_size(ctx, iv, &cw, &ch);
 
 	int32_t old_sel = iv->selected;
 
 	if(iv->view_mode == MKGUI_VIEW_COMPACT) {
-		int32_t row_h = MKGUI_ITEMVIEW_COMPACT_ROW_H;
+		int32_t row_h = sc(ctx, MKGUI_ITEMVIEW_COMPACT_ROW_H_PX);
 		int32_t rows_per_col = ca_h / row_h;
 		if(rows_per_col < 1) {
 			rows_per_col = 1;
@@ -960,12 +977,12 @@ static uint32_t handle_itemview_key(struct mkgui_ctx *ctx, struct mkgui_itemview
 
 	if(iv->selected != old_sel) {
 		if(iv->view_mode == MKGUI_VIEW_COMPACT) {
-			int32_t row_h = MKGUI_ITEMVIEW_COMPACT_ROW_H;
+			int32_t row_h = sc(ctx, MKGUI_ITEMVIEW_COMPACT_ROW_H_PX);
 			int32_t rows_per_col = ca_h / row_h;
 			if(rows_per_col < 1) {
 				rows_per_col = 1;
 			}
-			int32_t col_w = iv->cell_w > 0 ? iv->cell_w : 180;
+			int32_t col_w = iv->cell_w > 0 ? iv->cell_w : sc(ctx, 180);
 			int32_t item_col = iv->selected / rows_per_col;
 			int32_t item_x = item_col * col_w;
 			if(item_x < iv->scroll_y) {
@@ -991,7 +1008,7 @@ static uint32_t handle_itemview_key(struct mkgui_ctx *ctx, struct mkgui_itemview
 			}
 		}
 
-		itemview_clamp_scroll(iv, ca_w, ca_h);
+		itemview_clamp_scroll(ctx, iv, ca_w, ca_h);
 		dirty_all(ctx);
 		ev->type = MKGUI_EVENT_ITEMVIEW_SELECT;
 		ev->id = ctx->widgets[widget_idx].id;
@@ -1041,7 +1058,7 @@ MKGUI_API void mkgui_itemview_set_thumbnail(struct mkgui_ctx *ctx, uint32_t id, 
 		return;
 	}
 	iv->thumbnail_cb = cb;
-	iv->thumb_size = thumb_size > 0 ? thumb_size : MKGUI_ITEMVIEW_THUMB_SIZE;
+	iv->thumb_size = thumb_size > 0 ? thumb_size : sc(ctx, MKGUI_ITEMVIEW_THUMB_SIZE_PX);
 	if(iv->thumb_buf) {
 		free(iv->thumb_buf);
 	}
@@ -1139,9 +1156,9 @@ MKGUI_API void mkgui_itemview_scroll_to(struct mkgui_ctx *ctx, uint32_t id, int3
 	int32_t rw = ctx->rects[idx].w;
 	int32_t rh = ctx->rects[idx].h;
 	int32_t cx, cy, cw, ch;
-	itemview_content_area(iv, rx, ry, rw, rh, &cx, &cy, &cw, &ch);
+	itemview_content_area(ctx, iv, rx, ry, rw, rh, &cx, &cy, &cw, &ch);
 	int32_t cell_w, cell_h;
-	itemview_cell_size(iv, &cell_w, &cell_h);
+	itemview_cell_size(ctx, iv, &cell_w, &cell_h);
 	if(iv->view_mode == MKGUI_VIEW_COMPACT || iv->view_mode == MKGUI_VIEW_DETAIL) {
 		int32_t row_y = item * cell_h;
 		if(row_y < iv->scroll_y) {

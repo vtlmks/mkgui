@@ -1,9 +1,6 @@
 // Copyright (c) 2026, Peter Fors
 // SPDX-License-Identifier: MIT
 
-#define MKGUI_SLIDER_TRACK_SIZE       4
-#define MKGUI_SLIDER_METER_TRACK_SIZE 8
-#define MKGUI_SLIDER_THUMB_SIZE       10
 #define MKGUI_SLIDER_WEDGE_MAX_W      10
 
 // [=]===^=[ slider_draw_wedge_v ]================================[=]
@@ -101,6 +98,11 @@ static void render_slider(struct mkgui_ctx *ctx, uint32_t idx) {
 	uint32_t vertical = (w->flags & MKGUI_VERTICAL);
 	uint32_t mixer = (w->style & MKGUI_SLIDER_MIXER);
 
+	int32_t track_size = sc(ctx, 4);
+	int32_t meter_track_size = sc(ctx, 8);
+	int32_t thumb_size = sc(ctx, 10);
+	int32_t wedge_max_w = sc(ctx, 10);
+
 	int32_t range = sd->max_val - sd->min_val;
 	if(range <= 0) {
 		range = 1;
@@ -111,7 +113,7 @@ static void render_slider(struct mkgui_ctx *ctx, uint32_t idx) {
 	uint32_t wedge_color = blend_pixel(ctx->theme.bg, ctx->theme.widget_border, 128);
 
 	if(vertical) {
-		int32_t track_w = mixer ? MKGUI_SLIDER_METER_TRACK_SIZE : MKGUI_SLIDER_TRACK_SIZE;
+		int32_t track_w = mixer ? meter_track_size : track_size;
 		int32_t track_x = rx + rw / 2 - track_w / 2;
 		draw_rounded_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, track_x, ry, track_w, rh, ctx->theme.widget_border, 2);
 
@@ -136,14 +138,14 @@ static void render_slider(struct mkgui_ctx *ctx, uint32_t idx) {
 			}
 
 			int32_t wedge_x = track_x + track_w + 1;
-			slider_draw_wedge_v(ctx->pixels, ctx->win_w, ctx->win_h, wedge_x, ry, rh, 0, rh, MKGUI_SLIDER_WEDGE_MAX_W, wedge_color);
+			slider_draw_wedge_v(ctx->pixels, ctx->win_w, ctx->win_h, wedge_x, ry, rh, 0, rh, wedge_max_w, wedge_color);
 		}
 
-		int32_t thumb_y = ry + rh - MKGUI_SLIDER_THUMB_SIZE - (int32_t)((int64_t)(sd->value - sd->min_val) * (rh - MKGUI_SLIDER_THUMB_SIZE) / range);
-		draw_patch(ctx, MKGUI_STYLE_RAISED, rx + 2, thumb_y, rw - 4, MKGUI_SLIDER_THUMB_SIZE, thumb_color, thumb_border);
+		int32_t thumb_y = ry + rh - thumb_size - (int32_t)((int64_t)(sd->value - sd->min_val) * (rh - thumb_size) / range);
+		draw_patch(ctx, MKGUI_STYLE_RAISED, rx + sc(ctx, 2), thumb_y, rw - sc(ctx, 4), thumb_size, thumb_color, thumb_border);
 
 	} else {
-		int32_t track_h = mixer ? MKGUI_SLIDER_METER_TRACK_SIZE : MKGUI_SLIDER_TRACK_SIZE;
+		int32_t track_h = mixer ? meter_track_size : track_size;
 		int32_t track_y = ry + rh / 2 - track_h / 2;
 		draw_rounded_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, rx, track_y, rw, track_h, ctx->theme.widget_border, 2);
 
@@ -168,11 +170,11 @@ static void render_slider(struct mkgui_ctx *ctx, uint32_t idx) {
 			}
 
 			int32_t wedge_y = track_y + track_h + 1;
-			slider_draw_wedge_h(ctx->pixels, ctx->win_w, ctx->win_h, rx, wedge_y, rw, 0, rw, MKGUI_SLIDER_WEDGE_MAX_W, wedge_color);
+			slider_draw_wedge_h(ctx->pixels, ctx->win_w, ctx->win_h, rx, wedge_y, rw, 0, rw, wedge_max_w, wedge_color);
 		}
 
-		int32_t thumb_x = rx + (int32_t)((int64_t)(sd->value - sd->min_val) * (rw - MKGUI_SLIDER_THUMB_SIZE) / range);
-		draw_patch(ctx, MKGUI_STYLE_RAISED, thumb_x, ry + 2, MKGUI_SLIDER_THUMB_SIZE, rh - 4, thumb_color, thumb_border);
+		int32_t thumb_x = rx + (int32_t)((int64_t)(sd->value - sd->min_val) * (rw - thumb_size) / range);
+		draw_patch(ctx, MKGUI_STYLE_RAISED, thumb_x, ry + sc(ctx, 2), thumb_size, rh - sc(ctx, 4), thumb_color, thumb_border);
 	}
 }
 

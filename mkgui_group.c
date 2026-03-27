@@ -1,8 +1,6 @@
 // Copyright (c) 2026, Peter Fors
 // SPDX-License-Identifier: MIT
 
-#define MKGUI_GROUP_PAD 6
-
 // [=]===^=[ render_group ]========================================[=]
 static void render_group(struct mkgui_ctx *ctx, uint32_t idx) {
 	struct mkgui_widget *w = &ctx->widgets[idx];
@@ -11,14 +9,15 @@ static void render_group(struct mkgui_ctx *ctx, uint32_t idx) {
 	int32_t rw = ctx->rects[idx].w;
 	int32_t rh = ctx->rects[idx].h;
 
+	int32_t group_pad = sc(ctx, 6);
 	uint32_t collapsed = (w->style & MKGUI_COLLAPSED);
-	int32_t label_y = ry + 2;
-	int32_t label_x = rx + MKGUI_GROUP_PAD + 4;
+	int32_t label_y = ry + sc(ctx, 2);
+	int32_t label_x = rx + group_pad + sc(ctx, 4);
 	int32_t tw = text_width(ctx, w->label);
-	int32_t gap_left = label_x - 4;
-	int32_t gap_right = label_x + tw + 4;
+	int32_t gap_left = label_x - sc(ctx, 4);
+	int32_t gap_right = label_x + tw + sc(ctx, 4);
 
-	int32_t frame_y = ry + ctx->font_height / 2 + 2;
+	int32_t frame_y = ry + ctx->font_height / 2 + sc(ctx, 2);
 	int32_t frame_h = collapsed ? (rh - (frame_y - ry)) : (rh - (frame_y - ry));
 	uint32_t bc = ctx->theme.widget_border;
 	int32_t r = ctx->theme.corner_radius;
@@ -51,42 +50,21 @@ static void render_group(struct mkgui_ctx *ctx, uint32_t idx) {
 	}
 
 	uint32_t ac = ctx->theme.text;
-	int32_t ax = rx + MKGUI_GROUP_PAD - 4;
+	int32_t ax = rx + group_pad - sc(ctx, 4);
 	int32_t ay = label_y + ctx->font_height / 2;
 	if(collapsed) {
-		draw_pixel(ctx->pixels, ctx->win_w, ctx->win_h, ax, ay - 3, ac);
-		draw_pixel(ctx->pixels, ctx->win_w, ctx->win_h, ax, ay - 2, ac);
-		draw_pixel(ctx->pixels, ctx->win_w, ctx->win_h, ax + 1, ay - 2, ac);
-		draw_pixel(ctx->pixels, ctx->win_w, ctx->win_h, ax, ay - 1, ac);
-		draw_pixel(ctx->pixels, ctx->win_w, ctx->win_h, ax + 1, ay - 1, ac);
-		draw_pixel(ctx->pixels, ctx->win_w, ctx->win_h, ax + 2, ay - 1, ac);
-		draw_pixel(ctx->pixels, ctx->win_w, ctx->win_h, ax, ay, ac);
-		draw_pixel(ctx->pixels, ctx->win_w, ctx->win_h, ax + 1, ay, ac);
-		draw_pixel(ctx->pixels, ctx->win_w, ctx->win_h, ax + 2, ay, ac);
-		draw_pixel(ctx->pixels, ctx->win_w, ctx->win_h, ax + 3, ay, ac);
-		draw_pixel(ctx->pixels, ctx->win_w, ctx->win_h, ax, ay + 1, ac);
-		draw_pixel(ctx->pixels, ctx->win_w, ctx->win_h, ax + 1, ay + 1, ac);
-		draw_pixel(ctx->pixels, ctx->win_w, ctx->win_h, ax + 2, ay + 1, ac);
-		draw_pixel(ctx->pixels, ctx->win_w, ctx->win_h, ax, ay + 2, ac);
-		draw_pixel(ctx->pixels, ctx->win_w, ctx->win_h, ax + 1, ay + 2, ac);
-		draw_pixel(ctx->pixels, ctx->win_w, ctx->win_h, ax, ay + 3, ac);
+		draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, ax, ay - sc(ctx, 3), sc(ctx, 1), sc(ctx, 1), ac);
+		draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, ax, ay - sc(ctx, 2), sc(ctx, 2), sc(ctx, 1), ac);
+		draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, ax, ay - sc(ctx, 1), sc(ctx, 3), sc(ctx, 1), ac);
+		draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, ax, ay, sc(ctx, 4), sc(ctx, 1), ac);
+		draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, ax, ay + sc(ctx, 1), sc(ctx, 3), sc(ctx, 1), ac);
+		draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, ax, ay + sc(ctx, 2), sc(ctx, 2), sc(ctx, 1), ac);
+		draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, ax, ay + sc(ctx, 3), sc(ctx, 1), sc(ctx, 1), ac);
 	} else {
-		draw_pixel(ctx->pixels, ctx->win_w, ctx->win_h, ax - 2, ay - 1, ac);
-		draw_pixel(ctx->pixels, ctx->win_w, ctx->win_h, ax - 1, ay - 1, ac);
-		draw_pixel(ctx->pixels, ctx->win_w, ctx->win_h, ax, ay - 1, ac);
-		draw_pixel(ctx->pixels, ctx->win_w, ctx->win_h, ax + 1, ay - 1, ac);
-		draw_pixel(ctx->pixels, ctx->win_w, ctx->win_h, ax + 2, ay - 1, ac);
-		draw_pixel(ctx->pixels, ctx->win_w, ctx->win_h, ax + 3, ay - 1, ac);
-		draw_pixel(ctx->pixels, ctx->win_w, ctx->win_h, ax + 4, ay - 1, ac);
-		draw_pixel(ctx->pixels, ctx->win_w, ctx->win_h, ax - 1, ay, ac);
-		draw_pixel(ctx->pixels, ctx->win_w, ctx->win_h, ax, ay, ac);
-		draw_pixel(ctx->pixels, ctx->win_w, ctx->win_h, ax + 1, ay, ac);
-		draw_pixel(ctx->pixels, ctx->win_w, ctx->win_h, ax + 2, ay, ac);
-		draw_pixel(ctx->pixels, ctx->win_w, ctx->win_h, ax + 3, ay, ac);
-		draw_pixel(ctx->pixels, ctx->win_w, ctx->win_h, ax, ay + 1, ac);
-		draw_pixel(ctx->pixels, ctx->win_w, ctx->win_h, ax + 1, ay + 1, ac);
-		draw_pixel(ctx->pixels, ctx->win_w, ctx->win_h, ax + 2, ay + 1, ac);
-		draw_pixel(ctx->pixels, ctx->win_w, ctx->win_h, ax + 1, ay + 2, ac);
+		draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, ax - sc(ctx, 2), ay - sc(ctx, 1), sc(ctx, 7), sc(ctx, 1), ac);
+		draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, ax - sc(ctx, 1), ay, sc(ctx, 5), sc(ctx, 1), ac);
+		draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, ax, ay + sc(ctx, 1), sc(ctx, 3), sc(ctx, 1), ac);
+		draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, ax + sc(ctx, 1), ay + sc(ctx, 2), sc(ctx, 1), sc(ctx, 1), ac);
 	}
 }
 

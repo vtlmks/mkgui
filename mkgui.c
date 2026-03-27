@@ -48,7 +48,7 @@
 #define MKGUI_GLYPH_FIRST     32
 #define MKGUI_GLYPH_LAST      255
 #define MKGUI_GLYPH_COUNT     (MKGUI_GLYPH_LAST - MKGUI_GLYPH_FIRST + 1)
-#define MKGUI_GLYPH_MAX_BMP   1024
+#define MKGUI_GLYPH_MAX_BMP   4096
 #define MKGUI_ICON_PIXELS     (MKGUI_ICON_SIZE * MKGUI_ICON_SIZE)
 #define MKGUI_ICON_PIXEL_POOL (MKGUI_ICON_PIXELS * MKGUI_MAX_ICONS)
 
@@ -636,6 +636,7 @@ struct mkgui_ctx {
 	uint32_t drag_select_id;
 	uint32_t drag_text_id;
 	uint32_t drag_text_drop_pos;
+	int32_t drag_slider_offset;
 	int32_t mouse_x, mouse_y;
 	uint32_t mouse_btn;
 	uint32_t dirty;
@@ -667,6 +668,23 @@ struct mkgui_ctx {
 #endif
 	uint32_t anim_active;
 	uint32_t close_requested;
+
+	float scale;
+	int32_t row_height;
+	int32_t tab_height;
+	int32_t menu_height;
+	int32_t scrollbar_w;
+	int32_t split_thick;
+	int32_t split_min_px;
+	int32_t box_gap;
+	int32_t box_pad;
+	int32_t ui_margin;
+	int32_t icon_size;
+	int32_t pathbar_height;
+	int32_t toolbar_height;
+	int32_t toolbar_btn_w;
+	int32_t toolbar_sep_w;
+	int32_t statusbar_height;
 
 	struct mkgui_timer timers[MKGUI_MAX_TIMERS];
 	uint32_t timer_count;
@@ -886,6 +904,33 @@ MKGUI_API struct mkgui_theme light_theme(void) {
 
 #define MKGUI_CHECK(ctx) do { if(!(ctx)) { return; } } while(0)
 #define MKGUI_CHECK_VAL(ctx, val) do { if(!(ctx)) { return (val); } } while(0)
+
+// ---------------------------------------------------------------------------
+// Scale helpers
+// ---------------------------------------------------------------------------
+
+static inline int32_t sc(struct mkgui_ctx *ctx, int32_t px) {
+	return (int32_t)(px * ctx->scale + 0.5f);
+}
+
+// [=]===^=[ mkgui_recompute_metrics ]==============================[=]
+static void mkgui_recompute_metrics(struct mkgui_ctx *ctx) {
+	ctx->row_height      = sc(ctx, MKGUI_ROW_HEIGHT);
+	ctx->tab_height      = sc(ctx, MKGUI_TAB_HEIGHT);
+	ctx->menu_height     = sc(ctx, MKGUI_MENU_HEIGHT);
+	ctx->scrollbar_w     = sc(ctx, MKGUI_SCROLLBAR_W);
+	ctx->split_thick     = sc(ctx, MKGUI_SPLIT_THICK);
+	ctx->split_min_px    = sc(ctx, MKGUI_SPLIT_MIN_PX);
+	ctx->box_gap         = sc(ctx, MKGUI_BOX_GAP);
+	ctx->box_pad         = sc(ctx, MKGUI_BOX_PAD);
+	ctx->ui_margin       = sc(ctx, MKGUI_MARGIN);
+	ctx->icon_size       = sc(ctx, MKGUI_ICON_SIZE);
+	ctx->pathbar_height  = sc(ctx, MKGUI_PATHBAR_HEIGHT);
+	ctx->toolbar_height  = sc(ctx, MKGUI_TOOLBAR_HEIGHT_DEFAULT);
+	ctx->toolbar_btn_w   = sc(ctx, MKGUI_TOOLBAR_BTN_W);
+	ctx->toolbar_sep_w   = sc(ctx, MKGUI_TOOLBAR_SEP_W);
+	ctx->statusbar_height = sc(ctx, MKGUI_STATUSBAR_HEIGHT);
+}
 
 #include "mkgui_render.c"
 
@@ -1332,7 +1377,7 @@ static void layout_build_index(struct mkgui_ctx *ctx) {
 static int32_t natural_height(struct mkgui_ctx *ctx, uint32_t widget_type) {
 	switch(widget_type) {
 		case MKGUI_BUTTON: {
-			return ctx->font_height + 12;
+			return ctx->font_height + sc(ctx, 12);
 		}
 
 		case MKGUI_INPUT:
@@ -1342,31 +1387,31 @@ static int32_t natural_height(struct mkgui_ctx *ctx, uint32_t widget_type) {
 		case MKGUI_DATEPICKER:
 		case MKGUI_IPINPUT:
 		case MKGUI_PATHBAR: {
-			return ctx->font_height + 10;
+			return ctx->font_height + sc(ctx, 10);
 		}
 
 		case MKGUI_CHECKBOX:
 		case MKGUI_RADIO:
 		case MKGUI_TOGGLE: {
-			return ctx->font_height + 6;
+			return ctx->font_height + sc(ctx, 6);
 		}
 
 		case MKGUI_LABEL: {
-			return ctx->font_height + 4;
+			return ctx->font_height + sc(ctx, 4);
 		}
 
 		case MKGUI_SLIDER:
 		case MKGUI_SCROLLBAR: {
-			return 24;
+			return sc(ctx, 24);
 		}
 
 		case MKGUI_PROGRESS:
 		case MKGUI_METER: {
-			return 20;
+			return sc(ctx, 20);
 		}
 
 		case MKGUI_DIVIDER: {
-			return 6;
+			return sc(ctx, 6);
 		}
 
 		default: {
@@ -1411,7 +1456,7 @@ static int32_t lc_measure_container(struct mkgui_ctx *ctx, struct layout_ctx *lc
 		}
 		uint32_t rows = (pair_count + 1) / 2;
 		int32_t row_h = ctx->font_height + 10;
-		int32_t h = (int32_t)rows * row_h + (rows > 1 ? (int32_t)(rows - 1) * MKGUI_BOX_GAP : 0);
+		int32_t h = (int32_t)rows * row_h + (rows > 1 ? (int32_t)(rows - 1) * ctx->box_gap : 0);
 		return h;
 	}
 
@@ -1451,7 +1496,7 @@ static int32_t lc_measure_container(struct mkgui_ctx *ctx, struct layout_ctx *lc
 			cross_max = child_cross;
 		}
 	}
-	int32_t gap_total = visible > 1 ? (int32_t)(visible - 1) * MKGUI_BOX_GAP : 0;
+	int32_t gap_total = visible > 1 ? (int32_t)(visible - 1) * ctx->box_gap : 0;
 	main_total += gap_total;
 
 	uint32_t has_pad = 0;
@@ -1469,8 +1514,8 @@ static int32_t lc_measure_container(struct mkgui_ctx *ctx, struct layout_ctx *lc
 		}
 	}
 	if(has_pad) {
-		main_total += MKGUI_BOX_PAD * 2;
-		cross_max += MKGUI_BOX_PAD * 2;
+		main_total += ctx->box_pad * 2;
+		cross_max += ctx->box_pad * 2;
 	}
 
 	if(axis == 0) {
@@ -1519,8 +1564,8 @@ static void lc_layout_node(struct mkgui_ctx *ctx, struct layout_ctx *lc, uint32_
 				lc->rects[c].x = px;
 				lc->rects[c].y = top_y;
 				lc->rects[c].w = pw;
-				lc->rects[c].h = MKGUI_MENU_HEIGHT;
-				top_y += MKGUI_MENU_HEIGHT;
+				lc->rects[c].h = ctx->menu_height;
+				top_y += ctx->menu_height;
 			}
 		}
 		for(uint32_t i = 0; i < chrome_count; ++i) {
@@ -1560,18 +1605,18 @@ static void lc_layout_node(struct mkgui_ctx *ctx, struct layout_ctx *lc, uint32_
 				lc->rects[c].x = px + cw->margin_l;
 				lc->rects[c].y = top_y;
 				lc->rects[c].w = pw - cw->margin_l - cw->margin_r;
-				lc->rects[c].h = MKGUI_PATHBAR_HEIGHT;
-				top_y += MKGUI_PATHBAR_HEIGHT;
+				lc->rects[c].h = ctx->pathbar_height;
+				top_y += ctx->pathbar_height;
 			}
 		}
 		for(uint32_t i = 0; i < chrome_count; ++i) {
 			uint32_t c = chrome[i];
 			if(lw_get(lc, c)->type == MKGUI_STATUSBAR) {
-				bot_y -= MKGUI_STATUSBAR_HEIGHT;
+				bot_y -= ctx->statusbar_height;
 				lc->rects[c].x = px;
 				lc->rects[c].y = bot_y;
 				lc->rects[c].w = pw;
-				lc->rects[c].h = MKGUI_STATUSBAR_HEIGHT;
+				lc->rects[c].h = ctx->statusbar_height;
 			}
 		}
 		py = top_y;
@@ -1580,9 +1625,9 @@ static void lc_layout_node(struct mkgui_ctx *ctx, struct layout_ctx *lc, uint32_
 
 	if(w->type == MKGUI_TAB) {
 		px += 2;
-		py += MKGUI_TAB_HEIGHT + 2;
+		py += ctx->tab_height + 2;
 		pw -= 4;
-		ph -= MKGUI_TAB_HEIGHT + 4;
+		ph -= ctx->tab_height + 4;
 	}
 	if(w->type == MKGUI_GROUP) {
 		if(w->style & MKGUI_COLLAPSED) {
@@ -1609,10 +1654,10 @@ static void lc_layout_node(struct mkgui_ctx *ctx, struct layout_ctx *lc, uint32_
 				}
 			}
 			if(!nested || (w->style & MKGUI_PANEL_BORDER)) {
-				px += MKGUI_BOX_PAD;
-				py += MKGUI_BOX_PAD;
-				pw -= MKGUI_BOX_PAD * 2;
-				ph -= MKGUI_BOX_PAD * 2;
+				px += ctx->box_pad;
+				py += ctx->box_pad;
+				pw -= ctx->box_pad * 2;
+				ph -= ctx->box_pad * 2;
 				box_has_pad = 1;
 			}
 		}
@@ -1655,16 +1700,16 @@ static void lc_layout_node(struct mkgui_ctx *ctx, struct layout_ctx *lc, uint32_
 					weight_total += ew;
 				}
 			}
-			int32_t gap_total = child_count > 1 ? (int32_t)(child_count - 1) * MKGUI_BOX_GAP : 0;
+			int32_t gap_total = child_count > 1 ? (int32_t)(child_count - 1) * ctx->box_gap : 0;
 			int32_t content_h = fixed_total + min_total + gap_total;
 			uint32_t needs_scroll = scrollable && (content_h > ph);
 			if(needs_scroll) {
-				pw -= MKGUI_SCROLLBAR_W;
+				pw -= ctx->scrollbar_w;
 			}
 			if(bs) {
 				bs->content_h = content_h;
 				if(box_has_pad) {
-					bs->content_h += MKGUI_BOX_PAD * 2;
+					bs->content_h += ctx->box_pad * 2;
 				}
 			}
 			int32_t remaining = ph - fixed_total - min_total - gap_total;
@@ -1717,7 +1762,7 @@ static void lc_layout_node(struct mkgui_ctx *ctx, struct layout_ctx *lc, uint32_
 				lc->rects[j].y = cy;
 				lc->rects[j].w = cw_child;
 				lc->rects[j].h = ch;
-				cy += ch + MKGUI_BOX_GAP;
+				cy += ch + ctx->box_gap;
 			}
 
 		} else if(w->type == MKGUI_HBOX) {
@@ -1747,11 +1792,11 @@ static void lc_layout_node(struct mkgui_ctx *ctx, struct layout_ctx *lc, uint32_
 					weight_total += ew;
 				}
 			}
-			int32_t gap_total = child_count > 1 ? (int32_t)(child_count - 1) * MKGUI_BOX_GAP : 0;
+			int32_t gap_total = child_count > 1 ? (int32_t)(child_count - 1) * ctx->box_gap : 0;
 			int32_t content_w = fixed_total + min_total + gap_total;
 			uint32_t needs_scroll = scrollable && (content_w > pw);
 			if(needs_scroll) {
-				ph -= MKGUI_SCROLLBAR_W;
+				ph -= ctx->scrollbar_w;
 			}
 			if(bs) {
 				bs->content_w = content_w;
@@ -1802,7 +1847,7 @@ static void lc_layout_node(struct mkgui_ctx *ctx, struct layout_ctx *lc, uint32_
 				lc->rects[j].y = cy_child;
 				lc->rects[j].w = cw;
 				lc->rects[j].h = ch_child;
-				cx += cw + MKGUI_BOX_GAP;
+				cx += cw + ctx->box_gap;
 			}
 
 		} else {
@@ -1823,12 +1868,12 @@ static void lc_layout_node(struct mkgui_ctx *ctx, struct layout_ctx *lc, uint32_
 				uint32_t row_h = (uint32_t)(ctx->font_height + 10);
 				if((pair_idx & 1) == 0) {
 					lc->rects[j].x = px;
-					lc->rects[j].y = py + (int32_t)(row * (row_h + MKGUI_BOX_GAP));
+					lc->rects[j].y = py + (int32_t)(row * (row_h + (uint32_t)ctx->box_gap));
 					lc->rects[j].w = label_w;
 					lc->rects[j].h = (int32_t)row_h;
 				} else {
 					lc->rects[j].x = px + label_w;
-					lc->rects[j].y = py + (int32_t)(row * (row_h + MKGUI_BOX_GAP));
+					lc->rects[j].y = py + (int32_t)(row * (row_h + (uint32_t)ctx->box_gap));
 					lc->rects[j].w = pw - label_w;
 					lc->rects[j].h = (int32_t)row_h;
 				}
@@ -1857,9 +1902,9 @@ static void lc_layout_node(struct mkgui_ctx *ctx, struct layout_ctx *lc, uint32_
 						lc->rects[c].h = split;
 					} else if(cw->flags & MKGUI_REGION_BOTTOM) {
 						lc->rects[c].x = px;
-						lc->rects[c].y = py + split + MKGUI_SPLIT_THICK;
+						lc->rects[c].y = py + split + ctx->split_thick;
 						lc->rects[c].w = pw;
-						lc->rects[c].h = ph - split - MKGUI_SPLIT_THICK;
+						lc->rects[c].h = ph - split - ctx->split_thick;
 					}
 				}
 			} else {
@@ -1875,9 +1920,9 @@ static void lc_layout_node(struct mkgui_ctx *ctx, struct layout_ctx *lc, uint32_
 						lc->rects[c].w = split;
 						lc->rects[c].h = ph;
 					} else if(cw->flags & MKGUI_REGION_RIGHT) {
-						lc->rects[c].x = px + split + MKGUI_SPLIT_THICK;
+						lc->rects[c].x = px + split + ctx->split_thick;
 						lc->rects[c].y = py;
-						lc->rects[c].w = pw - split - MKGUI_SPLIT_THICK;
+						lc->rects[c].w = pw - split - ctx->split_thick;
 						lc->rects[c].h = ph;
 					}
 				}
@@ -1933,6 +1978,7 @@ static void layout_node(struct mkgui_ctx *ctx, uint32_t idx) {
 }
 
 static void platform_set_min_size(struct mkgui_ctx *ctx, int32_t min_w, int32_t min_h);
+static void platform_font_set_size(struct mkgui_ctx *ctx, int32_t pixel_size);
 
 // [=]===^=[ layout_min_size ]======================================[=]
 static void layout_min_size(struct mkgui_ctx *ctx, uint32_t idx, int32_t *out_w, int32_t *out_h) {
@@ -1941,7 +1987,7 @@ static void layout_min_size(struct mkgui_ctx *ctx, uint32_t idx, int32_t *out_w,
 
 	if(w->flags & MKGUI_SCROLL) {
 		*out_w = 100;
-		*out_h = MKGUI_ROW_HEIGHT * 3;
+		*out_h = ctx->row_height * 3;
 		return;
 	}
 
@@ -1976,13 +2022,13 @@ static void layout_min_size(struct mkgui_ctx *ctx, uint32_t idx, int32_t *out_w,
 			}
 		}
 		*out_w = max_tw + 4;
-		*out_h = MKGUI_TAB_HEIGHT + 4 + max_th;
+		*out_h = ctx->tab_height + 4 + max_th;
 		return;
 	}
 
 	if(t == MKGUI_HSPLIT) {
 		int32_t max_w = 0;
-		int32_t total_h = MKGUI_SPLIT_THICK;
+		int32_t total_h = ctx->split_thick;
 		for(uint32_t c = layout_first_child[idx]; c < ctx->widget_count; c = layout_next_sibling[c]) {
 			int32_t cw, ch;
 			layout_min_size(ctx, c, &cw, &ch);
@@ -1997,7 +2043,7 @@ static void layout_min_size(struct mkgui_ctx *ctx, uint32_t idx, int32_t *out_w,
 	}
 
 	if(t == MKGUI_VSPLIT) {
-		int32_t total_w = MKGUI_SPLIT_THICK;
+		int32_t total_w = ctx->split_thick;
 		int32_t max_h = 0;
 		for(uint32_t c = layout_first_child[idx]; c < ctx->widget_count; c = layout_next_sibling[c]) {
 			int32_t cw, ch;
@@ -2029,7 +2075,7 @@ static void layout_min_size(struct mkgui_ctx *ctx, uint32_t idx, int32_t *out_w,
 			++count;
 		}
 		if(count > 1) {
-			total_h += (int32_t)(count - 1) * MKGUI_BOX_GAP;
+			total_h += (int32_t)(count - 1) * ctx->box_gap;
 		}
 		*out_w = max_w;
 		*out_h = total_h;
@@ -2056,7 +2102,7 @@ static void layout_min_size(struct mkgui_ctx *ctx, uint32_t idx, int32_t *out_w,
 			++count;
 		}
 		if(count > 1) {
-			total_w += (int32_t)(count - 1) * MKGUI_BOX_GAP;
+			total_w += (int32_t)(count - 1) * ctx->box_gap;
 		}
 		*out_w = total_w;
 		*out_h = max_h;
@@ -2071,7 +2117,7 @@ static void layout_min_size(struct mkgui_ctx *ctx, uint32_t idx, int32_t *out_w,
 		uint32_t rows = (pair_count + 1) / 2;
 		int32_t row_h = ctx->font_height + 10;
 		*out_w = 120;
-		*out_h = (int32_t)rows * row_h + (rows > 1 ? (int32_t)(rows - 1) * MKGUI_BOX_GAP : 0);
+		*out_h = (int32_t)rows * row_h + (rows > 1 ? (int32_t)(rows - 1) * ctx->box_gap : 0);
 		return;
 	}
 
@@ -2109,13 +2155,13 @@ static void layout_compute_min_size(struct mkgui_ctx *ctx, uint32_t win_idx) {
 	for(uint32_t c = layout_first_child[win_idx]; c < ctx->widget_count; c = layout_next_sibling[c]) {
 		uint32_t ct = ctx->widgets[c].type;
 		if(ct == MKGUI_MENU) {
-			min_h += MKGUI_MENU_HEIGHT;
+			min_h += ctx->menu_height;
 		} else if(ct == MKGUI_TOOLBAR) {
 			min_h += ctx->font_height + 10;
 		} else if(ct == MKGUI_STATUSBAR) {
-			min_h += MKGUI_STATUSBAR_HEIGHT;
+			min_h += ctx->statusbar_height;
 		} else if(ct == MKGUI_PATHBAR && ctx->widgets[c].h == 0) {
-			min_h += MKGUI_PATHBAR_HEIGHT;
+			min_h += ctx->pathbar_height;
 		} else {
 			int32_t cw, ch;
 			layout_min_size(ctx, c, &cw, &ch);
@@ -2131,8 +2177,8 @@ static void layout_compute_min_size(struct mkgui_ctx *ctx, uint32_t win_idx) {
 	if(min_w < 200) {
 		min_w = 200;
 	}
-	min_w += MKGUI_BOX_PAD * 2;
-	min_h += MKGUI_BOX_PAD * 2;
+	min_w += ctx->box_pad * 2;
+	min_h += ctx->box_pad * 2;
 	platform_set_min_size(ctx, min_w, min_h);
 }
 
@@ -2189,12 +2235,12 @@ static int32_t hit_test(struct mkgui_ctx *ctx, int32_t mx, int32_t my) {
 			float ratio = sd ? sd->ratio : 0.5f;
 			if(w->type == MKGUI_HSPLIT) {
 				int32_t split_y = ry + (int32_t)(rh * ratio);
-				if(mx >= rx && mx < rx + rw && my >= split_y && my < split_y + MKGUI_SPLIT_THICK) {
+				if(mx >= rx && mx < rx + rw && my >= split_y && my < split_y + ctx->split_thick) {
 					return i;
 				}
 			} else {
 				int32_t split_x = rx + (int32_t)(rw * ratio);
-				if(mx >= split_x && mx < split_x + MKGUI_SPLIT_THICK && my >= ry && my < ry + rh) {
+				if(mx >= split_x && mx < split_x + ctx->split_thick && my >= ry && my < ry + rh) {
 					return i;
 				}
 			}
@@ -2614,16 +2660,16 @@ static void render_widget(struct mkgui_ctx *ctx, uint32_t idx) {
 				int32_t rh = ctx->rects[idx].h;
 				int32_t r = ctx->theme.corner_radius;
 				if(bs && bs->content_h > rh) {
-					int32_t sx = rx + rw - MKGUI_SCROLLBAR_W;
-					draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, sx, ry, MKGUI_SCROLLBAR_W, rh, ctx->theme.scrollbar_bg);
+					int32_t sx = rx + rw - ctx->scrollbar_w;
+					draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, sx, ry, ctx->scrollbar_w, rh, ctx->theme.scrollbar_bg);
 					int32_t track = rh;
 					int32_t total = bs->content_h;
 					if(total < 1) {
 						total = 1;
 					}
 					int32_t thumb = track * rh / total;
-					if(thumb < 20) {
-						thumb = 20;
+					if(thumb < sc(ctx, 20)) {
+						thumb = sc(ctx, 20);
 					}
 					if(thumb > track) {
 						thumb = track;
@@ -2639,19 +2685,19 @@ static void render_widget(struct mkgui_ctx *ctx, uint32_t idx) {
 					if(pos > track - thumb) {
 						pos = track - thumb;
 					}
-					draw_rounded_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, sx + 2, ry + pos, MKGUI_SCROLLBAR_W - 4, thumb, ctx->theme.scrollbar_thumb, r);
+					draw_rounded_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, sx + 2, ry + pos, ctx->scrollbar_w - 4, thumb, ctx->theme.scrollbar_thumb, r);
 				}
 				if(bs && bs->content_w > rw) {
-					int32_t sy = ry + rh - MKGUI_SCROLLBAR_W;
-					draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, rx, sy, rw, MKGUI_SCROLLBAR_W, ctx->theme.scrollbar_bg);
+					int32_t sy = ry + rh - ctx->scrollbar_w;
+					draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, rx, sy, rw, ctx->scrollbar_w, ctx->theme.scrollbar_bg);
 					int32_t track = rw;
 					int32_t total = bs->content_w;
 					if(total < 1) {
 						total = 1;
 					}
 					int32_t thumb = track * rw / total;
-					if(thumb < 20) {
-						thumb = 20;
+					if(thumb < sc(ctx, 20)) {
+						thumb = sc(ctx, 20);
 					}
 					if(thumb > track) {
 						thumb = track;
@@ -2667,7 +2713,7 @@ static void render_widget(struct mkgui_ctx *ctx, uint32_t idx) {
 					if(pos > track - thumb) {
 						pos = track - thumb;
 					}
-					draw_rounded_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, rx + pos, sy + 2, thumb, MKGUI_SCROLLBAR_W - 4, ctx->theme.scrollbar_thumb, r);
+					draw_rounded_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, rx + pos, sy + 2, thumb, ctx->scrollbar_w - 4, ctx->theme.scrollbar_thumb, r);
 				}
 			}
 		} break;
@@ -3641,6 +3687,9 @@ MKGUI_API struct mkgui_ctx *mkgui_create(struct mkgui_widget *widgets, uint32_t 
 		}
 	}
 
+	ctx->scale = 1.0f;
+	mkgui_recompute_metrics(ctx);
+
 	if(!platform_init(ctx, title, init_w, init_h)) {
 		mkgui_free_arrays(ctx);
 		free(ctx);
@@ -3695,6 +3744,23 @@ MKGUI_API void mkgui_set_theme(struct mkgui_ctx *ctx, struct mkgui_theme theme) 
 	icon_text_color = theme.text & 0x00ffffff;
 	icon_reload_all();
 	dirty_all(ctx);
+}
+
+// [=]===^=[ mkgui_set_scale ]=====================================[=]
+MKGUI_API void mkgui_set_scale(struct mkgui_ctx *ctx, float scale) {
+	MKGUI_CHECK(ctx);
+	if(scale < 0.5f) { scale = 0.5f; }
+	if(scale > 4.0f) { scale = 4.0f; }
+	ctx->scale = scale;
+	mkgui_recompute_metrics(ctx);
+	platform_font_set_size(ctx, (int32_t)(13.0f * scale + 0.5f));
+	dirty_all(ctx);
+}
+
+// [=]===^=[ mkgui_get_scale ]=====================================[=]
+MKGUI_API float mkgui_get_scale(struct mkgui_ctx *ctx) {
+	MKGUI_CHECK_VAL(ctx, 1.0f);
+	return ctx->scale;
 }
 
 // [=]===^=[ mkgui_set_weight ]===================================[=]
@@ -3902,6 +3968,9 @@ MKGUI_API struct mkgui_ctx *mkgui_create_child(struct mkgui_ctx *parent, struct 
 	}
 	memcpy(ctx->widgets, widgets, count * sizeof(struct mkgui_widget));
 	ctx->widget_count = count;
+
+	ctx->scale = parent->scale;
+	mkgui_recompute_metrics(ctx);
 
 	if(!platform_init_child(ctx, parent, title, w, h)) {
 		mkgui_free_arrays(ctx);
@@ -4167,7 +4236,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 					} else if(mpw && mpw->type == MKGUI_DATEPICKER) {
 						struct mkgui_datepicker_data *mdp = find_datepicker_data(ctx, mpw->id);
 						if(mdp) {
-							int32_t new_hover = datepicker_cal_hit(mdp, pev.x, pev.y);
+							int32_t new_hover = datepicker_cal_hit(ctx, mdp, pev.x, pev.y);
 							if(new_hover != mdp->cal_hover) {
 								mdp->cal_hover = new_hover;
 								mp->dirty = 1;
@@ -4187,7 +4256,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 								scroll_off = mcb->scroll_y;
 							}
 						}
-						int32_t new_item = (pev.y - 1 + scroll_off) / MKGUI_ROW_HEIGHT;
+						int32_t new_item = (pev.y - 1 + scroll_off) / ctx->row_height;
 						if(new_item != mp->hover_item) {
 							mp->dirty = 1;
 						}
@@ -4240,17 +4309,17 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 							int32_t ry = ctx->rects[dsi].y;
 							int32_t rh = ctx->rects[dsi].h;
 							if(ctx->mouse_y < ry + 1) {
-								ta->scroll_y -= MKGUI_ROW_HEIGHT;
+								ta->scroll_y -= ctx->row_height;
 								if(ta->scroll_y < 0) {
 									ta->scroll_y = 0;
 								}
 
 							} else if(ctx->mouse_y > ry + rh - 1) {
-								int32_t content_h = (int32_t)textarea_line_count(ta) * MKGUI_ROW_HEIGHT;
+								int32_t content_h = (int32_t)textarea_line_count(ta) * ctx->row_height;
 								int32_t view_h = rh - 2;
 								int32_t max_scroll = content_h - view_h;
 								if(max_scroll > 0) {
-									ta->scroll_y += MKGUI_ROW_HEIGHT;
+									ta->scroll_y += ctx->row_height;
 									if(ta->scroll_y > max_scroll) {
 										ta->scroll_y = max_scroll;
 									}
@@ -4265,7 +4334,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 						struct mkgui_pathbar_data *pb = find_pathbar_data(ctx, ctx->drag_select_id);
 						if(pb && pb->editing) {
 							int32_t rx = ctx->rects[dsi].x;
-							int32_t base_x = rx + 4;
+							int32_t base_x = rx + sc(ctx, 4);
 							uint32_t len = (uint32_t)strlen(pb->edit_buf);
 							char tmp[4096];
 							uint32_t hit_pos = len;
@@ -4319,8 +4388,8 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 									total = 1;
 								}
 								int32_t thumb = track * sw / total;
-								if(thumb < 20) {
-									thumb = 20;
+								if(thumb < sc(ctx, 20)) {
+									thumb = sc(ctx, 20);
 								}
 								if(thumb > track) {
 									thumb = track;
@@ -4350,8 +4419,8 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 									total = 1;
 								}
 								int32_t thumb = track * sh / total;
-								if(thumb < 20) {
-									thumb = 20;
+								if(thumb < sc(ctx, 20)) {
+									thumb = sc(ctx, 20);
 								}
 								if(thumb > track) {
 									thumb = track;
@@ -4389,8 +4458,8 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 
 				if(ctx->drag_col_resize_id) {
 					int32_t nw = ctx->drag_col_resize_start_w + (ctx->mouse_x - ctx->drag_col_resize_start_x);
-					if(nw < 40) {
-						nw = 40;
+					if(nw < sc(ctx, 40)) {
+						nw = sc(ctx, 40);
 					}
 					struct mkgui_listview_data *lv = find_listv_data(ctx, ctx->drag_col_resize_id);
 					if(lv) {
@@ -4409,7 +4478,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 
 				if(ctx->drag_col_id) {
 					int32_t dx = ctx->mouse_x - ctx->drag_col_start_x;
-					if(dx < -3 || dx > 3) {
+					if(dx < -sc(ctx, 3) || dx > sc(ctx, 3)) {
 						dirty_widget_id(ctx, ctx->drag_col_id);
 					}
 					int32_t lv_idx = find_widget_idx(ctx, ctx->drag_col_id);
@@ -4418,9 +4487,9 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 						if(lv) {
 							int32_t lx = ctx->rects[lv_idx].x;
 							int32_t lw = ctx->rects[lv_idx].w;
-							int32_t edge = 30;
-							int32_t scroll_step = MKGUI_ROW_HEIGHT * 2;
-							int32_t content_w = lw - 2 - MKGUI_SCROLLBAR_W;
+							int32_t edge = sc(ctx, 30);
+							int32_t scroll_step = ctx->row_height * 2;
+							int32_t content_w = lw - 2 - ctx->scrollbar_w;
 							if(ctx->mouse_x < lx + edge) {
 								lv->scroll_x -= scroll_step;
 								dirty_widget(ctx, (uint32_t)lv_idx);
@@ -4446,8 +4515,8 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 									int32_t rh = ctx->rects[pi].h;
 									if(rh > 0) {
 										sd->ratio = (float)(ctx->mouse_y - ctx->rects[pi].y) / (float)rh;
-										float min_ratio = (float)MKGUI_SPLIT_MIN_PX / (float)rh;
-										float max_ratio = 1.0f - (float)(MKGUI_SPLIT_MIN_PX + MKGUI_SPLIT_THICK) / (float)rh;
+										float min_ratio = (float)ctx->split_min_px / (float)rh;
+										float max_ratio = 1.0f - (float)(ctx->split_min_px + ctx->split_thick) / (float)rh;
 										if(min_ratio > 0.45f) {
 											min_ratio = 0.45f;
 										}
@@ -4466,8 +4535,8 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 									int32_t rw = ctx->rects[pi].w;
 									if(rw > 0) {
 										sd->ratio = (float)(ctx->mouse_x - ctx->rects[pi].x) / (float)rw;
-										float min_ratio = (float)MKGUI_SPLIT_MIN_PX / (float)rw;
-										float max_ratio = 1.0f - (float)(MKGUI_SPLIT_MIN_PX + MKGUI_SPLIT_THICK) / (float)rw;
+										float min_ratio = (float)ctx->split_min_px / (float)rw;
+										float max_ratio = 1.0f - (float)(ctx->split_min_px + ctx->split_thick) / (float)rw;
 										if(min_ratio > 0.45f) {
 											min_ratio = 0.45f;
 										}
@@ -4492,15 +4561,20 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 						int32_t pi = find_widget_idx(ctx, pw->id);
 						if(sd && pi >= 0) {
 							int32_t range = sd->max_val - sd->min_val;
+							int32_t thumb_sz = sc(ctx, 10);
 							int32_t new_val;
 							if(pw->flags & MKGUI_VERTICAL) {
 								int32_t ry = ctx->rects[pi].y;
 								int32_t rh = ctx->rects[pi].h;
-								new_val = sd->max_val - (int32_t)((int64_t)(ctx->mouse_y - ry) * range / (rh > 0 ? rh : 1));
+								int32_t track = rh - thumb_sz;
+								int32_t pos = (ctx->mouse_y - ctx->drag_slider_offset) - ry - thumb_sz / 2;
+								new_val = sd->max_val - (track > 0 ? (int32_t)((int64_t)pos * range / track) : 0);
 							} else {
 								int32_t rx = ctx->rects[pi].x;
 								int32_t rw = ctx->rects[pi].w;
-								new_val = sd->min_val + (int32_t)((int64_t)(ctx->mouse_x - rx) * range / (rw > 0 ? rw : 1));
+								int32_t track = rw - thumb_sz;
+								int32_t pos = (ctx->mouse_x - ctx->drag_slider_offset) - rx - thumb_sz / 2;
+								new_val = sd->min_val + (track > 0 ? (int32_t)((int64_t)pos * range / track) : 0);
 							}
 							if(new_val < sd->min_val) {
 								new_val = sd->min_val;
@@ -4544,7 +4618,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 				if(hi >= 0 && ctx->widgets[hi].type == MKGUI_PATHBAR) {
 					struct mkgui_pathbar_data *pb = find_pathbar_data(ctx, ctx->widgets[hi].id);
 					if(pb && !pb->editing) {
-						int32_t seg = pathbar_segment_hit(pb, ctx->rects[hi].x, ctx->mouse_x);
+						int32_t seg = pathbar_segment_hit(ctx, pb, ctx->rects[hi].x, ctx->mouse_x);
 						if(seg != pb->hover_seg) {
 							pb->hover_seg = seg;
 							dirty_widget(ctx, (uint32_t)hi);
@@ -4558,7 +4632,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 						if(dy < 0) {
 							dy = -dy;
 						}
-						if(!tv->drag_active && dy > 4) {
+						if(!tv->drag_active && dy > sc(ctx, 4)) {
 							tv->drag_active = 1;
 							ev->type = MKGUI_EVENT_DRAG_START;
 							ev->id = tv->widget_id;
@@ -4573,11 +4647,11 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 								if(node_idx >= 0 && node_idx != tv->drag_source) {
 									int32_t ry = ctx->rects[tidx].y;
 									int32_t local_y = ctx->mouse_y - ry - 1 + tv->scroll_y;
-									int32_t row_local = local_y % MKGUI_ROW_HEIGHT;
-									int32_t third = MKGUI_ROW_HEIGHT / 3;
+									int32_t row_local = local_y % ctx->row_height;
+									int32_t third = ctx->row_height / 3;
 									if(row_local < third) {
 										tv->drag_pos = 0;
-									} else if(row_local > MKGUI_ROW_HEIGHT - third) {
+									} else if(row_local > ctx->row_height - third) {
 										tv->drag_pos = 1;
 									} else {
 										tv->drag_pos = 2;
@@ -4598,7 +4672,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 						if(dy < 0) {
 							dy = -dy;
 						}
-						if(!lv->drag_active && dy > 4) {
+						if(!lv->drag_active && dy > sc(ctx, 4)) {
 							lv->drag_active = 1;
 							ev->type = MKGUI_EVENT_DRAG_START;
 							ev->id = lv->widget_id;
@@ -4627,7 +4701,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 						if(dy < 0) {
 							dy = -dy;
 						}
-						if(!gv->drag_active && dy > 4) {
+						if(!gv->drag_active && dy > sc(ctx, 4)) {
 							gv->drag_active = 1;
 							ev->type = MKGUI_EVENT_DRAG_START;
 							ev->id = gv->widget_id;
@@ -4720,7 +4794,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 					if((pev.button == 4 || pev.button == 5) && pw && pw->type == MKGUI_DATEPICKER) {
 						struct mkgui_datepicker_data *dp = find_datepicker_data(ctx, pw->id);
 						if(dp) {
-							int32_t hit = datepicker_cal_hit(dp, pev.x, pev.y);
+							int32_t hit = datepicker_cal_hit(ctx, dp, pev.x, pev.y);
 							if(hit == -5 || hit == -6 || hit == -7) {
 								dp->view_year += (pev.button == 4) ? 1 : -1;
 							} else {
@@ -4745,10 +4819,10 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 					if((pev.button == 4 || pev.button == 5) && pw && pw->type == MKGUI_DROPDOWN) {
 						struct mkgui_dropdown_data *dd = find_dropdown_data(ctx, pw->id);
 						if(dd) {
-							int32_t delta = (pev.button == 4) ? -MKGUI_ROW_HEIGHT * 3 : MKGUI_ROW_HEIGHT * 3;
+							int32_t delta = (pev.button == 4) ? -ctx->row_height * 3 : ctx->row_height * 3;
 							dd->scroll_y += delta;
-							dropdown_clamp_scroll(dd, p->h);
-							p->hover_item = (pev.y - 1 + dd->scroll_y) / MKGUI_ROW_HEIGHT;
+							dropdown_clamp_scroll(ctx, dd, p->h);
+							p->hover_item = (pev.y - 1 + dd->scroll_y) / ctx->row_height;
 							p->dirty = 1;
 						}
 						break;
@@ -4760,7 +4834,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 						if(sdd) {
 							scroll_off = sdd->scroll_y;
 						}
-						int32_t item = (pev.y - 1 + scroll_off) / MKGUI_ROW_HEIGHT;
+						int32_t item = (pev.y - 1 + scroll_off) / ctx->row_height;
 						struct mkgui_dropdown_data *dd = find_dropdown_data(ctx, pw->id);
 						if(dd && item >= 0 && item < (int32_t)dd->item_count) {
 							dd->selected = item;
@@ -4775,7 +4849,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 					} else if(pw && pw->type == MKGUI_COMBOBOX) {
 						struct mkgui_combobox_data *cb = find_combobox_data(ctx, pw->id);
 						if(cb) {
-							int32_t item = (pev.y - 1 + cb->scroll_y) / MKGUI_ROW_HEIGHT;
+							int32_t item = (pev.y - 1 + cb->scroll_y) / ctx->row_height;
 							if(item >= 0 && item < (int32_t)cb->filter_count) {
 								uint32_t real_idx = cb->filter_map[item];
 								cb->selected = (int32_t)real_idx;
@@ -4794,7 +4868,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 					} else if(pw && pw->type == MKGUI_DATEPICKER) {
 						struct mkgui_datepicker_data *dp = find_datepicker_data(ctx, pw->id);
 						if(dp) {
-							int32_t hit = datepicker_cal_hit(dp, pev.x, pev.y);
+							int32_t hit = datepicker_cal_hit(ctx, dp, pev.x, pev.y);
 							if(hit == -2) {
 								--dp->view_month;
 								if(dp->view_month < 1) {
@@ -4929,9 +5003,9 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 									ev->value = ctx->mouse_x;
 									return 1;
 								}
-								int32_t hh = lv->header_height > 0 ? lv->header_height : MKGUI_ROW_HEIGHT;
+								int32_t hh = lv->header_height > 0 ? lv->header_height : ctx->row_height;
 								int32_t body_y = ctx->rects[hi].y + hh + 1;
-								int32_t row = (ctx->mouse_y - body_y + lv->scroll_y) / MKGUI_ROW_HEIGHT;
+								int32_t row = (ctx->mouse_y - body_y + lv->scroll_y) / ctx->row_height;
 								int32_t col = -1;
 								int32_t cx = ctx->rects[hi].x - lv->scroll_x;
 								for(uint32_t d = 0; d < lv->col_count; ++d) {
@@ -4970,7 +5044,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 						} else if(hw->type == MKGUI_GRIDVIEW) {
 							struct mkgui_gridview_data *gv = find_gridv_data(ctx, hw->id);
 							if(gv) {
-								int32_t ghh = gv->header_height > 0 ? gv->header_height : MKGUI_ROW_HEIGHT;
+								int32_t ghh = gv->header_height > 0 ? gv->header_height : ctx->row_height;
 								if(ctx->mouse_y < ctx->rects[hi].y + ghh) {
 									int32_t col = gridview_col_at_x(gv, ctx->mouse_x, ctx->rects[hi].x + 1);
 									ev->type = MKGUI_EVENT_CONTEXT_HEADER;
@@ -4980,7 +5054,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 									return 1;
 								}
 								int32_t body_y = ctx->rects[hi].y + ghh + 1;
-								int32_t row = (ctx->mouse_y - body_y + gv->scroll_y) / MKGUI_ROW_HEIGHT;
+								int32_t row = (ctx->mouse_y - body_y + gv->scroll_y) / ctx->row_height;
 								int32_t col = gridview_col_at_x(gv, ctx->mouse_x, ctx->rects[hi].x + 1);
 								if(row < 0 || row >= (int32_t)gv->row_count) {
 									row = -1;
@@ -5015,7 +5089,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 							if(tv) {
 								int32_t body_y = ctx->rects[hi].y + 1;
 								tv_idx_build(tv);
-								int32_t vis_row = (ctx->mouse_y - body_y + tv->scroll_y) / MKGUI_ROW_HEIGHT;
+								int32_t vis_row = (ctx->mouse_y - body_y + tv->scroll_y) / ctx->row_height;
 								int32_t node_id = -1;
 								int32_t vis = 0;
 								for(uint32_t n = 0; n < tv->node_count; ++n) {
@@ -5066,22 +5140,22 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 
 				if(pev.button == 4 || pev.button == 5) {
 					int32_t hi = hit_test(ctx, ctx->mouse_x, ctx->mouse_y);
-					int32_t delta = (pev.button == 4) ? -MKGUI_ROW_HEIGHT * 3 : MKGUI_ROW_HEIGHT * 3;
+					int32_t delta = (pev.button == 4) ? -ctx->row_height * 3 : ctx->row_height * 3;
 					if(hi >= 0 && ctx->widgets[hi].type == MKGUI_LISTVIEW) {
 						struct mkgui_listview_data *lv = find_listv_data(ctx, ctx->widgets[hi].id);
 						if(lv) {
 							if((pev.keymod & MKGUI_MOD_SHIFT) || listview_hscrollbar_hit(ctx, (uint32_t)hi, ctx->mouse_x, ctx->mouse_y)) {
 								lv->scroll_x += delta;
-								int32_t content_w = ctx->rects[hi].w - 2 - MKGUI_SCROLLBAR_W;
+								int32_t content_w = ctx->rects[hi].w - 2 - ctx->scrollbar_w;
 								listview_clamp_scroll_x(lv, content_w);
 							} else {
 								lv->scroll_y += delta;
-								int32_t content_h = ctx->rects[hi].h - MKGUI_ROW_HEIGHT - 2;
-								int32_t content_w = ctx->rects[hi].w - 2 - MKGUI_SCROLLBAR_W;
+								int32_t content_h = ctx->rects[hi].h - ctx->row_height - 2;
+								int32_t content_w = ctx->rects[hi].w - 2 - ctx->scrollbar_w;
 								if(listview_total_col_w(lv) > content_w) {
-									content_h -= MKGUI_SCROLLBAR_W;
+									content_h -= ctx->scrollbar_w;
 								}
-								int32_t max_scroll = (int32_t)lv->row_count * MKGUI_ROW_HEIGHT - content_h;
+								int32_t max_scroll = (int32_t)lv->row_count * ctx->row_height - content_h;
 								if(max_scroll < 0) {
 									max_scroll = 0;
 								}
@@ -5099,9 +5173,9 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 						struct mkgui_gridview_data *gv = find_gridv_data(ctx, ctx->widgets[hi].id);
 						if(gv) {
 							gv->scroll_y += delta;
-							int32_t hh = gv->header_height > 0 ? gv->header_height : MKGUI_ROW_HEIGHT;
+							int32_t hh = gv->header_height > 0 ? gv->header_height : ctx->row_height;
 							int32_t content_h = ctx->rects[hi].h - hh - 2;
-							gridview_clamp_scroll(gv, content_h);
+							gridview_clamp_scroll(ctx, gv, content_h);
 							dirty_widget(ctx, (uint32_t)hi);
 						}
 
@@ -5180,7 +5254,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 						struct mkgui_textarea_data *ta = find_textarea_data(ctx, ctx->widgets[hi].id);
 						if(ta) {
 							ta->scroll_y += delta;
-							int32_t content_h = (int32_t)textarea_line_count(ta) * MKGUI_ROW_HEIGHT;
+							int32_t content_h = (int32_t)textarea_line_count(ta) * ctx->row_height;
 							int32_t view_h = ctx->rects[hi].h - 2;
 							int32_t max_scroll = content_h - view_h;
 							if(max_scroll < 0) {
@@ -5200,8 +5274,8 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 						if(iv) {
 							iv->scroll_y += delta;
 							int32_t ca_x, ca_y, ca_w, ca_h;
-							itemview_content_area(iv, ctx->rects[hi].x, ctx->rects[hi].y, ctx->rects[hi].w, ctx->rects[hi].h, &ca_x, &ca_y, &ca_w, &ca_h);
-							itemview_clamp_scroll(iv, ca_w, ca_h);
+							itemview_content_area(ctx, iv, ctx->rects[hi].x, ctx->rects[hi].y, ctx->rects[hi].w, ctx->rects[hi].h, &ca_x, &ca_y, &ca_w, &ca_h);
+							itemview_clamp_scroll(ctx, iv, ca_w, ca_h);
 							dirty_widget(ctx, (uint32_t)hi);
 						}
 
@@ -5274,12 +5348,12 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 
 				if(pev.button == 6 || pev.button == 7) {
 					int32_t hi = hit_test(ctx, ctx->mouse_x, ctx->mouse_y);
-					int32_t delta = (pev.button == 6) ? -MKGUI_ROW_HEIGHT * 3 : MKGUI_ROW_HEIGHT * 3;
+					int32_t delta = (pev.button == 6) ? -ctx->row_height * 3 : ctx->row_height * 3;
 					if(hi >= 0 && ctx->widgets[hi].type == MKGUI_LISTVIEW) {
 						struct mkgui_listview_data *lv = find_listv_data(ctx, ctx->widgets[hi].id);
 						if(lv) {
 							lv->scroll_x += delta;
-							int32_t content_w = ctx->rects[hi].w - 2 - MKGUI_SCROLLBAR_W;
+							int32_t content_w = ctx->rects[hi].w - 2 - ctx->scrollbar_w;
 							listview_clamp_scroll_x(lv, content_w);
 							dirty_widget(ctx, (uint32_t)hi);
 						}
@@ -5323,18 +5397,18 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 							continue;
 						}
 						if(bw->type == MKGUI_HBOX && bs->content_w > ctx->rects[bi].w) {
-							int32_t sy = ctx->rects[bi].y + ctx->rects[bi].h - MKGUI_SCROLLBAR_W;
+							int32_t sy = ctx->rects[bi].y + ctx->rects[bi].h - ctx->scrollbar_w;
 							int32_t sx = ctx->rects[bi].x;
 							int32_t sw = ctx->rects[bi].w;
-							if(ctx->mouse_x >= sx && ctx->mouse_x < sx + sw && ctx->mouse_y >= sy && ctx->mouse_y < sy + MKGUI_SCROLLBAR_W) {
+							if(ctx->mouse_x >= sx && ctx->mouse_x < sx + sw && ctx->mouse_y >= sy && ctx->mouse_y < sy + ctx->scrollbar_w) {
 								int32_t track = sw;
 								int32_t total = bs->content_w;
 								if(total < 1) {
 									total = 1;
 								}
 								int32_t thumb = track * sw / total;
-								if(thumb < 20) {
-									thumb = 20;
+								if(thumb < sc(ctx, 20)) {
+									thumb = sc(ctx, 20);
 								}
 								if(thumb > track) {
 									thumb = track;
@@ -5354,18 +5428,18 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 						if(bs->content_h <= ctx->rects[bi].h) {
 							continue;
 						}
-						int32_t sx = ctx->rects[bi].x + ctx->rects[bi].w - MKGUI_SCROLLBAR_W;
+						int32_t sx = ctx->rects[bi].x + ctx->rects[bi].w - ctx->scrollbar_w;
 						int32_t sy = ctx->rects[bi].y;
 						int32_t sh = ctx->rects[bi].h;
-						if(ctx->mouse_x >= sx && ctx->mouse_x < sx + MKGUI_SCROLLBAR_W && ctx->mouse_y >= sy && ctx->mouse_y < sy + sh) {
+						if(ctx->mouse_x >= sx && ctx->mouse_x < sx + ctx->scrollbar_w && ctx->mouse_y >= sy && ctx->mouse_y < sy + sh) {
 							int32_t track = sh;
 							int32_t total = bs->content_h;
 							if(total < 1) {
 								total = 1;
 							}
 							int32_t thumb = track * sh / total;
-							if(thumb < 20) {
-								thumb = 20;
+							if(thumb < sc(ctx, 20)) {
+								thumb = sc(ctx, 20);
 							}
 							if(thumb > track) {
 								thumb = track;
@@ -5474,7 +5548,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 
 					if(hw->type == MKGUI_COMBOBOX) {
 						if(closed_combobox_id == hw->id) {
-							int32_t btn_x = ctx->rects[hi].x + ctx->rects[hi].w - MKGUI_COMBOBOX_BTN_W;
+							int32_t btn_x = ctx->rects[hi].x + ctx->rects[hi].w - sc(ctx, 24);
 							if(ctx->mouse_x < btn_x) {
 								handle_combobox_click(ctx, ev, hw->id);
 							}
@@ -5547,7 +5621,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 						} else if(hsb_hit == 2 || hsb_hit == 3) {
 							struct mkgui_listview_data *hlv = find_listv_data(ctx, hw->id);
 							if(hlv) {
-								int32_t cw = ctx->rects[hi].w - 2 - MKGUI_SCROLLBAR_W;
+								int32_t cw = ctx->rects[hi].w - 2 - ctx->scrollbar_w;
 								hlv->scroll_x += (hsb_hit == 2 ? -1 : 1) * (cw / 2);
 								listview_clamp_scroll_x(hlv, cw);
 								dirty_widget(ctx, (uint32_t)hi);
@@ -5645,10 +5719,10 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 						} else if(gv_sb_hit == 2 || gv_sb_hit == 3) {
 							struct mkgui_gridview_data *gv = find_gridv_data(ctx, hw->id);
 							if(gv) {
-								int32_t ghh = gv->header_height > 0 ? gv->header_height : MKGUI_ROW_HEIGHT;
+								int32_t ghh = gv->header_height > 0 ? gv->header_height : ctx->row_height;
 								int32_t gcontent_h = ctx->rects[hi].h - ghh - 2;
 								gv->scroll_y += (gv_sb_hit == 2 ? -1 : 1) * gcontent_h;
-								gridview_clamp_scroll(gv, gcontent_h);
+								gridview_clamp_scroll(ctx, gv, gcontent_h);
 								dirty_widget(ctx, (uint32_t)hi);
 							}
 
@@ -5676,9 +5750,9 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 							} else {
 								struct mkgui_gridview_data *gv = find_gridv_data(ctx, hw->id);
 								if(gv) {
-									int32_t ghh = gv->header_height > 0 ? gv->header_height : MKGUI_ROW_HEIGHT;
+									int32_t ghh = gv->header_height > 0 ? gv->header_height : ctx->row_height;
 									int32_t gcontent_y = ctx->rects[hi].y + ghh + 1;
-									int32_t grow = (ctx->mouse_y - gcontent_y + gv->scroll_y) / MKGUI_ROW_HEIGHT;
+									int32_t grow = (ctx->mouse_y - gcontent_y + gv->scroll_y) / ctx->row_height;
 									int32_t gcol = gridview_col_at_x(gv, ctx->mouse_x, ctx->rects[hi].x + 1);
 									if(grow >= 0 && grow < (int32_t)gv->row_count) {
 										gv->selected_row = grow;
@@ -5821,15 +5895,33 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 						struct mkgui_slider_data *sd = find_slider_data(ctx, hw->id);
 						if(sd) {
 							int32_t range = sd->max_val - sd->min_val;
+							int32_t thumb_sz = sc(ctx, 10);
 							int32_t new_val;
+							ctx->drag_slider_offset = 0;
 							if(hw->flags & MKGUI_VERTICAL) {
 								int32_t ry = ctx->rects[hi].y;
 								int32_t rh = ctx->rects[hi].h;
-								new_val = sd->max_val - (int32_t)((int64_t)(ctx->mouse_y - ry) * range / (rh > 0 ? rh : 1));
+								int32_t track = rh - thumb_sz;
+								int32_t thumb_y = ry + rh - thumb_sz - (range > 0 ? (int32_t)((int64_t)(sd->value - sd->min_val) * track / range) : 0);
+								if(ctx->mouse_y >= thumb_y && ctx->mouse_y < thumb_y + thumb_sz) {
+									ctx->drag_slider_offset = ctx->mouse_y - (thumb_y + thumb_sz / 2);
+									new_val = sd->value;
+								} else {
+									int32_t pos = ctx->mouse_y - ry - thumb_sz / 2;
+									new_val = sd->max_val - (track > 0 ? (int32_t)((int64_t)pos * range / track) : 0);
+								}
 							} else {
 								int32_t rx = ctx->rects[hi].x;
 								int32_t rw = ctx->rects[hi].w;
-								new_val = sd->min_val + (int32_t)((int64_t)(ctx->mouse_x - rx) * range / (rw > 0 ? rw : 1));
+								int32_t track = rw - thumb_sz;
+								int32_t thumb_x = rx + (range > 0 ? (int32_t)((int64_t)(sd->value - sd->min_val) * track / range) : 0);
+								if(ctx->mouse_x >= thumb_x && ctx->mouse_x < thumb_x + thumb_sz) {
+									ctx->drag_slider_offset = ctx->mouse_x - (thumb_x + thumb_sz / 2);
+									new_val = sd->value;
+								} else {
+									int32_t pos = ctx->mouse_x - rx - thumb_sz / 2;
+									new_val = sd->min_val + (track > 0 ? (int32_t)((int64_t)pos * range / track) : 0);
+								}
 							}
 							if(new_val < sd->min_val) {
 								new_val = sd->min_val;
@@ -6158,6 +6250,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 
 						if(hw->type == MKGUI_GROUP && (hw->style & MKGUI_COLLAPSIBLE)) {
 							hw->style ^= MKGUI_COLLAPSED;
+							dirty_all(ctx);
 							ev->type = MKGUI_EVENT_CLICK;
 							ev->id = hw->id;
 							ev->value = (hw->style & MKGUI_COLLAPSED) ? 1 : 0;

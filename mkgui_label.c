@@ -8,7 +8,7 @@ static void render_label_wrap(struct mkgui_ctx *ctx, uint32_t idx, uint32_t tc) 
 	int32_t ry = ctx->rects[idx].y;
 	int32_t rw = ctx->rects[idx].w;
 	int32_t rh = ctx->rects[idx].h;
-	int32_t line_h = ctx->font_height + 2;
+	int32_t line_h = ctx->font_height + sc(ctx, 2);
 	int32_t cy = ry;
 	const char *p = w->label;
 	char line_buf[MKGUI_MAX_TEXT];

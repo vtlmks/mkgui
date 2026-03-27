@@ -1,23 +1,27 @@
 // Copyright (c) 2026, Peter Fors
 // SPDX-License-Identifier: MIT
 
-#define IPINPUT_PAD    4
-#define IPINPUT_DOT_W  6
+#define IPINPUT_PAD_PX    4
+#define IPINPUT_DOT_W_PX  6
 
 // [=]===^=[ ipinput_field_x ]=====================================[=]
 static int32_t ipinput_field_x(struct mkgui_ctx *ctx, int32_t rx, int32_t rw, uint32_t field) {
-	int32_t field_w = (rw - IPINPUT_PAD * 2 - IPINPUT_DOT_W * 3) / 4;
-	return rx + IPINPUT_PAD + (int32_t)field * (field_w + IPINPUT_DOT_W);
+	int32_t pad = sc(ctx, IPINPUT_PAD_PX);
+	int32_t dot_w = sc(ctx, IPINPUT_DOT_W_PX);
+	int32_t field_w = (rw - pad * 2 - dot_w * 3) / 4;
+	return rx + pad + (int32_t)field * (field_w + dot_w);
 }
 
 // [=]===^=[ ipinput_field_w ]=====================================[=]
-static int32_t ipinput_field_w(int32_t rw) {
-	return (rw - IPINPUT_PAD * 2 - IPINPUT_DOT_W * 3) / 4;
+static int32_t ipinput_field_w(struct mkgui_ctx *ctx, int32_t rw) {
+	int32_t pad = sc(ctx, IPINPUT_PAD_PX);
+	int32_t dot_w = sc(ctx, IPINPUT_DOT_W_PX);
+	return (rw - pad * 2 - dot_w * 3) / 4;
 }
 
 // [=]===^=[ ipinput_hit_field ]===================================[=]
 static int32_t ipinput_hit_field(struct mkgui_ctx *ctx, int32_t rx, int32_t rw, int32_t mx) {
-	int32_t fw = ipinput_field_w(rw);
+	int32_t fw = ipinput_field_w(ctx, rw);
 	for(uint32_t i = 0; i < 4; ++i) {
 		int32_t fx = ipinput_field_x(ctx, rx, rw, i);
 		if(mx >= fx && mx < fx + fw) {
@@ -57,8 +61,9 @@ static void render_ipinput(struct mkgui_ctx *ctx, uint32_t idx) {
 	}
 
 	int32_t ty = ry + (rh - ctx->font_height) / 2;
-	int32_t fw = ipinput_field_w(rw);
+	int32_t fw = ipinput_field_w(ctx, rw);
 	uint32_t tc = (w->flags & MKGUI_DISABLED) ? ctx->theme.text_disabled : ctx->theme.text;
+	int32_t inset = sc(ctx, 2);
 
 	for(uint32_t i = 0; i < 4; ++i) {
 		int32_t fx = ipinput_field_x(ctx, rx, rw, i);
@@ -70,7 +75,7 @@ static void render_ipinput(struct mkgui_ctx *ctx, uint32_t idx) {
 			int32_t sx = fx + (fw - tw) / 2;
 			int32_t sel_x = sx < fx ? fx : sx;
 			int32_t sel_w = tw < fw ? tw : fw;
-			draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, sel_x, ry + 2, sel_w, rh - 4, ctx->theme.selection);
+			draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, sel_x, ry + inset, sel_w, rh - inset * 2, ctx->theme.selection);
 			push_text_clip(sx, ty, buf, ctx->theme.sel_text, fx, ry + 1, fx + fw, ry + rh - 1);
 		} else if(focused && ip->active_field == i) {
 			char edit[4];
@@ -79,7 +84,7 @@ static void render_ipinput(struct mkgui_ctx *ctx, uint32_t idx) {
 			int32_t sx = fx + (fw - tw) / 2;
 			push_text_clip(sx, ty, edit, tc, fx, ry + 1, fx + fw, ry + rh - 1);
 			int32_t cx = sx + tw;
-			draw_vline(ctx->pixels, ctx->win_w, ctx->win_h, cx, ry + 2, rh - 4, ctx->theme.text);
+			draw_vline(ctx->pixels, ctx->win_w, ctx->win_h, cx, ry + inset, rh - inset * 2, ctx->theme.text);
 		} else {
 			int32_t tw = text_width(ctx, buf);
 			int32_t sx = fx + (fw - tw) / 2;

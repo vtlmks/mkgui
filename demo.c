@@ -762,6 +762,8 @@ int main(void) {
 		return 1;
 	}
 
+	mkgui_set_scale(ctx, 2.0f);
+
 	/* Controls tab setup */
 	const char *modes[] = { "Auto", "Manual", "Custom", "Debug" };
 	mkgui_dropdown_setup(ctx, ID_DROPDOWN1, modes, 4);

@@ -1759,7 +1759,7 @@ static uint32_t ed_tab_header_hit(struct mkgui_ctx *ctx, int32_t tabs_idx, int32
 	int32_t sy = ly + ed_win_y;
 	int32_t rel_x = sx - ed_rects[tabs_idx].x;
 	int32_t rel_y = sy - ed_rects[tabs_idx].y;
-	if(rel_y < 0 || rel_y >= MKGUI_TAB_HEIGHT) {
+	if(rel_y < 0 || rel_y >= ctx->tab_height) {
 		return 0;
 	}
 	struct ed_widget *tabs_w = &ed.widgets[tabs_idx];
@@ -2002,7 +2002,7 @@ static void ed_draw_widget_fallback(struct mkgui_ctx *ctx, uint32_t idx) {
 		} break;
 
 		case MKGUI_TABS: {
-			draw_rect_fill(buf, bw, bh, rx, ry, rw, MKGUI_TAB_HEIGHT, ctx->theme.tab_inactive);
+			draw_rect_fill(buf, bw, bh, rx, ry, rw, ctx->tab_height, ctx->theme.tab_inactive);
 			uint32_t active_id = ed_get_active_tab(ew->id);
 			int32_t tx = rx;
 			for(uint32_t i = 0; i < ed.widget_count; ++i) {
@@ -2016,42 +2016,42 @@ static void ed_draw_widget_fallback(struct mkgui_ctx *ctx, uint32_t idx) {
 				uint32_t active = (child->id == active_id);
 				uint32_t tab_bg = active ? ctx->theme.tab_active : ctx->theme.tab_inactive;
 				uint32_t bd = active ? ctx->theme.widget_border : ctx->theme.tab_inactive;
-				draw_rounded_rect(buf, bw, bh, tx, ry, tw, MKGUI_TAB_HEIGHT, tab_bg, bd, ctx->theme.corner_radius);
+				draw_rounded_rect(buf, bw, bh, tx, ry, tw, ctx->tab_height, tab_bg, bd, ctx->theme.corner_radius);
 				if(active) {
 					draw_hline(buf, bw, bh, tx, ry, tw, ctx->theme.splitter);
 				}
 				int32_t cx = tx + 10;
 				if(tab_ii >= 0) {
-					int32_t tab_iy = ry + (MKGUI_TAB_HEIGHT - icons[tab_ii].h) / 2;
-					draw_icon(buf, bw, bh, &icons[tab_ii], cx, tab_iy, tx + 1, ry + 1, tx + tw - 1, ry + MKGUI_TAB_HEIGHT - 1);
+					int32_t tab_iy = ry + (ctx->tab_height - icons[tab_ii].h) / 2;
+					draw_icon(buf, bw, bh, &icons[tab_ii], cx, tab_iy, tx + 1, ry + 1, tx + tw - 1, ry + ctx->tab_height - 1);
 					cx += tab_iw + 4;
 				}
-				int32_t tty = ry + (MKGUI_TAB_HEIGHT - ctx->font_height) / 2;
-				push_text_clip(cx, tty, child->label, ctx->theme.text, tx, ry, tx + tw, ry + MKGUI_TAB_HEIGHT);
+				int32_t tty = ry + (ctx->tab_height - ctx->font_height) / 2;
+				push_text_clip(cx, tty, child->label, ctx->theme.text, tx, ry, tx + tw, ry + ctx->tab_height);
 				tx += tw;
 			}
-			draw_hline(buf, bw, bh, rx, ry + MKGUI_TAB_HEIGHT - 1, rw, ctx->theme.widget_border);
+			draw_hline(buf, bw, bh, rx, ry + ctx->tab_height - 1, rw, ctx->theme.widget_border);
 		} break;
 
 		case MKGUI_LISTVIEW: {
 			draw_patch(ctx, MKGUI_STYLE_SUNKEN, rx, ry, rw, rh, ctx->theme.input_bg, ctx->theme.widget_border);
-			draw_rect_fill(buf, bw, bh, rx + 1, ry + 1, rw - 2, MKGUI_ROW_HEIGHT, ctx->theme.header_bg);
-			draw_hline(buf, bw, bh, rx + 1, ry + MKGUI_ROW_HEIGHT, rw - 2, ctx->theme.widget_border);
-			int32_t ty = ry + (MKGUI_ROW_HEIGHT - ctx->font_height) / 2 + 1;
-			push_text_clip(rx + 4, ty, ew->label[0] ? ew->label : "ListView", ctx->theme.text, rx + 1, ry + 1, rx + rw - 1, ry + MKGUI_ROW_HEIGHT);
+			draw_rect_fill(buf, bw, bh, rx + 1, ry + 1, rw - 2, ctx->row_height, ctx->theme.header_bg);
+			draw_hline(buf, bw, bh, rx + 1, ry + ctx->row_height, rw - 2, ctx->theme.widget_border);
+			int32_t ty = ry + (ctx->row_height - ctx->font_height) / 2 + 1;
+			push_text_clip(rx + 4, ty, ew->label[0] ? ew->label : "ListView", ctx->theme.text, rx + 1, ry + 1, rx + rw - 1, ry + ctx->row_height);
 		} break;
 
 		case MKGUI_GRIDVIEW: {
 			draw_patch(ctx, MKGUI_STYLE_SUNKEN, rx, ry, rw, rh, ctx->theme.input_bg, ctx->theme.widget_border);
-			draw_rect_fill(buf, bw, bh, rx + 1, ry + 1, rw - 2, MKGUI_ROW_HEIGHT, ctx->theme.header_bg);
-			draw_hline(buf, bw, bh, rx + 1, ry + MKGUI_ROW_HEIGHT, rw - 2, ctx->theme.widget_border);
-			int32_t ty = ry + (MKGUI_ROW_HEIGHT - ctx->font_height) / 2 + 1;
-			push_text_clip(rx + 4, ty, ew->label[0] ? ew->label : "GridView", ctx->theme.text, rx + 1, ry + 1, rx + rw - 1, ry + MKGUI_ROW_HEIGHT);
+			draw_rect_fill(buf, bw, bh, rx + 1, ry + 1, rw - 2, ctx->row_height, ctx->theme.header_bg);
+			draw_hline(buf, bw, bh, rx + 1, ry + ctx->row_height, rw - 2, ctx->theme.widget_border);
+			int32_t ty = ry + (ctx->row_height - ctx->font_height) / 2 + 1;
+			push_text_clip(rx + 4, ty, ew->label[0] ? ew->label : "GridView", ctx->theme.text, rx + 1, ry + 1, rx + rw - 1, ry + ctx->row_height);
 			uint32_t glc = blend_pixel(ctx->theme.input_bg, ctx->theme.widget_border, 80);
-			int32_t gy = ry + MKGUI_ROW_HEIGHT + MKGUI_ROW_HEIGHT;
+			int32_t gy = ry + ctx->row_height + ctx->row_height;
 			while(gy < ry + rh - 2) {
 				draw_hline(buf, bw, bh, rx + 1, gy, rw - 2, glc);
-				gy += MKGUI_ROW_HEIGHT;
+				gy += ctx->row_height;
 			}
 			int32_t gx = rx + 1 + rw / 3;
 			draw_vline(buf, bw, bh, gx, ry + 1, rh - 2, glc);
@@ -2126,9 +2126,9 @@ static void ed_draw_widget_fallback(struct mkgui_ctx *ctx, uint32_t idx) {
 					continue;
 				}
 				if(btn->style & MKGUI_SEPARATOR) {
-					int32_t sx = bx + MKGUI_TOOLBAR_SEP_W / 2;
+					int32_t sx = bx + ctx->toolbar_sep_w / 2;
 					draw_vline(buf, bw, bh, sx, ry + 4, rh - 8, ctx->theme.widget_border);
-					bx += MKGUI_TOOLBAR_SEP_W;
+					bx += ctx->toolbar_sep_w;
 					continue;
 				}
 				int32_t icon_idx = ed_show_icons && btn->icon[0] ? toolbar_icon_resolve(btn->icon) : -1;
@@ -2136,8 +2136,8 @@ static void ed_draw_widget_fallback(struct mkgui_ctx *ctx, uint32_t idx) {
 				int32_t icon_iw = icon_idx >= 0 ? icons[icon_idx].w + 4 : 0;
 				int32_t content_w = icon_iw + tw;
 				int32_t btn_w = content_w + 12;
-				if(btn_w < MKGUI_TOOLBAR_BTN_W) {
-					btn_w = MKGUI_TOOLBAR_BTN_W;
+				if(btn_w < ctx->toolbar_btn_w) {
+					btn_w = ctx->toolbar_btn_w;
 				}
 				int32_t btn_y = ry + 2;
 				int32_t btn_h = rh - 4;
@@ -2186,12 +2186,12 @@ static void ed_draw_widget_fallback(struct mkgui_ctx *ctx, uint32_t idx) {
 
 		case MKGUI_HSPLIT: {
 			int32_t split_y = ry + rh / 2;
-			draw_rect_fill(buf, bw, bh, rx, split_y, rw, MKGUI_SPLIT_THICK, ctx->theme.splitter);
+			draw_rect_fill(buf, bw, bh, rx, split_y, rw, ctx->split_thick, ctx->theme.splitter);
 		} break;
 
 		case MKGUI_VSPLIT: {
 			int32_t split_x = rx + rw / 2;
-			draw_rect_fill(buf, bw, bh, split_x, ry, MKGUI_SPLIT_THICK, rh, ctx->theme.splitter);
+			draw_rect_fill(buf, bw, bh, split_x, ry, ctx->split_thick, rh, ctx->theme.splitter);
 		} break;
 
 		case MKGUI_SCROLLBAR: {
@@ -2698,7 +2698,7 @@ static void ed_sync_events(struct mkgui_ctx *ctx) {
 		if(rows > 8) {
 			rows = 8;
 		}
-		grp->h = 36 + rows * MKGUI_ROW_HEIGHT + 20;
+		grp->h = 36 + rows * ctx->row_height + 20;
 	}
 }
 
@@ -4385,7 +4385,7 @@ int main(void) {
 	}
 	struct mkgui_split_data *sd_right = find_split_data(ctx, ED_SPLIT_RIGHT);
 	if(sd_right) {
-		sd_right->ratio = 1.0f - (float)ED_RIGHT_W / (1280.0f - ED_LEFT_W - MKGUI_SPLIT_THICK);
+		sd_right->ratio = 1.0f - (float)ED_RIGHT_W / (1280.0f - ED_LEFT_W - ctx->split_thick);
 	}
 
 	mkgui_toolbar_set_mode(ctx, ED_TOOLBAR, MKGUI_TOOLBAR_ICONS_ONLY);
@@ -4998,7 +4998,7 @@ int main(void) {
 						if(!new_parent) for(int32_t j = (int32_t)ed.widget_count - 2; j >= 0; --j) {
 							struct ed_widget *c = &ed.widgets[j];
 							if(c->type == MKGUI_TABS) {
-								if(screen_x >= ed_rects[j].x && screen_x < ed_rects[j].x + ed_rects[j].w && screen_y >= ed_rects[j].y + MKGUI_TAB_HEIGHT && screen_y < ed_rects[j].y + ed_rects[j].h) {
+								if(screen_x >= ed_rects[j].x && screen_x < ed_rects[j].x + ed_rects[j].w && screen_y >= ed_rects[j].y + ctx->tab_height && screen_y < ed_rects[j].y + ed_rects[j].h) {
 									uint32_t active = ed_get_active_tab(c->id);
 									if(active) {
 										new_parent = active;

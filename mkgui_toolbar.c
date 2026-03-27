@@ -22,7 +22,7 @@ static void render_toolbar(struct mkgui_ctx *ctx, uint32_t idx) {
 		}
 
 		if(btn->style & MKGUI_SEPARATOR) {
-			int32_t sx = bx + MKGUI_TOOLBAR_SEP_W / 2;
+			int32_t sx = bx + ctx->toolbar_sep_w / 2;
 			int32_t sep_margin = rh / 5;
 			if(sep_margin < 4) {
 				sep_margin = 4;
@@ -30,7 +30,7 @@ static void render_toolbar(struct mkgui_ctx *ctx, uint32_t idx) {
 				sep_margin = 8;
 			}
 			draw_vline(ctx->pixels, ctx->win_w, ctx->win_h, sx, ry + sep_margin, rh - sep_margin * 2, ctx->theme.widget_border);
-			bx += MKGUI_TOOLBAR_SEP_W;
+			bx += ctx->toolbar_sep_w;
 			int32_t sep_idx = find_widget_idx(ctx, btn->id);
 			if(sep_idx >= 0) {
 				ctx->rects[sep_idx].x = 0;
@@ -47,8 +47,8 @@ static void render_toolbar(struct mkgui_ctx *ctx, uint32_t idx) {
 		int32_t icon_w = has_icon ? icons[ii].w + 4 : 0;
 		int32_t content_w = icon_w + tw;
 		int32_t bw = content_w + 12;
-		if(bw < MKGUI_TOOLBAR_BTN_W) {
-			bw = MKGUI_TOOLBAR_BTN_W;
+		if(bw < ctx->toolbar_btn_w) {
+			bw = ctx->toolbar_btn_w;
 		}
 
 		int32_t by = ry + 2;

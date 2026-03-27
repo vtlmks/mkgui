@@ -12,10 +12,13 @@ static void render_statusbar(struct mkgui_ctx *ctx, uint32_t idx) {
 	draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, rx, ry, rw, rh, ctx->theme.header_bg);
 	draw_hline(ctx->pixels, ctx->win_w, ctx->win_h, rx, ry, rw, ctx->theme.widget_border);
 
+	int32_t text_pad = sc(ctx, 4);
+	int32_t inset2 = sc(ctx, 2);
+
 	struct mkgui_statusbar_data *sb = find_statusbar_data(ctx, w->id);
 	if(!sb || sb->section_count == 0) {
 		int32_t ty = ry + (rh - ctx->font_height) / 2;
-		push_text_clip(rx + 4, ty, w->label, ctx->theme.text, rx, ry, rx + rw, ry + rh);
+		push_text_clip(rx + text_pad, ty, w->label, ctx->theme.text, rx, ry, rx + rw, ry + rh);
 		return;
 	}
 
@@ -36,11 +39,11 @@ static void render_statusbar(struct mkgui_ctx *ctx, uint32_t idx) {
 		}
 
 		int32_t ty = ry + (rh - ctx->font_height) / 2;
-		push_text_clip(sx + 4, ty, sb->sections[i].text, ctx->theme.text, sx, ry, sx + sw, ry + rh);
+		push_text_clip(sx + text_pad, ty, sb->sections[i].text, ctx->theme.text, sx, ry, sx + sw, ry + rh);
 
 		sx += sw;
 		if(i < sb->section_count - 1) {
-			draw_vline(ctx->pixels, ctx->win_w, ctx->win_h, sx, ry + 2, rh - 4, ctx->theme.widget_border);
+			draw_vline(ctx->pixels, ctx->win_w, ctx->win_h, sx, ry + inset2, rh - inset2 * 2, ctx->theme.widget_border);
 			sx += 1;
 		}
 	}

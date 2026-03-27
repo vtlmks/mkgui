@@ -1,9 +1,6 @@
 // Copyright (c) 2026, Peter Fors
 // SPDX-License-Identifier: MIT
 
-#define MKGUI_RICHLIST_THUMB_PAD   4
-#define MKGUI_RICHLIST_TEXT_PAD    6
-#define MKGUI_RICHLIST_RIGHT_PAD   8
 #define MKGUI_RICHLIST_DEFAULT_ROW_HEIGHT 56
 
 // [=]===^=[ richlist_clamp_scroll ]===============================[=]
@@ -34,11 +31,11 @@ static uint32_t richlist_scrollbar_hit(struct mkgui_ctx *ctx, uint32_t idx, int3
 	int32_t rw = ctx->rects[idx].w;
 	int32_t rh = ctx->rects[idx].h;
 
-	int32_t sb_x = rx + rw - MKGUI_SCROLLBAR_W - 1;
+	int32_t sb_x = rx + rw - ctx->scrollbar_w - 1;
 	int32_t sb_y = ry + 1;
 	int32_t sb_h = rh - 2;
 
-	if(mx < sb_x || mx >= sb_x + MKGUI_SCROLLBAR_W || my < sb_y || my >= sb_y + sb_h) {
+	if(mx < sb_x || mx >= sb_x + ctx->scrollbar_w || my < sb_y || my >= sb_y + sb_h) {
 		return 0;
 	}
 
@@ -47,9 +44,10 @@ static uint32_t richlist_scrollbar_hit(struct mkgui_ctx *ctx, uint32_t idx, int3
 		return 0;
 	}
 
+	int32_t min_thumb = sc(ctx, 20);
 	int32_t thumb_h = sb_h * sb_h / total_h;
-	if(thumb_h < 20) {
-		thumb_h = 20;
+	if(thumb_h < min_thumb) {
+		thumb_h = min_thumb;
 	}
 	int32_t thumb_y = sb_y + (int32_t)((int64_t)rl->scroll_y * (sb_h - thumb_h) / (total_h - sb_h));
 
@@ -73,9 +71,10 @@ static int32_t richlist_thumb_offset(struct mkgui_ctx *ctx, uint32_t idx, int32_
 	int32_t sb_h = rh - 2;
 
 	int32_t total_h = (int32_t)rl->row_count * rl->row_height;
+	int32_t min_thumb = sc(ctx, 20);
 	int32_t thumb_h = sb_h * sb_h / total_h;
-	if(thumb_h < 20) {
-		thumb_h = 20;
+	if(thumb_h < min_thumb) {
+		thumb_h = min_thumb;
 	}
 	int32_t thumb_y = sb_y + (int32_t)((int64_t)rl->scroll_y * (sb_h - thumb_h) / (total_h - sb_h));
 	return my - thumb_y;
@@ -101,9 +100,10 @@ static void richlist_scroll_to_y(struct mkgui_ctx *ctx, uint32_t id, int32_t my)
 	if(total_h <= sb_h) {
 		return;
 	}
+	int32_t min_thumb = sc(ctx, 20);
 	int32_t thumb_h = sb_h * sb_h / total_h;
-	if(thumb_h < 20) {
-		thumb_h = 20;
+	if(thumb_h < min_thumb) {
+		thumb_h = min_thumb;
 	}
 
 	int32_t usable = sb_h - thumb_h;
@@ -140,7 +140,7 @@ static int32_t richlist_row_hit(struct mkgui_ctx *ctx, uint32_t idx, int32_t my)
 		return -1;
 	}
 
-	int32_t sb_x = ctx->rects[idx].x + ctx->rects[idx].w - MKGUI_SCROLLBAR_W - 1;
+	int32_t sb_x = ctx->rects[idx].x + ctx->rects[idx].w - ctx->scrollbar_w - 1;
 	if(ctx->mouse_x >= sb_x) {
 		return -1;
 	}
@@ -168,7 +168,7 @@ static void render_richlist(struct mkgui_ctx *ctx, uint32_t idx) {
 	uint32_t focused = (ctx->focus_id == w->id);
 	draw_patch(ctx, MKGUI_STYLE_SUNKEN, rx, ry, rw, rh, ctx->theme.input_bg, focused ? ctx->theme.splitter : ctx->theme.widget_border);
 
-	int32_t content_w = rw - 2 - MKGUI_SCROLLBAR_W;
+	int32_t content_w = rw - 2 - ctx->scrollbar_w;
 	int32_t content_y = ry + 1;
 	int32_t content_h = rh - 2;
 
@@ -199,9 +199,12 @@ static void render_richlist(struct mkgui_ctx *ctx, uint32_t idx) {
 	int32_t visible_rows = content_h / rl->row_height + 2;
 	int32_t first_row = rl->scroll_y / rl->row_height;
 
-	int32_t thumb_size = rl->row_height - MKGUI_RICHLIST_THUMB_PAD * 2;
-	if(thumb_size < 4) {
-		thumb_size = 4;
+	int32_t thumb_pad = sc(ctx, 4);
+	int32_t text_pad = sc(ctx, 6);
+	int32_t right_pad = sc(ctx, 8);
+	int32_t thumb_size = rl->row_height - thumb_pad * 2;
+	if(thumb_size < sc(ctx, 4)) {
+		thumb_size = sc(ctx, 4);
 	}
 
 	struct mkgui_richlist_row row_data;
@@ -234,11 +237,11 @@ static void render_richlist(struct mkgui_ctx *ctx, uint32_t idx) {
 			rl->row_cb((uint32_t)row_idx, &row_data, rl->userdata);
 		}
 
-		int32_t text_x = clip_left + MKGUI_RICHLIST_TEXT_PAD;
+		int32_t text_x = clip_left + text_pad;
 
 		if(row_data.thumbnail && row_data.thumb_w > 0 && row_data.thumb_h > 0) {
-			int32_t tx = clip_left + MKGUI_RICHLIST_THUMB_PAD;
-			int32_t ty = row_y + MKGUI_RICHLIST_THUMB_PAD;
+			int32_t tx = clip_left + thumb_pad;
+			int32_t ty = row_y + thumb_pad;
 			int32_t tw = thumb_size;
 			int32_t th = thumb_size;
 			if(row_data.thumb_w != tw || row_data.thumb_h != th) {
@@ -286,7 +289,7 @@ static void render_richlist(struct mkgui_ctx *ctx, uint32_t idx) {
 					}
 				}
 			}
-			text_x = clip_left + MKGUI_RICHLIST_THUMB_PAD + thumb_size + MKGUI_RICHLIST_TEXT_PAD;
+			text_x = clip_left + thumb_pad + thumb_size + text_pad;
 		}
 
 		uint32_t tc_title = is_selected ? ctx->theme.sel_text : ctx->theme.text;
@@ -294,7 +297,7 @@ static void render_richlist(struct mkgui_ctx *ctx, uint32_t idx) {
 
 		int32_t right_w = 0;
 		if(row_data.right_text[0]) {
-			right_w = text_width(ctx, row_data.right_text) + MKGUI_RICHLIST_RIGHT_PAD;
+			right_w = text_width(ctx, row_data.right_text) + right_pad;
 		}
 
 		int32_t text_right = clip_right - right_w;
@@ -310,13 +313,13 @@ static void render_richlist(struct mkgui_ctx *ctx, uint32_t idx) {
 		}
 
 		if(row_data.subtitle[0]) {
-			int32_t ty = row_y + rl->row_height / 2 + 2;
+			int32_t ty = row_y + rl->row_height / 2 + sc(ctx, 2);
 			push_text_clip(text_x, ty, row_data.subtitle, tc_sub, text_x, clip_top, text_right, clip_bottom);
 		}
 
 		if(row_data.right_text[0]) {
 			int32_t rtw = text_width(ctx, row_data.right_text);
-			int32_t rtx = clip_right - rtw - MKGUI_RICHLIST_RIGHT_PAD;
+			int32_t rtx = clip_right - rtw - right_pad;
 			int32_t rty = row_y + (rl->row_height - ctx->font_height) / 2;
 			push_text_clip(rtx, rty, row_data.right_text, tc_sub, rtx, clip_top, clip_right, clip_bottom);
 		}
@@ -333,20 +336,22 @@ static void render_richlist(struct mkgui_ctx *ctx, uint32_t idx) {
 	render_clip_y2 = saved_clip_y2;
 
 	if(rl->row_count > 0) {
-		int32_t sb_x = rx + rw - MKGUI_SCROLLBAR_W - 1;
+		int32_t sb_x = rx + rw - ctx->scrollbar_w - 1;
 		int32_t sb_y = content_y;
 		int32_t sb_h = content_h;
-		draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, sb_x, sb_y, MKGUI_SCROLLBAR_W, sb_h, ctx->theme.scrollbar_bg);
+		draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, sb_x, sb_y, ctx->scrollbar_w, sb_h, ctx->theme.scrollbar_bg);
 
 		int32_t total_h = (int32_t)rl->row_count * rl->row_height;
 		if(total_h > sb_h) {
+			int32_t min_th = sc(ctx, 20);
 			int32_t thumb_h = sb_h * sb_h / total_h;
-			if(thumb_h < 20) {
-				thumb_h = 20;
+			if(thumb_h < min_th) {
+				thumb_h = min_th;
 			}
 			int32_t thumb_y = sb_y + (int32_t)((int64_t)rl->scroll_y * (sb_h - thumb_h) / (total_h - sb_h));
 			uint32_t thumb_color = (ctx->drag_scrollbar_id == w->id) ? ctx->theme.widget_hover : ctx->theme.scrollbar_thumb;
-			draw_rounded_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, sb_x + 2, thumb_y, MKGUI_SCROLLBAR_W - 4, thumb_h, thumb_color, ctx->theme.corner_radius);
+			int32_t sb_inset = sc(ctx, 2);
+			draw_rounded_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, sb_x + sb_inset, thumb_y, ctx->scrollbar_w - sb_inset * 2, thumb_h, thumb_color, ctx->theme.corner_radius);
 		}
 	}
 }
@@ -428,7 +433,7 @@ MKGUI_API void mkgui_richlist_setup(struct mkgui_ctx *ctx, uint32_t id, uint32_t
 		rl->selected_row = -1;
 	}
 	rl->row_count = row_count;
-	rl->row_height = row_height > 0 ? row_height : MKGUI_RICHLIST_DEFAULT_ROW_HEIGHT;
+	rl->row_height = row_height > 0 ? row_height : sc(ctx, MKGUI_RICHLIST_DEFAULT_ROW_HEIGHT);
 	rl->row_cb = cb;
 	rl->userdata = userdata;
 	rl->scroll_y = 0;

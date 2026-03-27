@@ -1,15 +1,14 @@
 // Copyright (c) 2026, Peter Fors
 // SPDX-License-Identifier: MIT
 
-#define MKGUI_SPINBOX_BTN_W 20
-
 // [=]===^=[ spinbox_btn_hit ]====================================[=]
 static int32_t spinbox_btn_hit(struct mkgui_ctx *ctx, uint32_t idx, int32_t mx, int32_t my) {
+	int32_t btn_w = sc(ctx, 20);
 	int32_t rx = ctx->rects[idx].x;
 	int32_t ry = ctx->rects[idx].y;
 	int32_t rw = ctx->rects[idx].w;
 	int32_t rh = ctx->rects[idx].h;
-	int32_t bx = rx + rw - MKGUI_SPINBOX_BTN_W;
+	int32_t bx = rx + rw - btn_w;
 
 	if(mx < bx || mx >= rx + rw) {
 		return 0;
@@ -75,6 +74,11 @@ static void render_spinbox(struct mkgui_ctx *ctx, uint32_t idx) {
 	uint32_t focused = (ctx->focus_id == w->id);
 	draw_patch(ctx, MKGUI_STYLE_SUNKEN, rx, ry, rw, rh, ctx->theme.input_bg, focused ? ctx->theme.splitter : ctx->theme.widget_border);
 
+	int32_t btn_w = sc(ctx, 20);
+	int32_t text_pad = sc(ctx, 4);
+	int32_t inset2 = sc(ctx, 2);
+	int32_t inset3 = sc(ctx, 3);
+
 	struct mkgui_spinbox_data *sd = find_spinbox_data(ctx, w->id);
 	uint32_t tc = disabled ? ctx->theme.text_disabled : ctx->theme.text;
 	if(sd) {
@@ -88,42 +92,42 @@ static void render_spinbox(struct mkgui_ctx *ctx, uint32_t idx) {
 			display = val_buf;
 		}
 		int32_t ty = ry + (rh - ctx->font_height) / 2;
-		int32_t text_right = rx + rw - MKGUI_SPINBOX_BTN_W;
+		int32_t text_right = rx + rw - btn_w;
 		if(sd->editing && focused && sd->select_all && sd->edit_len > 0) {
 			int32_t sel_w = text_width(ctx, display);
-			if(rx + 4 + sel_w > text_right) {
-				sel_w = text_right - rx - 4;
+			if(rx + text_pad + sel_w > text_right) {
+				sel_w = text_right - rx - text_pad;
 			}
 			if(sel_w > 0) {
-				draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, rx + 4, ry + 2, sel_w, rh - 4, ctx->theme.selection);
-				push_text_clip(rx + 4, ty, display, ctx->theme.sel_text, rx + 1, ry + 1, text_right, ry + rh - 1);
+				draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, rx + text_pad, ry + inset2, sel_w, rh - inset2 * 2, ctx->theme.selection);
+				push_text_clip(rx + text_pad, ty, display, ctx->theme.sel_text, rx + 1, ry + 1, text_right, ry + rh - 1);
 			}
 		} else {
-			push_text_clip(rx + 4, ty, display, tc, rx + 1, ry + 1, text_right, ry + rh - 1);
+			push_text_clip(rx + text_pad, ty, display, tc, rx + 1, ry + 1, text_right, ry + rh - 1);
 		}
 		if(sd->editing && focused && !sd->select_all) {
-			int32_t cur_x = rx + 4 + text_width(ctx, display);
+			int32_t cur_x = rx + text_pad + text_width(ctx, display);
 			if(cur_x < text_right) {
-				draw_vline(ctx->pixels, ctx->win_w, ctx->win_h, cur_x, ry + 3, rh - 6, tc);
+				draw_vline(ctx->pixels, ctx->win_w, ctx->win_h, cur_x, ry + inset3, rh - inset3 * 2, tc);
 			}
 		}
 	}
 
-	int32_t bx = rx + rw - MKGUI_SPINBOX_BTN_W;
+	int32_t bx = rx + rw - btn_w;
 	int32_t half = rh / 2;
 	int32_t hover_btn = (!disabled && ctx->hover_id == w->id && sd) ? sd->hover_btn : 0;
 
 	uint32_t up_bg = (hover_btn == 1) ? ctx->theme.widget_hover : ctx->theme.widget_bg;
-	draw_patch(ctx, MKGUI_STYLE_RAISED, bx, ry, MKGUI_SPINBOX_BTN_W, half, up_bg, ctx->theme.widget_border);
+	draw_patch(ctx, MKGUI_STYLE_RAISED, bx, ry, btn_w, half, up_bg, ctx->theme.widget_border);
 
-	int32_t acx = bx + MKGUI_SPINBOX_BTN_W / 2;
+	int32_t acx = bx + btn_w / 2;
 	int32_t acy = ry + half / 2 - 2;
 	for(uint32_t j = 0; j < 4; ++j) {
 		draw_hline(ctx->pixels, ctx->win_w, ctx->win_h, acx - (int32_t)j, acy + (int32_t)j, 1 + (int32_t)j * 2, tc);
 	}
 
 	uint32_t dn_bg = (hover_btn == -1) ? ctx->theme.widget_hover : ctx->theme.widget_bg;
-	draw_patch(ctx, MKGUI_STYLE_RAISED, bx, ry + half, MKGUI_SPINBOX_BTN_W, rh - half, dn_bg, ctx->theme.widget_border);
+	draw_patch(ctx, MKGUI_STYLE_RAISED, bx, ry + half, btn_w, rh - half, dn_bg, ctx->theme.widget_border);
 
 	int32_t acy2 = ry + half + (rh - half) / 2 - 2;
 	for(uint32_t j = 0; j < 4; ++j) {

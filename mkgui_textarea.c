@@ -115,7 +115,7 @@ static uint32_t textarea_pos_to_line(struct mkgui_textarea_data *ta, uint32_t po
 // [=]===^=[ textarea_hit_pos ]====================================[=]
 static uint32_t textarea_hit_pos(struct mkgui_ctx *ctx, struct mkgui_textarea_data *ta, int32_t rx, int32_t ry, int32_t rh, int32_t mx, int32_t my) {
 	int32_t local_y = my - (ry + 1) + ta->scroll_y;
-	int32_t hit_line = local_y / MKGUI_ROW_HEIGHT;
+	int32_t hit_line = local_y / ctx->row_height;
 	if(hit_line < 0) {
 		hit_line = 0;
 	}
@@ -126,7 +126,7 @@ static uint32_t textarea_hit_pos(struct mkgui_ctx *ctx, struct mkgui_textarea_da
 		if(i == ta->text_len || ta->text[i] == '\n') {
 			if((int32_t)line == hit_line) {
 				uint32_t len = i - line_start;
-				int32_t base_x = rx + 4 - ta->scroll_x;
+				int32_t base_x = rx + sc(ctx, 4) - ta->scroll_x;
 				char tmp[MKGUI_MAX_TEXTAREA_LINE];
 				if(len >= MKGUI_MAX_TEXTAREA_LINE) {
 					len = MKGUI_MAX_TEXTAREA_LINE - 1;
@@ -188,14 +188,16 @@ static void render_textarea(struct mkgui_ctx *ctx, uint32_t idx) {
 	uint32_t cursor_col = ta->cursor - textarea_line_start(ta, ta->cursor);
 
 	uint32_t tc = (w->flags & MKGUI_DISABLED) ? ctx->theme.text_disabled : ctx->theme.text;
+	int32_t text_pad = sc(ctx, 4);
+	int32_t cursor_inset = sc(ctx, 2);
 
 	for(uint32_t i = 0; i <= ta->text_len; ++i) {
 		if(i == ta->text_len || ta->text[i] == '\n') {
-			int32_t draw_y = ry + 1 + (int32_t)line * MKGUI_ROW_HEIGHT - ta->scroll_y;
+			int32_t draw_y = ry + 1 + (int32_t)line * ctx->row_height - ta->scroll_y;
 
-			if(draw_y + MKGUI_ROW_HEIGHT > clip_top && draw_y < clip_bottom) {
-				int32_t ty = draw_y + (MKGUI_ROW_HEIGHT - ctx->font_height) / 2;
-				int32_t tx = rx + 4 - ta->scroll_x;
+			if(draw_y + ctx->row_height > clip_top && draw_y < clip_bottom) {
+				int32_t ty = draw_y + (ctx->row_height - ctx->font_height) / 2;
+				int32_t tx = rx + text_pad - ta->scroll_x;
 
 				uint32_t len = i - line_start;
 				char line_buf[MKGUI_MAX_TEXTAREA_LINE];
@@ -221,7 +223,7 @@ static void render_textarea(struct mkgui_ctx *ctx, uint32_t idx) {
 					int32_t cx1 = sx1 < clip_left ? clip_left : sx1;
 					int32_t cx2 = sx2 > clip_right ? clip_right : sx2;
 					if(cx2 > cx1) {
-						draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, cx1, draw_y, cx2 - cx1, MKGUI_ROW_HEIGHT, ctx->theme.selection);
+						draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, cx1, draw_y, cx2 - cx1, ctx->row_height, ctx->theme.selection);
 					}
 
 					if(ty >= clip_top && ty + ctx->font_height <= clip_bottom) {
@@ -253,7 +255,7 @@ static void render_textarea(struct mkgui_ctx *ctx, uint32_t idx) {
 					cursor_buf[clen] = '\0';
 					int32_t cx = tx + text_width(ctx, cursor_buf);
 					if(cx >= clip_left && cx < clip_right) {
-						draw_vline(ctx->pixels, ctx->win_w, ctx->win_h, cx, draw_y + 2, MKGUI_ROW_HEIGHT - 4, ctx->theme.sel_text);
+						draw_vline(ctx->pixels, ctx->win_w, ctx->win_h, cx, draw_y + cursor_inset, ctx->row_height - cursor_inset * 2, ctx->theme.sel_text);
 					}
 				}
 
@@ -270,8 +272,8 @@ static void render_textarea(struct mkgui_ctx *ctx, uint32_t idx) {
 					drop_buf[dlen] = '\0';
 					int32_t dx = tx + text_width(ctx, drop_buf);
 					if(dx >= clip_left && dx < clip_right) {
-						draw_vline(ctx->pixels, ctx->win_w, ctx->win_h, dx, draw_y, MKGUI_ROW_HEIGHT, ctx->theme.selection);
-						draw_vline(ctx->pixels, ctx->win_w, ctx->win_h, dx + 1, draw_y, MKGUI_ROW_HEIGHT, ctx->theme.selection);
+						draw_vline(ctx->pixels, ctx->win_w, ctx->win_h, dx, draw_y, ctx->row_height, ctx->theme.selection);
+						draw_vline(ctx->pixels, ctx->win_w, ctx->win_h, dx + 1, draw_y, ctx->row_height, ctx->theme.selection);
 					}
 				}
 			}
@@ -282,25 +284,27 @@ static void render_textarea(struct mkgui_ctx *ctx, uint32_t idx) {
 	}
 
 	int32_t total_lines = (int32_t)textarea_line_count(ta);
-	int32_t content_h = total_lines * MKGUI_ROW_HEIGHT;
+	int32_t content_h = total_lines * ctx->row_height;
 	int32_t view_h = rh - 2;
 	if(content_h > view_h) {
-		int32_t sb_x = rx + rw - MKGUI_SCROLLBAR_W;
-		draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, sb_x, ry + 1, MKGUI_SCROLLBAR_W - 1, rh - 2, ctx->theme.scrollbar_bg);
+		int32_t sb_x = rx + rw - ctx->scrollbar_w;
+		draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, sb_x, ry + 1, ctx->scrollbar_w - 1, rh - 2, ctx->theme.scrollbar_bg);
 
+		int32_t min_thumb = sc(ctx, 20);
+		int32_t sb_inset = sc(ctx, 2);
 		int32_t thumb_h = (int32_t)((int64_t)view_h * view_h / content_h);
-		if(thumb_h < 20) {
-			thumb_h = 20;
+		if(thumb_h < min_thumb) {
+			thumb_h = min_thumb;
 		}
 		int32_t thumb_y = ry + 1 + (int32_t)((int64_t)ta->scroll_y * (view_h - thumb_h) / (content_h - view_h));
-		draw_rounded_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, sb_x + 2, thumb_y, MKGUI_SCROLLBAR_W - 5, thumb_h, ctx->theme.scrollbar_thumb, ctx->theme.corner_radius);
+		draw_rounded_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, sb_x + sb_inset, thumb_y, ctx->scrollbar_w - sb_inset * 2 - 1, thumb_h, ctx->theme.scrollbar_thumb, ctx->theme.corner_radius);
 	}
 }
 
 // [=]===^=[ textarea_has_scrollbar ]==============================[=]
 static uint32_t textarea_has_scrollbar(struct mkgui_ctx *ctx, uint32_t idx, struct mkgui_textarea_data *ta) {
 	int32_t rh = ctx->rects[idx].h;
-	int32_t content_h = (int32_t)textarea_line_count(ta) * MKGUI_ROW_HEIGHT;
+	int32_t content_h = (int32_t)textarea_line_count(ta) * ctx->row_height;
 	return content_h > rh - 2;
 }
 
@@ -310,15 +314,16 @@ static int32_t textarea_sb_hit(struct mkgui_ctx *ctx, uint32_t idx, struct mkgui
 	int32_t ry = ctx->rects[idx].y;
 	int32_t rw = ctx->rects[idx].w;
 	int32_t rh = ctx->rects[idx].h;
-	int32_t sb_x = rx + rw - MKGUI_SCROLLBAR_W;
+	int32_t sb_x = rx + rw - ctx->scrollbar_w;
 	if(mx < sb_x || mx >= rx + rw) {
 		return -1;
 	}
-	int32_t content_h = (int32_t)textarea_line_count(ta) * MKGUI_ROW_HEIGHT;
+	int32_t content_h = (int32_t)textarea_line_count(ta) * ctx->row_height;
 	int32_t view_h = rh - 2;
+	int32_t min_thumb = sc(ctx, 20);
 	int32_t thumb_h = (int32_t)((int64_t)view_h * view_h / content_h);
-	if(thumb_h < 20) {
-		thumb_h = 20;
+	if(thumb_h < min_thumb) {
+		thumb_h = min_thumb;
 	}
 	int32_t max_scroll = content_h - view_h;
 	if(max_scroll <= 0) {
@@ -332,11 +337,12 @@ static int32_t textarea_sb_hit(struct mkgui_ctx *ctx, uint32_t idx, struct mkgui
 static void textarea_scroll_drag(struct mkgui_ctx *ctx, uint32_t idx, struct mkgui_textarea_data *ta, int32_t my, int32_t offset) {
 	int32_t ry = ctx->rects[idx].y;
 	int32_t rh = ctx->rects[idx].h;
-	int32_t content_h = (int32_t)textarea_line_count(ta) * MKGUI_ROW_HEIGHT;
+	int32_t content_h = (int32_t)textarea_line_count(ta) * ctx->row_height;
 	int32_t view_h = rh - 2;
+	int32_t min_thumb = sc(ctx, 20);
 	int32_t thumb_h = (int32_t)((int64_t)view_h * view_h / content_h);
-	if(thumb_h < 20) {
-		thumb_h = 20;
+	if(thumb_h < min_thumb) {
+		thumb_h = min_thumb;
 	}
 	int32_t max_scroll = content_h - view_h;
 	if(max_scroll <= 0) {
@@ -370,13 +376,13 @@ static void textarea_scroll_to_cursor(struct mkgui_ctx *ctx, uint32_t widget_id)
 	int32_t rh = ctx->rects[idx].h;
 	int32_t view_h = rh - 2;
 	int32_t cursor_line = (int32_t)textarea_cursor_line(ta);
-	int32_t cursor_y = cursor_line * MKGUI_ROW_HEIGHT;
+	int32_t cursor_y = cursor_line * ctx->row_height;
 
 	if(cursor_y < ta->scroll_y) {
 		ta->scroll_y = cursor_y;
 	}
-	if(cursor_y + MKGUI_ROW_HEIGHT > ta->scroll_y + view_h) {
-		ta->scroll_y = cursor_y + MKGUI_ROW_HEIGHT - view_h;
+	if(cursor_y + ctx->row_height > ta->scroll_y + view_h) {
+		ta->scroll_y = cursor_y + ctx->row_height - view_h;
 	}
 	if(ta->scroll_y < 0) {
 		ta->scroll_y = 0;
@@ -758,7 +764,7 @@ MKGUI_API void mkgui_textarea_scroll_to_end(struct mkgui_ctx *ctx, uint32_t id) 
 	}
 	int32_t rh = ctx->rects[idx].h;
 	int32_t view_h = rh - 2;
-	int32_t content_h = (int32_t)textarea_line_count(ta) * MKGUI_ROW_HEIGHT;
+	int32_t content_h = (int32_t)textarea_line_count(ta) * ctx->row_height;
 	int32_t max_scroll = content_h - view_h;
 	if(max_scroll < 0) {
 		max_scroll = 0;

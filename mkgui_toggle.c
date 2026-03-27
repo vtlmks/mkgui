@@ -1,11 +1,6 @@
 // Copyright (c) 2026, Peter Fors
 // SPDX-License-Identifier: MIT
 
-#define MKGUI_TOGGLE_TRACK_W 38
-#define MKGUI_TOGGLE_TRACK_H 20
-#define MKGUI_TOGGLE_KNOB_PAD 3
-#define MKGUI_TOGGLE_KNOB_SIZE (MKGUI_TOGGLE_TRACK_H - MKGUI_TOGGLE_KNOB_PAD * 2)
-
 // [=]===^=[ render_toggle ]=======================================[=]
 static void render_toggle(struct mkgui_ctx *ctx, uint32_t idx) {
 	struct mkgui_widget *w = &ctx->widgets[idx];
@@ -19,13 +14,18 @@ static void render_toggle(struct mkgui_ctx *ctx, uint32_t idx) {
 		return;
 	}
 
+	int32_t track_w = sc(ctx, 38);
+	int32_t track_h = sc(ctx, 20);
+	int32_t knob_pad = sc(ctx, 3);
+	int32_t knob_size = track_h - knob_pad * 2;
+
 	uint32_t disabled = (w->flags & MKGUI_DISABLED);
 	uint32_t focused = (ctx->focus_id == w->id);
 	uint32_t hovered = (!disabled && ctx->hover_id == w->id);
 	uint32_t on = td->state;
 
-	int32_t ty = ry + (rh - MKGUI_TOGGLE_TRACK_H) / 2;
-	int32_t track_r = MKGUI_TOGGLE_TRACK_H / 2;
+	int32_t ty = ry + (rh - track_h) / 2;
+	int32_t track_r = track_h / 2;
 
 	uint32_t track_fill;
 	uint32_t track_border;
@@ -36,21 +36,21 @@ static void render_toggle(struct mkgui_ctx *ctx, uint32_t idx) {
 		track_fill = ctx->theme.bg;
 		track_border = (focused || hovered) ? ctx->theme.splitter : ctx->theme.widget_border;
 	}
-	draw_rounded_rect(ctx->pixels, ctx->win_w, ctx->win_h, rx, ty, MKGUI_TOGGLE_TRACK_W, MKGUI_TOGGLE_TRACK_H, track_fill, track_border, track_r);
+	draw_rounded_rect(ctx->pixels, ctx->win_w, ctx->win_h, rx, ty, track_w, track_h, track_fill, track_border, track_r);
 
 	int32_t knob_x;
 	if(on) {
-		knob_x = rx + MKGUI_TOGGLE_TRACK_W - MKGUI_TOGGLE_KNOB_PAD - MKGUI_TOGGLE_KNOB_SIZE;
+		knob_x = rx + track_w - knob_pad - knob_size;
 	} else {
-		knob_x = rx + MKGUI_TOGGLE_KNOB_PAD;
+		knob_x = rx + knob_pad;
 	}
-	int32_t knob_y = ty + MKGUI_TOGGLE_KNOB_PAD;
-	int32_t knob_r = MKGUI_TOGGLE_KNOB_SIZE / 2;
+	int32_t knob_y = ty + knob_pad;
+	int32_t knob_r = knob_size / 2;
 	uint32_t knob_color = on ? 0xffffffff : (disabled ? ctx->theme.text_disabled : ctx->theme.widget_border);
-	draw_rounded_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, knob_x, knob_y, MKGUI_TOGGLE_KNOB_SIZE, MKGUI_TOGGLE_KNOB_SIZE, knob_color, knob_r);
+	draw_rounded_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, knob_x, knob_y, knob_size, knob_size, knob_color, knob_r);
 
 	if(w->label[0]) {
-		int32_t lx = rx + MKGUI_TOGGLE_TRACK_W + 6;
+		int32_t lx = rx + track_w + sc(ctx, 6);
 		int32_t ly = ry + (rh - ctx->font_height) / 2;
 		uint32_t tc = disabled ? ctx->theme.text_disabled : ctx->theme.text;
 		push_text_clip(lx, ly, w->label, tc, rx, ry, rx + rw, ry + rh);

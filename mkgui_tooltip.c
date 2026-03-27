@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: MIT
 
 #define MKGUI_TOOLTIP_DELAY 30
-#define MKGUI_TOOLTIP_PAD   4
 
 // [=]===^=[ render_tooltip ]=====================================[=]
 static void render_tooltip(struct mkgui_ctx *ctx) {
@@ -20,20 +19,21 @@ static void render_tooltip(struct mkgui_ctx *ctx) {
 		return;
 	}
 
-	int32_t tw = text_width(ctx, text) + MKGUI_TOOLTIP_PAD * 2;
-	int32_t th = ctx->font_height + MKGUI_TOOLTIP_PAD * 2;
-	int32_t tx = ctx->tooltip_x + 12;
-	int32_t ty = ctx->tooltip_y + 16;
+	int32_t pad = sc(ctx, 4);
+	int32_t tw = text_width(ctx, text) + pad * 2;
+	int32_t th = ctx->font_height + pad * 2;
+	int32_t tx = ctx->tooltip_x + sc(ctx, 12);
+	int32_t ty = ctx->tooltip_y + sc(ctx, 16);
 
 	if(tx + tw > ctx->win_w) {
 		tx = ctx->win_w - tw;
 	}
 	if(ty + th > ctx->win_h) {
-		ty = ctx->tooltip_y - th - 4;
+		ty = ctx->tooltip_y - th - sc(ctx, 4);
 	}
 
 	draw_rounded_rect(ctx->pixels, ctx->win_w, ctx->win_h, tx, ty, tw, th, ctx->theme.widget_bg, ctx->theme.widget_border, ctx->theme.corner_radius);
-	push_text_clip(tx + MKGUI_TOOLTIP_PAD, ty + MKGUI_TOOLTIP_PAD, text, ctx->theme.text, tx, ty, tx + tw, ty + th);
+	push_text_clip(tx + pad, ty + pad, text, ctx->theme.text, tx, ty, tx + tw, ty + th);
 }
 
 // [=]===^=[ tooltip_update ]=====================================[=]

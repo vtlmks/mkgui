@@ -26,9 +26,11 @@ static void render_dropdown(struct mkgui_ctx *ctx, uint32_t idx) {
 	}
 	uint32_t tc = disabled ? ctx->theme.text_disabled : ctx->theme.text;
 	int32_t ty = ry + (rh - ctx->font_height) / 2;
-	push_text_clip(rx + 4, ty, text, tc, rx + 1, ry + 1, rx + rw - 16, ry + rh - 1);
+	int32_t text_pad = sc(ctx, 4);
+	int32_t arrow_margin = sc(ctx, 14);
+	push_text_clip(rx + text_pad, ty, text, tc, rx + 1, ry + 1, rx + rw - arrow_margin - sc(ctx, 2), ry + rh - 1);
 
-	int32_t ax = rx + rw - 14;
+	int32_t ax = rx + rw - arrow_margin;
 	int32_t ay = ry + rh / 2 - 2;
 	for(uint32_t j = 0; j < 5; ++j) {
 		draw_hline(ctx->pixels, ctx->win_w, ctx->win_h, ax + (int32_t)j, ay + (int32_t)j, 9 - (int32_t)j * 2, tc);
@@ -36,8 +38,8 @@ static void render_dropdown(struct mkgui_ctx *ctx, uint32_t idx) {
 }
 
 // [=]===^=[ dropdown_clamp_scroll ]=============================[=]
-static void dropdown_clamp_scroll(struct mkgui_dropdown_data *dd, int32_t popup_h) {
-	int32_t content_h = (int32_t)dd->item_count * MKGUI_ROW_HEIGHT;
+static void dropdown_clamp_scroll(struct mkgui_ctx *ctx, struct mkgui_dropdown_data *dd, int32_t popup_h) {
+	int32_t content_h = (int32_t)dd->item_count * ctx->row_height;
 	int32_t view_h = popup_h - 2;
 	int32_t max_scroll = content_h - view_h;
 	if(max_scroll < 0) {
@@ -65,13 +67,14 @@ static void render_dropdown_popup(struct mkgui_ctx *ctx, struct mkgui_popup *p, 
 	draw_rounded_rect(p->pixels, p->w, p->h, 0, 0, p->w, p->h, ctx->theme.menu_bg, ctx->theme.widget_border, ctx->theme.corner_radius);
 
 	int32_t view_h = p->h - 2;
-	int32_t content_h = (int32_t)dd->item_count * MKGUI_ROW_HEIGHT;
+	int32_t content_h = (int32_t)dd->item_count * ctx->row_height;
+	int32_t sb_w = sc(ctx, 8);
 	uint32_t needs_scroll = content_h > view_h;
-	int32_t item_w = needs_scroll ? p->w - 10 : p->w - 2;
+	int32_t item_w = needs_scroll ? p->w - sb_w - 2 : p->w - 2;
 
 	for(uint32_t i = 0; i < dd->item_count; ++i) {
-		int32_t iy = 1 + (int32_t)i * MKGUI_ROW_HEIGHT - dd->scroll_y;
-		if(iy + MKGUI_ROW_HEIGHT <= 0 || iy >= p->h) {
+		int32_t iy = 1 + (int32_t)i * ctx->row_height - dd->scroll_y;
+		if(iy + ctx->row_height <= 0 || iy >= p->h) {
 			continue;
 		}
 		uint32_t bg;
@@ -82,25 +85,26 @@ static void render_dropdown_popup(struct mkgui_ctx *ctx, struct mkgui_popup *p, 
 		} else {
 			bg = ctx->theme.menu_bg;
 		}
-		draw_rect_fill(p->pixels, p->w, p->h, 1, iy, item_w, MKGUI_ROW_HEIGHT, bg);
-		int32_t ty = iy + (MKGUI_ROW_HEIGHT - ctx->font_height) / 2;
+		draw_rect_fill(p->pixels, p->w, p->h, 1, iy, item_w, ctx->row_height, bg);
+		int32_t ty = iy + (ctx->row_height - ctx->font_height) / 2;
 		uint32_t tc = ((int32_t)i == dd->selected) ? ctx->theme.sel_text : ctx->theme.text;
-		push_text_clip(p->x + 5, ty + p->y, dd->items[i], tc, p->x + 1, p->y + 1, p->x + p->w - 1, p->y + p->h - 1);
+		push_text_clip(p->x + sc(ctx, 5), ty + p->y, dd->items[i], tc, p->x + 1, p->y + 1, p->x + p->w - 1, p->y + p->h - 1);
 	}
 
 	if(needs_scroll) {
-		int32_t sb_x = p->w - 9;
-		draw_rect_fill(p->pixels, p->w, p->h, sb_x, 1, 8, view_h, ctx->theme.scrollbar_bg);
+		int32_t min_thumb = sc(ctx, 16);
+		int32_t sb_x = p->w - sb_w - 1;
+		draw_rect_fill(p->pixels, p->w, p->h, sb_x, 1, sb_w, view_h, ctx->theme.scrollbar_bg);
 		int32_t thumb_h = (view_h * view_h) / content_h;
-		if(thumb_h < 16) {
-			thumb_h = 16;
+		if(thumb_h < min_thumb) {
+			thumb_h = min_thumb;
 		}
 		int32_t max_scroll = content_h - view_h;
 		int32_t thumb_y = 1;
 		if(max_scroll > 0) {
 			thumb_y = 1 + (dd->scroll_y * (view_h - thumb_h)) / max_scroll;
 		}
-		draw_rounded_rect_fill(p->pixels, p->w, p->h, sb_x, thumb_y, 8, thumb_h, ctx->theme.scrollbar_thumb, ctx->theme.corner_radius);
+		draw_rounded_rect_fill(p->pixels, p->w, p->h, sb_x, thumb_y, sb_w, thumb_h, ctx->theme.scrollbar_thumb, ctx->theme.corner_radius);
 	}
 
 	render_clip_x1 = saved_clip_x1;
@@ -125,18 +129,18 @@ static void dropdown_open_popup(struct mkgui_ctx *ctx, uint32_t widget_id) {
 	platform_translate_coords(ctx, ctx->rects[idx].x, ctx->rects[idx].y + ctx->rects[idx].h, &abs_x, &abs_y);
 
 	int32_t pw = ctx->rects[idx].w;
-	int32_t ph = (int32_t)dd->item_count * MKGUI_ROW_HEIGHT + 2;
-	int32_t max_ph = MKGUI_DROPDOWN_MAX_VISIBLE * MKGUI_ROW_HEIGHT + 2;
+	int32_t ph = (int32_t)dd->item_count * ctx->row_height + 2;
+	int32_t max_ph = MKGUI_DROPDOWN_MAX_VISIBLE * ctx->row_height + 2;
 	if(ph > max_ph) {
 		ph = max_ph;
 	}
 
 	if(dd->selected > 0) {
-		dd->scroll_y = dd->selected * MKGUI_ROW_HEIGHT - (ph - 2) / 2;
+		dd->scroll_y = dd->selected * ctx->row_height - (ph - 2) / 2;
 	} else {
 		dd->scroll_y = 0;
 	}
-	dropdown_clamp_scroll(dd, ph);
+	dropdown_clamp_scroll(ctx, dd, ph);
 
 	popup_destroy_all(ctx);
 	struct mkgui_popup *p = popup_create(ctx, abs_x, abs_y, pw, ph, widget_id);

@@ -127,8 +127,8 @@ static void render_meter(struct mkgui_ctx *ctx, uint32_t idx) {
 
 		// thin fill bar (60% width, centered)
 		int32_t bar_w = iw * 6 / 10;
-		if(bar_w < 3) {
-			bar_w = 3;
+		if(bar_w < sc(ctx, 3)) {
+			bar_w = sc(ctx, 3);
 		}
 		int32_t bar_x = ix + (iw - bar_w) / 2;
 		if(fill_h > 0) {
@@ -221,8 +221,8 @@ static void render_meter(struct mkgui_ctx *ctx, uint32_t idx) {
 
 		// thin fill bar (60% height, centered)
 		int32_t bar_h = ih * 6 / 10;
-		if(bar_h < 3) {
-			bar_h = 3;
+		if(bar_h < sc(ctx, 3)) {
+			bar_h = sc(ctx, 3);
 		}
 		int32_t bar_y = iy + (ih - bar_h) / 2;
 		if(fill_w > 0) {

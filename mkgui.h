@@ -427,6 +427,8 @@ MKGUI_API uint32_t mkgui_get_flags(struct mkgui_ctx *ctx, uint32_t id);
 MKGUI_API struct mkgui_theme default_theme(void);
 MKGUI_API struct mkgui_theme light_theme(void);
 MKGUI_API void mkgui_set_theme(struct mkgui_ctx *ctx, struct mkgui_theme theme);
+MKGUI_API void mkgui_set_scale(struct mkgui_ctx *ctx, float scale);
+MKGUI_API float mkgui_get_scale(struct mkgui_ctx *ctx);
 MKGUI_API void mkgui_set_weight(struct mkgui_ctx *ctx, uint32_t id, uint32_t weight);
 MKGUI_API void mkgui_toolbar_set_mode(struct mkgui_ctx *ctx, uint32_t toolbar_id, uint32_t mode);
 

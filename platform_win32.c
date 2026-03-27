@@ -646,34 +646,34 @@ static void platform_next_event(struct mkgui_ctx *ctx, struct mkgui_plat_event *
 static HDC plat_font_dc;
 static HFONT plat_font_handle;
 
-// [=]===^=[ platform_font_init ]==================================[=]
-static void platform_font_init(struct mkgui_ctx *ctx) {
-	plat_font_dc = CreateCompatibleDC(NULL);
+// [=]===^=[ platform_font_rasterize ]==============================[=]
+static void platform_font_rasterize(struct mkgui_ctx *ctx, int32_t pixel_size) {
 	if(!plat_font_dc) {
-		ctx->font_ascent = 11;
-		ctx->font_height = 13;
-		ctx->char_width = 7;
 		return;
 	}
 
+	if(plat_font_handle) {
+		DeleteObject(plat_font_handle);
+	}
+
 	plat_font_handle = CreateFontA(
-		-13, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
+		-pixel_size, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
 		DEFAULT_CHARSET, OUT_TT_PRECIS, CLIP_DEFAULT_PRECIS,
 		ANTIALIASED_QUALITY, DEFAULT_PITCH | FF_DONTCARE,
 		"Segoe UI");
 
 	if(!plat_font_handle) {
 		plat_font_handle = CreateFontA(
-			-13, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
+			-pixel_size, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
 			DEFAULT_CHARSET, OUT_TT_PRECIS, CLIP_DEFAULT_PRECIS,
 			ANTIALIASED_QUALITY, DEFAULT_PITCH | FF_DONTCARE,
 			"Tahoma");
 	}
 
 	if(!plat_font_handle) {
-		ctx->font_ascent = 11;
-		ctx->font_height = 13;
-		ctx->char_width = 7;
+		ctx->font_ascent = sc(ctx, 11);
+		ctx->font_height = sc(ctx, 13);
+		ctx->char_width = sc(ctx, 7);
 		return;
 	}
 
@@ -695,7 +695,7 @@ static void platform_font_init(struct mkgui_ctx *ctx) {
 			if(GetCharABCWidthsA(plat_font_dc, c, c, &abc)) {
 				g->advance = abc.abcA + (int32_t)abc.abcB + abc.abcC;
 			} else {
-				g->advance = 7;
+				g->advance = sc(ctx, 7);
 			}
 			continue;
 		}
@@ -735,8 +735,27 @@ static void platform_font_init(struct mkgui_ctx *ctx) {
 
 	ctx->char_width = ctx->glyphs['M' - MKGUI_GLYPH_FIRST].advance;
 	if(ctx->char_width == 0) {
-		ctx->char_width = 7;
+		ctx->char_width = sc(ctx, 7);
 	}
+}
+
+// [=]===^=[ platform_font_init ]==================================[=]
+static void platform_font_init(struct mkgui_ctx *ctx) {
+	plat_font_dc = CreateCompatibleDC(NULL);
+	if(!plat_font_dc) {
+		ctx->font_ascent = sc(ctx, 11);
+		ctx->font_height = sc(ctx, 13);
+		ctx->char_width = sc(ctx, 7);
+		return;
+	}
+
+	int32_t font_px = (int32_t)(13.0f * ctx->scale + 0.5f);
+	platform_font_rasterize(ctx, font_px);
+}
+
+// [=]===^=[ platform_font_set_size ]===============================[=]
+static void platform_font_set_size(struct mkgui_ctx *ctx, int32_t pixel_size) {
+	platform_font_rasterize(ctx, pixel_size);
 }
 
 // [=]===^=[ platform_font_fini ]==================================[=]

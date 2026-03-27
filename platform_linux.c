@@ -653,27 +653,12 @@ static const char *platform_find_font(void) {
 	return NULL;
 }
 
-// [=]===^=[ platform_font_init ]==================================[=]
-static void platform_font_init(struct mkgui_ctx *ctx) {
-	if(FT_Init_FreeType(&plat_ft_lib)) {
-		fprintf(stderr, "mkgui: cannot init freetype\n");
-		ctx->font_ascent = 11;
-		ctx->font_height = 13;
-		ctx->char_width = 7;
+// [=]===^=[ platform_font_rasterize ]==============================[=]
+static void platform_font_rasterize(struct mkgui_ctx *ctx, int32_t pixel_size) {
+	if(!plat_ft_face) {
 		return;
 	}
-
-	const char *path = platform_find_font();
-	if(!path || FT_New_Face(plat_ft_lib, path, 0, &plat_ft_face)) {
-		fprintf(stderr, "mkgui: cannot load font%s%s\n", path ? ": " : "", path ? path : "");
-		plat_ft_face = NULL;
-		ctx->font_ascent = 11;
-		ctx->font_height = 13;
-		ctx->char_width = 7;
-		return;
-	}
-
-	FT_Set_Pixel_Sizes(plat_ft_face, 0, 13);
+	FT_Set_Pixel_Sizes(plat_ft_face, 0, (FT_UInt)pixel_size);
 
 	ctx->font_ascent = (int32_t)(plat_ft_face->size->metrics.ascender >> 6);
 	ctx->font_height = (int32_t)((plat_ft_face->size->metrics.ascender - plat_ft_face->size->metrics.descender) >> 6);
@@ -702,8 +687,37 @@ static void platform_font_init(struct mkgui_ctx *ctx) {
 
 	ctx->char_width = ctx->glyphs['M' - MKGUI_GLYPH_FIRST].advance;
 	if(ctx->char_width == 0) {
-		ctx->char_width = 7;
+		ctx->char_width = sc(ctx, 7);
 	}
+}
+
+// [=]===^=[ platform_font_init ]==================================[=]
+static void platform_font_init(struct mkgui_ctx *ctx) {
+	if(FT_Init_FreeType(&plat_ft_lib)) {
+		fprintf(stderr, "mkgui: cannot init freetype\n");
+		ctx->font_ascent = sc(ctx, 11);
+		ctx->font_height = sc(ctx, 13);
+		ctx->char_width = sc(ctx, 7);
+		return;
+	}
+
+	const char *path = platform_find_font();
+	if(!path || FT_New_Face(plat_ft_lib, path, 0, &plat_ft_face)) {
+		fprintf(stderr, "mkgui: cannot load font%s%s\n", path ? ": " : "", path ? path : "");
+		plat_ft_face = NULL;
+		ctx->font_ascent = sc(ctx, 11);
+		ctx->font_height = sc(ctx, 13);
+		ctx->char_width = sc(ctx, 7);
+		return;
+	}
+
+	int32_t font_px = (int32_t)(13.0f * ctx->scale + 0.5f);
+	platform_font_rasterize(ctx, font_px);
+}
+
+// [=]===^=[ platform_font_set_size ]===============================[=]
+static void platform_font_set_size(struct mkgui_ctx *ctx, int32_t pixel_size) {
+	platform_font_rasterize(ctx, pixel_size);
 }
 
 // [=]===^=[ platform_font_fini ]==================================[=]
