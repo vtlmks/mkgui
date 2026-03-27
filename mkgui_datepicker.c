@@ -552,10 +552,10 @@ MKGUI_API void mkgui_datepicker_set_readonly(struct mkgui_ctx *ctx, uint32_t id,
 		return;
 	}
 	if(readonly) {
-		w->flags |= MKGUI_READONLY;
+		w->style |= MKGUI_READONLY;
 
 	} else {
-		w->flags &= ~MKGUI_READONLY;
+		w->style &= ~MKGUI_READONLY;
 	}
 	dirty_all(ctx);
 }
@@ -564,5 +564,5 @@ MKGUI_API void mkgui_datepicker_set_readonly(struct mkgui_ctx *ctx, uint32_t id,
 MKGUI_API uint32_t mkgui_datepicker_get_readonly(struct mkgui_ctx *ctx, uint32_t id) {
 	MKGUI_CHECK_VAL(ctx, 0);
 	struct mkgui_widget *w = find_widget(ctx, id);
-	return (w && (w->flags & MKGUI_READONLY)) ? 1 : 0;
+	return (w && (w->style & MKGUI_READONLY)) ? 1 : 0;
 }

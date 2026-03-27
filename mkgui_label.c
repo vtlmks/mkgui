@@ -13,7 +13,7 @@ static void render_label(struct mkgui_ctx *ctx, uint32_t idx) {
 	int32_t ty = ry + (rh - ctx->font_height) / 2;
 	int32_t tx = rx;
 	const char *text = w->label;
-	if(w->flags & MKGUI_TRUNCATE) {
+	if(w->style & MKGUI_TRUNCATE) {
 		text = text_truncate(ctx, text, rw);
 	}
 	uint32_t align = w->flags & MKGUI_ALIGN_MASK;

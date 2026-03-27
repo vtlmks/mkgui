@@ -337,30 +337,30 @@ MKGUI_API uint32_t mkgui_message_box(struct mkgui_ctx *ctx, const char *title, c
 	struct mkgui_widget widgets[DLG_MAX_LINES + 8];
 	uint32_t wi = 0;
 
-	widgets[wi] = (struct mkgui_widget){ MKGUI_WINDOW, MKGUI_DLG_WINDOW, "", "", 0, dw, dh, 0, 0 };
+	widgets[wi] = (struct mkgui_widget){ MKGUI_WINDOW, MKGUI_DLG_WINDOW, "", "", 0, dw, dh, 0, 0, 0 };
 	strncpy(widgets[wi].label, title, MKGUI_MAX_TEXT - 1);
 	++wi;
 
-	widgets[wi] = (struct mkgui_widget){ MKGUI_VBOX, MKGUI_DLG_VBOX, "", "", MKGUI_DLG_WINDOW, 0, 0, 0, 0 };
+	widgets[wi] = (struct mkgui_widget){ MKGUI_VBOX, MKGUI_DLG_VBOX, "", "", MKGUI_DLG_WINDOW, 0, 0, 0, 0, 0 };
 	++wi;
 
 	for(uint32_t i = 0; i < line_count; ++i) {
 		widgets[wi] = (struct mkgui_widget){ MKGUI_LABEL, MKGUI_DLG_LABEL_BASE + i, "", "", MKGUI_DLG_VBOX,
-			0, ctx->font_height, MKGUI_FIXED, 0 };
+			0, ctx->font_height, MKGUI_FIXED, 0, 0 };
 		widgets[wi].margin_l = icon_area;
 		strncpy(widgets[wi].label, lines[i], MKGUI_MAX_TEXT - 1);
 		++wi;
 	}
 
-	widgets[wi] = (struct mkgui_widget){ MKGUI_HBOX, MKGUI_DLG_BTN_HBOX, "", "", MKGUI_DLG_VBOX, 0, DLG_BTN_H, MKGUI_FIXED, 0 };
+	widgets[wi] = (struct mkgui_widget){ MKGUI_HBOX, MKGUI_DLG_BTN_HBOX, "", "", MKGUI_DLG_VBOX, 0, DLG_BTN_H, MKGUI_FIXED, 0, 0 };
 	++wi;
 
-	widgets[wi] = (struct mkgui_widget){ MKGUI_LABEL, MKGUI_DLG_SPACER, "", "", MKGUI_DLG_BTN_HBOX, 0, 0, 0, 1 };
+	widgets[wi] = (struct mkgui_widget){ MKGUI_LABEL, MKGUI_DLG_SPACER, "", "", MKGUI_DLG_BTN_HBOX, 0, 0, 0, 0, 1 };
 	++wi;
 
 	for(uint32_t i = 0; i < btn_count; ++i) {
 		widgets[wi] = (struct mkgui_widget){ MKGUI_BUTTON, MKGUI_DLG_BTN_1 + i, "", "", MKGUI_DLG_BTN_HBOX,
-			DLG_BTN_W, 0, MKGUI_FIXED, 0 };
+			DLG_BTN_W, 0, MKGUI_FIXED, 0, 0 };
 		strncpy(widgets[wi].label, dlg_button_defs[buttons][i].label, MKGUI_MAX_TEXT - 1);
 		++wi;
 	}
@@ -444,38 +444,38 @@ MKGUI_API uint32_t mkgui_input_dialog(struct mkgui_ctx *ctx, const char *title, 
 	struct mkgui_widget widgets[DLG_MAX_LINES + 10];
 	uint32_t wi = 0;
 
-	widgets[wi] = (struct mkgui_widget){ MKGUI_WINDOW, MKGUI_DLG_WINDOW, "", "", 0, dw, dh, 0, 0 };
+	widgets[wi] = (struct mkgui_widget){ MKGUI_WINDOW, MKGUI_DLG_WINDOW, "", "", 0, dw, dh, 0, 0, 0 };
 	strncpy(widgets[wi].label, title, MKGUI_MAX_TEXT - 1);
 	++wi;
 
-	widgets[wi] = (struct mkgui_widget){ MKGUI_VBOX, MKGUI_DLG_VBOX, "", "", MKGUI_DLG_WINDOW, 0, 0, 0, 0 };
+	widgets[wi] = (struct mkgui_widget){ MKGUI_VBOX, MKGUI_DLG_VBOX, "", "", MKGUI_DLG_WINDOW, 0, 0, 0, 0, 0 };
 	++wi;
 
 	for(uint32_t i = 0; i < line_count; ++i) {
 		widgets[wi] = (struct mkgui_widget){ MKGUI_LABEL, MKGUI_DLG_LABEL_BASE + i, "", "", MKGUI_DLG_VBOX,
-			0, ctx->font_height, MKGUI_FIXED, 0 };
+			0, ctx->font_height, MKGUI_FIXED, 0, 0 };
 		widgets[wi].margin_l = icon_area;
 		strncpy(widgets[wi].label, lines[i], MKGUI_MAX_TEXT - 1);
 		++wi;
 	}
 
 	widgets[wi] = (struct mkgui_widget){ MKGUI_INPUT, MKGUI_DLG_INPUT, "", "", MKGUI_DLG_VBOX,
-		0, DLG_INPUT_H, MKGUI_FIXED, 0 };
+		0, DLG_INPUT_H, MKGUI_FIXED, 0, 0 };
 	widgets[wi].margin_l = icon_area;
 	++wi;
 
-	widgets[wi] = (struct mkgui_widget){ MKGUI_HBOX, MKGUI_DLG_BTN_HBOX, "", "", MKGUI_DLG_VBOX, 0, DLG_BTN_H, MKGUI_FIXED, 0 };
+	widgets[wi] = (struct mkgui_widget){ MKGUI_HBOX, MKGUI_DLG_BTN_HBOX, "", "", MKGUI_DLG_VBOX, 0, DLG_BTN_H, MKGUI_FIXED, 0, 0 };
 	++wi;
 
-	widgets[wi] = (struct mkgui_widget){ MKGUI_LABEL, MKGUI_DLG_SPACER, "", "", MKGUI_DLG_BTN_HBOX, 0, 0, 0, 1 };
+	widgets[wi] = (struct mkgui_widget){ MKGUI_LABEL, MKGUI_DLG_SPACER, "", "", MKGUI_DLG_BTN_HBOX, 0, 0, 0, 0, 1 };
 	++wi;
 
 	widgets[wi] = (struct mkgui_widget){ MKGUI_BUTTON, MKGUI_DLG_BTN_1, "OK", "", MKGUI_DLG_BTN_HBOX,
-		DLG_BTN_W, 0, MKGUI_FIXED, 0 };
+		DLG_BTN_W, 0, MKGUI_FIXED, 0, 0 };
 	++wi;
 
 	widgets[wi] = (struct mkgui_widget){ MKGUI_BUTTON, MKGUI_DLG_BTN_2, "Cancel", "", MKGUI_DLG_BTN_HBOX,
-		DLG_BTN_W, 0, MKGUI_FIXED, 0 };
+		DLG_BTN_W, 0, MKGUI_FIXED, 0, 0 };
 	++wi;
 
 	dlg_rs.icon_idx = icon_idx;

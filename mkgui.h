@@ -121,7 +121,7 @@ enum {
 };
 
 // ---------------------------------------------------------------------------
-// Flags
+// Universal flags (stored in 'flags' field, apply to any widget)
 // ---------------------------------------------------------------------------
 
 #define MKGUI_REGION_TOP           (1u << 4)
@@ -130,33 +130,37 @@ enum {
 #define MKGUI_REGION_RIGHT         (1u << 7)
 #define MKGUI_HIDDEN               (1u << 8)
 #define MKGUI_DISABLED             (1u << 9)
-#define MKGUI_CHECKED              (1u << 10)
-#define MKGUI_PASSWORD             (1u << 11)
-#define MKGUI_READONLY             (1u << 12)
-#define MKGUI_SEPARATOR            (1u << 13)
-#define MKGUI_TOOLBAR_SEP          (1u << 14)
-#define MKGUI_MENU_CHECK           (1u << 15)
-#define MKGUI_MENU_RADIO           (1u << 16)
-#define MKGUI_PANEL_BORDER         (1u << 17)
-#define MKGUI_PANEL_SUNKEN         (1u << 18)
-#define MKGUI_SLIDER_MIXER         (1u << 19)
-#define MKGUI_IMAGE_STRETCH        (1u << 20)
-#define MKGUI_SCROLL               (1u << 21)
-#define MKGUI_NO_PAD               (1u << 22)
-#define MKGUI_TAB_CLOSABLE         (1u << 23)
-#define MKGUI_MULTI_SELECT         (1u << 24)
-#define MKGUI_ALIGN_START          (1u << 25)
-#define MKGUI_ALIGN_CENTER         (2u << 25)
-#define MKGUI_ALIGN_END            (3u << 25)
-#define MKGUI_ALIGN_MASK           (3u << 25)
-#define MKGUI_FIXED                (1u << 27)
+#define MKGUI_SCROLL               (1u << 10)
+#define MKGUI_NO_PAD               (1u << 11)
+#define MKGUI_ALIGN_START          (1u << 12)
+#define MKGUI_ALIGN_CENTER         (2u << 12)
+#define MKGUI_ALIGN_END            (3u << 12)
+#define MKGUI_ALIGN_MASK           (3u << 12)
+#define MKGUI_FIXED                (1u << 14)
+#define MKGUI_VERTICAL             (1u << 15)
+
+// ---------------------------------------------------------------------------
+// Widget style flags (stored in 'style' field, per-widget-type)
+// ---------------------------------------------------------------------------
+
+#define MKGUI_CHECKED              (1u << 0)
+#define MKGUI_PASSWORD             (1u << 1)
+#define MKGUI_READONLY             (1u << 2)
+#define MKGUI_SEPARATOR            (1u << 3)
+#define MKGUI_MENU_CHECK           (1u << 4)
+#define MKGUI_MENU_RADIO           (1u << 5)
+#define MKGUI_PANEL_BORDER         (1u << 6)
+#define MKGUI_PANEL_SUNKEN         (1u << 7)
+#define MKGUI_SLIDER_MIXER         (1u << 8)
+#define MKGUI_METER_TEXT           (1u << 8)
+#define MKGUI_IMAGE_STRETCH        (1u << 9)
+#define MKGUI_TAB_CLOSABLE         (1u << 10)
+#define MKGUI_MULTI_SELECT         (1u << 11)
+#define MKGUI_TRUNCATE             (1u << 12)
 #define MKGUI_TOOLBAR_ICONS_TEXT   0
-#define MKGUI_TOOLBAR_ICONS_ONLY   (1u << 28)
-#define MKGUI_TOOLBAR_TEXT_ONLY    (2u << 28)
-#define MKGUI_TOOLBAR_MODE_MASK    (3u << 28)
-#define MKGUI_VERTICAL             (1u << 30)
-#define MKGUI_TRUNCATE             (1u << 31)
-#define MKGUI_METER_TEXT           (1u << 19)
+#define MKGUI_TOOLBAR_ICONS_ONLY   (1u << 13)
+#define MKGUI_TOOLBAR_TEXT_ONLY    (2u << 13)
+#define MKGUI_TOOLBAR_MODE_MASK    (3u << 13)
 
 // ---------------------------------------------------------------------------
 // Event types
@@ -282,6 +286,7 @@ struct mkgui_widget {
 	uint32_t parent_id;
 	int32_t w, h;
 	uint32_t flags;
+	uint32_t style;
 	uint32_t weight;
 	int32_t margin_l, margin_r, margin_t, margin_b;
 };

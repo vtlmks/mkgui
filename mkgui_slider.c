@@ -99,7 +99,7 @@ static void render_slider(struct mkgui_ctx *ctx, uint32_t idx) {
 
 	uint32_t disabled = (w->flags & MKGUI_DISABLED);
 	uint32_t vertical = (w->flags & MKGUI_VERTICAL);
-	uint32_t mixer = (w->flags & MKGUI_SLIDER_MIXER);
+	uint32_t mixer = (w->style & MKGUI_SLIDER_MIXER);
 
 	int32_t range = sd->max_val - sd->min_val;
 	if(range <= 0) {

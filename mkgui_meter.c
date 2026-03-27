@@ -138,7 +138,7 @@ static void render_meter(struct mkgui_ctx *ctx, uint32_t idx) {
 		}
 
 		// percentage text
-		if(w->flags & MKGUI_METER_TEXT) {
+		if(w->style & MKGUI_METER_TEXT) {
 			char buf[16];
 			int32_t pct = (int32_t)((int64_t)md->value * 100 / md->max_val);
 			snprintf(buf, sizeof(buf), "%d%%", pct);
@@ -231,7 +231,7 @@ static void render_meter(struct mkgui_ctx *ctx, uint32_t idx) {
 		}
 
 		// percentage text
-		if(w->flags & MKGUI_METER_TEXT) {
+		if(w->style & MKGUI_METER_TEXT) {
 			char buf[16];
 			int32_t pct = (int32_t)((int64_t)md->value * 100 / md->max_val);
 			snprintf(buf, sizeof(buf), "%d%%", pct);

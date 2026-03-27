@@ -40,7 +40,7 @@ static void glview_sync_all(struct mkgui_ctx *ctx) {
 		int32_t rh = ctx->rects[idx].h;
 
 		struct mkgui_widget *w = &ctx->widgets[idx];
-		if(w->flags & MKGUI_PANEL_BORDER) {
+		if(w->style & MKGUI_PANEL_BORDER) {
 			rx += 1;
 			ry += 1;
 			rw -= 2;
@@ -68,7 +68,7 @@ static void glview_sync_all(struct mkgui_ctx *ctx) {
 static void render_glview(struct mkgui_ctx *ctx, uint32_t idx) {
 	struct mkgui_widget *w = &ctx->widgets[idx];
 
-	if(w->flags & MKGUI_PANEL_BORDER) {
+	if(w->style & MKGUI_PANEL_BORDER) {
 		int32_t rx = ctx->rects[idx].x;
 		int32_t ry = ctx->rects[idx].y;
 		int32_t rw = ctx->rects[idx].w;
@@ -110,7 +110,7 @@ MKGUI_API uint32_t mkgui_glview_init(struct mkgui_ctx *ctx, uint32_t id) {
 	int32_t rh = ctx->rects[idx].h;
 
 	struct mkgui_widget *w = &ctx->widgets[idx];
-	if(w->flags & MKGUI_PANEL_BORDER) {
+	if(w->style & MKGUI_PANEL_BORDER) {
 		rx += 1;
 		ry += 1;
 		rw -= 2;

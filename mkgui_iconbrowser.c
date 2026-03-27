@@ -113,10 +113,10 @@ static uint32_t mkgui_icon_browser_pack(struct mkgui_ctx *ctx, struct mdi_pack *
 	popup_destroy_all(ctx);
 
 	struct mkgui_widget widgets[] = {
-		{ MKGUI_WINDOW, IB_ID_WINDOW, "Icon Browser", "", 0, IB_WIN_W, IB_WIN_H, 0, 0 },
-		{ MKGUI_VBOX, IB_ID_VBOX, "", "", IB_ID_WINDOW, 0, 0, 0, 0 },
-		{ MKGUI_INPUT, IB_ID_SEARCH, "", "magnify", IB_ID_VBOX, 0, 24, MKGUI_FIXED, 0 },
-		{ MKGUI_ITEMVIEW, IB_ID_ITEMVIEW, "", "", IB_ID_VBOX, 0, 0, 0, 1 },
+		{ MKGUI_WINDOW, IB_ID_WINDOW, "Icon Browser", "", 0, IB_WIN_W, IB_WIN_H, 0, 0, 0 },
+		{ MKGUI_VBOX, IB_ID_VBOX, "", "", IB_ID_WINDOW, 0, 0, 0, 0, 0 },
+		{ MKGUI_INPUT, IB_ID_SEARCH, "", "magnify", IB_ID_VBOX, 0, 24, MKGUI_FIXED, 0, 0 },
+		{ MKGUI_ITEMVIEW, IB_ID_ITEMVIEW, "", "", IB_ID_VBOX, 0, 0, 0, 0, 1 },
 	};
 	uint32_t wcount = sizeof(widgets) / sizeof(widgets[0]);
 

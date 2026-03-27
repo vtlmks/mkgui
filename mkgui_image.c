@@ -68,7 +68,7 @@ static void render_image(struct mkgui_ctx *ctx, uint32_t idx) {
 	int32_t rw = ctx->rects[idx].w;
 	int32_t rh = ctx->rects[idx].h;
 
-	if(w->flags & MKGUI_PANEL_BORDER) {
+	if(w->style & MKGUI_PANEL_BORDER) {
 		draw_rounded_rect(ctx->pixels, ctx->win_w, ctx->win_h, rx, ry, rw, rh, ctx->theme.bg, ctx->theme.widget_border, ctx->theme.corner_radius);
 		rx += 1;
 		ry += 1;
@@ -85,7 +85,7 @@ static void render_image(struct mkgui_ctx *ctx, uint32_t idx) {
 	int32_t ih = img->img_h;
 
 	int32_t dx, dy, dw, dh;
-	if(w->flags & MKGUI_IMAGE_STRETCH) {
+	if(w->style & MKGUI_IMAGE_STRETCH) {
 		dx = rx;
 		dy = ry;
 		dw = rw;
@@ -94,7 +94,7 @@ static void render_image(struct mkgui_ctx *ctx, uint32_t idx) {
 		float scale_x = (float)rw / (float)iw;
 		float scale_y = (float)rh / (float)ih;
 		float scale = scale_x < scale_y ? scale_x : scale_y;
-		if(scale > 1.0f && !(w->flags & MKGUI_IMAGE_STRETCH)) {
+		if(scale > 1.0f && !(w->style & MKGUI_IMAGE_STRETCH)) {
 			scale = 1.0f;
 		}
 		dw = (int32_t)(iw * scale);

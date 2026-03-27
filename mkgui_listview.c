@@ -447,7 +447,7 @@ static void render_listview(struct mkgui_ctx *ctx, uint32_t idx) {
 		int32_t draw_h = draw_end - draw_y;
 
 		uint32_t is_selected;
-		if(w->flags & MKGUI_MULTI_SELECT) {
+		if(w->style & MKGUI_MULTI_SELECT) {
 			is_selected = (lv_multi_sel_find(lv, row_idx) >= 0);
 		} else {
 			is_selected = ((uint32_t)row_idx == (uint32_t)lv->selected_row);

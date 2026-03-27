@@ -81,11 +81,11 @@ static void render_checkbox(struct mkgui_ctx *ctx, uint32_t idx) {
 	uint32_t focused = (ctx->focus_id == w->id);
 	uint32_t hovered = (!disabled && ctx->hover_id == w->id);
 	uint32_t pressed = (!disabled && ctx->press_id == w->id);
-	uint32_t bg = (w->flags & MKGUI_CHECKED) ? (disabled ? ctx->theme.widget_border : ctx->theme.splitter) : (pressed ? ctx->theme.widget_press : ctx->theme.input_bg);
+	uint32_t bg = (w->style & MKGUI_CHECKED) ? (disabled ? ctx->theme.widget_border : ctx->theme.splitter) : (pressed ? ctx->theme.widget_press : ctx->theme.input_bg);
 	uint32_t border = (focused || hovered) ? ctx->theme.splitter : ctx->theme.widget_border;
 	draw_patch(ctx, MKGUI_STYLE_SUNKEN, rx, by, box_size, box_size, bg, border);
 
-	if(w->flags & MKGUI_CHECKED) {
+	if(w->style & MKGUI_CHECKED) {
 		int32_t cx = rx + box_size / 2;
 		int32_t cy = by + box_size / 2;
 		uint32_t check_color = disabled ? ctx->theme.text_disabled : ctx->theme.sel_text;
@@ -106,10 +106,10 @@ static uint32_t handle_checkbox_key(struct mkgui_ctx *ctx, struct mkgui_event *e
 		if(!w) {
 			return 0;
 		}
-		w->flags ^= MKGUI_CHECKED;
+		w->style ^= MKGUI_CHECKED;
 		ev->type = MKGUI_EVENT_CHECKBOX_CHANGED;
 		ev->id = ctx->focus_id;
-		ev->value = (w->flags & MKGUI_CHECKED) ? 1 : 0;
+		ev->value = (w->style & MKGUI_CHECKED) ? 1 : 0;
 		dirty_all(ctx);
 		return 1;
 	}
@@ -123,7 +123,7 @@ MKGUI_API uint32_t mkgui_checkbox_get(struct mkgui_ctx *ctx, uint32_t id) {
 	if(!w) {
 		return 0;
 	}
-	return (w->flags & MKGUI_CHECKED) ? 1 : 0;
+	return (w->style & MKGUI_CHECKED) ? 1 : 0;
 }
 
 // [=]===^=[ mkgui_checkbox_set ]================================[=]
@@ -134,10 +134,10 @@ MKGUI_API void mkgui_checkbox_set(struct mkgui_ctx *ctx, uint32_t id, uint32_t c
 		return;
 	}
 	if(checked) {
-		w->flags |= MKGUI_CHECKED;
+		w->style |= MKGUI_CHECKED;
 
 	} else {
-		w->flags &= ~MKGUI_CHECKED;
+		w->style &= ~MKGUI_CHECKED;
 	}
 	dirty_all(ctx);
 }

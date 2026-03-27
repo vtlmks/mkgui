@@ -54,7 +54,7 @@ static void input_scroll_to_cursor(struct mkgui_ctx *ctx, uint32_t widget_id) {
 	const char *display = inp->text;
 	char masked[MKGUI_MAX_TEXT];
 	struct mkgui_widget *w = &ctx->widgets[widx];
-	if(w->flags & MKGUI_PASSWORD) {
+	if(w->style & MKGUI_PASSWORD) {
 		uint32_t len = (uint32_t)strlen(inp->text);
 		for(uint32_t j = 0; j < len && j < MKGUI_MAX_TEXT - 1; ++j) {
 			masked[j] = '*';
@@ -130,7 +130,7 @@ static void render_input(struct mkgui_ctx *ctx, uint32_t idx) {
 
 	const char *display = inp->text;
 	char masked[MKGUI_MAX_TEXT];
-	if(w->flags & MKGUI_PASSWORD) {
+	if(w->style & MKGUI_PASSWORD) {
 		uint32_t len = (uint32_t)strlen(inp->text);
 		for(uint32_t j = 0; j < len && j < MKGUI_MAX_TEXT - 1; ++j) {
 			masked[j] = '*';
@@ -200,7 +200,7 @@ static uint32_t handle_input_key(struct mkgui_ctx *ctx, struct mkgui_event *ev, 
 	}
 
 	struct mkgui_widget *w = find_widget(ctx, ctx->focus_id);
-	uint32_t readonly = (w && (w->flags & MKGUI_READONLY));
+	uint32_t readonly = (w && (w->style & MKGUI_READONLY));
 	uint32_t shift = (keymod & MKGUI_MOD_SHIFT);
 	uint32_t text_len = (uint32_t)strlen(inp->text);
 
@@ -381,10 +381,10 @@ MKGUI_API void mkgui_input_set_readonly(struct mkgui_ctx *ctx, uint32_t id, uint
 		return;
 	}
 	if(readonly) {
-		w->flags |= MKGUI_READONLY;
+		w->style |= MKGUI_READONLY;
 
 	} else {
-		w->flags &= ~MKGUI_READONLY;
+		w->style &= ~MKGUI_READONLY;
 	}
 	dirty_all(ctx);
 }
@@ -393,7 +393,7 @@ MKGUI_API void mkgui_input_set_readonly(struct mkgui_ctx *ctx, uint32_t id, uint
 MKGUI_API uint32_t mkgui_input_get_readonly(struct mkgui_ctx *ctx, uint32_t id) {
 	MKGUI_CHECK_VAL(ctx, 0);
 	struct mkgui_widget *w = find_widget(ctx, id);
-	return (w && (w->flags & MKGUI_READONLY)) ? 1 : 0;
+	return (w && (w->style & MKGUI_READONLY)) ? 1 : 0;
 }
 
 // [=]===^=[ mkgui_input_get_cursor ]=================================[=]

@@ -8,7 +8,7 @@ static int32_t tab_calc_width(struct mkgui_ctx *ctx, struct mkgui_widget *child)
 	if(ii >= 0) {
 		tw += icons[ii].w + 4;
 	}
-	if(child->flags & MKGUI_TAB_CLOSABLE) {
+	if(child->style & MKGUI_TAB_CLOSABLE) {
 		tw += 16;
 	}
 	return tw;
@@ -30,7 +30,7 @@ static uint32_t tab_close_hit_test(struct mkgui_ctx *ctx, uint32_t tabs_idx, int
 			continue;
 		}
 		int32_t tw = tab_calc_width(ctx, child);
-		if(mx >= tx && mx < tx + tw && (child->flags & MKGUI_TAB_CLOSABLE)) {
+		if(mx >= tx && mx < tx + tw && (child->style & MKGUI_TAB_CLOSABLE)) {
 			int32_t bx = tx + tw - 16;
 			int32_t by = ry + (MKGUI_TAB_HEIGHT - 10) / 2;
 			if(mx >= bx && mx < bx + 10 && my >= by && my < by + 10) {
@@ -104,7 +104,7 @@ static void render_tabs(struct mkgui_ctx *ctx, uint32_t idx) {
 		}
 		int32_t tty = ry + (MKGUI_TAB_HEIGHT - ctx->font_height) / 2;
 		push_text_clip(cx, tty, child->label, ctx->theme.text, tx, ry, tx + tw, ry + MKGUI_TAB_HEIGHT);
-		if(child->flags & MKGUI_TAB_CLOSABLE) {
+		if(child->style & MKGUI_TAB_CLOSABLE) {
 			int32_t bx = tx + tw - 14;
 			int32_t by = ry + (MKGUI_TAB_HEIGHT - 10) / 2;
 			uint32_t clr = ctx->theme.text_disabled;

@@ -8,7 +8,7 @@ static void render_toolbar(struct mkgui_ctx *ctx, uint32_t idx) {
 	int32_t ry = ctx->rects[idx].y;
 	int32_t rw = ctx->rects[idx].w;
 	int32_t rh = ctx->rects[idx].h;
-	uint32_t mode = w->flags & MKGUI_TOOLBAR_MODE_MASK;
+	uint32_t mode = w->style & MKGUI_TOOLBAR_MODE_MASK;
 	uint32_t show_icons = (mode != MKGUI_TOOLBAR_TEXT_ONLY);
 	uint32_t show_text = (mode != MKGUI_TOOLBAR_ICONS_ONLY);
 
@@ -21,7 +21,7 @@ static void render_toolbar(struct mkgui_ctx *ctx, uint32_t idx) {
 			continue;
 		}
 
-		if(btn->flags & MKGUI_SEPARATOR) {
+		if(btn->style & MKGUI_SEPARATOR) {
 			int32_t sx = bx + MKGUI_TOOLBAR_SEP_W / 2;
 			int32_t sep_margin = rh / 5;
 			if(sep_margin < 4) {

@@ -1515,7 +1515,7 @@ static int32_t lc_measure_container(struct mkgui_ctx *ctx, struct layout_ctx *lc
 				nested = 1;
 			}
 		}
-		if(!nested || (w->flags & MKGUI_PANEL_BORDER)) {
+		if(!nested || (w->style & MKGUI_PANEL_BORDER)) {
 			has_pad = 1;
 		}
 	}
@@ -1578,7 +1578,7 @@ static void lc_layout_node(struct mkgui_ctx *ctx, struct layout_ctx *lc, uint32_
 			uint32_t c = chrome[i];
 			struct mkgui_widget *cw = lw_get(lc, c);
 			if(cw->type == MKGUI_TOOLBAR) {
-				uint32_t tb_mode = cw->flags & MKGUI_TOOLBAR_MODE_MASK;
+				uint32_t tb_mode = cw->style & MKGUI_TOOLBAR_MODE_MASK;
 				int32_t th;
 				if(tb_mode == MKGUI_TOOLBAR_TEXT_ONLY) {
 					th = ctx->font_height + 10;
@@ -1656,7 +1656,7 @@ static void lc_layout_node(struct mkgui_ctx *ctx, struct layout_ctx *lc, uint32_
 					nested = 1;
 				}
 			}
-			if(!nested || (w->flags & MKGUI_PANEL_BORDER)) {
+			if(!nested || (w->style & MKGUI_PANEL_BORDER)) {
 				px += MKGUI_BOX_PAD;
 				py += MKGUI_BOX_PAD;
 				pw -= MKGUI_BOX_PAD * 2;
@@ -2622,7 +2622,7 @@ static void render_widget(struct mkgui_ctx *ctx, uint32_t idx) {
 		case MKGUI_VBOX:
 		case MKGUI_HBOX:
 		case MKGUI_FORM: {
-			if(ctx->widgets[idx].flags & MKGUI_PANEL_BORDER) {
+			if(ctx->widgets[idx].style & MKGUI_PANEL_BORDER) {
 				render_panel(ctx, idx);
 			}
 			if(ctx->widgets[idx].flags & MKGUI_SCROLL) {
@@ -3724,7 +3724,7 @@ MKGUI_API void mkgui_toolbar_set_mode(struct mkgui_ctx *ctx, uint32_t toolbar_id
 	MKGUI_CHECK(ctx);
 	struct mkgui_widget *w = find_widget(ctx, toolbar_id);
 	if(w && w->type == MKGUI_TOOLBAR) {
-		w->flags = (w->flags & ~MKGUI_TOOLBAR_MODE_MASK) | (mode & MKGUI_TOOLBAR_MODE_MASK);
+		w->style = (w->style & ~MKGUI_TOOLBAR_MODE_MASK) | (mode & MKGUI_TOOLBAR_MODE_MASK);
 		dirty_all(ctx);
 	}
 }
@@ -4157,7 +4157,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 							mp->dirty = 1;
 						}
 						mp->hover_item = hit_idx;
-						if(hovered && !(hovered->flags & MKGUI_SEPARATOR) && menu_item_has_children(ctx, hovered->id)) {
+						if(hovered && !(hovered->style & MKGUI_SEPARATOR) && menu_item_has_children(ctx, hovered->id)) {
 							uint32_t already_open = 0;
 							if((uint32_t)popup_idx + 1 < ctx->popup_count) {
 								if(ctx->popups[popup_idx + 1].widget_id == hovered->id) {
@@ -4216,7 +4216,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 						if(inp) {
 							const char *display = inp->text;
 							char masked_buf[MKGUI_MAX_TEXT];
-							if(ctx->widgets[dsi].flags & MKGUI_PASSWORD) {
+							if(ctx->widgets[dsi].style & MKGUI_PASSWORD) {
 								uint32_t mlen = (uint32_t)strlen(inp->text);
 								for(uint32_t mi = 0; mi < mlen && mi < MKGUI_MAX_TEXT - 1; ++mi) {
 									masked_buf[mi] = '*';
@@ -4851,26 +4851,26 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 					} else if(pw && pw->type == MKGUI_MENUITEM) {
 						int32_t hit_idx;
 						struct mkgui_widget *clicked = menu_popup_hit_item(ctx, pw->id, pev.y, &hit_idx);
-						if(clicked && !(clicked->flags & MKGUI_SEPARATOR)) {
+						if(clicked && !(clicked->style & MKGUI_SEPARATOR)) {
 							if(menu_item_has_children(ctx, clicked->id)) {
 								menu_open_submenu(ctx, (uint32_t)popup_idx, clicked->id);
 
 							} else {
-								if(clicked->flags & MKGUI_MENU_CHECK) {
-									clicked->flags ^= MKGUI_CHECKED;
+								if(clicked->style & MKGUI_MENU_CHECK) {
+									clicked->style ^= MKGUI_CHECKED;
 
-								} else if(clicked->flags & MKGUI_MENU_RADIO) {
+								} else if(clicked->style & MKGUI_MENU_RADIO) {
 									for(uint32_t ri = 0; ri < ctx->widget_count; ++ri) {
 										struct mkgui_widget *rw = &ctx->widgets[ri];
-										if(rw->type == MKGUI_MENUITEM && rw->parent_id == clicked->parent_id && (rw->flags & MKGUI_MENU_RADIO)) {
-											rw->flags &= ~MKGUI_CHECKED;
+										if(rw->type == MKGUI_MENUITEM && rw->parent_id == clicked->parent_id && (rw->style & MKGUI_MENU_RADIO)) {
+											rw->style &= ~MKGUI_CHECKED;
 										}
 									}
-									clicked->flags |= MKGUI_CHECKED;
+									clicked->style |= MKGUI_CHECKED;
 								}
 								ev->type = MKGUI_EVENT_MENU;
 								ev->id = clicked->id;
-								ev->value = (clicked->flags & MKGUI_CHECKED) ? 1 : 0;
+								ev->value = (clicked->style & MKGUI_CHECKED) ? 1 : 0;
 								popup_destroy_all(ctx);
 								dirty_all(ctx);
 								return 1;
@@ -4941,7 +4941,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 								if(row < 0 || row >= (int32_t)lv->row_count) {
 									row = -1;
 								} else {
-									if(hw->flags & MKGUI_MULTI_SELECT) {
+									if(hw->style & MKGUI_MULTI_SELECT) {
 										if(lv_multi_sel_find(lv, row) < 0) {
 											lv->multi_sel_count = 0;
 											lv->multi_sel[0] = row;
@@ -5442,7 +5442,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 							} else {
 								const char *display = inp->text;
 								char masked_buf[MKGUI_MAX_TEXT];
-								if(hw->flags & MKGUI_PASSWORD) {
+								if(hw->style & MKGUI_PASSWORD) {
 									uint32_t mlen = (uint32_t)strlen(inp->text);
 									for(uint32_t mi = 0; mi < mlen && mi < MKGUI_MAX_TEXT - 1; ++mi) {
 										masked_buf[mi] = '*';
@@ -5588,7 +5588,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 											ctx->dblclick_id = hw->id;
 											ctx->dblclick_row = row;
 											ctx->dblclick_time = now;
-											if(hw->flags & MKGUI_MULTI_SELECT) {
+											if(hw->style & MKGUI_MULTI_SELECT) {
 												lv_multi_sel_toggle(lv, row);
 												lv->selected_row = row;
 											} else {
@@ -6095,10 +6095,10 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 						}
 
 						if(hw->type == MKGUI_CHECKBOX) {
-							hw->flags ^= MKGUI_CHECKED;
+							hw->style ^= MKGUI_CHECKED;
 							ev->type = MKGUI_EVENT_CHECKBOX_CHANGED;
 							ev->id = hw->id;
-							ev->value = (hw->flags & MKGUI_CHECKED) ? 1 : 0;
+							ev->value = (hw->style & MKGUI_CHECKED) ? 1 : 0;
 							return 1;
 						}
 
@@ -6231,7 +6231,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 					}
 
 					if(fw && (ks == 'c' || ks == 'C')) {
-						if(fw->type == MKGUI_INPUT && !(fw->flags & MKGUI_PASSWORD)) {
+						if(fw->type == MKGUI_INPUT && !(fw->style & MKGUI_PASSWORD)) {
 							struct mkgui_input_data *inp = find_input_data(ctx, ctx->focus_id);
 							if(inp) {
 								if(input_has_selection(inp)) {
@@ -6258,8 +6258,8 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 						break;
 					}
 
-					if(fw && (ks == 'x' || ks == 'X') && !(fw->flags & MKGUI_READONLY)) {
-						if(fw->type == MKGUI_INPUT && !(fw->flags & MKGUI_PASSWORD)) {
+					if(fw && (ks == 'x' || ks == 'X') && !(fw->style & MKGUI_READONLY)) {
+						if(fw->type == MKGUI_INPUT && !(fw->style & MKGUI_PASSWORD)) {
 							struct mkgui_input_data *inp = find_input_data(ctx, ctx->focus_id);
 							if(inp && input_has_selection(inp)) {
 								uint32_t lo, hi;
@@ -6290,7 +6290,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 						break;
 					}
 
-					if(fw && (ks == 'v' || ks == 'V') && !(fw->flags & MKGUI_READONLY)) {
+					if(fw && (ks == 'v' || ks == 'V') && !(fw->style & MKGUI_READONLY)) {
 						if(fw->type == MKGUI_INPUT) {
 							char clip_buf[MKGUI_CLIP_MAX];
 							uint32_t clip_len = platform_clipboard_get(ctx, clip_buf, sizeof(clip_buf));
