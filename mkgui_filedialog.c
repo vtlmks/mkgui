@@ -147,27 +147,27 @@ static const char *fd_icon_for_name(const char *name, uint32_t is_dir) {
 	}
 	const char *dot = strrchr(name, '.');
 	if(!dot) {
-		return "file-document-outline";
+		return "text-x-generic";
 	}
 	if(strcmp(dot, ".c") == 0 || strcmp(dot, ".cpp") == 0 || strcmp(dot, ".cc") == 0) {
-		return "language-c";
+		return "text-x-csrc";
 	}
 	if(strcmp(dot, ".h") == 0 || strcmp(dot, ".hpp") == 0) {
-		return "language-c";
+		return "text-x-csrc";
 	}
 	if(strcmp(dot, ".sh") == 0) {
-		return "script-text";
+		return "text-x-script";
 	}
 	if(strcmp(dot, ".py") == 0) {
-		return "language-python";
+		return "text-x-python";
 	}
 	if(strcmp(dot, ".md") == 0 || strcmp(dot, ".txt") == 0) {
-		return "file-document-outline";
+		return "text-x-generic";
 	}
 	if(strcmp(dot, ".png") == 0 || strcmp(dot, ".jpg") == 0 || strcmp(dot, ".jpeg") == 0 || strcmp(dot, ".gif") == 0 || strcmp(dot, ".svg") == 0) {
-		return "file-image";
+		return "image-x-generic";
 	}
-	return "file-document-outline";
+	return "text-x-generic";
 }
 
 // [=]===^=[ fd_path_exists ]======================================[=]
@@ -929,20 +929,20 @@ static void fd_bookmark_row_cb(uint32_t row, uint32_t col, char *buf, uint32_t b
 	if(row < fd.bookmark_count) {
 		const char *icon = "folder";
 		if(strcmp(fd.bookmarks[row].label, "Home") == 0) {
-			icon = "home";
+			icon = "user-home";
 		} else if(strcmp(fd.bookmarks[row].label, "Desktop") == 0) {
-			icon = "monitor";
+			icon = "user-desktop";
 		} else if(strcmp(fd.bookmarks[row].label, "Downloads") == 0) {
-			icon = "download";
+			icon = "folder-download";
 		} else if(strcmp(fd.bookmarks[row].label, "Documents") == 0) {
-			icon = "file-document-multiple";
+			icon = "folder-documents";
 		} else {
 			uint32_t is_mount = 0;
 			if(strncmp(fd.bookmarks[row].path, "/media/", 7) == 0 || strncmp(fd.bookmarks[row].path, "/mnt/", 5) == 0) {
 				is_mount = 1;
 			}
 			if(is_mount) {
-				icon = "harddisk";
+				icon = "drive-harddisk";
 			}
 		}
 		snprintf(buf, buf_size, "%s\t%s", icon, fd.bookmarks[row].label);
@@ -1089,11 +1089,11 @@ static uint32_t fd_run_dialog(struct mkgui_ctx *ctx, uint32_t mode, const struct
 		{ MKGUI_WINDOW,   FD_ID_WINDOW,        "",              "",             0,                  FD_INIT_W, FD_INIT_H, 0, 0, 0 },
 
 		{ MKGUI_TOOLBAR,  FD_ID_TOOLBAR,        "",              "",             FD_ID_WINDOW,       0, 0, 0, 0, 0 },
-		{ MKGUI_BUTTON,   FD_ID_BTN_BACK,       "",              "arrow-left",   FD_ID_TOOLBAR,      0, 0, 0, 0, 0 },
-		{ MKGUI_BUTTON,   FD_ID_BTN_FWD,        "",              "arrow-right",  FD_ID_TOOLBAR,      0, 0, 0, 0, 0 },
-		{ MKGUI_BUTTON,   FD_ID_BTN_UP,         "",              "arrow-up",     FD_ID_TOOLBAR,      0, 0, 0, 0, 0 },
+		{ MKGUI_BUTTON,   FD_ID_BTN_BACK,       "",              "go-previous",  FD_ID_TOOLBAR,      0, 0, 0, 0, 0 },
+		{ MKGUI_BUTTON,   FD_ID_BTN_FWD,        "",              "go-next",      FD_ID_TOOLBAR,      0, 0, 0, 0, 0 },
+		{ MKGUI_BUTTON,   FD_ID_BTN_UP,         "",              "go-up",        FD_ID_TOOLBAR,      0, 0, 0, 0, 0 },
 		{ MKGUI_BUTTON,   FD_ID_TB_SEP1,        "",              "",             FD_ID_TOOLBAR,      0, 0, 0, MKGUI_SEPARATOR, 0 },
-		{ MKGUI_BUTTON,   FD_ID_BTN_NEWFOLDER,  "",              "folder-plus",  FD_ID_TOOLBAR,      0, 0, 0, 0, 0 },
+		{ MKGUI_BUTTON,   FD_ID_BTN_NEWFOLDER,  "",              "folder-new",   FD_ID_TOOLBAR,      0, 0, 0, 0, 0 },
 
 		{ MKGUI_PATHBAR,  FD_ID_PATHBAR,        "",              "",             FD_ID_WINDOW,       0, 0, 0, 0, 0 },
 
@@ -1110,7 +1110,7 @@ static uint32_t fd_run_dialog(struct mkgui_ctx *ctx, uint32_t mode, const struct
 
 		{ MKGUI_HBOX,     FD_ID_BTN_HBOX,       "",              "",             FD_ID_CONTENT_VBOX, 0, 28, MKGUI_FIXED, 0, 0 },
 		{ MKGUI_CHECKBOX, FD_ID_CHK_HIDDEN,     "Show hidden",   "",             FD_ID_BTN_HBOX,     110, 0, MKGUI_FIXED, 0, 0 },
-		{ MKGUI_LABEL,    FD_ID_SEARCH_LABEL,   "",              "magnify",      FD_ID_BTN_HBOX,     200, 0, MKGUI_FIXED | MKGUI_HIDDEN, 0, 0 },
+		{ MKGUI_LABEL,    FD_ID_SEARCH_LABEL,   "",              "edit-find",    FD_ID_BTN_HBOX,     200, 0, MKGUI_FIXED | MKGUI_HIDDEN, 0, 0 },
 		{ MKGUI_LABEL,    FD_ID_SPACER,         "",              "",             FD_ID_BTN_HBOX,     0, 0, 0, 0, 1 },
 		{ MKGUI_BUTTON,   FD_ID_BTN_CONFIRM,    "",              "",             FD_ID_BTN_HBOX,     80, 0, MKGUI_FIXED, 0, 0 },
 		{ MKGUI_BUTTON,   FD_ID_BTN_CANCEL,     "Cancel",        "",             FD_ID_BTN_HBOX,     80, 0, MKGUI_FIXED, 0, 0 },

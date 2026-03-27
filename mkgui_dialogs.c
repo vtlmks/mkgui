@@ -59,11 +59,11 @@ static uint32_t dlg_enter_result;
 static uint32_t dlg_escape_result;
 
 static const struct dlg_icon_def dlg_icon_defs[] = {
-	{ NULL,           0        },
-	{ "information",  0x3daee9 },
-	{ "alert",        0xf67400 },
-	{ "alert-circle", 0xda4453 },
-	{ "help-circle",  0x3daee9 },
+	{ NULL,                  0        },
+	{ "dialog-information",  0x3daee9 },
+	{ "dialog-warning",      0xf67400 },
+	{ "dialog-error",        0xda4453 },
+	{ "help-browser",        0x3daee9 },
 };
 
 static const struct dlg_btn_def dlg_button_defs[5][3] = {

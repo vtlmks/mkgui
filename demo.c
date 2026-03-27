@@ -762,7 +762,7 @@ int main(void) {
 		return 1;
 	}
 
-	mkgui_set_scale(ctx, 2.0f);
+	mkgui_set_scale(ctx, 1.0f);
 	mkgui_icon_load_svg_dir(ctx, "icons");
 
 	/* Controls tab setup */
