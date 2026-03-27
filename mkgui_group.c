@@ -46,6 +46,10 @@ static void render_group(struct mkgui_ctx *ctx, uint32_t idx) {
 
 	push_text_clip(label_x, label_y, w->label, ctx->theme.text, rx, ry, rx + rw, ry + rh);
 
+	if(!(w->style & MKGUI_COLLAPSIBLE)) {
+		return;
+	}
+
 	uint32_t ac = ctx->theme.text;
 	int32_t ax = rx + MKGUI_GROUP_PAD - 4;
 	int32_t ay = label_y + ctx->font_height / 2;

@@ -84,7 +84,7 @@ struct mkgui_widget {
 };
 ```
 
-The `flags` field holds universal layout and state flags: `MKGUI_FIXED`, `MKGUI_HIDDEN`, `MKGUI_DISABLED`, `MKGUI_SCROLL`, `MKGUI_NO_PAD`, `MKGUI_VERTICAL`, `MKGUI_REGION_*`, `MKGUI_ALIGN_*`, `MKGUI_TOOLBAR_SEP`. The `style` field holds per-widget-type appearance flags: `MKGUI_CHECKED`, `MKGUI_PASSWORD`, `MKGUI_READONLY`, `MKGUI_SEPARATOR`, `MKGUI_MENU_CHECK`, `MKGUI_MENU_RADIO`, `MKGUI_PANEL_BORDER`, `MKGUI_PANEL_SUNKEN`, `MKGUI_SLIDER_MIXER`, `MKGUI_METER_TEXT`, `MKGUI_IMAGE_STRETCH`, `MKGUI_TAB_CLOSABLE`, `MKGUI_MULTI_SELECT`, `MKGUI_TRUNCATE`, `MKGUI_TOOLBAR_ICONS_ONLY`, `MKGUI_TOOLBAR_TEXT_ONLY`, `MKGUI_LINK`, `MKGUI_COLLAPSED`, `MKGUI_WRAP`, `MKGUI_NUMERIC`.
+The `flags` field holds universal layout and state flags: `MKGUI_FIXED`, `MKGUI_HIDDEN`, `MKGUI_DISABLED`, `MKGUI_SCROLL`, `MKGUI_NO_PAD`, `MKGUI_VERTICAL`, `MKGUI_REGION_*`, `MKGUI_ALIGN_*`, `MKGUI_TOOLBAR_SEP`. The `style` field holds per-widget-type appearance flags: `MKGUI_CHECKED`, `MKGUI_PASSWORD`, `MKGUI_READONLY`, `MKGUI_SEPARATOR`, `MKGUI_MENU_CHECK`, `MKGUI_MENU_RADIO`, `MKGUI_PANEL_BORDER`, `MKGUI_PANEL_SUNKEN`, `MKGUI_SLIDER_MIXER`, `MKGUI_METER_TEXT`, `MKGUI_IMAGE_STRETCH`, `MKGUI_TAB_CLOSABLE`, `MKGUI_MULTI_SELECT`, `MKGUI_TRUNCATE`, `MKGUI_TOOLBAR_ICONS_ONLY`, `MKGUI_TOOLBAR_TEXT_ONLY`, `MKGUI_LINK`, `MKGUI_COLLAPSIBLE`, `MKGUI_COLLAPSED`, `MKGUI_WRAP`, `MKGUI_NUMERIC`.
 
 There are no `x, y` fields. All positioning is handled by the container-based layout system. The `w` and `h` fields specify size; when `h` is 0, the widget uses its natural height (derived from the font height for most widget types).
 
@@ -1102,10 +1102,11 @@ Children are laid out inside the group's content area (inside the border), stack
 
 ### Collapsible group
 
-Set `MKGUI_COLLAPSED` to make a group start collapsed. Click the group header to toggle. When collapsed, children are hidden and the group shrinks to header height. Generates `MKGUI_EVENT_CLICK` with `value=1` when collapsed, `value=0` when expanded.
+Set `MKGUI_COLLAPSIBLE` to allow a group to be collapsed/expanded by clicking the header. A collapsible group is always content-sized (it does not stretch to fill available space). Add `MKGUI_COLLAPSED` to start collapsed. When collapsed, children are hidden and the group shrinks to header height. Generates `MKGUI_EVENT_CLICK` with `value=1` when collapsed, `value=0` when expanded. Groups without `MKGUI_COLLAPSIBLE` ignore header clicks and have no arrow indicator.
 
 ```c
-{ MKGUI_GROUP, ID_GRP, "Advanced", "", ID_PARENT, 0, 0, 0, MKGUI_COLLAPSED, 1 }
+{ MKGUI_GROUP, ID_GRP, "Advanced", "", ID_PARENT, 0, 0, 0, MKGUI_COLLAPSIBLE, 1 }
+{ MKGUI_GROUP, ID_GRP, "Advanced", "", ID_PARENT, 0, 0, 0, MKGUI_COLLAPSIBLE | MKGUI_COLLAPSED, 1 }
 ```
 
 ```c

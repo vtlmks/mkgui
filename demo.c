@@ -668,7 +668,7 @@ int main(void) {
 
 		/* Controls: right column */
 		{ MKGUI_VBOX,     ID_CTL_RVBOX, "",                  "", ID_CTL_HBOX, 280, 0, MKGUI_FIXED, 0, 0 },
-		{ MKGUI_GROUP,    ID_GRP_EXTRA, "Extra Controls",    "", ID_CTL_RVBOX, 0, 0, 0, 0, 1 },
+		{ MKGUI_GROUP,    ID_GRP_EXTRA, "Extra Controls",    "", ID_CTL_RVBOX, 0, 0, 0, MKGUI_COLLAPSIBLE, 1 },
 		{ MKGUI_FORM,     ID_EXTRA_FORM,"",                  "", ID_GRP_EXTRA, 0, 0, 0, 0, 0 },
 		{ MKGUI_LABEL,    ID_LBL_POWER, "Power:",            "", ID_EXTRA_FORM, 0, 0, 0, 0, 0 },
 		{ MKGUI_TOGGLE,   ID_TOGGLE1,   "",                  "", ID_EXTRA_FORM, 0, 0, 0, 0, 0 },
@@ -685,7 +685,7 @@ int main(void) {
 
 		{ MKGUI_DIVIDER,  ID_DIVIDER1,  "",                  "", ID_CTL_RVBOX, 0, 0, MKGUI_FIXED, 0, 0 },
 
-		{ MKGUI_GROUP,    ID_GRP_COLLAPSIBLE, "Collapsible", "", ID_CTL_RVBOX, 0, 0, 0, 0, 1 },
+		{ MKGUI_GROUP,    ID_GRP_COLLAPSIBLE, "Collapsible", "", ID_CTL_RVBOX, 0, 0, 0, MKGUI_COLLAPSIBLE, 1 },
 		{ MKGUI_VBOX,     ID_COLL_LBL,  "",                  "", ID_GRP_COLLAPSIBLE, 0, 0, 0, 0, 0 },
 		{ MKGUI_LABEL,    ID_LINK1,     "mkgui on GitHub",   "", ID_COLL_LBL, 0, 0, MKGUI_FIXED, MKGUI_LINK, 0 },
 		{ MKGUI_LABEL,    ID_LBL_WRAP,  "This label demonstrates word wrapping. Text flows to the next line when it reaches the edge of the widget.", "", ID_COLL_LBL, 0, 80, MKGUI_FIXED, MKGUI_WRAP, 0 },

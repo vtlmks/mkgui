@@ -1695,7 +1695,7 @@ static void lc_layout_node(struct mkgui_ctx *ctx, struct layout_ctx *lc, uint32_
 					continue;
 				}
 				++child_count;
-				uint32_t treat_fixed = (jw->flags & MKGUI_FIXED) || (jw->type == MKGUI_GROUP && (jw->style & MKGUI_COLLAPSED));
+				uint32_t treat_fixed = (jw->flags & MKGUI_FIXED) || (jw->type == MKGUI_GROUP && (jw->style & MKGUI_COLLAPSIBLE));
 				if(treat_fixed) {
 					int32_t fh = jw->h;
 					if(jw->type == MKGUI_GROUP && (jw->style & MKGUI_COLLAPSED)) {
@@ -1748,7 +1748,7 @@ static void lc_layout_node(struct mkgui_ctx *ctx, struct layout_ctx *lc, uint32_
 					continue;
 				}
 				int32_t ch;
-				if((jw->flags & MKGUI_FIXED) || (jw->type == MKGUI_GROUP && (jw->style & MKGUI_COLLAPSED))) {
+				if((jw->flags & MKGUI_FIXED) || (jw->type == MKGUI_GROUP && (jw->style & MKGUI_COLLAPSIBLE))) {
 					ch = lc->rects[j].h;
 				} else {
 					uint32_t wt = jw->weight > 0 ? jw->weight : 1;
@@ -6148,7 +6148,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 							return 1;
 						}
 
-						if(hw->type == MKGUI_GROUP) {
+						if(hw->type == MKGUI_GROUP && (hw->style & MKGUI_COLLAPSIBLE)) {
 							hw->style ^= MKGUI_COLLAPSED;
 							ev->type = MKGUI_EVENT_CLICK;
 							ev->id = hw->id;
