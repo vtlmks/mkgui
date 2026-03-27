@@ -665,7 +665,6 @@ struct mkgui_ctx {
 #endif
 	uint32_t anim_active;
 	uint32_t close_requested;
-	int32_t poll_timeout_ms;
 
 	struct mkgui_timer timers[MKGUI_MAX_TIMERS];
 	uint32_t timer_count;
@@ -3736,7 +3735,7 @@ MKGUI_API struct mkgui_ctx *mkgui_create(struct mkgui_widget *widgets, uint32_t 
 	clock_gettime(CLOCK_MONOTONIC, &ctx->anim_prev);
 #endif
 	ctx->anim_time = 0.0;
-	ctx->poll_timeout_ms = -1;
+
 
 	init_aux_data(ctx);
 	window_register(ctx);
@@ -3987,7 +3986,7 @@ MKGUI_API struct mkgui_ctx *mkgui_create_child(struct mkgui_ctx *parent, struct 
 	clock_gettime(CLOCK_MONOTONIC, &ctx->anim_prev);
 #endif
 	ctx->anim_time = 0.0;
-	ctx->poll_timeout_ms = -1;
+
 
 	init_aux_data(ctx);
 	window_register(ctx);
@@ -6756,13 +6755,6 @@ MKGUI_API void mkgui_wait(struct mkgui_ctx *ctx) {
 	if(ctx->close_requested) {
 		return;
 	}
-	if(ctx->poll_timeout_ms == 0) {
-		return;
-	}
-	if(ctx->poll_timeout_ms > 0) {
-		platform_wait_event(ctx, ctx->poll_timeout_ms);
-		return;
-	}
 	uint32_t any_anim = ctx->anim_active;
 	if(!any_anim) {
 		for(uint32_t i = 0; i < window_registry_count; ++i) {
@@ -6774,12 +6766,6 @@ MKGUI_API void mkgui_wait(struct mkgui_ctx *ctx) {
 		}
 	}
 	platform_wait_event(ctx, any_anim ? 16 : -1);
-}
-
-// [=]===^=[ mkgui_set_poll_timeout ]==============================[=]
-MKGUI_API void mkgui_set_poll_timeout(struct mkgui_ctx *ctx, int32_t ms) {
-	MKGUI_CHECK(ctx);
-	ctx->poll_timeout_ms = ms;
 }
 
 // [=]===^=[ mkgui_add_timer ]=====================================[=]

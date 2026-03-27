@@ -619,15 +619,6 @@ static void platform_wait_event(struct mkgui_ctx *ctx, int32_t timeout_ms) {
 	MsgWaitForMultipleObjects(0, NULL, FALSE, wait_ms, QS_ALLINPUT);
 }
 
-// [=]===^=[ platform_wait_timeout ]================================[=]
-static void platform_wait_timeout(struct mkgui_ctx *ctx, int32_t timeout_ms) {
-	(void)ctx;
-	if(timeout_ms <= 0) {
-		return;
-	}
-	Sleep((DWORD)timeout_ms);
-}
-
 // [=]===^=[ platform_pending ]====================================[=]
 static uint32_t platform_pending(struct mkgui_ctx *ctx) {
 	platform_pump_messages();
