@@ -289,15 +289,37 @@ reparenting, tab/menu/data operations.
 
 ## File format
 
-Projects are saved as binary `.mkgui` files containing the complete widget tree,
+Projects are saved as text `.mkgui` files containing the complete widget tree,
 properties, hierarchy, data items, and editor state. The format stores widget
 types as numeric values, making it forward-compatible with new widget types.
 
+## Canvas rendering
+
+The editor canvas uses the real mkgui render functions for simple widgets
+(button, label, checkbox, radio, group, panel) by copying widget data into a
+staging slot and calling `render_widget`. Complex widgets that need aux data
+(input, listview, treeview, etc.) use simplified preview rendering via
+`ed_draw_widget_fallback`. A `uint64_t ed_real_render` bitfield in editor.c
+controls which widget types use real rendering.
+
+## Adding a new widget type
+
+To add a new widget type to mkgui and the editor:
+
+1. Add enum value to widget type enum in `mkgui.h`
+2. Create `mkgui_newwidget.c` with render function and API functions
+3. `#include` it in `mkgui.c`
+4. Add case to `render_widget()` in mkgui.c
+5. Add `natural_height()` case in mkgui.c if it has a natural height
+6. **Editor rendering**: add bit to `ed_real_render` if no aux data needed, or add case to `ed_draw_widget_fallback` if aux data needed
+7. Add to editor palette (`ed_widgets[]` or `ed_containers[]`)
+8. Add default size in new-widget switch in editor.c
+9. Add `ed_type_name_upper()` case for code generation
+10. Add `ed_gen_id_name()` case for default ID prefix
+
 ## Tips
 
-- **Rapid layout building**: select a container, hold Ctrl, click palette
-  entries to add multiple children without nesting them inside each other.
-- **Quick property editing**: press X/Y/W/H/L/I to jump to that field without
+- **Quick property editing**: press W/H/L/I to jump to that field without
   reaching for the mouse.
 - **Tab workflow**: create a TABS widget, use "Add Tab" in properties, then
   click tab headers on the canvas to switch between tabs while placing widgets.

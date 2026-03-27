@@ -1835,8 +1835,8 @@ static uint32_t ed_canvas_edge_hit(int32_t lx, int32_t ly) {
 // Design-time widget drawing (inert visual representations)
 // ---------------------------------------------------------------------------
 
-// [=]===^=[ ed_draw_widget ]======================================[=]
-static void ed_draw_widget(struct mkgui_ctx *ctx, uint32_t idx) {
+// [=]===^=[ ed_draw_widget_fallback ]==============================[=]
+static void ed_draw_widget_fallback(struct mkgui_ctx *ctx, uint32_t idx) {
 	struct ed_widget *ew = &ed.widgets[idx];
 	int32_t rx = ed_rects[idx].x;
 	int32_t ry = ed_rects[idx].y;
@@ -1847,29 +1847,6 @@ static void ed_draw_widget(struct mkgui_ctx *ctx, uint32_t idx) {
 	int32_t bh = ctx->win_h;
 
 	switch(ew->type) {
-		case MKGUI_BUTTON: {
-			draw_patch(ctx, MKGUI_STYLE_RAISED, rx, ry, rw, rh, ctx->theme.widget_bg, ctx->theme.widget_border);
-			int32_t icon_idx = ew->icon[0] ? icon_resolve(ew->icon) : -1;
-			int32_t icon_iw = icon_idx >= 0 ? icons[icon_idx].w + 4 : 0;
-			int32_t tw = text_width(ctx, ew->label);
-			int32_t content_w = icon_iw + (ew->label[0] ? tw : 0);
-			int32_t cx = rx + (rw - content_w) / 2;
-			if(icon_idx >= 0) {
-				int32_t iy = ry + (rh - icons[icon_idx].h) / 2;
-				draw_icon(buf, bw, bh, &icons[icon_idx], cx, iy, rx + 1, ry + 1, rx + rw - 1, ry + rh - 1);
-				cx += icons[icon_idx].w + 4;
-			}
-			if(ew->label[0]) {
-				int32_t ty = ry + (rh - ctx->font_height) / 2;
-				push_text_clip(cx, ty, ew->label, ctx->theme.text, rx, ry, rx + rw, ry + rh);
-			}
-		} break;
-
-		case MKGUI_LABEL: {
-			int32_t ty = ry + (rh - ctx->font_height) / 2;
-			push_text_clip(rx, ty, ew->label, ctx->theme.text, rx, ry, rx + rw, ry + rh);
-		} break;
-
 		case MKGUI_INPUT: {
 			draw_patch(ctx, MKGUI_STYLE_SUNKEN, rx, ry, rw, rh, ctx->theme.input_bg, ctx->theme.widget_border);
 			if(ew->label[0]) {
@@ -1921,33 +1898,6 @@ static void ed_draw_widget(struct mkgui_ctx *ctx, uint32_t idx) {
 			draw_patch(ctx, MKGUI_STYLE_RAISED, rx + text_w, ry, 24, rh, ctx->theme.widget_bg, ctx->theme.widget_border);
 			int32_t dty = ry + (rh - ctx->font_height) / 2;
 			push_text_clip(rx + 4, dty, "2026-01-01", ctx->theme.text_disabled, rx + 1, ry + 1, rx + text_w - 1, ry + rh - 1);
-		} break;
-
-		case MKGUI_CHECKBOX: {
-			int32_t box_size = 16;
-			int32_t by = ry + (rh - box_size) / 2;
-			uint32_t bg = (ew->flags & MKGUI_CHECKED) ? ctx->theme.splitter : ctx->theme.input_bg;
-			draw_patch(ctx, MKGUI_STYLE_SUNKEN, rx, by, box_size, box_size, bg, ctx->theme.widget_border);
-			if(ew->flags & MKGUI_CHECKED) {
-				int32_t cx = rx + box_size / 2;
-				int32_t cy = by + box_size / 2;
-				draw_aa_line(buf, bw, bh, cx - 4, cy - 1, cx - 1, cy + 3, ctx->theme.sel_text, 2);
-				draw_aa_line(buf, bw, bh, cx - 1, cy + 3, cx + 5, cy - 4, ctx->theme.sel_text, 2);
-			}
-			int32_t ty = ry + (rh - ctx->font_height) / 2;
-			push_text_clip(rx + box_size + 6, ty, ew->label, ctx->theme.text, rx, ry, rx + rw, ry + rh);
-		} break;
-
-		case MKGUI_RADIO: {
-			int32_t cy = ry + rh / 2;
-			int32_t cx = rx + 9;
-			uint32_t fill = (ew->flags & MKGUI_CHECKED) ? ctx->theme.splitter : ctx->theme.input_bg;
-			draw_aa_circle_ring(buf, bw, bh, cx, cy, 7, 6, fill, ctx->theme.widget_border);
-			if(ew->flags & MKGUI_CHECKED) {
-				draw_aa_circle_fill(buf, bw, bh, cx, cy, 3, ctx->theme.sel_text);
-			}
-			int32_t ty = ry + (rh - ctx->font_height) / 2;
-			push_text_clip(rx + 22, ty, ew->label, ctx->theme.text, rx, ry, rx + rw, ry + rh);
 		} break;
 
 		case MKGUI_SLIDER: {
@@ -2056,39 +2006,6 @@ static void ed_draw_widget(struct mkgui_ctx *ctx, uint32_t idx) {
 				tx += tw;
 			}
 			draw_hline(buf, bw, bh, rx, ry + MKGUI_TAB_HEIGHT - 1, rw, ctx->theme.widget_border);
-		} break;
-
-		case MKGUI_GROUP: {
-			int32_t label_y = ry + 2;
-			int32_t label_x = rx + 10;
-			int32_t tw = text_width(ctx, ew->label);
-			int32_t gap_left = label_x - 4;
-			int32_t gap_right = label_x + tw + 4;
-			int32_t frame_y = ry + ctx->font_height / 2 + 2;
-			int32_t frame_h = rh - (frame_y - ry);
-			uint32_t group_bg = shade_color(ctx->theme.bg, -10);
-			draw_rounded_rect(buf, bw, bh, rx, frame_y, rw, frame_h, group_bg, ctx->theme.widget_border, ctx->theme.corner_radius);
-			if(gap_left > rx && gap_right <= rx + rw) {
-				if(frame_y >= 0 && frame_y < bh) {
-					int32_t left = gap_left < 0 ? 0 : gap_left;
-					int32_t right = gap_right > bw ? bw : gap_right;
-					uint32_t *row = &buf[frame_y * bw];
-					for(int32_t x = left; x < right; ++x) {
-						row[x] = group_bg;
-					}
-				}
-			}
-			push_text_clip(label_x, label_y, ew->label, ctx->theme.text, rx, ry, rx + rw, ry + rh);
-		} break;
-
-		case MKGUI_PANEL:
-		case MKGUI_VBOX:
-		case MKGUI_HBOX:
-		case MKGUI_FORM: {
-			uint32_t bg = (ew->flags & MKGUI_PANEL_SUNKEN) ? shade_color(ctx->theme.bg, -15) : ctx->theme.bg;
-			if(ew->flags & MKGUI_PANEL_BORDER) {
-				draw_rounded_rect(buf, bw, bh, rx, ry, rw, rh, bg, ctx->theme.widget_border, ctx->theme.corner_radius);
-			}
 		} break;
 
 		case MKGUI_LISTVIEW: {
@@ -2403,6 +2320,16 @@ static void ed_render_canvas(struct mkgui_ctx *ctx, uint32_t id, uint32_t *pixel
 	}
 
 	// Render design-time widget representations
+	// Simple widgets (no aux data) use real render via staging slot 0;
+	// complex widgets use simplified fallback previews.
+	struct mkgui_widget save_w0 = ctx->widgets[0];
+	struct mkgui_rect save_r0 = ctx->rects[0];
+	uint32_t save_hover = ctx->hover_id;
+	uint32_t save_press = ctx->press_id;
+	uint32_t save_focus = ctx->focus_id;
+	ctx->hover_id = 0;
+	ctx->press_id = 0;
+	ctx->focus_id = 0;
 	for(uint32_t i = 0; i < ed.widget_count; ++i) {
 		if(ed.widgets[i].type == MKGUI_WINDOW || ed.widgets[i].type == MKGUI_TAB || ed.widgets[i].type == MKGUI_MENUITEM) {
 			continue;
@@ -2416,8 +2343,24 @@ static void ed_render_canvas(struct mkgui_ctx *ctx, uint32_t id, uint32_t *pixel
 		if(ed_rects[i].w <= 0 || ed_rects[i].h <= 0) {
 			continue;
 		}
-		ed_draw_widget(ctx, i);
+		uint32_t t = ed.widgets[i].type;
+		static const uint64_t ed_real_render =
+			(1ull << MKGUI_BUTTON) | (1ull << MKGUI_LABEL) |
+			(1ull << MKGUI_CHECKBOX) | (1ull << MKGUI_RADIO) |
+			(1ull << MKGUI_GROUP) | (1ull << MKGUI_PANEL);
+		if(t < 64 && (ed_real_render & (1ull << t))) {
+			memcpy(&ctx->widgets[0], &ed.widgets[i], sizeof(struct mkgui_widget));
+			memcpy(&ctx->rects[0], &ed_rects[i], sizeof(struct mkgui_rect));
+			render_widget(ctx, 0);
+		} else {
+			ed_draw_widget_fallback(ctx, i);
+		}
 	}
+	ctx->widgets[0] = save_w0;
+	ctx->rects[0] = save_r0;
+	ctx->hover_id = save_hover;
+	ctx->press_id = save_press;
+	ctx->focus_id = save_focus;
 
 	// Draw dashed outlines for invisible containers
 	for(uint32_t i = 0; i < ed.widget_count; ++i) {
