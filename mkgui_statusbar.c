@@ -58,7 +58,7 @@ MKGUI_API void mkgui_statusbar_setup(struct mkgui_ctx *ctx, uint32_t id, uint32_
 	}
 	sb->section_count = section_count > MKGUI_MAX_STATUSBAR_SECTIONS ? MKGUI_MAX_STATUSBAR_SECTIONS : section_count;
 	for(uint32_t i = 0; i < sb->section_count; ++i) {
-		sb->sections[i].width = widths[i];
+		sb->sections[i].width = widths[i] > 0 ? sc(ctx, widths[i]) : widths[i];
 		sb->sections[i].text[0] = '\0';
 	}
 	dirty_all(ctx);

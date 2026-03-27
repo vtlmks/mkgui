@@ -433,7 +433,7 @@ MKGUI_API void mkgui_richlist_setup(struct mkgui_ctx *ctx, uint32_t id, uint32_t
 		rl->selected_row = -1;
 	}
 	rl->row_count = row_count;
-	rl->row_height = row_height > 0 ? row_height : sc(ctx, MKGUI_RICHLIST_DEFAULT_ROW_HEIGHT);
+	rl->row_height = row_height > 0 ? sc(ctx, row_height) : sc(ctx, MKGUI_RICHLIST_DEFAULT_ROW_HEIGHT);
 	rl->row_cb = cb;
 	rl->userdata = userdata;
 	rl->scroll_y = 0;

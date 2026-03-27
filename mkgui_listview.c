@@ -1034,6 +1034,9 @@ MKGUI_API void mkgui_listview_setup(struct mkgui_ctx *ctx, uint32_t id, uint32_t
 	lv->row_count = row_count;
 	lv->col_count = col_count > MKGUI_MAX_COLS ? MKGUI_MAX_COLS : col_count;
 	memcpy(lv->columns, columns, lv->col_count * sizeof(struct mkgui_column));
+	for(uint32_t ci = 0; ci < lv->col_count; ++ci) {
+		lv->columns[ci].width = sc(ctx, lv->columns[ci].width);
+	}
 	lv->row_cb = cb;
 	lv->userdata = userdata;
 	lv->selected_row = -1;
@@ -1143,7 +1146,7 @@ MKGUI_API void mkgui_listview_set_col_width(struct mkgui_ctx *ctx, uint32_t id, 
 	if(width < min_col_w) {
 		width = min_col_w;
 	}
-	lv->columns[col].width = width;
+	lv->columns[col].width = sc(ctx, width);
 	dirty_all(ctx);
 }
 

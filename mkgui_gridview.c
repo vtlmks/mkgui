@@ -608,6 +608,7 @@ MKGUI_API void mkgui_gridview_setup(struct mkgui_ctx *ctx, uint32_t id, uint32_t
 	gv->col_count = col_count > MKGUI_MAX_COLS ? MKGUI_MAX_COLS : col_count;
 	for(uint32_t c = 0; c < gv->col_count; ++c) {
 		gv->columns[c] = columns[c];
+		gv->columns[c].width = sc(ctx, gv->columns[c].width);
 	}
 	gv->cell_cb = cell_cb;
 	gv->userdata = userdata;
@@ -703,7 +704,7 @@ MKGUI_API void mkgui_gridview_set_col_width(struct mkgui_ctx *ctx, uint32_t id, 
 	if(!gv || col >= gv->col_count) {
 		return;
 	}
-	gv->columns[col].width = width;
+	gv->columns[col].width = sc(ctx, width);
 	dirty_all(ctx);
 }
 

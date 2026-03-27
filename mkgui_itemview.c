@@ -1099,8 +1099,8 @@ MKGUI_API void mkgui_itemview_set_cell_size(struct mkgui_ctx *ctx, uint32_t id, 
 	if(!iv) {
 		return;
 	}
-	iv->cell_w = w;
-	iv->cell_h = h;
+	iv->cell_w = sc(ctx, w);
+	iv->cell_h = sc(ctx, h);
 	dirty_all(ctx);
 }
 
