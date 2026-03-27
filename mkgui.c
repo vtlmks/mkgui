@@ -1131,72 +1131,6 @@ static void dirty_widget_id(struct mkgui_ctx *ctx, uint32_t id) {
 	}
 }
 
-// [=]===^=[ dirty_intersects ]====================================[=]
-static uint32_t dirty_intersects(struct mkgui_ctx *ctx, int32_t x, int32_t y, int32_t w, int32_t h) {
-	if(ctx->dirty_full) {
-		return 1;
-	}
-	for(uint32_t i = 0; i < ctx->dirty_count; ++i) {
-		int32_t dx = ctx->dirty_rects[i].x;
-		int32_t dy = ctx->dirty_rects[i].y;
-		int32_t dw = ctx->dirty_rects[i].w;
-		int32_t dh = ctx->dirty_rects[i].h;
-		if(x < dx + dw && x + w > dx && y < dy + dh && y + h > dy) {
-			return 1;
-		}
-	}
-	return 0;
-}
-
-// [=]===^=[ dirty_bounds ]========================================[=]
-static void dirty_bounds(struct mkgui_ctx *ctx, int32_t *bx, int32_t *by, int32_t *bw, int32_t *bh) {
-	if(ctx->dirty_full || ctx->dirty_count == 0) {
-		*bx = 0;
-		*by = 0;
-		*bw = ctx->win_w;
-		*bh = ctx->win_h;
-		return;
-	}
-	int32_t x0 = ctx->dirty_rects[0].x;
-	int32_t y0 = ctx->dirty_rects[0].y;
-	int32_t x1 = x0 + ctx->dirty_rects[0].w;
-	int32_t y1 = y0 + ctx->dirty_rects[0].h;
-	for(uint32_t i = 1; i < ctx->dirty_count; ++i) {
-		int32_t dx = ctx->dirty_rects[i].x;
-		int32_t dy = ctx->dirty_rects[i].y;
-		if(dx < x0) {
-			x0 = dx;
-		}
-		if(dy < y0) {
-			y0 = dy;
-		}
-		int32_t dr = dx + ctx->dirty_rects[i].w;
-		int32_t db = dy + ctx->dirty_rects[i].h;
-		if(dr > x1) {
-			x1 = dr;
-		}
-		if(db > y1) {
-			y1 = db;
-		}
-	}
-	if(x0 < 0) {
-		x0 = 0;
-	}
-	if(y0 < 0) {
-		y0 = 0;
-	}
-	if(x1 > ctx->win_w) {
-		x1 = ctx->win_w;
-	}
-	if(y1 > ctx->win_h) {
-		y1 = ctx->win_h;
-	}
-	*bx = x0;
-	*by = y0;
-	*bw = x1 - x0;
-	*bh = y1 - y0;
-}
-
 // ---------------------------------------------------------------------------
 // Layout
 // ---------------------------------------------------------------------------
@@ -2789,28 +2723,32 @@ static void render_widgets(struct mkgui_ctx *ctx) {
 			render_widget(ctx, i);
 		}
 	} else {
-		int32_t bx, by, bw, bh;
-		dirty_bounds(ctx, &bx, &by, &bw, &bh);
-		render_base_clip_x1 = bx;
-		render_base_clip_y1 = by;
-		render_base_clip_x2 = bx + bw;
-		render_base_clip_y2 = by + bh;
-		render_clip_x1 = bx;
-		render_clip_y1 = by;
-		render_clip_x2 = bx + bw;
-		render_clip_y2 = by + bh;
 		for(uint32_t d = 0; d < ctx->dirty_count; ++d) {
-			draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h,
-				ctx->dirty_rects[d].x, ctx->dirty_rects[d].y,
-				ctx->dirty_rects[d].w, ctx->dirty_rects[d].h, ctx->theme.bg);
-		}
-		for(uint32_t i = 0; i < ctx->widget_count; ++i) {
-			if(!widget_visible(ctx, i)) {
-				continue;
-			}
-			if(dirty_intersects(ctx, ctx->rects[i].x, ctx->rects[i].y, ctx->rects[i].w, ctx->rects[i].h)) {
-				set_parent_clip(ctx, i);
-				render_widget(ctx, i);
+			int32_t dx = ctx->dirty_rects[d].x;
+			int32_t dy = ctx->dirty_rects[d].y;
+			int32_t dw = ctx->dirty_rects[d].w;
+			int32_t dh = ctx->dirty_rects[d].h;
+			render_base_clip_x1 = dx;
+			render_base_clip_y1 = dy;
+			render_base_clip_x2 = dx + dw;
+			render_base_clip_y2 = dy + dh;
+			render_clip_x1 = dx;
+			render_clip_y1 = dy;
+			render_clip_x2 = dx + dw;
+			render_clip_y2 = dy + dh;
+			draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, dx, dy, dw, dh, ctx->theme.bg);
+			for(uint32_t i = 0; i < ctx->widget_count; ++i) {
+				if(!widget_visible(ctx, i)) {
+					continue;
+				}
+				int32_t wx = ctx->rects[i].x;
+				int32_t wy = ctx->rects[i].y;
+				int32_t wr = wx + ctx->rects[i].w;
+				int32_t wb = wy + ctx->rects[i].h;
+				if(wx < dx + dw && wr > dx && wy < dy + dh && wb > dy) {
+					set_parent_clip(ctx, i);
+					render_widget(ctx, i);
+				}
 			}
 		}
 	}
@@ -6613,7 +6551,6 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 // [=]===^=[ mkgui_flush ]========================================[=]
 static void mkgui_flush(struct mkgui_ctx *ctx) {
 	if(ctx->dirty) {
-		dirty_all(ctx); // TODO: partial rendering disabled - dirty rect path has a bug, always full redraw for now
 		double t0 = mkgui_time_us();
 		layout_widgets(ctx);
 		glview_sync_all(ctx);
@@ -6631,9 +6568,11 @@ static void mkgui_flush(struct mkgui_ctx *ctx) {
 		if(ctx->dirty_full || ctx->render_cb) {
 			platform_blit(ctx);
 		} else {
-			int32_t bx, by, bw, bh;
-			dirty_bounds(ctx, &bx, &by, &bw, &bh);
-			platform_blit_region(ctx, bx, by, bw, bh);
+			for(uint32_t d = 0; d < ctx->dirty_count; ++d) {
+				platform_blit_region(ctx,
+					ctx->dirty_rects[d].x, ctx->dirty_rects[d].y,
+					ctx->dirty_rects[d].w, ctx->dirty_rects[d].h);
+			}
 		}
 		double t3 = mkgui_time_us();
 		ctx->perf_layout_us = t1 - t0;
