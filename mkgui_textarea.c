@@ -256,6 +256,24 @@ static void render_textarea(struct mkgui_ctx *ctx, uint32_t idx) {
 						draw_vline(ctx->pixels, ctx->win_w, ctx->win_h, cx, draw_y + 2, MKGUI_ROW_HEIGHT - 4, ctx->theme.sel_text);
 					}
 				}
+
+				if(ctx->drag_text_id == w->id && ctx->drag_text_drop_pos >= line_start && ctx->drag_text_drop_pos <= i) {
+					uint32_t dlen = ctx->drag_text_drop_pos - line_start;
+					if(dlen > len) {
+						dlen = len;
+					}
+					char drop_buf[512];
+					if(dlen > sizeof(drop_buf) - 1) {
+						dlen = sizeof(drop_buf) - 1;
+					}
+					memcpy(drop_buf, &ta->text[line_start], dlen);
+					drop_buf[dlen] = '\0';
+					int32_t dx = tx + text_width(ctx, drop_buf);
+					if(dx >= clip_left && dx < clip_right) {
+						draw_vline(ctx->pixels, ctx->win_w, ctx->win_h, dx, draw_y, MKGUI_ROW_HEIGHT, ctx->theme.selection);
+						draw_vline(ctx->pixels, ctx->win_w, ctx->win_h, dx + 1, draw_y, MKGUI_ROW_HEIGHT, ctx->theme.selection);
+					}
+				}
 			}
 
 			line_start = i + 1;

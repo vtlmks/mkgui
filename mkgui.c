@@ -634,6 +634,8 @@ struct mkgui_ctx {
 	int32_t drag_col_resize_start_x;
 	int32_t drag_col_resize_start_w;
 	uint32_t drag_select_id;
+	uint32_t drag_text_id;
+	uint32_t drag_text_drop_pos;
 	int32_t mouse_x, mouse_y;
 	uint32_t mouse_btn;
 	uint32_t dirty;
@@ -3453,6 +3455,9 @@ MKGUI_API uint32_t mkgui_remove_widget(struct mkgui_ctx *ctx, uint32_t id) {
 			if(ctx->drag_select_id == wid) {
 				ctx->drag_select_id = 0;
 			}
+			if(ctx->drag_text_id == wid) {
+				ctx->drag_text_id = 0;
+			}
 			if(ctx->dblclick_id == wid) {
 				ctx->dblclick_id = 0;
 			}
@@ -4195,6 +4200,18 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 
 				ctx->mouse_x = pev.x;
 				ctx->mouse_y = pev.y;
+
+				if(ctx->drag_text_id) {
+					int32_t dsi = find_widget_idx(ctx, ctx->drag_text_id);
+					if(dsi >= 0) {
+						struct mkgui_textarea_data *ta = find_textarea_data(ctx, ctx->drag_text_id);
+						if(ta) {
+							ctx->drag_text_drop_pos = textarea_hit_pos(ctx, ta, ctx->rects[dsi].x, ctx->rects[dsi].y, ctx->rects[dsi].h, ctx->mouse_x, ctx->mouse_y);
+							dirty_widget(ctx, (uint32_t)dsi);
+						}
+					}
+					break;
+				}
 
 				if(ctx->drag_select_id) {
 					int32_t dsi = find_widget_idx(ctx, ctx->drag_select_id);
@@ -5481,7 +5498,17 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 							}
 						}
 						if(ta) {
-							ta->cursor = textarea_hit_pos(ctx, ta, ctx->rects[hi].x, ctx->rects[hi].y, ctx->rects[hi].h, ctx->mouse_x, ctx->mouse_y);
+							uint32_t hit = textarea_hit_pos(ctx, ta, ctx->rects[hi].x, ctx->rects[hi].y, ctx->rects[hi].h, ctx->mouse_x, ctx->mouse_y);
+							if(textarea_has_selection(ta) && !(hw->style & MKGUI_READONLY)) {
+								uint32_t lo, hi2;
+								textarea_sel_range(ta, &lo, &hi2);
+								if(hit >= lo && hit < hi2) {
+									ctx->drag_text_id = hw->id;
+									ctx->drag_text_drop_pos = hit;
+									break;
+								}
+							}
+							ta->cursor = hit;
 							textarea_clear_selection(ta);
 							ctx->drag_select_id = hw->id;
 							dirty_widget(ctx, (uint32_t)hi);
@@ -5980,6 +6007,47 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 
 				ctx->drag_select_id = 0;
 
+				if(ctx->drag_text_id) {
+					uint32_t dtid = ctx->drag_text_id;
+					uint32_t drop = ctx->drag_text_drop_pos;
+					ctx->drag_text_id = 0;
+					struct mkgui_textarea_data *ta = find_textarea_data(ctx, dtid);
+					if(ta && textarea_has_selection(ta)) {
+						uint32_t lo, hi2;
+						textarea_sel_range(ta, &lo, &hi2);
+						if(drop < lo || drop >= hi2) {
+							uint32_t sel_len = hi2 - lo;
+							char *tmp = (char *)malloc(sel_len);
+							if(tmp) {
+								memcpy(tmp, &ta->text[lo], sel_len);
+								if(drop > hi2) {
+									memmove(&ta->text[lo], &ta->text[hi2], drop - hi2);
+									memcpy(&ta->text[drop - sel_len], tmp, sel_len);
+									ta->cursor = drop;
+									ta->sel_start = drop - sel_len;
+									ta->sel_end = drop;
+								} else {
+									memmove(&ta->text[drop + sel_len], &ta->text[drop], lo - drop);
+									memcpy(&ta->text[drop], tmp, sel_len);
+									ta->cursor = drop + sel_len;
+									ta->sel_start = drop;
+									ta->sel_end = drop + sel_len;
+								}
+								free(tmp);
+								ev->type = MKGUI_EVENT_TEXTAREA_CHANGED;
+								ev->id = dtid;
+								dirty_widget_id(ctx, dtid);
+								return 1;
+							}
+						} else {
+							ta->cursor = drop;
+							textarea_clear_selection(ta);
+						}
+					}
+					dirty_widget_id(ctx, dtid);
+					break;
+				}
+
 				if(ctx->drag_col_resize_id) {
 					uint32_t dcr_id = ctx->drag_col_resize_id;
 					ctx->drag_col_resize_id = 0;
@@ -6209,7 +6277,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 								inp->sel_start = 0;
 								inp->sel_end = (uint32_t)strlen(inp->text);
 								inp->cursor = inp->sel_end;
-								dirty_all(ctx);
+								dirty_widget_id(ctx, ctx->focus_id);
 								input_scroll_to_cursor(ctx, ctx->focus_id);
 							}
 
@@ -6217,7 +6285,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 							struct mkgui_combobox_data *cb = find_combobox_data(ctx, ctx->focus_id);
 							if(cb) {
 								combobox_select_all(cb);
-								dirty_all(ctx);
+								dirty_widget_id(ctx, ctx->focus_id);
 							}
 
 						} else if(fw->type == MKGUI_TEXTAREA) {
@@ -6226,7 +6294,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 								ta->sel_start = 0;
 								ta->sel_end = ta->text_len;
 								ta->cursor = ta->text_len;
-								dirty_all(ctx);
+								dirty_widget_id(ctx, ctx->focus_id);
 							}
 						}
 						break;
@@ -6268,7 +6336,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 								input_sel_range(inp, &lo, &hi);
 								platform_clipboard_set(ctx, inp->text + lo, hi - lo);
 								input_delete_selection(inp);
-								dirty_all(ctx);
+								dirty_widget_id(ctx, ctx->focus_id);
 								input_scroll_to_cursor(ctx, ctx->focus_id);
 								ev->type = MKGUI_EVENT_INPUT_CHANGED;
 								ev->id = ctx->focus_id;
@@ -6282,7 +6350,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 								textarea_sel_range(ta, &lo, &hi);
 								platform_clipboard_set(ctx, ta->text + lo, hi - lo);
 								textarea_delete_selection(ta);
-								dirty_all(ctx);
+								dirty_widget_id(ctx, ctx->focus_id);
 								textarea_scroll_to_cursor(ctx, ctx->focus_id);
 								ev->type = MKGUI_EVENT_TEXTAREA_CHANGED;
 								ev->id = ctx->focus_id;
@@ -6313,7 +6381,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 										memcpy(&inp->text[inp->cursor], clip_buf, clip_len);
 										inp->cursor += clip_len;
 										input_clear_selection(inp);
-										dirty_all(ctx);
+										dirty_widget_id(ctx, ctx->focus_id);
 										input_scroll_to_cursor(ctx, ctx->focus_id);
 										ev->type = MKGUI_EVENT_INPUT_CHANGED;
 										ev->id = ctx->focus_id;
@@ -6345,7 +6413,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 									ta->text_len += clip_len;
 									ta->text[ta->text_len] = '\0';
 									textarea_clear_selection(ta);
-									dirty_all(ctx);
+									dirty_widget_id(ctx, ctx->focus_id);
 									textarea_scroll_to_cursor(ctx, ctx->focus_id);
 									ev->type = MKGUI_EVENT_TEXTAREA_CHANGED;
 									ev->id = ctx->focus_id;
