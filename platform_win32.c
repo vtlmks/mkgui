@@ -101,6 +101,19 @@ static LRESULT CALLBACK mkgui_wndproc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 	pev.popup_idx = popup_idx;
 
 	switch(msg) {
+		case WM_GETMINMAXINFO: {
+			if(owner && pev.popup_idx < 0 && (owner->plat.min_w > 0 || owner->plat.min_h > 0)) {
+				MINMAXINFO *mmi = (MINMAXINFO *)lp;
+				if(owner->plat.min_w > 0) {
+					mmi->ptMinTrackSize.x = owner->plat.min_w;
+				}
+				if(owner->plat.min_h > 0) {
+					mmi->ptMinTrackSize.y = owner->plat.min_h;
+				}
+			}
+			return 0;
+		} break;
+
 		case WM_PAINT: {
 			PAINTSTRUCT ps;
 			BeginPaint(hwnd, &ps);
@@ -535,6 +548,12 @@ static void platform_screen_size(struct mkgui_ctx *ctx, int32_t *sw, int32_t *sh
 	(void)ctx;
 	*sw = GetSystemMetrics(SM_CXSCREEN);
 	*sh = GetSystemMetrics(SM_CYSCREEN);
+}
+
+// [=]===^=[ platform_set_min_size ]================================[=]
+static void platform_set_min_size(struct mkgui_ctx *ctx, int32_t min_w, int32_t min_h) {
+	ctx->plat.min_w = min_w;
+	ctx->plat.min_h = min_h;
 }
 
 // ---------------------------------------------------------------------------

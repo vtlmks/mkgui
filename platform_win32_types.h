@@ -18,6 +18,8 @@ struct mkgui_platform {
 	struct mkgui_plat_event evq_buf[MKGUI_EVQ_SIZE];
 	uint32_t evq_head;
 	uint32_t evq_tail;
+	int32_t min_w;
+	int32_t min_h;
 };
 
 struct mkgui_popup_platform {

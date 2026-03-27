@@ -1973,6 +1973,253 @@ static void layout_node(struct mkgui_ctx *ctx, uint32_t idx) {
 	lc_layout_node(ctx, &lc, idx);
 }
 
+static void platform_set_min_size(struct mkgui_ctx *ctx, int32_t min_w, int32_t min_h);
+
+// [=]===^=[ layout_min_height ]====================================[=]
+static int32_t layout_min_height(struct mkgui_ctx *ctx, uint32_t idx) {
+	struct mkgui_widget *w = &ctx->widgets[idx];
+	uint32_t t = w->type;
+
+	if(w->flags & MKGUI_SCROLL) {
+		return MKGUI_ROW_HEIGHT * 3;
+	}
+
+	int32_t nh = natural_height(ctx, t);
+	if(nh > 0) {
+		return w->h > 0 ? w->h : nh;
+	}
+
+	if(t == MKGUI_TABS) {
+		int32_t max_tab = 0;
+		for(uint32_t c = layout_first_child[idx]; c < ctx->widget_count; c = layout_next_sibling[c]) {
+			if(ctx->widgets[c].type == MKGUI_TAB) {
+				int32_t th = 0;
+				for(uint32_t gc = layout_first_child[c]; gc < ctx->widget_count; gc = layout_next_sibling[gc]) {
+					th += layout_min_height(ctx, gc);
+				}
+				if(th > max_tab) {
+					max_tab = th;
+				}
+			}
+		}
+		return MKGUI_TAB_HEIGHT + 4 + max_tab;
+	}
+
+	if(t == MKGUI_HSPLIT) {
+		int32_t total = MKGUI_SPLIT_THICK;
+		for(uint32_t c = layout_first_child[idx]; c < ctx->widget_count; c = layout_next_sibling[c]) {
+			total += layout_min_height(ctx, c);
+		}
+		return total;
+	}
+
+	if(t == MKGUI_VSPLIT) {
+		int32_t max_h = 0;
+		for(uint32_t c = layout_first_child[idx]; c < ctx->widget_count; c = layout_next_sibling[c]) {
+			int32_t ch = layout_min_height(ctx, c);
+			if(ch > max_h) {
+				max_h = ch;
+			}
+		}
+		return max_h;
+	}
+
+	if(t == MKGUI_VBOX || t == MKGUI_PANEL) {
+		int32_t total = 0;
+		uint32_t count = 0;
+		for(uint32_t c = layout_first_child[idx]; c < ctx->widget_count; c = layout_next_sibling[c]) {
+			if(ctx->widgets[c].flags & MKGUI_HIDDEN) {
+				continue;
+			}
+			total += layout_min_height(ctx, c);
+			++count;
+		}
+		if(count > 1) {
+			total += (int32_t)(count - 1) * MKGUI_BOX_GAP;
+		}
+		return total;
+	}
+
+	if(t == MKGUI_HBOX) {
+		int32_t max_h = 0;
+		for(uint32_t c = layout_first_child[idx]; c < ctx->widget_count; c = layout_next_sibling[c]) {
+			if(ctx->widgets[c].flags & MKGUI_HIDDEN) {
+				continue;
+			}
+			int32_t ch = layout_min_height(ctx, c);
+			if(ch > max_h) {
+				max_h = ch;
+			}
+		}
+		return max_h;
+	}
+
+	if(t == MKGUI_FORM) {
+		uint32_t pair_count = 0;
+		for(uint32_t c = layout_first_child[idx]; c < ctx->widget_count; c = layout_next_sibling[c]) {
+			++pair_count;
+		}
+		uint32_t rows = (pair_count + 1) / 2;
+		int32_t row_h = ctx->font_height + 10;
+		return (int32_t)rows * row_h + (rows > 1 ? (int32_t)(rows - 1) * MKGUI_BOX_GAP : 0);
+	}
+
+	if(t == MKGUI_GROUP) {
+		int32_t gtop = ctx->font_height + 4;
+		int32_t gpad = 6;
+		int32_t inner = 0;
+		for(uint32_t c = layout_first_child[idx]; c < ctx->widget_count; c = layout_next_sibling[c]) {
+			inner += layout_min_height(ctx, c);
+		}
+		return gtop + gpad + inner;
+	}
+
+	if(w->h > 0) {
+		return w->h;
+	}
+	return 0;
+}
+
+// [=]===^=[ layout_min_width ]=====================================[=]
+static int32_t layout_min_width(struct mkgui_ctx *ctx, uint32_t idx) {
+	struct mkgui_widget *w = &ctx->widgets[idx];
+	uint32_t t = w->type;
+
+	if(w->flags & MKGUI_SCROLL) {
+		return 100;
+	}
+
+	int32_t nh = natural_height(ctx, t);
+	if(nh > 0) {
+		return w->w > 0 ? w->w : 40;
+	}
+
+	if(t == MKGUI_TABS) {
+		int32_t max_w = 0;
+		for(uint32_t c = layout_first_child[idx]; c < ctx->widget_count; c = layout_next_sibling[c]) {
+			if(ctx->widgets[c].type == MKGUI_TAB) {
+				int32_t tw = 0;
+				for(uint32_t gc = layout_first_child[c]; gc < ctx->widget_count; gc = layout_next_sibling[gc]) {
+					int32_t cw = layout_min_width(ctx, gc);
+					if(cw > tw) {
+						tw = cw;
+					}
+				}
+				if(tw > max_w) {
+					max_w = tw;
+				}
+			}
+		}
+		return max_w + 4;
+	}
+
+	if(t == MKGUI_VSPLIT) {
+		int32_t total = MKGUI_SPLIT_THICK;
+		for(uint32_t c = layout_first_child[idx]; c < ctx->widget_count; c = layout_next_sibling[c]) {
+			total += layout_min_width(ctx, c);
+		}
+		return total;
+	}
+
+	if(t == MKGUI_HSPLIT) {
+		int32_t max_w = 0;
+		for(uint32_t c = layout_first_child[idx]; c < ctx->widget_count; c = layout_next_sibling[c]) {
+			int32_t cw = layout_min_width(ctx, c);
+			if(cw > max_w) {
+				max_w = cw;
+			}
+		}
+		return max_w;
+	}
+
+	if(t == MKGUI_HBOX) {
+		int32_t total = 0;
+		uint32_t count = 0;
+		for(uint32_t c = layout_first_child[idx]; c < ctx->widget_count; c = layout_next_sibling[c]) {
+			if(ctx->widgets[c].flags & MKGUI_HIDDEN) {
+				continue;
+			}
+			int32_t cw = layout_min_width(ctx, c);
+			if(ctx->widgets[c].w > cw) {
+				cw = ctx->widgets[c].w;
+			}
+			total += cw;
+			++count;
+		}
+		if(count > 1) {
+			total += (int32_t)(count - 1) * MKGUI_BOX_GAP;
+		}
+		return total;
+	}
+
+	if(t == MKGUI_VBOX || t == MKGUI_PANEL) {
+		int32_t max_w = 0;
+		for(uint32_t c = layout_first_child[idx]; c < ctx->widget_count; c = layout_next_sibling[c]) {
+			if(ctx->widgets[c].flags & MKGUI_HIDDEN) {
+				continue;
+			}
+			int32_t cw = layout_min_width(ctx, c);
+			if(cw > max_w) {
+				max_w = cw;
+			}
+		}
+		return max_w;
+	}
+
+	if(t == MKGUI_FORM) {
+		return 120;
+	}
+
+	if(t == MKGUI_GROUP) {
+		int32_t inner = 0;
+		for(uint32_t c = layout_first_child[idx]; c < ctx->widget_count; c = layout_next_sibling[c]) {
+			int32_t cw = layout_min_width(ctx, c);
+			if(cw > inner) {
+				inner = cw;
+			}
+		}
+		return inner + 12;
+	}
+
+	if(w->w > 0) {
+		return w->w;
+	}
+	return 0;
+}
+
+// [=]===^=[ layout_compute_min_size ]==============================[=]
+static void layout_compute_min_size(struct mkgui_ctx *ctx, uint32_t win_idx) {
+	int32_t min_h = 0;
+	int32_t min_w = 0;
+	for(uint32_t c = layout_first_child[win_idx]; c < ctx->widget_count; c = layout_next_sibling[c]) {
+		uint32_t ct = ctx->widgets[c].type;
+		if(ct == MKGUI_MENU) {
+			min_h += MKGUI_MENU_HEIGHT;
+		} else if(ct == MKGUI_TOOLBAR) {
+			min_h += ctx->font_height + 10;
+		} else if(ct == MKGUI_STATUSBAR) {
+			min_h += MKGUI_STATUSBAR_HEIGHT;
+		} else if(ct == MKGUI_PATHBAR && ctx->widgets[c].h == 0) {
+			min_h += MKGUI_PATHBAR_HEIGHT;
+		} else {
+			min_h += layout_min_height(ctx, c);
+			int32_t cw = layout_min_width(ctx, c);
+			if(cw > min_w) {
+				min_w = cw;
+			}
+		}
+	}
+	if(min_h < 100) {
+		min_h = 100;
+	}
+	if(min_w < 200) {
+		min_w = 200;
+	}
+	min_w += MKGUI_BOX_PAD * 2;
+	min_h += MKGUI_BOX_PAD * 2;
+	platform_set_min_size(ctx, min_w, min_h);
+}
+
 // [=]===^=[ layout_widgets ]====================================[=]
 static void layout_widgets(struct mkgui_ctx *ctx) {
 	layout_build_index(ctx);
@@ -1983,6 +2230,7 @@ static void layout_widgets(struct mkgui_ctx *ctx) {
 			ctx->rects[i].w = ctx->win_w;
 			ctx->rects[i].h = ctx->win_h;
 			layout_node(ctx, i);
+			layout_compute_min_size(ctx, i);
 		}
 	}
 }

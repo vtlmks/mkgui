@@ -95,8 +95,8 @@ static uint32_t platform_init(struct mkgui_ctx *ctx, const char *title, int32_t 
 
 	XSizeHints hints = {0};
 	hints.flags = PMinSize;
-	hints.min_width = 128;
-	hints.min_height = 64;
+	hints.min_width = 200;
+	hints.min_height = 100;
 	XSetWMNormalHints(plat->dpy, plat->win, &hints);
 
 	plat->cursor_default = XCreateFontCursor(plat->dpy, XC_left_ptr);
@@ -293,6 +293,15 @@ static void platform_popup_fini(struct mkgui_ctx *ctx, struct mkgui_popup *p) {
 static void platform_screen_size(struct mkgui_ctx *ctx, int32_t *sw, int32_t *sh) {
 	*sw = DisplayWidth(ctx->plat.dpy, ctx->plat.screen);
 	*sh = DisplayHeight(ctx->plat.dpy, ctx->plat.screen);
+}
+
+// [=]===^=[ platform_set_min_size ]================================[=]
+static void platform_set_min_size(struct mkgui_ctx *ctx, int32_t min_w, int32_t min_h) {
+	XSizeHints hints = {0};
+	hints.flags = PMinSize;
+	hints.min_width = min_w;
+	hints.min_height = min_h;
+	XSetWMNormalHints(ctx->plat.dpy, ctx->plat.win, &hints);
 }
 
 // ---------------------------------------------------------------------------
