@@ -1,6 +1,30 @@
 // Copyright (c) 2026, Peter Fors
 // SPDX-License-Identifier: MIT
 
+// [=]===^=[ utf8_prev ]==============================================[=]
+static uint32_t utf8_prev(const char *text, uint32_t pos) {
+	if(pos == 0) {
+		return 0;
+	}
+	--pos;
+	while(pos > 0 && ((uint8_t)text[pos] & 0xc0) == 0x80) {
+		--pos;
+	}
+	return pos;
+}
+
+// [=]===^=[ utf8_next ]==============================================[=]
+static uint32_t utf8_next(const char *text, uint32_t pos) {
+	if(!text[pos]) {
+		return pos;
+	}
+	++pos;
+	while(text[pos] && ((uint8_t)text[pos] & 0xc0) == 0x80) {
+		++pos;
+	}
+	return pos;
+}
+
 // [=]===^=[ input_has_selection ]====================================[=]
 static uint32_t input_has_selection(struct mkgui_input_data *inp) {
 	return inp->sel_start != inp->sel_end;
@@ -213,9 +237,7 @@ static uint32_t handle_input_key(struct mkgui_ctx *ctx, struct mkgui_event *ev, 
 	}
 
 	if(ks == MKGUI_KEY_LEFT) {
-		if(inp->cursor > 0) {
-			--inp->cursor;
-		}
+		inp->cursor = utf8_prev(inp->text, inp->cursor);
 		if(shift) {
 			inp->sel_end = inp->cursor;
 		} else {
@@ -226,9 +248,7 @@ static uint32_t handle_input_key(struct mkgui_ctx *ctx, struct mkgui_event *ev, 
 		return 0;
 
 	} else if(ks == MKGUI_KEY_RIGHT) {
-		if(inp->cursor < text_len) {
-			++inp->cursor;
-		}
+		inp->cursor = utf8_next(inp->text, inp->cursor);
 		if(shift) {
 			inp->sel_end = inp->cursor;
 		} else {
@@ -273,8 +293,11 @@ static uint32_t handle_input_key(struct mkgui_ctx *ctx, struct mkgui_event *ev, 
 			return 1;
 		}
 		if(inp->cursor > 0 && text_len > 0) {
-			memmove(&inp->text[inp->cursor - 1], &inp->text[inp->cursor], text_len - inp->cursor + 1);
-			--inp->cursor;
+			uint32_t prev = utf8_prev(inp->text, inp->cursor);
+			uint32_t del = inp->cursor - prev;
+			memmove(&inp->text[prev], &inp->text[inp->cursor], text_len - inp->cursor + 1);
+			inp->cursor = prev;
+			(void)del;
 			input_clear_selection(inp);
 			dirty_all(ctx);
 			input_scroll_to_cursor(ctx, ctx->focus_id);
@@ -297,7 +320,10 @@ static uint32_t handle_input_key(struct mkgui_ctx *ctx, struct mkgui_event *ev, 
 			return 1;
 		}
 		if(inp->cursor < text_len) {
-			memmove(&inp->text[inp->cursor], &inp->text[inp->cursor + 1], text_len - inp->cursor);
+			uint32_t next = utf8_next(inp->text, inp->cursor);
+			uint32_t del = next - inp->cursor;
+			memmove(&inp->text[inp->cursor], &inp->text[next], text_len - next + 1);
+			(void)del;
 			dirty_all(ctx);
 			input_scroll_to_cursor(ctx, ctx->focus_id);
 			ev->type = MKGUI_EVENT_INPUT_CHANGED;

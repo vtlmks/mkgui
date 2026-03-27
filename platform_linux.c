@@ -103,6 +103,12 @@ static uint32_t platform_init(struct mkgui_ctx *ctx, const char *title, int32_t 
 	plat->cursor_h_resize = XCreateFontCursor(plat->dpy, XC_sb_h_double_arrow);
 	plat->cursor_active = 0;
 
+	plat->xim = XOpenIM(plat->dpy, NULL, NULL, NULL);
+	if(plat->xim) {
+		plat->xic = XCreateIC(plat->xim, XNInputStyle, XIMPreeditNothing | XIMStatusNothing,
+			XNClientWindow, plat->win, XNFocusWindow, plat->win, NULL);
+	}
+
 	XMapWindow(plat->dpy, plat->win);
 	XFlush(plat->dpy);
 
@@ -162,6 +168,13 @@ static uint32_t platform_init_child(struct mkgui_ctx *ctx, struct mkgui_ctx *par
 	plat->cursor_h_resize = XCreateFontCursor(plat->dpy, XC_sb_h_double_arrow);
 	plat->cursor_active = 0;
 
+	plat->xim = pplat->xim;
+	plat->xic = NULL;
+	if(plat->xim) {
+		plat->xic = XCreateIC(plat->xim, XNInputStyle, XIMPreeditNothing | XIMStatusNothing,
+			XNClientWindow, plat->win, XNFocusWindow, plat->win, NULL);
+	}
+
 	XMapWindow(plat->dpy, plat->win);
 	XFlush(plat->dpy);
 
@@ -175,6 +188,12 @@ static void platform_destroy(struct mkgui_ctx *ctx) {
 	plat->img = NULL;
 	XFreeCursor(plat->dpy, plat->cursor_default);
 	XFreeCursor(plat->dpy, plat->cursor_h_resize);
+	if(plat->xic) {
+		XDestroyIC(plat->xic);
+	}
+	if(plat->xim && !plat->is_child) {
+		XCloseIM(plat->xim);
+	}
 	XFreeGC(plat->dpy, plat->gc);
 	XDestroyWindow(plat->dpy, plat->win);
 	if(!plat->is_child) {
@@ -474,7 +493,13 @@ static void platform_translate_xevent(struct mkgui_ctx *owner, XEvent *xev, stru
 		case KeyPress: {
 			char buf[32];
 			KeySym ks;
-			int32_t len = XLookupString(&xev->xkey, buf, sizeof(buf) - 1, &ks, NULL);
+			int32_t len;
+			if(owner->plat.xic) {
+				Status status;
+				len = Xutf8LookupString(owner->plat.xic, &xev->xkey, buf, sizeof(buf) - 1, &ks, &status);
+			} else {
+				len = XLookupString(&xev->xkey, buf, sizeof(buf) - 1, &ks, NULL);
+			}
 			buf[len] = '\0';
 
 			pev->type = MKGUI_PLAT_KEY;

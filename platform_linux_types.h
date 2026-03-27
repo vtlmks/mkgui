@@ -36,6 +36,8 @@ struct mkgui_platform {
 	Cursor cursor_h_resize;
 	uint32_t cursor_active;
 	uint32_t is_child;
+	XIM xim;
+	XIC xic;
 	struct mkgui_plat_event deferred[MKGUI_DEFERRED_SIZE];
 	uint32_t deferred_head;
 	uint32_t deferred_tail;

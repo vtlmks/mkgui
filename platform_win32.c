@@ -229,13 +229,27 @@ static LRESULT CALLBACK mkgui_wndproc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 		} break;
 
 		case WM_CHAR: {
-			if(wp >= 32 && wp < 127) {
+			uint32_t cp = (uint32_t)wp;
+			if(cp >= 32) {
 				pev.type = MKGUI_PLAT_KEY;
-				pev.keysym = (uint32_t)wp;
+				pev.keysym = cp < 128 ? cp : 0;
 				pev.keymod = platform_get_keymod();
-				pev.text[0] = (char)wp;
-				pev.text[1] = '\0';
-				pev.text_len = 1;
+				if(cp < 0x80) {
+					pev.text[0] = (char)cp;
+					pev.text[1] = '\0';
+					pev.text_len = 1;
+				} else if(cp < 0x800) {
+					pev.text[0] = (char)(0xc0 | (cp >> 6));
+					pev.text[1] = (char)(0x80 | (cp & 0x3f));
+					pev.text[2] = '\0';
+					pev.text_len = 2;
+				} else {
+					pev.text[0] = (char)(0xe0 | (cp >> 12));
+					pev.text[1] = (char)(0x80 | ((cp >> 6) & 0x3f));
+					pev.text[2] = (char)(0x80 | (cp & 0x3f));
+					pev.text[3] = '\0';
+					pev.text_len = 3;
+				}
 				evq_push_ctx(&owner->plat, &pev);
 			}
 			return 0;

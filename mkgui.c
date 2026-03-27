@@ -46,7 +46,7 @@
 // ---------------------------------------------------------------------------
 
 #define MKGUI_GLYPH_FIRST     32
-#define MKGUI_GLYPH_LAST      126
+#define MKGUI_GLYPH_LAST      255
 #define MKGUI_GLYPH_COUNT     (MKGUI_GLYPH_LAST - MKGUI_GLYPH_FIRST + 1)
 #define MKGUI_GLYPH_MAX_BMP   1024
 #define MKGUI_ICON_PIXELS     (MKGUI_ICON_SIZE * MKGUI_ICON_SIZE)

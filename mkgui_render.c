@@ -375,11 +375,36 @@ static void draw_patch(struct mkgui_ctx *ctx, uint32_t style, int32_t x, int32_t
 // Software text renderer
 // ---------------------------------------------------------------------------
 
+// [=]===^=[ utf8_decode ]========================================[=]
+static uint32_t utf8_decode(const char *p, uint32_t *out_cp) {
+	uint8_t b = (uint8_t)p[0];
+	if(b < 0x80) {
+		*out_cp = b;
+		return 1;
+	}
+	if((b & 0xe0) == 0xc0 && (p[1] & 0xc0) == 0x80) {
+		*out_cp = ((uint32_t)(b & 0x1f) << 6) | (uint32_t)(p[1] & 0x3f);
+		return 2;
+	}
+	if((b & 0xf0) == 0xe0 && (p[1] & 0xc0) == 0x80 && (p[2] & 0xc0) == 0x80) {
+		*out_cp = ((uint32_t)(b & 0x0f) << 12) | ((uint32_t)(p[1] & 0x3f) << 6) | (uint32_t)(p[2] & 0x3f);
+		return 3;
+	}
+	if((b & 0xf8) == 0xf0 && (p[1] & 0xc0) == 0x80 && (p[2] & 0xc0) == 0x80 && (p[3] & 0xc0) == 0x80) {
+		*out_cp = ((uint32_t)(b & 0x07) << 18) | ((uint32_t)(p[1] & 0x3f) << 12) | ((uint32_t)(p[2] & 0x3f) << 6) | (uint32_t)(p[3] & 0x3f);
+		return 4;
+	}
+	*out_cp = 0xfffd;
+	return 1;
+}
+
 // [=]===^=[ draw_text_sw ]=======================================[=]
 static void draw_text_sw(struct mkgui_ctx *ctx, uint32_t *buf, int32_t bw, int32_t x, int32_t y, const char *text, uint32_t color, int32_t cx1, int32_t cy1, int32_t cx2, int32_t cy2) {
 	int32_t cx = x;
-	for(const char *p = text; *p; ++p) {
-		uint32_t ch = (uint8_t)*p;
+	for(const char *p = text; *p; ) {
+		uint32_t ch;
+		uint32_t bytes = utf8_decode(p, &ch);
+		p += bytes;
 		if(ch < MKGUI_GLYPH_FIRST || ch > MKGUI_GLYPH_LAST) {
 			cx += ctx->char_width;
 			continue;
@@ -591,8 +616,10 @@ static void flush_text_popup(struct mkgui_ctx *ctx, struct mkgui_popup *p) {
 // [=]===^=[ text_width ]========================================[=]
 static int32_t text_width(struct mkgui_ctx *ctx, const char *text) {
 	int32_t w = 0;
-	for(const char *p = text; *p; ++p) {
-		uint32_t ch = (uint8_t)*p;
+	for(const char *p = text; *p; ) {
+		uint32_t ch;
+		uint32_t bytes = utf8_decode(p, &ch);
+		p += bytes;
 		if(ch >= MKGUI_GLYPH_FIRST && ch <= MKGUI_GLYPH_LAST) {
 			w += ctx->glyphs[ch - MKGUI_GLYPH_FIRST].advance;
 		} else {
@@ -620,8 +647,9 @@ static const char *text_truncate(struct mkgui_ctx *ctx, const char *text, int32_
 	}
 	int32_t w = 0;
 	uint32_t n = 0;
-	for(const char *p = text; *p && n < MKGUI_MAX_TEXT - 4; ++p, ++n) {
-		uint32_t ch = (uint8_t)*p;
+	for(const char *p = text; *p && n < MKGUI_MAX_TEXT - 4; ) {
+		uint32_t ch;
+		uint32_t bytes = utf8_decode(p, &ch);
 		int32_t adv;
 		if(ch >= MKGUI_GLYPH_FIRST && ch <= MKGUI_GLYPH_LAST) {
 			adv = ctx->glyphs[ch - MKGUI_GLYPH_FIRST].advance;
@@ -631,7 +659,10 @@ static const char *text_truncate(struct mkgui_ctx *ctx, const char *text, int32_
 		if(w + adv > budget) {
 			break;
 		}
-		buf[n] = *p;
+		for(uint32_t bi = 0; bi < bytes && n < MKGUI_MAX_TEXT - 4; ++bi) {
+			buf[n++] = p[bi];
+		}
+		p += bytes;
 		w += adv;
 	}
 	buf[n++] = '.';

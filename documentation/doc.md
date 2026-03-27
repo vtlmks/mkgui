@@ -45,9 +45,9 @@ static void on_event(struct mkgui_ctx *ctx, struct mkgui_event *ev, void *userda
 
 int main(void) {
     struct mkgui_widget widgets[] = {
-        { MKGUI_WINDOW, ID_WIN, "Hello",  "",  0,      400, 300, 0, 0 },
-        { MKGUI_BUTTON, ID_BTN, "Click",  "",  ID_WIN, 100, 0, MKGUI_FIXED, 0 },
-        { MKGUI_LABEL,  ID_LBL, "Ready",  "",  ID_WIN, 0, 0, 0, 0 },
+        { MKGUI_WINDOW, ID_WIN, "Hello",  "",  0,      400, 300, 0, 0, 0 },
+        { MKGUI_BUTTON, ID_BTN, "Click",  "",  ID_WIN, 100, 0, MKGUI_FIXED, 0, 0 },
+        { MKGUI_LABEL,  ID_LBL, "Ready",  "",  ID_WIN, 0, 0, 0, 0, 0 },
     };
 
     struct mkgui_ctx *ctx = mkgui_create(widgets, 3);
@@ -77,11 +77,14 @@ struct mkgui_widget {
     char     icon[64];    // icon name (MDI name, e.g. "folder-open")
     uint32_t parent_id;   // parent widget id
     int32_t  w, h;        // size (0 = natural size derived from font height)
-    uint32_t flags;       // MKGUI_CHECKED, MKGUI_FIXED, etc.
+    uint32_t flags;       // universal layout flags (MKGUI_FIXED, MKGUI_HIDDEN, etc.)
+    uint32_t style;       // per-widget-type flags (MKGUI_TRUNCATE, MKGUI_CHECKED, etc.)
     uint32_t weight;      // layout weight (0=default flex, >0=explicit proportional)
     int32_t  margin_l, margin_r, margin_t, margin_b; // layout margins
 };
 ```
+
+The `flags` field holds universal layout and state flags: `MKGUI_FIXED`, `MKGUI_HIDDEN`, `MKGUI_DISABLED`, `MKGUI_SCROLL`, `MKGUI_NO_PAD`, `MKGUI_VERTICAL`, `MKGUI_REGION_*`, `MKGUI_ALIGN_*`, `MKGUI_TOOLBAR_SEP`. The `style` field holds per-widget-type appearance flags: `MKGUI_CHECKED`, `MKGUI_PASSWORD`, `MKGUI_READONLY`, `MKGUI_SEPARATOR`, `MKGUI_MENU_CHECK`, `MKGUI_MENU_RADIO`, `MKGUI_PANEL_BORDER`, `MKGUI_PANEL_SUNKEN`, `MKGUI_SLIDER_MIXER`, `MKGUI_METER_TEXT`, `MKGUI_IMAGE_STRETCH`, `MKGUI_TAB_CLOSABLE`, `MKGUI_MULTI_SELECT`, `MKGUI_TRUNCATE`, `MKGUI_TOOLBAR_ICONS_ONLY`, `MKGUI_TOOLBAR_TEXT_ONLY`, `MKGUI_LINK`, `MKGUI_COLLAPSED`, `MKGUI_WRAP`, `MKGUI_NUMERIC`.
 
 There are no `x, y` fields. All positioning is handled by the container-based layout system. The `w` and `h` fields specify size; when `h` is 0, the widget uses its natural height (derived from the font height for most widget types).
 
@@ -155,17 +158,17 @@ The `margin_l`, `margin_r`, `margin_t`, `margin_b` fields add spacing around a w
 ```c
 // Menu, toolbar, and statusbar are auto-positioned by the layout engine.
 // Just parent them to the window:
-{ MKGUI_MENU,      ID_MENU, "",  "", ID_WINDOW, 0, 0, 0, 0 },
-{ MKGUI_TOOLBAR,   ID_TB,   "",  "", ID_WINDOW, 0, 0, 0, 0 },
-{ MKGUI_STATUSBAR, ID_SB,   "",  "", ID_WINDOW, 0, 0, 0, 0 },
+{ MKGUI_MENU,      ID_MENU, "",  "", ID_WINDOW, 0, 0, 0, 0, 0 },
+{ MKGUI_TOOLBAR,   ID_TB,   "",  "", ID_WINDOW, 0, 0, 0, 0, 0 },
+{ MKGUI_STATUSBAR, ID_SB,   "",  "", ID_WINDOW, 0, 0, 0, 0, 0 },
 
 // Other children of the window fill the remaining content area:
-{ MKGUI_TABS, ID_TABS, "", "", ID_WINDOW, 0, 0, 0, 0 },
+{ MKGUI_TABS, ID_TABS, "", "", ID_WINDOW, 0, 0, 0, 0, 0 },
 
 // A simple form inside a tab:
-{ MKGUI_FORM,  ID_FORM, "", "", ID_TAB1, 0, 0, 0, 0 },
-{ MKGUI_LABEL, ID_L1,   "Name:",  "", ID_FORM, 0, 0, 0, 0 },
-{ MKGUI_INPUT, ID_I1,   "",       "", ID_FORM, 0, 0, 0, 0 },
+{ MKGUI_FORM,  ID_FORM, "", "", ID_TAB1, 0, 0, 0, 0, 0 },
+{ MKGUI_LABEL, ID_L1,   "Name:",  "", ID_FORM, 0, 0, 0, 0, 0 },
+{ MKGUI_INPUT, ID_I1,   "",       "", ID_FORM, 0, 0, 0, 0, 0 },
 ```
 
 ## Flags
@@ -401,11 +404,11 @@ Returns 1 on success, 0 on allocation failure. The widget's aux data (slider sta
 
 ```c
 // add a slider as the first child of a vbox
-struct mkgui_widget slider = { MKGUI_SLIDER, 500, "Volume", "", VBOX_ID, 0, 0, 0, 0 };
+struct mkgui_widget slider = { MKGUI_SLIDER, 500, "Volume", "", VBOX_ID, 0, 0, 0, 0, 0 };
 mkgui_add_widget(ctx, slider, VBOX_ID);
 
 // add a button after an existing sibling
-struct mkgui_widget btn = { MKGUI_BUTTON, 501, "Mute", "", VBOX_ID, 80, 0, MKGUI_FIXED, 0 };
+struct mkgui_widget btn = { MKGUI_BUTTON, 501, "Mute", "", VBOX_ID, 80, 0, MKGUI_FIXED, 0, 0 };
 mkgui_add_widget(ctx, btn, 500);  // after the slider
 
 // remove the slider and anything nested inside it
@@ -469,7 +472,7 @@ const char *mkgui_button_get_text(struct mkgui_ctx *ctx, uint32_t id);
 
 ```c
 // Icon-only buttons center the icon automatically when label is empty
-{ MKGUI_BUTTON, ID_MUTE, "", "volume-high", ID_VBOX, 28, 28, MKGUI_FIXED | MKGUI_ALIGN_CENTER, 0 },
+{ MKGUI_BUTTON, ID_MUTE, "", "volume-high", ID_VBOX, 28, 28, MKGUI_FIXED | MKGUI_ALIGN_CENTER, 0, 0 },
 
 // In event callback:
 case MKGUI_EVENT_CLICK: {
@@ -493,7 +496,23 @@ Set `MKGUI_TRUNCATE` to clip text that overflows the widget width, replacing the
 
 ```c
 { MKGUI_LABEL, ID_NAME, "Very Long Channel Name", "", ID_PARENT, 80, 0,
-  MKGUI_TRUNCATE | MKGUI_FIXED, 0 }
+  MKGUI_FIXED, MKGUI_TRUNCATE, 0 }
+```
+
+#### Link label
+
+Set `MKGUI_LINK` to make a label clickable. The text renders in the selection color with an underline. Hover changes color. Generates `MKGUI_EVENT_CLICK` when clicked.
+
+```c
+{ MKGUI_LABEL, ID_LINK, "Visit website", "", ID_PARENT, 0, 0, MKGUI_FIXED, MKGUI_LINK, 0 }
+```
+
+#### Wrapping label
+
+Set `MKGUI_WRAP` to word-wrap text across multiple lines. The label renders from the top and wraps at word boundaries to fit the widget width. Set an explicit height or use flex fill.
+
+```c
+{ MKGUI_LABEL, ID_DESC, "Long description text here...", "", ID_PARENT, 0, 80, MKGUI_FIXED, MKGUI_WRAP, 0 }
 ```
 
 ### Input
@@ -516,6 +535,14 @@ Double-click on an input widget selects all text. Single click positions the cur
 Supports Ctrl+C (copy) and Ctrl+V (paste). Newlines in pasted text are replaced with spaces. Copy is disabled when `MKGUI_PASSWORD` is set. Paste is disabled when `MKGUI_READONLY` is set.
 
 `input_clear` resets text, cursor, and selection. `input_set_readonly` / `input_get_readonly` toggle the `MKGUI_READONLY` flag at runtime. Cursor and selection positions are byte offsets into the text.
+
+#### Numeric input
+
+Set `MKGUI_NUMERIC` to filter keyboard input to digits, decimal point, sign, and scientific notation (e/E). Non-numeric characters are rejected.
+
+```c
+{ MKGUI_INPUT, ID_AMOUNT, "", "", ID_FORM, 0, 0, 0, MKGUI_NUMERIC, 0 }
+```
 
 ### Checkbox
 
@@ -640,7 +667,7 @@ Level meter with colored zones showing capacity/usage. The background displays t
 ### Spinner
 
 ```c
-{ MKGUI_SPINNER, ID_SPIN, "", "", ID_PARENT, 24, 24, MKGUI_FIXED, 0 }
+{ MKGUI_SPINNER, ID_SPIN, "", "", ID_PARENT, 24, 24, MKGUI_FIXED, 0, 0 }
 ```
 
 No setup or API functions needed. The spinner is a rotating arc that animates automatically. Size is determined by the widget's `w` and `h` (uses the smaller of the two as diameter). Uses `theme.accent` for the arc color. Place it anywhere a loading indicator is needed.
@@ -918,7 +945,7 @@ void mkgui_canvas_set_callback(struct mkgui_ctx *ctx, uint32_t id, mkgui_canvas_
 ```
 
 ```c
-{ MKGUI_CANVAS, ID_CANVAS, "", "", ID_PARENT, 0, 0, MKGUI_PANEL_BORDER, 0 }
+{ MKGUI_CANVAS, ID_CANVAS, "", "", ID_PARENT, 0, 0, 0, MKGUI_PANEL_BORDER, 0 }
 ```
 
 The callback receives the pixel buffer and the widget's rect. All `draw_*` functions respect the clip rect, which is automatically set to the widget bounds before the callback and restored after. Use `MKGUI_PANEL_BORDER` to draw a border before the callback runs.
@@ -938,12 +965,12 @@ mkgui_canvas_set_callback(ctx, ID_CANVAS, my_draw, NULL);
 Menus are built from a `MKGUI_MENU` (the bar) containing `MKGUI_MENUITEM` entries. Submenus are menu items whose parent is another menu item:
 
 ```c
-{ MKGUI_MENU,     ID_MENU,  "",     "",             ID_WINDOW, 0, 0, 0, 0 },
-{ MKGUI_MENUITEM, ID_FILE,  "File", "",             ID_MENU,   0, 0, 0, 0 },
-{ MKGUI_MENUITEM, ID_OPEN,  "Open", "folder-open",  ID_FILE,   0, 0, 0, 0 },
-{ MKGUI_MENUITEM, ID_SAVE,  "Save", "content-save", ID_FILE,   0, 0, 0, 0 },
-{ MKGUI_MENUITEM, ID_SEP1,  "",     "",             ID_FILE,   0, 0, MKGUI_SEPARATOR, 0 },
-{ MKGUI_MENUITEM, ID_EXIT,  "Exit", "",             ID_FILE,   0, 0, 0, 0 },
+{ MKGUI_MENU,     ID_MENU,  "",     "",             ID_WINDOW, 0, 0, 0, 0, 0 },
+{ MKGUI_MENUITEM, ID_FILE,  "File", "",             ID_MENU,   0, 0, 0, 0, 0 },
+{ MKGUI_MENUITEM, ID_OPEN,  "Open", "folder-open",  ID_FILE,   0, 0, 0, 0, 0 },
+{ MKGUI_MENUITEM, ID_SAVE,  "Save", "content-save", ID_FILE,   0, 0, 0, 0, 0 },
+{ MKGUI_MENUITEM, ID_SEP1,  "",     "",             ID_FILE,   0, 0, 0, MKGUI_SEPARATOR, 0 },
+{ MKGUI_MENUITEM, ID_EXIT,  "Exit", "",             ID_FILE,   0, 0, 0, 0, 0 },
 ```
 
 `MKGUI_SEPARATOR` makes the item render as a horizontal separator line. Use a dedicated menu item with an empty label and the `MKGUI_SEPARATOR` flag to create visual grouping between menu entries.
@@ -951,9 +978,9 @@ Menus are built from a `MKGUI_MENU` (the bar) containing `MKGUI_MENUITEM` entrie
 Check/radio menu items:
 
 ```c
-{ MKGUI_MENUITEM, ID_SHOW_TB, "Show Toolbar", "", ID_VIEW, 0, 0, MKGUI_MENU_CHECK | MKGUI_CHECKED, 0 },
-{ MKGUI_MENUITEM, ID_SORT_NAME, "By Name",    "", ID_SORT, 0, 0, MKGUI_MENU_RADIO | MKGUI_CHECKED, 0 },
-{ MKGUI_MENUITEM, ID_SORT_SIZE, "By Size",    "", ID_SORT, 0, 0, MKGUI_MENU_RADIO, 0 },
+{ MKGUI_MENUITEM, ID_SHOW_TB, "Show Toolbar", "", ID_VIEW, 0, 0, 0, MKGUI_MENU_CHECK | MKGUI_CHECKED, 0 },
+{ MKGUI_MENUITEM, ID_SORT_NAME, "By Name",    "", ID_SORT, 0, 0, 0, MKGUI_MENU_RADIO | MKGUI_CHECKED, 0 },
+{ MKGUI_MENUITEM, ID_SORT_SIZE, "By Size",    "", ID_SORT, 0, 0, 0, MKGUI_MENU_RADIO, 0 },
 ```
 
 Check items toggle on click. Radio items auto-uncheck siblings. Only leaf items (no children) emit `MKGUI_EVENT_MENU`.
@@ -963,10 +990,10 @@ Check items toggle on click. Radio items auto-uncheck siblings. Only leaf items 
 Toolbar children are `MKGUI_BUTTON` widgets. Use `MKGUI_TOOLBAR_SEP` on a button to draw a separator before it:
 
 ```c
-{ MKGUI_TOOLBAR, ID_TB,      "",     "",             ID_WINDOW, 0, 0, 0, 0 },
-{ MKGUI_BUTTON,  ID_TB_NEW,  "New",  "file-plus",    ID_TB,     0, 0, 0, 0 },
-{ MKGUI_BUTTON,  ID_TB_OPEN, "Open", "folder-open",  ID_TB,     0, 0, MKGUI_TOOLBAR_SEP, 0 },
-{ MKGUI_BUTTON,  ID_TB_SAVE, "Save", "content-save", ID_TB,     0, 0, 0, 0 },
+{ MKGUI_TOOLBAR, ID_TB,      "",     "",             ID_WINDOW, 0, 0, 0, 0, 0 },
+{ MKGUI_BUTTON,  ID_TB_NEW,  "New",  "file-plus",    ID_TB,     0, 0, 0, 0, 0 },
+{ MKGUI_BUTTON,  ID_TB_OPEN, "Open", "folder-open",  ID_TB,     0, 0, MKGUI_TOOLBAR_SEP, 0, 0 },
+{ MKGUI_BUTTON,  ID_TB_SAVE, "Save", "content-save", ID_TB,     0, 0, 0, 0, 0 },
 ```
 
 Toolbar buttons render flat (Breeze style) -- no border when idle, highlighted on hover, pressed on click. They emit `MKGUI_EVENT_CLICK`.
@@ -986,7 +1013,7 @@ mkgui_toolbar_set_mode(ctx, ID_TB, MKGUI_TOOLBAR_ICONS_ONLY);
 Or set the mode in the widget flags at init time:
 
 ```c
-{ MKGUI_TOOLBAR, ID_TB, "", "", ID_WINDOW, 0, 0, MKGUI_TOOLBAR_ICONS_ONLY, 0 },
+{ MKGUI_TOOLBAR, ID_TB, "", "", ID_WINDOW, 0, 0, 0, MKGUI_TOOLBAR_ICONS_ONLY, 0 },
 ```
 
 ### Toolbar icon pack
@@ -1047,9 +1074,9 @@ const char *mkgui_tabs_get_text(struct mkgui_ctx *ctx, uint32_t tabs_id, uint32_
 ## Splitters
 
 ```c
-{ MKGUI_VSPLIT,   ID_SPLIT, "", "", ID_WIN, 0, 0, 0, 0 },
-{ MKGUI_TREEVIEW, ID_TREE,  "", "", ID_SPLIT, 0, 0, MKGUI_REGION_LEFT, 0 },
-{ MKGUI_LISTVIEW, ID_LIST,  "", "", ID_SPLIT, 0, 0, MKGUI_REGION_RIGHT, 0 },
+{ MKGUI_VSPLIT,   ID_SPLIT, "", "", ID_WIN, 0, 0, 0, 0, 0 },
+{ MKGUI_TREEVIEW, ID_TREE,  "", "", ID_SPLIT, 0, 0, MKGUI_REGION_LEFT, 0, 0 },
+{ MKGUI_LISTVIEW, ID_LIST,  "", "", ID_SPLIT, 0, 0, MKGUI_REGION_RIGHT, 0, 0 },
 ```
 
 The divider is draggable. Children sized automatically based on their region flag.
@@ -1066,20 +1093,33 @@ void mkgui_split_set_ratio(struct mkgui_ctx *ctx, uint32_t id, float ratio);
 A container that draws a thin rounded border with a title label breaking the top edge. Children are automatically inset inside the frame (top padding accounts for the label height, sides and bottom have a small margin).
 
 ```c
-{ MKGUI_GROUP,    ID_GRP, "Settings",     "", ID_TAB1, 0, 0, MKGUI_FIXED, 0 },
-{ MKGUI_INPUT,    ID_INP, "",             "", ID_GRP,  0, 0, MKGUI_FIXED, 0 },
-{ MKGUI_CHECKBOX, ID_CHK, "Enable",       "", ID_GRP,  0, 0, 0, 0 },
+{ MKGUI_GROUP,    ID_GRP, "Settings",     "", ID_TAB1, 0, 0, MKGUI_FIXED, 0, 0 },
+{ MKGUI_INPUT,    ID_INP, "",             "", ID_GRP,  0, 0, MKGUI_FIXED, 0, 0 },
+{ MKGUI_CHECKBOX, ID_CHK, "Enable",       "", ID_GRP,  0, 0, 0, 0, 0 },
 ```
 
 Children are laid out inside the group's content area (inside the border), stacking vertically like VBOX. The group is not focusable and does not intercept mouse events -- clicks pass through to children.
+
+### Collapsible group
+
+Set `MKGUI_COLLAPSED` to make a group start collapsed. Click the group header to toggle. When collapsed, children are hidden and the group shrinks to header height. Generates `MKGUI_EVENT_CLICK` with `value=1` when collapsed, `value=0` when expanded.
+
+```c
+{ MKGUI_GROUP, ID_GRP, "Advanced", "", ID_PARENT, 0, 0, 0, MKGUI_COLLAPSED, 1 }
+```
+
+```c
+void mkgui_group_set_collapsed(struct mkgui_ctx *ctx, uint32_t id, uint32_t collapsed);
+uint32_t mkgui_group_get_collapsed(struct mkgui_ctx *ctx, uint32_t id);
+```
 
 ## Panel
 
 A plain container that behaves as a VBOX. Useful for layout grouping. Children are stacked vertically.
 
 ```c
-{ MKGUI_PANEL, ID_PANEL, "", "", ID_TAB1, 0, 0, MKGUI_PANEL_BORDER | MKGUI_PANEL_SUNKEN, 0 },
-{ MKGUI_BUTTON, ID_BTN,  "OK", "", ID_PANEL, 80, 0, MKGUI_FIXED, 0 },
+{ MKGUI_PANEL, ID_PANEL, "", "", ID_TAB1, 0, 0, 0, MKGUI_PANEL_BORDER | MKGUI_PANEL_SUNKEN, 0 },
+{ MKGUI_BUTTON, ID_BTN,  "OK", "", ID_PANEL, 80, 0, MKGUI_FIXED, 0, 0 },
 ```
 
 Flags: `MKGUI_PANEL_BORDER` draws a rounded border, `MKGUI_PANEL_SUNKEN` darkens the background.
@@ -1089,7 +1129,7 @@ Flags: `MKGUI_PANEL_BORDER` draws a rounded border, `MKGUI_PANEL_SUNKEN` darkens
 Standalone scrollbar widget. Horizontal by default, set `MKGUI_VERTICAL` for vertical orientation.
 
 ```c
-{ MKGUI_SCROLLBAR, ID_SB, "", "", ID_TAB1, MKGUI_SCROLLBAR_W, 200, MKGUI_VERTICAL | MKGUI_FIXED, 0 },
+{ MKGUI_SCROLLBAR, ID_SB, "", "", ID_TAB1, MKGUI_SCROLLBAR_W, 200, MKGUI_VERTICAL | MKGUI_FIXED, 0, 0 },
 ```
 
 ```c
@@ -1104,12 +1144,20 @@ int32_t mkgui_scrollbar_get(struct mkgui_ctx *ctx, uint32_t id);
 
 Use `MKGUI_VERTICAL` flag for a vertical scrollbar. Emits `MKGUI_EVENT_SCROLL` on interaction (thumb drag, click, scroll wheel).
 
+## Divider
+
+A visual separator line for VBOX/HBOX containers. Draws an etched line. Horizontal by default; set `MKGUI_VERTICAL` for vertical.
+
+```c
+{ MKGUI_DIVIDER, ID_DIV, "", "", ID_VBOX, 0, 0, MKGUI_FIXED, 0, 0 }
+```
+
 ## Image
 
 Displays ARGB pixel data. The image is centered in the widget and scaled down to fit (never scaled up) by default.
 
 ```c
-{ MKGUI_IMAGE, ID_IMG, "", "", ID_TAB1, 200, 200, MKGUI_PANEL_BORDER | MKGUI_FIXED, 0 },
+{ MKGUI_IMAGE, ID_IMG, "", "", ID_TAB1, 200, 200, MKGUI_FIXED, MKGUI_PANEL_BORDER, 0 },
 ```
 
 ```c
@@ -1124,7 +1172,7 @@ Pixels are ARGB format (alpha in bits 31-24). The widget copies the pixel data i
 Embeds an OpenGL viewport. mkgui creates a native child window; the user creates their own GL context and renders to it. The widget automatically triggers 60fps redraws when visible on the active tab.
 
 ```c
-{ MKGUI_GLVIEW, ID_GL, "", "", ID_TAB1, 0, 0, MKGUI_PANEL_BORDER, 0 },
+{ MKGUI_GLVIEW, ID_GL, "", "", ID_TAB1, 0, 0, 0, MKGUI_PANEL_BORDER, 0 },
 ```
 
 ```c
@@ -1209,10 +1257,10 @@ Use `mkgui_set_weight(ctx, id, weight)` to change weight at runtime.
 Stacks children vertically with 6px gap. By default children stretch to the full container width (override with `MKGUI_ALIGN_START/CENTER/END`). Use `MKGUI_SCROLL` to enable vertical scrolling when content overflows.
 
 ```c
-{ MKGUI_VBOX,   ID_VBOX,  "", "", ID_TAB1, 0, 0, 0, 0 },
-{ MKGUI_BUTTON, ID_BTN1,  "Fixed (28px)", "", ID_VBOX, 0, 28, MKGUI_FIXED, 0 },
-{ MKGUI_INPUT,  ID_INP1,  "",             "", ID_VBOX, 0, 0, MKGUI_FIXED, 0 },
-{ MKGUI_BUTTON, ID_BTN2,  "Flex (fills)", "", ID_VBOX, 0, 0, 0, 0 },
+{ MKGUI_VBOX,   ID_VBOX,  "", "", ID_TAB1, 0, 0, 0, 0, 0 },
+{ MKGUI_BUTTON, ID_BTN1,  "Fixed (28px)", "", ID_VBOX, 0, 28, MKGUI_FIXED, 0, 0 },
+{ MKGUI_INPUT,  ID_INP1,  "",             "", ID_VBOX, 0, 0, MKGUI_FIXED, 0, 0 },
+{ MKGUI_BUTTON, ID_BTN2,  "Flex (fills)", "", ID_VBOX, 0, 0, 0, 0, 0 },
 ```
 
 ### HBox
@@ -1220,10 +1268,10 @@ Stacks children vertically with 6px gap. By default children stretch to the full
 Stacks children horizontally with 6px gap. By default children stretch to the full container height (override with `MKGUI_ALIGN_START/CENTER/END`). Use `MKGUI_SCROLL` to enable horizontal scrolling when content overflows.
 
 ```c
-{ MKGUI_HBOX,   ID_HBOX, "", "", ID_TAB1, 0, 0, 0, 0 },
-{ MKGUI_PANEL,  ID_LEFT, "", "", ID_HBOX, 200, 0, MKGUI_PANEL_BORDER | MKGUI_FIXED, 0 },
-{ MKGUI_PANEL,  ID_MID,  "", "", ID_HBOX, 0, 0, 0, 0 },
-{ MKGUI_PANEL,  ID_RIGHT,"", "", ID_HBOX, 150, 0, MKGUI_PANEL_BORDER | MKGUI_FIXED, 0 },
+{ MKGUI_HBOX,   ID_HBOX, "", "", ID_TAB1, 0, 0, 0, 0, 0 },
+{ MKGUI_PANEL,  ID_LEFT, "", "", ID_HBOX, 200, 0, MKGUI_FIXED, MKGUI_PANEL_BORDER, 0 },
+{ MKGUI_PANEL,  ID_MID,  "", "", ID_HBOX, 0, 0, 0, 0, 0 },
+{ MKGUI_PANEL,  ID_RIGHT,"", "", ID_HBOX, 150, 0, MKGUI_FIXED, MKGUI_PANEL_BORDER, 0 },
 ```
 
 ### Form
@@ -1231,13 +1279,13 @@ Stacks children horizontally with 6px gap. By default children stretch to the fu
 Two-column form layout for label+control pairs. Children are paired in order: 1st is label, 2nd is control, 3rd is label, 4th is control, etc. The label column auto-sizes to the widest label. Each row is 24px tall with 6px gap.
 
 ```c
-{ MKGUI_FORM,     ID_FORM,  "", "", ID_TAB1, 0, 0, 0, 0 },
-{ MKGUI_LABEL,    ID_LBL1,  "Name:",    "", ID_FORM, 0, 0, 0, 0 },
-{ MKGUI_INPUT,    ID_INP1,  "",          "", ID_FORM, 0, 0, 0, 0 },
-{ MKGUI_LABEL,    ID_LBL2,  "Email:",   "", ID_FORM, 0, 0, 0, 0 },
-{ MKGUI_INPUT,    ID_INP2,  "",          "", ID_FORM, 0, 0, 0, 0 },
-{ MKGUI_LABEL,    ID_LBL3,  "Category:","", ID_FORM, 0, 0, 0, 0 },
-{ MKGUI_DROPDOWN, ID_DRP1,  "",          "", ID_FORM, 0, 0, 0, 0 },
+{ MKGUI_FORM,     ID_FORM,  "", "", ID_TAB1, 0, 0, 0, 0, 0 },
+{ MKGUI_LABEL,    ID_LBL1,  "Name:",    "", ID_FORM, 0, 0, 0, 0, 0 },
+{ MKGUI_INPUT,    ID_INP1,  "",          "", ID_FORM, 0, 0, 0, 0, 0 },
+{ MKGUI_LABEL,    ID_LBL2,  "Email:",   "", ID_FORM, 0, 0, 0, 0, 0 },
+{ MKGUI_INPUT,    ID_INP2,  "",          "", ID_FORM, 0, 0, 0, 0, 0 },
+{ MKGUI_LABEL,    ID_LBL3,  "Category:","", ID_FORM, 0, 0, 0, 0, 0 },
+{ MKGUI_DROPDOWN, ID_DRP1,  "",          "", ID_FORM, 0, 0, 0, 0, 0 },
 ```
 
 The widget editor automatically inserts a label when dropping a non-label widget into a FORM, ensuring the pairing is always correct. Dropping a label by itself places it in the label column.
@@ -1247,12 +1295,12 @@ Containers can be nested. For example, an HBOX containing a VBOX and a FORM side
 ## Tabs
 
 ```c
-{ MKGUI_TABS, ID_TABS, "",         "", ID_WINDOW, 0, 0, 0, 0 },
-{ MKGUI_TAB,  ID_TAB1, "General",  "", ID_TABS, 0, 0, 0, 0 },
-{ MKGUI_TAB,  ID_TAB2, "Settings", "", ID_TABS, 0, 0, 0, 0 },
+{ MKGUI_TABS, ID_TABS, "",         "", ID_WINDOW, 0, 0, 0, 0, 0 },
+{ MKGUI_TAB,  ID_TAB1, "General",  "", ID_TABS, 0, 0, 0, 0, 0 },
+{ MKGUI_TAB,  ID_TAB2, "Settings", "", ID_TABS, 0, 0, 0, 0, 0 },
 
 // Widgets inside tabs
-{ MKGUI_BUTTON, ID_BTN, "OK", "", ID_TAB1, 80, 0, MKGUI_FIXED, 0 },
+{ MKGUI_BUTTON, ID_BTN, "OK", "", ID_TAB1, 80, 0, MKGUI_FIXED, 0, 0 },
 ```
 
 Only widgets parented to the active tab are visible. Animated widgets (spinners, progress bars, glviews) on inactive tabs do not consume CPU.
@@ -1550,6 +1598,21 @@ Displays a prompt label with a text input field and OK/Cancel buttons. Returns 1
 char name[256];
 if(mkgui_input_dialog(ctx, "New File", "File name:", "untitled.txt", name, sizeof(name))) {
     printf("Created: %s\n", name);
+}
+```
+
+### Color picker
+
+```c
+uint32_t mkgui_color_dialog(struct mkgui_ctx *ctx, uint32_t initial_color, uint32_t *out_color);
+```
+
+Opens a modal color picker dialog with three modes selectable via tabs: SV square with hue bar, color wheel, and RGB sliders. Includes hex input, R/G/B spinboxes, and a preview swatch. Returns 1 if OK (selected color written to `out_color` as 0x00RRGGBB), 0 if cancelled.
+
+```c
+uint32_t color = 0;
+if(mkgui_color_dialog(ctx, 0x3366cc, &color)) {
+    printf("Selected: #%06x\n", color);
 }
 ```
 
