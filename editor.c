@@ -17,7 +17,7 @@
 // Editor constants
 // ---------------------------------------------------------------------------
 
-#define ED_MAX_WIDGETS    1024
+#define ED_MAX_WIDGETS    4096
 #define ED_MAX_UNDO       64
 #define ED_GRID_DEFAULT   8
 #define ED_CANVAS_DEF_W   640
@@ -367,16 +367,17 @@ static const char *ed_type_name(uint32_t type) {
 struct ed_widget {
 	uint32_t type;
 	uint32_t id;
-	char id_name[64];
 	char label[MKGUI_MAX_TEXT];
 	char icon[MKGUI_ICON_NAME_LEN];
 	uint32_t parent_id;
-	int32_t x, y, w, h;
+	int32_t w, h;
 	uint32_t flags;
 	uint32_t weight;
+	int32_t margin_l, margin_r, margin_t, margin_b;
+	char id_name[64];
+	int32_t x, y;
 	uint32_t tab_order;
 	uint64_t event_mask;
-	int32_t margin_l, margin_r, margin_t, margin_b;
 };
 
 // ---------------------------------------------------------------------------
@@ -2307,7 +2308,7 @@ static void ed_draw_widget(struct mkgui_ctx *ctx, uint32_t idx) {
 // Editor layout engine (mirrors layout_node tree walk from mkgui.c)
 // ---------------------------------------------------------------------------
 
-#define ED_LAYOUT_HASH_SIZE 1024
+#define ED_LAYOUT_HASH_SIZE 8192
 #define ED_LAYOUT_HASH_MASK (ED_LAYOUT_HASH_SIZE - 1)
 
 static struct {
@@ -2319,547 +2320,16 @@ static uint32_t ed_layout_parent[ED_MAX_WIDGETS];
 static uint32_t ed_layout_first_child[ED_MAX_WIDGETS];
 static uint32_t ed_layout_next_sibling[ED_MAX_WIDGETS];
 
-// [=]===^=[ ed_layout_find_idx ]=================================[=]
-static uint32_t ed_layout_find_idx(uint32_t id) {
-	uint32_t h = (id * 2654435761u) & ED_LAYOUT_HASH_MASK;
-	for(;;) {
-		if(ed_layout_id_map[h].idx == UINT32_MAX) {
-			return UINT32_MAX;
-		}
-		if(ed_layout_id_map[h].id == id) {
-			return ed_layout_id_map[h].idx;
-		}
-		h = (h + 1) & ED_LAYOUT_HASH_MASK;
-	}
-}
-
 // [=]===^=[ ed_layout_build_index ]==============================[=]
 static void ed_layout_build_index(void) {
-	for(uint32_t i = 0; i < ED_LAYOUT_HASH_SIZE; ++i) {
-		ed_layout_id_map[i].idx = UINT32_MAX;
-	}
-	for(uint32_t i = 0; i < ed.widget_count; ++i) {
-		uint32_t h = (ed.widgets[i].id * 2654435761u) & ED_LAYOUT_HASH_MASK;
-		while(ed_layout_id_map[h].idx != UINT32_MAX) {
-			h = (h + 1) & ED_LAYOUT_HASH_MASK;
-		}
-		ed_layout_id_map[h].id = ed.widgets[i].id;
-		ed_layout_id_map[h].idx = i;
-		ed_layout_first_child[i] = UINT32_MAX;
-		ed_layout_next_sibling[i] = UINT32_MAX;
-	}
-	uint32_t i = ed.widget_count;
-	while(i > 0) {
-		--i;
-		uint32_t pidx = ed_layout_find_idx(ed.widgets[i].parent_id);
-		ed_layout_parent[i] = pidx;
-		if(pidx < ed.widget_count && pidx != i) {
-			ed_layout_next_sibling[i] = ed_layout_first_child[pidx];
-			ed_layout_first_child[pidx] = i;
-		}
-	}
-}
-
-// [=]===^=[ ed_measure_container ]================================[=]
-static int32_t ed_measure_container(struct mkgui_ctx *ctx, uint32_t idx, uint32_t axis) {
-	struct ed_widget *w = &ed.widgets[idx];
-
-	if(w->type == MKGUI_GROUP) {
-		int32_t gtop = ctx->font_height + 4;
-		int32_t gpad = 6;
-		for(uint32_t j = ed_layout_first_child[idx]; j < ed.widget_count; j = ed_layout_next_sibling[j]) {
-			uint32_t ct = ed.widgets[j].type;
-			if(ct == MKGUI_VBOX || ct == MKGUI_HBOX || ct == MKGUI_FORM || ct == MKGUI_PANEL) {
-				int32_t inner = ed_measure_container(ctx, j, axis);
-				if(axis == 1) {
-					return inner + gtop + gpad;
-				}
-				return inner + gpad * 2;
-			}
-		}
-		return 0;
-	}
-
-	uint32_t is_vbox = (w->type == MKGUI_VBOX || w->type == MKGUI_PANEL);
-	uint32_t is_hbox = (w->type == MKGUI_HBOX);
-	uint32_t is_form = (w->type == MKGUI_FORM);
-	if(!is_vbox && !is_hbox && !is_form) {
-		return 0;
-	}
-
-	if(is_form) {
-		uint32_t pair_count = 0;
-		for(uint32_t j = ed_layout_first_child[idx]; j < ed.widget_count; j = ed_layout_next_sibling[j]) {
-			if(!(ed.widgets[j].flags & MKGUI_HIDDEN)) {
-				++pair_count;
-			}
-		}
-		uint32_t rows = (pair_count + 1) / 2;
-		int32_t row_h = ctx->font_height + 10;
-		int32_t h = (int32_t)rows * row_h + (rows > 1 ? (int32_t)(rows - 1) * MKGUI_BOX_GAP : 0);
-		return h;
-	}
-
-	int32_t main_total = 0;
-	int32_t cross_max = 0;
-	uint32_t visible = 0;
-	for(uint32_t j = ed_layout_first_child[idx]; j < ed.widget_count; j = ed_layout_next_sibling[j]) {
-		if(ed.widgets[j].flags & MKGUI_HIDDEN) {
-			continue;
-		}
-		++visible;
-		int32_t child_main;
-		int32_t child_cross;
-		uint32_t ct = ed.widgets[j].type;
-		if(is_vbox) {
-			child_main = ed.widgets[j].h;
-			child_cross = ed.widgets[j].w;
-		} else {
-			child_main = ed.widgets[j].w;
-			child_cross = ed.widgets[j].h;
-		}
-		if(child_main == 0 && (ed.widgets[j].flags & MKGUI_FIXED) && (ct == MKGUI_VBOX || ct == MKGUI_HBOX || ct == MKGUI_FORM || ct == MKGUI_GROUP || ct == MKGUI_PANEL)) {
-			child_main = ed_measure_container(ctx, j, is_vbox ? 1 : 0);
-		}
-		if(child_main == 0) {
-			child_main = natural_height(ctx, ct);
-		}
-		if(child_cross == 0) {
-			int32_t nh = natural_height(ctx, ct);
-			if(nh > 0) {
-				child_cross = nh;
-			}
-		}
-		main_total += child_main;
-		if(child_cross > cross_max) {
-			cross_max = child_cross;
-		}
-	}
-	int32_t gap_total = visible > 1 ? (int32_t)(visible - 1) * MKGUI_BOX_GAP : 0;
-	main_total += gap_total;
-
-	uint32_t has_pad = 0;
-	if(!(w->flags & MKGUI_NO_PAD)) {
-		uint32_t gpidx = ed_layout_parent[idx];
-		uint32_t nested = 0;
-		if(gpidx < ed.widget_count) {
-			uint32_t gpt = ed.widgets[gpidx].type;
-			if(gpt == MKGUI_VBOX || gpt == MKGUI_HBOX || gpt == MKGUI_FORM || gpt == MKGUI_GROUP || gpt == MKGUI_TABS || gpt == MKGUI_PANEL) {
-				nested = 1;
-			}
-		}
-		if(!nested || (w->flags & MKGUI_PANEL_BORDER)) {
-			has_pad = 1;
-		}
-	}
-	if(has_pad) {
-		main_total += MKGUI_BOX_PAD * 2;
-		cross_max += MKGUI_BOX_PAD * 2;
-	}
-
-	if(axis == 0) {
-		return is_vbox ? cross_max : main_total;
-	}
-	return is_vbox ? main_total : cross_max;
-}
-
-// [=]===^=[ ed_layout_node ]=====================================[=]
-static void ed_layout_node(struct mkgui_ctx *ctx, uint32_t idx) {
-	struct ed_widget *w = &ed.widgets[idx];
-
-	int32_t px = ed_rects[idx].x;
-	int32_t py = ed_rects[idx].y;
-	int32_t pw = ed_rects[idx].w;
-	int32_t ph = ed_rects[idx].h;
-
-	if(w->type == MKGUI_WINDOW) {
-		int32_t top_y = py;
-		int32_t bot_y = py + ph;
-		for(uint32_t c = ed_layout_first_child[idx]; c < ed.widget_count; c = ed_layout_next_sibling[c]) {
-			if(ed.widgets[c].type == MKGUI_MENU) {
-				ed_rects[c].x = px;
-				ed_rects[c].y = top_y;
-				ed_rects[c].w = pw;
-				ed_rects[c].h = MKGUI_MENU_HEIGHT;
-				top_y += MKGUI_MENU_HEIGHT;
-			}
-		}
-		for(uint32_t c = ed_layout_first_child[idx]; c < ed.widget_count; c = ed_layout_next_sibling[c]) {
-			if(ed.widgets[c].type == MKGUI_TOOLBAR) {
-				uint32_t ed_tb_mode = ed.widgets[c].flags & MKGUI_TOOLBAR_MODE_MASK;
-				int32_t th;
-				if(ed_tb_mode == MKGUI_TOOLBAR_TEXT_ONLY) {
-					th = ctx->font_height + 10;
-				} else {
-					uint32_t ed_tb_has_icons = 0;
-					for(uint32_t j = ed_layout_first_child[c]; j < ed.widget_count; j = ed_layout_next_sibling[j]) {
-						if(ed.widgets[j].icon[0]) {
-							ed_tb_has_icons = 1;
-							break;
-						}
-					}
-					if(ed_tb_has_icons && mdi_toolbar.icon_size > 0) {
-						int32_t ed_ih = (int32_t)mdi_toolbar.icon_size;
-						th = (ed_tb_mode == MKGUI_TOOLBAR_ICONS_ONLY) ? ed_ih + 10 : ((ed_ih > ctx->font_height ? ed_ih : ctx->font_height) + 10);
-					} else {
-						th = ctx->font_height + 10;
-					}
-				}
-				ed_rects[c].x = px;
-				ed_rects[c].y = top_y;
-				ed_rects[c].w = pw;
-				ed_rects[c].h = th;
-				top_y += th;
-			}
-		}
-		for(uint32_t c = ed_layout_first_child[idx]; c < ed.widget_count; c = ed_layout_next_sibling[c]) {
-			if(ed.widgets[c].type == MKGUI_PATHBAR && ed.widgets[c].h == 0) {
-				ed_rects[c].x = px + ed.widgets[c].margin_l;
-				ed_rects[c].y = top_y;
-				ed_rects[c].w = pw - ed.widgets[c].margin_l - ed.widgets[c].margin_r;
-				ed_rects[c].h = MKGUI_PATHBAR_HEIGHT;
-				top_y += MKGUI_PATHBAR_HEIGHT;
-			}
-		}
-		for(uint32_t c = ed_layout_first_child[idx]; c < ed.widget_count; c = ed_layout_next_sibling[c]) {
-			if(ed.widgets[c].type == MKGUI_STATUSBAR) {
-				bot_y -= MKGUI_STATUSBAR_HEIGHT;
-				ed_rects[c].x = px;
-				ed_rects[c].y = bot_y;
-				ed_rects[c].w = pw;
-				ed_rects[c].h = MKGUI_STATUSBAR_HEIGHT;
-			}
-		}
-		py = top_y;
-		ph = bot_y - top_y;
-	}
-
-	if(w->type == MKGUI_TAB) {
-		px += 2;
-		py += MKGUI_TAB_HEIGHT + 2;
-		pw -= 4;
-		ph -= MKGUI_TAB_HEIGHT + 4;
-	}
-	if(w->type == MKGUI_GROUP) {
-		int32_t gtop = ctx->font_height + 4;
-		int32_t gpad = 6;
-		px += gpad;
-		py += gtop;
-		pw -= gpad * 2;
-		ph -= gtop + gpad;
-	}
-
-	uint32_t ed_is_panel_vbox = (w->type == MKGUI_PANEL);
-	if(w->type == MKGUI_VBOX || w->type == MKGUI_HBOX || w->type == MKGUI_FORM || ed_is_panel_vbox) {
-		if(!(w->flags & MKGUI_NO_PAD)) {
-			uint32_t gpidx = ed_layout_parent[idx];
-			uint32_t nested = 0;
-			if(gpidx < ed.widget_count) {
-				uint32_t gpt = ed.widgets[gpidx].type;
-				if(gpt == MKGUI_VBOX || gpt == MKGUI_HBOX || gpt == MKGUI_FORM || gpt == MKGUI_GROUP || gpt == MKGUI_TABS || gpt == MKGUI_PANEL) {
-					nested = 1;
-				}
-			}
-			if(!nested || (w->flags & MKGUI_PANEL_BORDER)) {
-				px += MKGUI_BOX_PAD;
-				py += MKGUI_BOX_PAD;
-				pw -= MKGUI_BOX_PAD * 2;
-				ph -= MKGUI_BOX_PAD * 2;
-			}
-		}
-
-		uint32_t child_count = 0;
-		for(uint32_t j = ed_layout_first_child[idx]; j < ed.widget_count; j = ed_layout_next_sibling[j]) {
-			if(!(ed.widgets[j].flags & MKGUI_HIDDEN)) {
-				++child_count;
-			}
-		}
-
-		if(w->type == MKGUI_VBOX || ed_is_panel_vbox) {
-			int32_t fixed_total = 0;
-			int32_t min_total = 0;
-			uint32_t weight_total = 0;
-			for(uint32_t j = ed_layout_first_child[idx]; j < ed.widget_count; j = ed_layout_next_sibling[j]) {
-				if(ed.widgets[j].flags & MKGUI_HIDDEN) {
-					continue;
-				}
-				if(ed.widgets[j].flags & MKGUI_FIXED) {
-					int32_t fh = ed.widgets[j].h;
-					uint32_t ct = ed.widgets[j].type;
-					if(fh == 0 && (ct == MKGUI_VBOX || ct == MKGUI_HBOX || ct == MKGUI_FORM || ct == MKGUI_GROUP || ct == MKGUI_PANEL)) {
-						fh = ed_measure_container(ctx, j, 1);
-					}
-					if(fh == 0) {
-						fh = natural_height(ctx, ct);
-					}
-					fixed_total += fh;
-				} else {
-					uint32_t ew = ed.widgets[j].weight > 0 ? ed.widgets[j].weight : 1;
-					int32_t minh = ed.widgets[j].h;
-					if(minh == 0) {
-						minh = natural_height(ctx, ed.widgets[j].type);
-					}
-					min_total += minh;
-					weight_total += ew;
-				}
-			}
-			int32_t gap_total = child_count > 1 ? (int32_t)(child_count - 1) * MKGUI_BOX_GAP : 0;
-			int32_t remaining = ph - fixed_total - min_total - gap_total;
-			if(remaining < 0) {
-				remaining = 0;
-			}
-			uint32_t wdist = 0;
-			int32_t cy = py;
-			for(uint32_t j = ed_layout_first_child[idx]; j < ed.widget_count; j = ed_layout_next_sibling[j]) {
-				if(ed.widgets[j].flags & MKGUI_HIDDEN) {
-					continue;
-				}
-				int32_t ch;
-				if(ed.widgets[j].flags & MKGUI_FIXED) {
-					ch = ed.widgets[j].h;
-					uint32_t ct = ed.widgets[j].type;
-					if(ch == 0 && (ct == MKGUI_VBOX || ct == MKGUI_HBOX || ct == MKGUI_FORM || ct == MKGUI_GROUP || ct == MKGUI_PANEL)) {
-						ch = ed_measure_container(ctx, j, 1);
-					}
-					if(ch == 0) {
-						ch = natural_height(ctx, ct);
-					}
-				} else {
-					uint32_t wt = ed.widgets[j].weight > 0 ? ed.widgets[j].weight : 1;
-					int32_t base_h = ed.widgets[j].h;
-					if(base_h == 0) {
-						base_h = natural_height(ctx, ed.widgets[j].type);
-					}
-					ch = base_h + (weight_total > 0 ? (int32_t)(remaining * (int32_t)wt / (int32_t)weight_total) : 0);
-					uint32_t extra = wdist + wt * (uint32_t)(remaining % (int32_t)weight_total);
-					if(extra >= weight_total && weight_total > 0) {
-						++ch;
-					}
-					wdist = extra % weight_total;
-				}
-				int32_t cx_child = px;
-				int32_t cw_child = pw;
-				uint32_t align = ed.widgets[j].flags & MKGUI_ALIGN_MASK;
-				if(align && ed.widgets[j].w > 0) {
-					if(align == MKGUI_ALIGN_START) {
-						cw_child = ed.widgets[j].w;
-					} else if(align == MKGUI_ALIGN_CENTER) {
-						cw_child = ed.widgets[j].w;
-						cx_child = px + (pw - cw_child) / 2;
-					} else if(align == MKGUI_ALIGN_END) {
-						cw_child = ed.widgets[j].w;
-						cx_child = px + pw - cw_child;
-					}
-				}
-				ed_rects[j].x = cx_child;
-				ed_rects[j].y = cy;
-				ed_rects[j].w = cw_child;
-				ed_rects[j].h = ch;
-				cy += ch + MKGUI_BOX_GAP;
-			}
-
-		} else if(w->type == MKGUI_HBOX) {
-			int32_t fixed_total = 0;
-			int32_t min_total = 0;
-			uint32_t weight_total = 0;
-			for(uint32_t j = ed_layout_first_child[idx]; j < ed.widget_count; j = ed_layout_next_sibling[j]) {
-				if(ed.widgets[j].flags & MKGUI_HIDDEN) {
-					continue;
-				}
-				if(ed.widgets[j].flags & MKGUI_FIXED) {
-					int32_t fw = ed.widgets[j].w;
-					uint32_t ct = ed.widgets[j].type;
-					if(fw == 0 && (ct == MKGUI_VBOX || ct == MKGUI_HBOX || ct == MKGUI_FORM || ct == MKGUI_GROUP || ct == MKGUI_PANEL)) {
-						fw = ed_measure_container(ctx, j, 0);
-					}
-					fixed_total += fw;
-				} else {
-					uint32_t ew = ed.widgets[j].weight > 0 ? ed.widgets[j].weight : 1;
-					min_total += ed.widgets[j].w;
-					weight_total += ew;
-				}
-			}
-			int32_t gap_total = child_count > 1 ? (int32_t)(child_count - 1) * MKGUI_BOX_GAP : 0;
-			int32_t remaining = pw - fixed_total - min_total - gap_total;
-			if(remaining < 0) {
-				remaining = 0;
-			}
-			uint32_t wdist = 0;
-			int32_t cx = px;
-			for(uint32_t j = ed_layout_first_child[idx]; j < ed.widget_count; j = ed_layout_next_sibling[j]) {
-				if(ed.widgets[j].flags & MKGUI_HIDDEN) {
-					continue;
-				}
-				int32_t cw;
-				if(ed.widgets[j].flags & MKGUI_FIXED) {
-					cw = ed.widgets[j].w;
-					uint32_t ct = ed.widgets[j].type;
-					if(cw == 0 && (ct == MKGUI_VBOX || ct == MKGUI_HBOX || ct == MKGUI_FORM || ct == MKGUI_GROUP || ct == MKGUI_PANEL)) {
-						cw = ed_measure_container(ctx, j, 0);
-					}
-				} else {
-					uint32_t wt = ed.widgets[j].weight > 0 ? ed.widgets[j].weight : 1;
-					cw = ed.widgets[j].w + (weight_total > 0 ? (int32_t)(remaining * (int32_t)wt / (int32_t)weight_total) : 0);
-					uint32_t extra = wdist + wt * (uint32_t)(remaining % (int32_t)weight_total);
-					if(extra >= weight_total && weight_total > 0) {
-						++cw;
-					}
-					wdist = extra % weight_total;
-				}
-				int32_t cy_child = py;
-				int32_t ch_child = ph;
-				uint32_t align = ed.widgets[j].flags & MKGUI_ALIGN_MASK;
-				if(align && ed.widgets[j].h > 0) {
-					if(align == MKGUI_ALIGN_START) {
-						ch_child = ed.widgets[j].h;
-					} else if(align == MKGUI_ALIGN_CENTER) {
-						ch_child = ed.widgets[j].h;
-						cy_child = py + (ph - ch_child) / 2;
-					} else if(align == MKGUI_ALIGN_END) {
-						ch_child = ed.widgets[j].h;
-						cy_child = py + ph - ch_child;
-					}
-				}
-				ed_rects[j].x = cx;
-				ed_rects[j].y = cy_child;
-				ed_rects[j].w = cw;
-				ed_rects[j].h = ch_child;
-				cx += cw + MKGUI_BOX_GAP;
-			}
-
-		} else {
-			int32_t label_w = 0;
-			uint32_t pair_idx = 0;
-			for(uint32_t j = ed_layout_first_child[idx]; j < ed.widget_count; j = ed_layout_next_sibling[j]) {
-				if(!(ed.widgets[j].flags & MKGUI_HIDDEN)) {
-					if((pair_idx & 1) == 0) {
-						int32_t tw = text_width(ctx, ed.widgets[j].label) + 8;
-						if(tw > label_w) {
-							label_w = tw;
-						}
-					}
-					++pair_idx;
-				}
-			}
-			pair_idx = 0;
-			for(uint32_t j = ed_layout_first_child[idx]; j < ed.widget_count; j = ed_layout_next_sibling[j]) {
-				if(!(ed.widgets[j].flags & MKGUI_HIDDEN)) {
-					uint32_t row = pair_idx / 2;
-					uint32_t row_h = (uint32_t)(ctx->font_height + 10);
-					int32_t row_y = py + (int32_t)(row * (row_h + MKGUI_BOX_GAP));
-					if((pair_idx & 1) == 0) {
-						ed_rects[j].x = px;
-						ed_rects[j].y = row_y;
-						ed_rects[j].w = label_w;
-						ed_rects[j].h = (int32_t)row_h;
-					} else {
-						ed_rects[j].x = px + label_w;
-						ed_rects[j].y = row_y;
-						ed_rects[j].w = pw - label_w;
-						ed_rects[j].h = (int32_t)row_h;
-					}
-					++pair_idx;
-				}
-			}
-		}
-
-	} else if(w->type == MKGUI_TOOLBAR) {
-		uint32_t edl_tb_mode = w->flags & MKGUI_TOOLBAR_MODE_MASK;
-		uint32_t edl_show_icons = (edl_tb_mode != MKGUI_TOOLBAR_TEXT_ONLY);
-		uint32_t edl_show_text = (edl_tb_mode != MKGUI_TOOLBAR_ICONS_ONLY);
-		int32_t bx = px + 2;
-		for(uint32_t c = ed_layout_first_child[idx]; c < ed.widget_count; c = ed_layout_next_sibling[c]) {
-			struct ed_widget *btn = &ed.widgets[c];
-			if(btn->type != MKGUI_BUTTON) {
-				continue;
-			}
-			if(btn->flags & MKGUI_SEPARATOR) {
-				bx += MKGUI_TOOLBAR_SEP_W;
-				continue;
-			}
-			int32_t tw = edl_show_text ? text_width(ctx, btn->label) : 0;
-			int32_t ed_ii = edl_show_icons && btn->icon[0] ? toolbar_icon_resolve(btn->icon) : -1;
-			int32_t icon_w = ed_ii >= 0 ? icons[ed_ii].w + 4 : 0;
-			int32_t btn_w = icon_w + tw + 12;
-			if(btn_w < MKGUI_TOOLBAR_BTN_W) {
-				btn_w = MKGUI_TOOLBAR_BTN_W;
-			}
-			ed_rects[c].x = bx;
-			ed_rects[c].y = py + 2;
-			ed_rects[c].w = btn_w;
-			ed_rects[c].h = ph - 4;
-			bx += btn_w + 2;
-		}
-
-	} else {
-		if(w->type == MKGUI_HSPLIT || w->type == MKGUI_VSPLIT) {
-			struct mkgui_split_data *sd = find_split_data(ctx, w->id);
-			float ratio = sd ? sd->ratio : 0.5f;
-			if(w->type == MKGUI_HSPLIT) {
-				int32_t split = (int32_t)(ph * ratio);
-				for(uint32_t c = ed_layout_first_child[idx]; c < ed.widget_count; c = ed_layout_next_sibling[c]) {
-					if(ed.widgets[c].flags & MKGUI_HIDDEN) {
-						continue;
-					}
-					if(ed.widgets[c].flags & MKGUI_REGION_TOP) {
-						ed_rects[c].x = px; ed_rects[c].y = py;
-						ed_rects[c].w = pw; ed_rects[c].h = split;
-					} else if(ed.widgets[c].flags & MKGUI_REGION_BOTTOM) {
-						ed_rects[c].x = px; ed_rects[c].y = py + split + MKGUI_SPLIT_THICK;
-						ed_rects[c].w = pw; ed_rects[c].h = ph - split - MKGUI_SPLIT_THICK;
-					}
-				}
-			} else {
-				int32_t split = (int32_t)(pw * ratio);
-				for(uint32_t c = ed_layout_first_child[idx]; c < ed.widget_count; c = ed_layout_next_sibling[c]) {
-					if(ed.widgets[c].flags & MKGUI_HIDDEN) {
-						continue;
-					}
-					if(ed.widgets[c].flags & MKGUI_REGION_LEFT) {
-						ed_rects[c].x = px; ed_rects[c].y = py;
-						ed_rects[c].w = split; ed_rects[c].h = ph;
-					} else if(ed.widgets[c].flags & MKGUI_REGION_RIGHT) {
-						ed_rects[c].x = px + split + MKGUI_SPLIT_THICK; ed_rects[c].y = py;
-						ed_rects[c].w = pw - split - MKGUI_SPLIT_THICK; ed_rects[c].h = ph;
-					}
-				}
-			}
-		} else {
-			for(uint32_t c = ed_layout_first_child[idx]; c < ed.widget_count; c = ed_layout_next_sibling[c]) {
-				uint32_t ct = ed.widgets[c].type;
-				if(ct == MKGUI_MENUITEM || (ed.widgets[c].flags & MKGUI_HIDDEN)) {
-					continue;
-				}
-				if(w->type == MKGUI_WINDOW && (ct == MKGUI_MENU || ct == MKGUI_TOOLBAR || ct == MKGUI_STATUSBAR)) {
-					continue;
-				}
-				if(w->type == MKGUI_WINDOW && ct == MKGUI_PATHBAR && ed.widgets[c].h == 0) {
-					continue;
-				}
-				struct ed_widget *cw = &ed.widgets[c];
-				int32_t ml = cw->margin_l;
-				int32_t mr = cw->margin_r;
-				int32_t mt = cw->margin_t;
-				int32_t mb = cw->margin_b;
-				ed_rects[c].x = px + ml;
-				ed_rects[c].y = py + mt;
-				ed_rects[c].w = pw - ml - mr;
-				ed_rects[c].h = ph - mt - mb;
-				if((cw->flags & MKGUI_FIXED) && cw->w > 0) {
-					ed_rects[c].w = cw->w;
-				}
-				if((cw->flags & MKGUI_FIXED) && cw->h > 0) {
-					ed_rects[c].h = cw->h;
-				}
-			}
-		}
-	}
-
-	for(uint32_t c = ed_layout_first_child[idx]; c < ed.widget_count; c = ed_layout_next_sibling[c]) {
-		if(ed.widgets[c].type != MKGUI_MENUITEM && !(ed.widgets[c].flags & MKGUI_HIDDEN)) {
-			ed_layout_node(ctx, c);
-		}
-	}
+	struct layout_ctx lc = {
+		.widgets = (struct mkgui_widget *)ed.widgets,
+		.first_child = ed_layout_first_child, .next_sibling = ed_layout_next_sibling,
+		.parent = ed_layout_parent, .id_map = (struct mkgui_layout_hash_entry *)ed_layout_id_map,
+		.hash_mask = ED_LAYOUT_HASH_MASK,
+		.widget_count = ed.widget_count, .widget_stride = sizeof(struct ed_widget)
+	};
+	lc_build_index(&lc);
 }
 
 // ---------------------------------------------------------------------------
@@ -2909,7 +2379,19 @@ static void ed_render_canvas(struct mkgui_ctx *ctx, uint32_t id, uint32_t *pixel
 			ed_rects[i].h = ed.canvas_h;
 			ed_win_save_y = win_y;
 			ed_win_save_h = ed.canvas_h;
-			ed_layout_node(ctx, i);
+			{
+				struct layout_ctx elc = {
+					.widgets = (struct mkgui_widget *)ed.widgets,
+					.rects = (void *)ed_rects,
+					.first_child = ed_layout_first_child,
+					.next_sibling = ed_layout_next_sibling,
+					.parent = ed_layout_parent,
+					.widget_count = ed.widget_count,
+					.has_scroll = 0,
+					.widget_stride = sizeof(struct ed_widget)
+				};
+				lc_layout_node(ctx, &elc, i);
+			}
 			break;
 		}
 	}
