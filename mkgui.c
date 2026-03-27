@@ -1319,9 +1319,7 @@ static uint32_t lc_find_idx(struct layout_ctx *lc, uint32_t id) {
 
 // [=]===^=[ lc_build_index ]========================================[=]
 static void lc_build_index(struct layout_ctx *lc) {
-	for(uint32_t i = 0; i <= lc->hash_mask; ++i) {
-		lc->id_map[i].idx = UINT32_MAX;
-	}
+	memset(lc->id_map, 0xff, (size_t)(lc->hash_mask + 1) * sizeof(*lc->id_map));
 	for(uint32_t i = 0; i < lc->widget_count; ++i) {
 		struct mkgui_widget *w = lw_get(lc, i);
 		uint32_t h = (w->id * 2654435761u) & lc->hash_mask;
@@ -1555,7 +1553,19 @@ static void lc_layout_node(struct mkgui_ctx *ctx, struct layout_ctx *lc, uint32_
 	if(w->type == MKGUI_WINDOW) {
 		int32_t top_y = py;
 		int32_t bot_y = py + ph;
+		uint32_t chrome[16];
+		uint32_t chrome_count = 0;
 		for(uint32_t c = lc->first_child[idx]; c < lc->widget_count; c = lc->next_sibling[c]) {
+			struct mkgui_widget *cw = lw_get(lc, c);
+			uint32_t ct = cw->type;
+			if(ct == MKGUI_MENU || ct == MKGUI_TOOLBAR || ct == MKGUI_STATUSBAR || (ct == MKGUI_PATHBAR && cw->h == 0)) {
+				if(chrome_count < 16) {
+					chrome[chrome_count++] = c;
+				}
+			}
+		}
+		for(uint32_t i = 0; i < chrome_count; ++i) {
+			uint32_t c = chrome[i];
 			if(lw_get(lc, c)->type == MKGUI_MENU) {
 				lc->rects[c].x = px;
 				lc->rects[c].y = top_y;
@@ -1564,7 +1574,8 @@ static void lc_layout_node(struct mkgui_ctx *ctx, struct layout_ctx *lc, uint32_
 				top_y += MKGUI_MENU_HEIGHT;
 			}
 		}
-		for(uint32_t c = lc->first_child[idx]; c < lc->widget_count; c = lc->next_sibling[c]) {
+		for(uint32_t i = 0; i < chrome_count; ++i) {
+			uint32_t c = chrome[i];
 			struct mkgui_widget *cw = lw_get(lc, c);
 			if(cw->type == MKGUI_TOOLBAR) {
 				uint32_t tb_mode = cw->flags & MKGUI_TOOLBAR_MODE_MASK;
@@ -1593,9 +1604,10 @@ static void lc_layout_node(struct mkgui_ctx *ctx, struct layout_ctx *lc, uint32_
 				top_y += th;
 			}
 		}
-		for(uint32_t c = lc->first_child[idx]; c < lc->widget_count; c = lc->next_sibling[c]) {
+		for(uint32_t i = 0; i < chrome_count; ++i) {
+			uint32_t c = chrome[i];
 			struct mkgui_widget *cw = lw_get(lc, c);
-			if(cw->type == MKGUI_PATHBAR && cw->h == 0) {
+			if(cw->type == MKGUI_PATHBAR) {
 				lc->rects[c].x = px + cw->margin_l;
 				lc->rects[c].y = top_y;
 				lc->rects[c].w = pw - cw->margin_l - cw->margin_r;
@@ -1603,7 +1615,8 @@ static void lc_layout_node(struct mkgui_ctx *ctx, struct layout_ctx *lc, uint32_
 				top_y += MKGUI_PATHBAR_HEIGHT;
 			}
 		}
-		for(uint32_t c = lc->first_child[idx]; c < lc->widget_count; c = lc->next_sibling[c]) {
+		for(uint32_t i = 0; i < chrome_count; ++i) {
+			uint32_t c = chrome[i];
 			if(lw_get(lc, c)->type == MKGUI_STATUSBAR) {
 				bot_y -= MKGUI_STATUSBAR_HEIGHT;
 				lc->rects[c].x = px;
@@ -1652,24 +1665,19 @@ static void lc_layout_node(struct mkgui_ctx *ctx, struct layout_ctx *lc, uint32_
 			}
 		}
 
-		uint32_t child_count = 0;
-		for(uint32_t j = lc->first_child[idx]; j < lc->widget_count; j = lc->next_sibling[j]) {
-			if(!(lw_get(lc, j)->flags & MKGUI_HIDDEN)) {
-				++child_count;
-			}
-		}
-
 		if(w->type == MKGUI_VBOX || is_panel_vbox) {
 			uint32_t scrollable = lc->has_scroll && (w->flags & MKGUI_SCROLL) ? 1 : 0;
 			struct mkgui_box_scroll *bs = scrollable ? find_box_scroll(ctx, w->id) : NULL;
 			int32_t fixed_total = 0;
 			int32_t min_total = 0;
 			uint32_t weight_total = 0;
+			uint32_t child_count = 0;
 			for(uint32_t j = lc->first_child[idx]; j < lc->widget_count; j = lc->next_sibling[j]) {
 				struct mkgui_widget *jw = lw_get(lc, j);
 				if(jw->flags & MKGUI_HIDDEN) {
 					continue;
 				}
+				++child_count;
 				if(jw->flags & MKGUI_FIXED) {
 					int32_t fh = jw->h;
 					uint32_t ct = jw->type;
@@ -1679,6 +1687,7 @@ static void lc_layout_node(struct mkgui_ctx *ctx, struct layout_ctx *lc, uint32_
 					if(fh == 0) {
 						fh = natural_height(ctx, ct);
 					}
+					lc->rects[j].h = fh;
 					fixed_total += fh;
 				} else {
 					uint32_t ew = jw->weight > 0 ? jw->weight : 1;
@@ -1719,14 +1728,7 @@ static void lc_layout_node(struct mkgui_ctx *ctx, struct layout_ctx *lc, uint32_
 				}
 				int32_t ch;
 				if(jw->flags & MKGUI_FIXED) {
-					ch = jw->h;
-					uint32_t ct = jw->type;
-					if(ch == 0 && (ct == MKGUI_VBOX || ct == MKGUI_HBOX || ct == MKGUI_FORM || ct == MKGUI_GROUP || ct == MKGUI_PANEL)) {
-						ch = lc_measure_container(ctx, lc, j, 1);
-					}
-					if(ch == 0) {
-						ch = natural_height(ctx, ct);
-					}
+					ch = lc->rects[j].h;
 				} else {
 					uint32_t wt = jw->weight > 0 ? jw->weight : 1;
 					int32_t base_h = jw->h;
@@ -1767,17 +1769,20 @@ static void lc_layout_node(struct mkgui_ctx *ctx, struct layout_ctx *lc, uint32_
 			int32_t fixed_total = 0;
 			int32_t min_total = 0;
 			uint32_t weight_total = 0;
+			uint32_t child_count = 0;
 			for(uint32_t j = lc->first_child[idx]; j < lc->widget_count; j = lc->next_sibling[j]) {
 				struct mkgui_widget *jw = lw_get(lc, j);
 				if(jw->flags & MKGUI_HIDDEN) {
 					continue;
 				}
+				++child_count;
 				if(jw->flags & MKGUI_FIXED) {
 					int32_t fw = jw->w;
 					uint32_t ct = jw->type;
 					if(fw == 0 && (ct == MKGUI_VBOX || ct == MKGUI_HBOX || ct == MKGUI_FORM || ct == MKGUI_GROUP || ct == MKGUI_PANEL)) {
 						fw = lc_measure_container(ctx, lc, j, 0);
 					}
+					lc->rects[j].w = fw;
 					fixed_total += fw;
 				} else {
 					uint32_t ew = jw->weight > 0 ? jw->weight : 1;
@@ -1811,11 +1816,7 @@ static void lc_layout_node(struct mkgui_ctx *ctx, struct layout_ctx *lc, uint32_
 				}
 				int32_t cw;
 				if(jw->flags & MKGUI_FIXED) {
-					cw = jw->w;
-					uint32_t ct = jw->type;
-					if(cw == 0 && (ct == MKGUI_VBOX || ct == MKGUI_HBOX || ct == MKGUI_FORM || ct == MKGUI_GROUP || ct == MKGUI_PANEL)) {
-						cw = lc_measure_container(ctx, lc, j, 0);
-					}
+					cw = lc->rects[j].w;
 				} else {
 					uint32_t wt = jw->weight > 0 ? jw->weight : 1;
 					cw = jw->w + (weight_total > 0 ? (int32_t)(remaining * (int32_t)wt / (int32_t)weight_total) : 0);
@@ -1975,83 +1976,133 @@ static void layout_node(struct mkgui_ctx *ctx, uint32_t idx) {
 
 static void platform_set_min_size(struct mkgui_ctx *ctx, int32_t min_w, int32_t min_h);
 
-// [=]===^=[ layout_min_height ]====================================[=]
-static int32_t layout_min_height(struct mkgui_ctx *ctx, uint32_t idx) {
+// [=]===^=[ layout_min_size ]======================================[=]
+static void layout_min_size(struct mkgui_ctx *ctx, uint32_t idx, int32_t *out_w, int32_t *out_h) {
 	struct mkgui_widget *w = &ctx->widgets[idx];
 	uint32_t t = w->type;
 
 	if(w->flags & MKGUI_SCROLL) {
-		return MKGUI_ROW_HEIGHT * 3;
+		*out_w = 100;
+		*out_h = MKGUI_ROW_HEIGHT * 3;
+		return;
 	}
 
 	int32_t nh = natural_height(ctx, t);
 	if(nh > 0) {
-		return w->h > 0 ? w->h : nh;
+		*out_w = w->w > 0 ? w->w : 40;
+		*out_h = w->h > 0 ? w->h : nh;
+		return;
 	}
 
 	if(t == MKGUI_TABS) {
-		int32_t max_tab = 0;
+		int32_t max_tw = 0;
+		int32_t max_th = 0;
 		for(uint32_t c = layout_first_child[idx]; c < ctx->widget_count; c = layout_next_sibling[c]) {
 			if(ctx->widgets[c].type == MKGUI_TAB) {
+				int32_t tw = 0;
 				int32_t th = 0;
 				for(uint32_t gc = layout_first_child[c]; gc < ctx->widget_count; gc = layout_next_sibling[gc]) {
-					th += layout_min_height(ctx, gc);
+					int32_t cw, ch;
+					layout_min_size(ctx, gc, &cw, &ch);
+					if(cw > tw) {
+						tw = cw;
+					}
+					th += ch;
 				}
-				if(th > max_tab) {
-					max_tab = th;
+				if(tw > max_tw) {
+					max_tw = tw;
+				}
+				if(th > max_th) {
+					max_th = th;
 				}
 			}
 		}
-		return MKGUI_TAB_HEIGHT + 4 + max_tab;
+		*out_w = max_tw + 4;
+		*out_h = MKGUI_TAB_HEIGHT + 4 + max_th;
+		return;
 	}
 
 	if(t == MKGUI_HSPLIT) {
-		int32_t total = MKGUI_SPLIT_THICK;
+		int32_t max_w = 0;
+		int32_t total_h = MKGUI_SPLIT_THICK;
 		for(uint32_t c = layout_first_child[idx]; c < ctx->widget_count; c = layout_next_sibling[c]) {
-			total += layout_min_height(ctx, c);
+			int32_t cw, ch;
+			layout_min_size(ctx, c, &cw, &ch);
+			if(cw > max_w) {
+				max_w = cw;
+			}
+			total_h += ch;
 		}
-		return total;
+		*out_w = max_w;
+		*out_h = total_h;
+		return;
 	}
 
 	if(t == MKGUI_VSPLIT) {
+		int32_t total_w = MKGUI_SPLIT_THICK;
 		int32_t max_h = 0;
 		for(uint32_t c = layout_first_child[idx]; c < ctx->widget_count; c = layout_next_sibling[c]) {
-			int32_t ch = layout_min_height(ctx, c);
+			int32_t cw, ch;
+			layout_min_size(ctx, c, &cw, &ch);
+			total_w += cw;
 			if(ch > max_h) {
 				max_h = ch;
 			}
 		}
-		return max_h;
+		*out_w = total_w;
+		*out_h = max_h;
+		return;
 	}
 
 	if(t == MKGUI_VBOX || t == MKGUI_PANEL) {
-		int32_t total = 0;
+		int32_t max_w = 0;
+		int32_t total_h = 0;
 		uint32_t count = 0;
 		for(uint32_t c = layout_first_child[idx]; c < ctx->widget_count; c = layout_next_sibling[c]) {
 			if(ctx->widgets[c].flags & MKGUI_HIDDEN) {
 				continue;
 			}
-			total += layout_min_height(ctx, c);
+			int32_t cw, ch;
+			layout_min_size(ctx, c, &cw, &ch);
+			if(cw > max_w) {
+				max_w = cw;
+			}
+			total_h += ch;
 			++count;
 		}
 		if(count > 1) {
-			total += (int32_t)(count - 1) * MKGUI_BOX_GAP;
+			total_h += (int32_t)(count - 1) * MKGUI_BOX_GAP;
 		}
-		return total;
+		*out_w = max_w;
+		*out_h = total_h;
+		return;
 	}
 
 	if(t == MKGUI_HBOX) {
+		int32_t total_w = 0;
 		int32_t max_h = 0;
+		uint32_t count = 0;
 		for(uint32_t c = layout_first_child[idx]; c < ctx->widget_count; c = layout_next_sibling[c]) {
 			if(ctx->widgets[c].flags & MKGUI_HIDDEN) {
 				continue;
 			}
-			int32_t ch = layout_min_height(ctx, c);
+			int32_t cw, ch;
+			layout_min_size(ctx, c, &cw, &ch);
+			if(ctx->widgets[c].w > cw) {
+				cw = ctx->widgets[c].w;
+			}
+			total_w += cw;
 			if(ch > max_h) {
 				max_h = ch;
 			}
+			++count;
 		}
-		return max_h;
+		if(count > 1) {
+			total_w += (int32_t)(count - 1) * MKGUI_BOX_GAP;
+		}
+		*out_w = total_w;
+		*out_h = max_h;
+		return;
 	}
 
 	if(t == MKGUI_FORM) {
@@ -2061,130 +2112,31 @@ static int32_t layout_min_height(struct mkgui_ctx *ctx, uint32_t idx) {
 		}
 		uint32_t rows = (pair_count + 1) / 2;
 		int32_t row_h = ctx->font_height + 10;
-		return (int32_t)rows * row_h + (rows > 1 ? (int32_t)(rows - 1) * MKGUI_BOX_GAP : 0);
+		*out_w = 120;
+		*out_h = (int32_t)rows * row_h + (rows > 1 ? (int32_t)(rows - 1) * MKGUI_BOX_GAP : 0);
+		return;
 	}
 
 	if(t == MKGUI_GROUP) {
 		int32_t gtop = ctx->font_height + 4;
 		int32_t gpad = 6;
-		int32_t inner = 0;
+		int32_t inner_w = 0;
+		int32_t inner_h = 0;
 		for(uint32_t c = layout_first_child[idx]; c < ctx->widget_count; c = layout_next_sibling[c]) {
-			inner += layout_min_height(ctx, c);
-		}
-		return gtop + gpad + inner;
-	}
-
-	if(w->h > 0) {
-		return w->h;
-	}
-	return 0;
-}
-
-// [=]===^=[ layout_min_width ]=====================================[=]
-static int32_t layout_min_width(struct mkgui_ctx *ctx, uint32_t idx) {
-	struct mkgui_widget *w = &ctx->widgets[idx];
-	uint32_t t = w->type;
-
-	if(w->flags & MKGUI_SCROLL) {
-		return 100;
-	}
-
-	int32_t nh = natural_height(ctx, t);
-	if(nh > 0) {
-		return w->w > 0 ? w->w : 40;
-	}
-
-	if(t == MKGUI_TABS) {
-		int32_t max_w = 0;
-		for(uint32_t c = layout_first_child[idx]; c < ctx->widget_count; c = layout_next_sibling[c]) {
-			if(ctx->widgets[c].type == MKGUI_TAB) {
-				int32_t tw = 0;
-				for(uint32_t gc = layout_first_child[c]; gc < ctx->widget_count; gc = layout_next_sibling[gc]) {
-					int32_t cw = layout_min_width(ctx, gc);
-					if(cw > tw) {
-						tw = cw;
-					}
-				}
-				if(tw > max_w) {
-					max_w = tw;
-				}
+			int32_t cw, ch;
+			layout_min_size(ctx, c, &cw, &ch);
+			if(cw > inner_w) {
+				inner_w = cw;
 			}
+			inner_h += ch;
 		}
-		return max_w + 4;
+		*out_w = inner_w + 12;
+		*out_h = gtop + gpad + inner_h;
+		return;
 	}
 
-	if(t == MKGUI_VSPLIT) {
-		int32_t total = MKGUI_SPLIT_THICK;
-		for(uint32_t c = layout_first_child[idx]; c < ctx->widget_count; c = layout_next_sibling[c]) {
-			total += layout_min_width(ctx, c);
-		}
-		return total;
-	}
-
-	if(t == MKGUI_HSPLIT) {
-		int32_t max_w = 0;
-		for(uint32_t c = layout_first_child[idx]; c < ctx->widget_count; c = layout_next_sibling[c]) {
-			int32_t cw = layout_min_width(ctx, c);
-			if(cw > max_w) {
-				max_w = cw;
-			}
-		}
-		return max_w;
-	}
-
-	if(t == MKGUI_HBOX) {
-		int32_t total = 0;
-		uint32_t count = 0;
-		for(uint32_t c = layout_first_child[idx]; c < ctx->widget_count; c = layout_next_sibling[c]) {
-			if(ctx->widgets[c].flags & MKGUI_HIDDEN) {
-				continue;
-			}
-			int32_t cw = layout_min_width(ctx, c);
-			if(ctx->widgets[c].w > cw) {
-				cw = ctx->widgets[c].w;
-			}
-			total += cw;
-			++count;
-		}
-		if(count > 1) {
-			total += (int32_t)(count - 1) * MKGUI_BOX_GAP;
-		}
-		return total;
-	}
-
-	if(t == MKGUI_VBOX || t == MKGUI_PANEL) {
-		int32_t max_w = 0;
-		for(uint32_t c = layout_first_child[idx]; c < ctx->widget_count; c = layout_next_sibling[c]) {
-			if(ctx->widgets[c].flags & MKGUI_HIDDEN) {
-				continue;
-			}
-			int32_t cw = layout_min_width(ctx, c);
-			if(cw > max_w) {
-				max_w = cw;
-			}
-		}
-		return max_w;
-	}
-
-	if(t == MKGUI_FORM) {
-		return 120;
-	}
-
-	if(t == MKGUI_GROUP) {
-		int32_t inner = 0;
-		for(uint32_t c = layout_first_child[idx]; c < ctx->widget_count; c = layout_next_sibling[c]) {
-			int32_t cw = layout_min_width(ctx, c);
-			if(cw > inner) {
-				inner = cw;
-			}
-		}
-		return inner + 12;
-	}
-
-	if(w->w > 0) {
-		return w->w;
-	}
-	return 0;
+	*out_w = w->w > 0 ? w->w : 0;
+	*out_h = w->h > 0 ? w->h : 0;
 }
 
 // [=]===^=[ layout_compute_min_size ]==============================[=]
@@ -2202,8 +2154,9 @@ static void layout_compute_min_size(struct mkgui_ctx *ctx, uint32_t win_idx) {
 		} else if(ct == MKGUI_PATHBAR && ctx->widgets[c].h == 0) {
 			min_h += MKGUI_PATHBAR_HEIGHT;
 		} else {
-			min_h += layout_min_height(ctx, c);
-			int32_t cw = layout_min_width(ctx, c);
+			int32_t cw, ch;
+			layout_min_size(ctx, c, &cw, &ch);
+			min_h += ch;
 			if(cw > min_w) {
 				min_w = cw;
 			}
