@@ -16,6 +16,7 @@
 #include <stdio.h>
 #include <time.h>
 #include <math.h>
+#include <dirent.h>
 
 #if defined(__SSE2__)
 #include <emmintrin.h>
@@ -680,6 +681,8 @@ struct mkgui_ctx {
 	int32_t box_pad;
 	int32_t ui_margin;
 	int32_t icon_size;
+	int32_t toolbar_icon_size;
+	int32_t dialog_icon_size;
 	int32_t pathbar_height;
 	int32_t toolbar_height;
 	int32_t toolbar_btn_w;
@@ -924,7 +927,9 @@ static void mkgui_recompute_metrics(struct mkgui_ctx *ctx) {
 	ctx->box_gap         = sc(ctx, MKGUI_BOX_GAP);
 	ctx->box_pad         = sc(ctx, MKGUI_BOX_PAD);
 	ctx->ui_margin       = sc(ctx, MKGUI_MARGIN);
-	ctx->icon_size       = sc(ctx, MKGUI_ICON_SIZE);
+	ctx->icon_size           = sc(ctx, MKGUI_ICON_SIZE);
+	ctx->toolbar_icon_size   = sc(ctx, 22);
+	ctx->dialog_icon_size    = sc(ctx, 32);
 	ctx->pathbar_height  = sc(ctx, MKGUI_PATHBAR_HEIGHT);
 	ctx->toolbar_height  = sc(ctx, MKGUI_TOOLBAR_HEIGHT_DEFAULT);
 	ctx->toolbar_btn_w   = sc(ctx, MKGUI_TOOLBAR_BTN_W);
@@ -2418,17 +2423,18 @@ static void draw_icon(uint32_t *buf, int32_t bw, int32_t bh, struct mkgui_icon *
 			int32_t px = x + col;
 			__m128i dst = _mm_loadu_si128((__m128i *)&rowp[px]);
 			__m128i ia = _mm_sub_epi32(val_255, alphas);
-			__m128i a16 = _mm_or_si128(alphas, _mm_slli_epi32(alphas, 16));
 			__m128i ia16 = _mm_or_si128(ia, _mm_slli_epi32(ia, 16));
 			__m128i src_rb = _mm_and_si128(spx, mask_rb);
 			__m128i src_g8 = _mm_and_si128(_mm_srli_epi32(spx, 8), mask_byte);
 			__m128i dst_rb = _mm_and_si128(dst, mask_rb);
 			__m128i dst_g8 = _mm_and_si128(_mm_srli_epi32(dst, 8), mask_byte);
-			__m128i rb = _mm_add_epi32(_mm_add_epi32(_mm_mullo_epi16(src_rb, a16), _mm_mullo_epi16(dst_rb, ia16)), round_rb);
-			rb = _mm_and_si128(_mm_srli_epi32(_mm_add_epi32(rb, _mm_and_si128(_mm_srli_epi32(rb, 8), mask_rb)), 8), mask_rb);
-			__m128i gv = _mm_add_epi32(_mm_add_epi32(_mm_mullo_epi16(src_g8, alphas), _mm_mullo_epi16(dst_g8, ia)), round_g);
-			gv = _mm_slli_epi32(_mm_and_si128(_mm_srli_epi32(_mm_add_epi32(gv, _mm_and_si128(_mm_srli_epi32(gv, 8), mask_byte)), 8), mask_byte), 8);
-			__m128i result = _mm_or_si128(_mm_or_si128(rb, gv), mask_a);
+			__m128i d_rb = _mm_add_epi32(_mm_mullo_epi16(dst_rb, ia16), round_rb);
+			d_rb = _mm_and_si128(_mm_srli_epi32(_mm_add_epi32(d_rb, _mm_and_si128(_mm_srli_epi32(d_rb, 8), mask_rb)), 8), mask_rb);
+			__m128i d_gv = _mm_add_epi32(_mm_mullo_epi16(dst_g8, ia), round_g);
+			d_gv = _mm_slli_epi32(_mm_and_si128(_mm_srli_epi32(_mm_add_epi32(d_gv, _mm_and_si128(_mm_srli_epi32(d_gv, 8), mask_byte)), 8), mask_byte), 8);
+			__m128i rb = _mm_add_epi32(src_rb, d_rb);
+			__m128i gv = _mm_add_epi32(_mm_slli_epi32(src_g8, 8), d_gv);
+			__m128i result = _mm_or_si128(_mm_and_si128(_mm_or_si128(rb, gv), _mm_set1_epi32(0x00ffffff)), mask_a);
 			__m128i full = _mm_cmpeq_epi32(alphas, val_255);
 			result = _mm_or_si128(_mm_and_si128(full, spx), _mm_andnot_si128(full, result));
 			__m128i skip = _mm_cmpeq_epi32(alphas, zero);
@@ -2445,11 +2451,13 @@ static void draw_icon(uint32_t *buf, int32_t bw, int32_t bh, struct mkgui_icon *
 			} else if(a > 0) {
 				uint32_t ia = 255 - a;
 				uint32_t d = rowp[px];
-				uint32_t rb = ((spx & 0x00ff00ff) * a + (d & 0x00ff00ff) * ia + 0x00800080);
-				rb = ((rb + ((rb >> 8) & 0x00ff00ff)) >> 8) & 0x00ff00ff;
-				uint32_t gv = ((spx & 0x0000ff00) * a + (d & 0x0000ff00) * ia + 0x00008000);
-				gv = ((gv + ((gv >> 8) & 0x0000ff00)) >> 8) & 0x0000ff00;
-				rowp[px] = 0xff000000 | rb | gv;
+				uint32_t d_rb = (d & 0x00ff00ff) * ia + 0x00800080;
+				d_rb = ((d_rb + ((d_rb >> 8) & 0x00ff00ff)) >> 8) & 0x00ff00ff;
+				uint32_t d_g = (d & 0x0000ff00) * ia + 0x00008000;
+				d_g = ((d_g + ((d_g >> 8) & 0x0000ff00)) >> 8) & 0x0000ff00;
+				uint32_t s_rb = spx & 0x00ff00ff;
+				uint32_t s_g = spx & 0x0000ff00;
+				rowp[px] = 0xff000000 | ((s_rb + d_rb) & 0x00ff00ff) | ((s_g + d_g) & 0x0000ff00);
 			}
 		}
 	}
@@ -2459,6 +2467,21 @@ static void draw_icon(uint32_t *buf, int32_t bw, int32_t bh, struct mkgui_icon *
 static void draw_icon_popup(struct mkgui_popup *p, struct mkgui_icon *icon, int32_t x, int32_t y) {
 	draw_icon(p->pixels, p->w, p->h, icon, x, y, 0, 0, p->w, p->h);
 }
+
+// ---------------------------------------------------------------------------
+// nanosvg (SVG parsing + rasterization)
+// ---------------------------------------------------------------------------
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wsign-conversion"
+#pragma GCC diagnostic ignored "-Wconversion"
+#pragma GCC diagnostic ignored "-Wmissing-prototypes"
+#define NANOSVG_ALL_COLOR_KEYWORDS
+#define NANOSVG_IMPLEMENTATION
+#include "nanosvg.h"
+#define NANOSVGRAST_IMPLEMENTATION
+#include "nanosvgrast.h"
+#pragma GCC diagnostic pop
 
 // ---------------------------------------------------------------------------
 // Widget implementations
@@ -3748,6 +3771,7 @@ MKGUI_API void mkgui_set_theme(struct mkgui_ctx *ctx, struct mkgui_theme theme) 
 	ctx->theme = theme;
 	icon_text_color = theme.text & 0x00ffffff;
 	icon_reload_all();
+	svg_rerasterize_all(ctx);
 	dirty_all(ctx);
 }
 
@@ -3759,6 +3783,7 @@ MKGUI_API void mkgui_set_scale(struct mkgui_ctx *ctx, float scale) {
 	ctx->scale = scale;
 	mkgui_recompute_metrics(ctx);
 	platform_font_set_size(ctx, (int32_t)(13.0f * scale + 0.5f));
+	svg_rerasterize_all(ctx);
 	dirty_all(ctx);
 }
 
@@ -3949,6 +3974,7 @@ MKGUI_API void mkgui_destroy(struct mkgui_ctx *ctx) {
 	platform_font_fini(ctx);
 	platform_destroy(ctx);
 	mdi_dat_free();
+	svg_cleanup();
 	if(window_registry_count == 0) {
 		text_cmd_fini();
 		layout_arena_fini();

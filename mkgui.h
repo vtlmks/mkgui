@@ -444,6 +444,8 @@ MKGUI_API const char *mkgui_get_tooltip(struct mkgui_ctx *ctx, uint32_t id);
 // ---------------------------------------------------------------------------
 
 MKGUI_API int32_t mkgui_icon_add(const char *name, const uint32_t *pixels, int32_t w, int32_t h);
+MKGUI_API int32_t mkgui_icon_load_svg(struct mkgui_ctx *ctx, const char *name, const char *path);
+MKGUI_API uint32_t mkgui_icon_load_svg_dir(struct mkgui_ctx *ctx, const char *dir_path);
 MKGUI_API void mkgui_set_icon(struct mkgui_ctx *ctx, uint32_t widget_id, const char *icon_name);
 MKGUI_API void mkgui_set_treenode_icon(struct mkgui_ctx *ctx, uint32_t widget_id, uint32_t node_id, const char *icon_name);
 MKGUI_API uint32_t mkgui_icon_browser(struct mkgui_ctx *ctx, char *out, uint32_t out_size);

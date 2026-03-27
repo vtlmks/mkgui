@@ -611,10 +611,10 @@ int main(void) {
 
 		/* Toolbar */
 		{ MKGUI_TOOLBAR,  ID_TOOLBAR,   "",                  "", ID_WINDOW,   0, 0, 0, 0, 0 },
-		{ MKGUI_BUTTON,   ID_TB_NEW,    "New",               "file-plus",    ID_TOOLBAR, 0, 0, 0, 0, 0 },
-		{ MKGUI_BUTTON,   ID_TB_SEP1,   "",                  "",             ID_TOOLBAR, 0, 0, 0, MKGUI_SEPARATOR, 0 },
-		{ MKGUI_BUTTON,   ID_TB_OPEN,   "Open",              "folder-open",  ID_TOOLBAR, 0, 0, 0, 0, 0 },
-		{ MKGUI_BUTTON,   ID_TB_SAVE,   "Save",              "content-save", ID_TOOLBAR, 0, 0, 0, 0, 0 },
+		{ MKGUI_BUTTON,   ID_TB_NEW,    "New",               "edit-copy",     ID_TOOLBAR, 0, 0, 0, 0, 0 },
+		{ MKGUI_BUTTON,   ID_TB_SEP1,   "",                  "",              ID_TOOLBAR, 0, 0, 0, MKGUI_SEPARATOR, 0 },
+		{ MKGUI_BUTTON,   ID_TB_OPEN,   "Open",              "folder-open",   ID_TOOLBAR, 0, 0, 0, 0, 0 },
+		{ MKGUI_BUTTON,   ID_TB_SAVE,   "Save",              "document-save", ID_TOOLBAR, 0, 0, 0, 0, 0 },
 
 		/* Tabs */
 		{ MKGUI_TABS,     ID_TABS,      "",                  "", ID_WINDOW,   0, 0, 0, 0, 0 },
@@ -662,7 +662,7 @@ int main(void) {
 		{ MKGUI_SPINBOX,  ID_SPINBOX1,  "",                  "", ID_COUNT_HBOX, 120, 0, MKGUI_FIXED, 0, 0 },
 
 		{ MKGUI_HBOX,     ID_BTN_HBOX,  "",                  "", ID_CTL_LVBOX, 0, 28, MKGUI_FIXED, 0, 0 },
-		{ MKGUI_BUTTON,   ID_BUTTON1,   "Apply",             "", ID_BTN_HBOX, 100, 0, MKGUI_FIXED, 0, 0 },
+		{ MKGUI_BUTTON,   ID_BUTTON1,   "Apply",             "document-save", ID_BTN_HBOX, 100, 0, MKGUI_FIXED, 0, 0 },
 		{ MKGUI_SPACER,   ID_SPACER1,   "",                  "", ID_BTN_HBOX, 0, 0, 0, 0, 1 },
 		{ MKGUI_CHECKBOX, ID_THEME_CHECK,"Light theme",      "brightness-6", ID_BTN_HBOX, 140, 0, MKGUI_FIXED, 0, 0 },
 
@@ -763,6 +763,7 @@ int main(void) {
 	}
 
 	mkgui_set_scale(ctx, 2.0f);
+	mkgui_icon_load_svg_dir(ctx, "icons");
 
 	/* Controls tab setup */
 	const char *modes[] = { "Auto", "Manual", "Custom", "Debug" };

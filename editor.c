@@ -2131,7 +2131,7 @@ static void ed_draw_widget_fallback(struct mkgui_ctx *ctx, uint32_t idx) {
 					bx += ctx->toolbar_sep_w;
 					continue;
 				}
-				int32_t icon_idx = ed_show_icons && btn->icon[0] ? toolbar_icon_resolve(btn->icon) : -1;
+				int32_t icon_idx = ed_show_icons && btn->icon[0] ? toolbar_icon_resolve_ctx(ctx, btn->icon) : -1;
 				int32_t tw = ed_show_text ? text_width(ctx, btn->label) : 0;
 				int32_t icon_iw = icon_idx >= 0 ? icons[icon_idx].w + 4 : 0;
 				int32_t content_w = icon_iw + tw;
@@ -4518,7 +4518,7 @@ int main(void) {
 										struct mdi_pack *browse_pack = is_tb_child ? &mdi_toolbar : &mdi;
 										if(mkgui_icon_browser_pack(ctx, browse_pack, icon_name, sizeof(icon_name))) {
 											if(is_tb_child) {
-												toolbar_icon_resolve(icon_name);
+												toolbar_icon_resolve_ctx(ctx, icon_name);
 											} else {
 												icon_resolve(icon_name);
 											}
