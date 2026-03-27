@@ -101,16 +101,6 @@ static void textarea_insert_char(struct mkgui_textarea_data *ta, char ch) {
 	ta->text[ta->text_len] = '\0';
 }
 
-// [=]===^=[ textarea_delete_char ]===============================[=]
-static void textarea_delete_char(struct mkgui_textarea_data *ta, uint32_t pos) {
-	if(pos >= ta->text_len) {
-		return;
-	}
-	memmove(&ta->text[pos], &ta->text[pos + 1], ta->text_len - pos - 1);
-	--ta->text_len;
-	ta->text[ta->text_len] = '\0';
-}
-
 // [=]===^=[ textarea_pos_to_line ]================================[=]
 static uint32_t textarea_pos_to_line(struct mkgui_textarea_data *ta, uint32_t pos) {
 	uint32_t line = 0;
@@ -415,8 +405,10 @@ static uint32_t handle_textarea_key(struct mkgui_ctx *ctx, struct mkgui_event *e
 			return 1;
 		}
 		if(ta->cursor > 0) {
-			--ta->cursor;
-			textarea_delete_char(ta, ta->cursor);
+			uint32_t prev = utf8_prev(ta->text, ta->cursor);
+			memmove(&ta->text[prev], &ta->text[ta->cursor], ta->text_len - ta->cursor + 1);
+			ta->text_len -= (ta->cursor - prev);
+			ta->cursor = prev;
 			textarea_clear_selection(ta);
 			dirty_all(ctx);
 			textarea_scroll_to_cursor(ctx, ctx->focus_id);
@@ -440,7 +432,9 @@ static uint32_t handle_textarea_key(struct mkgui_ctx *ctx, struct mkgui_event *e
 			return 1;
 		}
 		if(ta->cursor < ta->text_len) {
-			textarea_delete_char(ta, ta->cursor);
+			uint32_t next = utf8_next(ta->text, ta->cursor);
+			memmove(&ta->text[ta->cursor], &ta->text[next], ta->text_len - next + 1);
+			ta->text_len -= (next - ta->cursor);
 			dirty_all(ctx);
 			ev->type = MKGUI_EVENT_TEXTAREA_CHANGED;
 			ev->id = ctx->focus_id;
@@ -451,7 +445,7 @@ static uint32_t handle_textarea_key(struct mkgui_ctx *ctx, struct mkgui_event *e
 
 	if(ks == MKGUI_KEY_LEFT) {
 		if(ta->cursor > 0) {
-			--ta->cursor;
+			ta->cursor = utf8_prev(ta->text, ta->cursor);
 		}
 		if(shift) {
 			ta->sel_end = ta->cursor;
@@ -468,7 +462,7 @@ static uint32_t handle_textarea_key(struct mkgui_ctx *ctx, struct mkgui_event *e
 
 	if(ks == MKGUI_KEY_RIGHT) {
 		if(ta->cursor < ta->text_len) {
-			++ta->cursor;
+			ta->cursor = utf8_next(ta->text, ta->cursor);
 		}
 		if(shift) {
 			ta->sel_end = ta->cursor;

@@ -534,7 +534,7 @@ Double-click on an input widget selects all text. Single click positions the cur
 
 Supports Ctrl+C (copy) and Ctrl+V (paste). Newlines in pasted text are replaced with spaces. Copy is disabled when `MKGUI_PASSWORD` is set. Paste is disabled when `MKGUI_READONLY` is set.
 
-`input_clear` resets text, cursor, and selection. `input_set_readonly` / `input_get_readonly` toggle the `MKGUI_READONLY` flag at runtime. Cursor and selection positions are byte offsets into the text.
+`input_clear` resets text, cursor, and selection. `input_set_readonly` / `input_get_readonly` toggle the `MKGUI_READONLY` flag at runtime. Cursor and selection positions are byte offsets into the text. Text is stored as UTF-8. Cursor navigation (left/right, backspace, delete) is UTF-8 aware -- multi-byte characters are treated as single units. The glyph range covers Latin-1 (codepoints 32-255), supporting Western European languages.
 
 #### Numeric input
 
@@ -915,7 +915,7 @@ void mkgui_textarea_scroll_to_end(struct mkgui_ctx *ctx, uint32_t id);
 
 Supports Ctrl+C (copy) and Ctrl+V (paste). Uses the system clipboard (X11 CLIPBOARD selection / Win32 clipboard).
 
-`textarea_set_readonly` / `textarea_get_readonly` toggle the `MKGUI_READONLY` flag at runtime. Cursor position is returned as line/col (0-based). Selection start/end are byte offsets. `textarea_insert` inserts text at the cursor (replacing any selection). `textarea_append` appends to the end without moving the cursor. `textarea_scroll_to_end` scrolls to the bottom -- useful for log views.
+`textarea_set_readonly` / `textarea_get_readonly` toggle the `MKGUI_READONLY` flag at runtime. Cursor position is returned as line/col (0-based). Selection start/end are byte offsets. `textarea_insert` inserts text at the cursor (replacing any selection). `textarea_append` appends to the end without moving the cursor. `textarea_scroll_to_end` scrolls to the bottom -- useful for log views. Text is stored as UTF-8. Cursor navigation (left/right, backspace, delete) is UTF-8 aware -- multi-byte characters are treated as single units.
 
 ### Statusbar
 
