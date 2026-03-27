@@ -2230,7 +2230,9 @@ static void layout_widgets(struct mkgui_ctx *ctx) {
 			ctx->rects[i].w = ctx->win_w;
 			ctx->rects[i].h = ctx->win_h;
 			layout_node(ctx, i);
-			layout_compute_min_size(ctx, i);
+			if(ctx->dirty_full) {
+				layout_compute_min_size(ctx, i);
+			}
 		}
 	}
 }
