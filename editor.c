@@ -133,6 +133,7 @@ static struct ed_palette_entry ed_widgets[] = {
 	{ "RichList",   MKGUI_RICHLIST },
 	{ "Scrollbar",  MKGUI_SCROLLBAR },
 	{ "Slider",     MKGUI_SLIDER },
+	{ "Divider",    MKGUI_DIVIDER },
 	{ "Spacer",     MKGUI_SPACER },
 	{ "Spinbox",    MKGUI_SPINBOX },
 	{ "Spinner",    MKGUI_SPINNER },
@@ -666,6 +667,7 @@ static struct ed_help_entry ed_help[] = {
 	{ MKGUI_PROGRESS,  "Progress bar with animated shimmer. Set value/max with mkgui_progress_set(). No user interaction." },
 	{ MKGUI_RADIO,     "Radio button. Mutually exclusive within the same parent container. Clicking one unchecks siblings." },
 	{ MKGUI_SCROLLBAR, "Standalone scrollbar. Horizontal by default, set MKGUI_VERTICAL for vertical. Emits scroll events." },
+	{ MKGUI_DIVIDER,   "Visual separator line. Horizontal by default, MKGUI_VERTICAL for vertical. Draws an etched line in the parent container." },
 	{ MKGUI_SPACER,    "Invisible spacer. Use w=0 or h=0 for flex fill inside HBox/VBox. Pushes siblings to the opposite edge." },
 	{ MKGUI_SLIDER,    "Slider with draggable thumb. MKGUI_VERTICAL for vertical, MKGUI_SLIDER_MIXER for tapered volume style with meter support. Set range with mkgui_slider_setup()." },
 	{ MKGUI_SPINBOX,   "Numeric input with +/- buttons. Click text to type, use arrows or mouse wheel to step. Enter confirms." },
@@ -1287,6 +1289,7 @@ static void ed_gen_id_name(struct ed_widget *w) {
 		case MKGUI_GLVIEW:     { prefix = "ID_GLVIEW"; } break;
 		case MKGUI_CANVAS:     { prefix = "ID_CANVAS"; } break;
 		case MKGUI_SPACER:     { prefix = "ID_SPACER"; } break;
+		case MKGUI_DIVIDER:    { prefix = "ID_DIVIDER"; } break;
 		case MKGUI_IPINPUT:    { prefix = "ID_IPINPUT"; } break;
 		case MKGUI_TOGGLE:     { prefix = "ID_TOGGLE"; } break;
 		case MKGUI_COMBOBOX:   { prefix = "ID_COMBOBOX"; } break;
@@ -1505,6 +1508,11 @@ static int32_t ed_add_widget(uint32_t type, int32_t x, int32_t y) {
 		} break;
 
 		case MKGUI_SPACER: {
+			w->w = 0;
+			w->h = 0;
+		} break;
+
+		case MKGUI_DIVIDER: {
 			w->w = 0;
 			w->h = 0;
 		} break;
@@ -2350,7 +2358,8 @@ static void ed_render_canvas(struct mkgui_ctx *ctx, uint32_t id, uint32_t *pixel
 		static const uint64_t ed_real_render =
 			(1ull << MKGUI_BUTTON) | (1ull << MKGUI_LABEL) |
 			(1ull << MKGUI_CHECKBOX) | (1ull << MKGUI_RADIO) |
-			(1ull << MKGUI_GROUP) | (1ull << MKGUI_PANEL);
+			(1ull << MKGUI_GROUP) | (1ull << MKGUI_PANEL) |
+			(1ull << MKGUI_DIVIDER);
 		if(t < 64 && (ed_real_render & (1ull << t))) {
 			memcpy(&ctx->widgets[0], &ed.widgets[i], sizeof(struct mkgui_widget));
 			memcpy(&ctx->rects[0], &ed_rects[i], sizeof(struct mkgui_rect));
@@ -2370,7 +2379,7 @@ static void ed_render_canvas(struct mkgui_ctx *ctx, uint32_t id, uint32_t *pixel
 		uint32_t t = ed.widgets[i].type;
 		uint32_t st = ed.widgets[i].style;
 		uint32_t needs_outline = 0;
-		if(t == MKGUI_VBOX || t == MKGUI_HBOX || t == MKGUI_FORM || t == MKGUI_SPACER) {
+		if(t == MKGUI_VBOX || t == MKGUI_HBOX || t == MKGUI_FORM || t == MKGUI_SPACER || t == MKGUI_DIVIDER) {
 			if(!(st & MKGUI_PANEL_BORDER)) {
 				needs_outline = 1;
 			}
@@ -3318,6 +3327,7 @@ static const char *ed_type_name_upper(uint32_t type) {
 		case MKGUI_GLVIEW:     { return "MKGUI_GLVIEW"; }
 		case MKGUI_CANVAS:     { return "MKGUI_CANVAS"; }
 		case MKGUI_SPACER:     { return "MKGUI_SPACER"; }
+		case MKGUI_DIVIDER:    { return "MKGUI_DIVIDER"; }
 		case MKGUI_IPINPUT:    { return "MKGUI_IPINPUT"; }
 		case MKGUI_TOGGLE:     { return "MKGUI_TOGGLE"; }
 		case MKGUI_COMBOBOX:   { return "MKGUI_COMBOBOX"; }

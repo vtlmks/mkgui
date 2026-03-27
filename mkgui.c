@@ -1423,6 +1423,10 @@ static int32_t natural_height(struct mkgui_ctx *ctx, uint32_t widget_type) {
 			return 20;
 		}
 
+		case MKGUI_DIVIDER: {
+			return 6;
+		}
+
 		default: {
 			return 0;
 		}
@@ -1434,6 +1438,9 @@ static int32_t lc_measure_container(struct mkgui_ctx *ctx, struct layout_ctx *lc
 	struct mkgui_widget *w = lw_get(lc, idx);
 	if(w->type == MKGUI_GROUP) {
 		int32_t gtop = ctx->font_height + 4;
+		if(w->style & MKGUI_COLLAPSED) {
+			return (axis == 1) ? gtop : 0;
+		}
 		int32_t gpad = 6;
 		for(uint32_t j = lc->first_child[idx]; j < lc->widget_count; j = lc->next_sibling[j]) {
 			uint32_t ct = lw_get(lc, j)->type;
@@ -1636,6 +1643,9 @@ static void lc_layout_node(struct mkgui_ctx *ctx, struct layout_ctx *lc, uint32_
 		ph -= MKGUI_TAB_HEIGHT + 4;
 	}
 	if(w->type == MKGUI_GROUP) {
+		if(w->style & MKGUI_COLLAPSED) {
+			return;
+		}
 		int32_t gtop = ctx->font_height + 4;
 		int32_t gpad = 6;
 		px += gpad;
@@ -2119,6 +2129,11 @@ static void layout_min_size(struct mkgui_ctx *ctx, uint32_t idx, int32_t *out_w,
 
 	if(t == MKGUI_GROUP) {
 		int32_t gtop = ctx->font_height + 4;
+		if(w->style & MKGUI_COLLAPSED) {
+			*out_w = 40;
+			*out_h = gtop;
+			return;
+		}
 		int32_t gpad = 6;
 		int32_t inner_w = 0;
 		int32_t inner_h = 0;
@@ -2201,7 +2216,18 @@ static int32_t hit_test(struct mkgui_ctx *ctx, int32_t mx, int32_t my) {
 			continue;
 		}
 		struct mkgui_widget *w = &ctx->widgets[i];
-		if(w->type == MKGUI_WINDOW || w->type == MKGUI_TAB || w->type == MKGUI_GROUP || w->type == MKGUI_PANEL || w->type == MKGUI_SPINNER || w->type == MKGUI_GLVIEW || w->type == MKGUI_VBOX || w->type == MKGUI_HBOX || w->type == MKGUI_FORM) {
+		if(w->type == MKGUI_WINDOW || w->type == MKGUI_TAB || w->type == MKGUI_PANEL || w->type == MKGUI_SPINNER || w->type == MKGUI_GLVIEW || w->type == MKGUI_VBOX || w->type == MKGUI_HBOX || w->type == MKGUI_FORM || w->type == MKGUI_DIVIDER) {
+			continue;
+		}
+		if(w->type == MKGUI_GROUP) {
+			int32_t ry = ctx->rects[i].y;
+			int32_t header_h = ctx->font_height + 4;
+			if(my >= ry && my < ry + header_h) {
+				return i;
+			}
+			continue;
+		}
+		if(w->type == MKGUI_LABEL && !(w->style & MKGUI_LINK)) {
 			continue;
 		}
 		if(w->type == MKGUI_HSPLIT || w->type == MKGUI_VSPLIT) {
@@ -2461,6 +2487,7 @@ static void draw_icon_popup(struct mkgui_popup *p, struct mkgui_icon *icon, int3
 #include "mkgui_group.c"
 #include "mkgui_panel.c"
 #include "mkgui_spacer.c"
+#include "mkgui_divider.c"
 #include "mkgui_ipinput.c"
 #include "mkgui_toggle.c"
 #include "mkgui_combobox.c"
@@ -2617,6 +2644,10 @@ static void render_widget(struct mkgui_ctx *ctx, uint32_t idx) {
 
 		case MKGUI_RICHLIST: {
 			render_richlist(ctx, idx);
+		} break;
+
+		case MKGUI_DIVIDER: {
+			render_divider(ctx, idx);
 		} break;
 
 		case MKGUI_VBOX:
@@ -6091,6 +6122,20 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 						if(hw->type == MKGUI_BUTTON) {
 							ev->type = MKGUI_EVENT_CLICK;
 							ev->id = hw->id;
+							return 1;
+						}
+
+						if(hw->type == MKGUI_LABEL && (hw->style & MKGUI_LINK)) {
+							ev->type = MKGUI_EVENT_CLICK;
+							ev->id = hw->id;
+							return 1;
+						}
+
+						if(hw->type == MKGUI_GROUP) {
+							hw->style ^= MKGUI_COLLAPSED;
+							ev->type = MKGUI_EVENT_CLICK;
+							ev->id = hw->id;
+							ev->value = (hw->style & MKGUI_COLLAPSED) ? 1 : 0;
 							return 1;
 						}
 

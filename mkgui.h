@@ -118,6 +118,7 @@ enum {
 	MKGUI_GRIDVIEW,
 	MKGUI_RICHLIST,
 	MKGUI_METER,
+	MKGUI_DIVIDER,
 };
 
 // ---------------------------------------------------------------------------
@@ -161,6 +162,10 @@ enum {
 #define MKGUI_TOOLBAR_ICONS_ONLY   (1u << 13)
 #define MKGUI_TOOLBAR_TEXT_ONLY    (2u << 13)
 #define MKGUI_TOOLBAR_MODE_MASK    (3u << 13)
+#define MKGUI_LINK                 (1u << 15)
+#define MKGUI_COLLAPSED            (1u << 16)
+#define MKGUI_WRAP                 (1u << 17)
+#define MKGUI_NUMERIC              (1u << 18)
 
 // ---------------------------------------------------------------------------
 // Event types
@@ -453,6 +458,9 @@ MKGUI_API const char *mkgui_button_get_text(struct mkgui_ctx *ctx, uint32_t id);
 
 MKGUI_API void mkgui_label_set(struct mkgui_ctx *ctx, uint32_t id, const char *text);
 MKGUI_API const char *mkgui_label_get(struct mkgui_ctx *ctx, uint32_t id);
+
+MKGUI_API void mkgui_group_set_collapsed(struct mkgui_ctx *ctx, uint32_t id, uint32_t collapsed);
+MKGUI_API uint32_t mkgui_group_get_collapsed(struct mkgui_ctx *ctx, uint32_t id);
 
 // ---------------------------------------------------------------------------
 // Input

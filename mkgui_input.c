@@ -310,6 +310,14 @@ static uint32_t handle_input_key(struct mkgui_ctx *ctx, struct mkgui_event *ev, 
 		if(readonly) {
 			return 0;
 		}
+		if(w && (w->style & MKGUI_NUMERIC)) {
+			for(int32_t ci = 0; ci < len; ++ci) {
+				char ch = buf[ci];
+				if(!((ch >= '0' && ch <= '9') || ch == '.' || ch == '-' || ch == '+' || ch == 'e' || ch == 'E')) {
+					return 0;
+				}
+			}
+		}
 		if(input_has_selection(inp)) {
 			input_delete_selection(inp);
 			text_len = (uint32_t)strlen(inp->text);
