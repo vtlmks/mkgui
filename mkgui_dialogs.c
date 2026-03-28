@@ -93,54 +93,22 @@ static void dlg_render(struct mkgui_ctx *ctx, void *userdata) {
 }
 
 // [=]===^=[ dlg_icon_resolve ]=======================================[=]
-static int32_t dlg_icon_resolve(uint32_t icon_type) {
+static int32_t dlg_icon_resolve(struct mkgui_ctx *ctx, uint32_t icon_type) {
 	if(icon_type == 0 || icon_type >= sizeof(dlg_icon_defs) / sizeof(dlg_icon_defs[0])) {
 		return -1;
 	}
-
 	const char *name = dlg_icon_defs[icon_type].name;
-	uint32_t color = dlg_icon_defs[icon_type].color;
-
 	char cache_name[MKGUI_ICON_NAME_LEN];
 	snprintf(cache_name, sizeof(cache_name), "dlg:%s", name);
 	int32_t idx = icon_find_idx(cache_name);
 	if(idx >= 0) {
 		return idx;
 	}
-
-	struct mdi_pack *pack = &mdi_toolbar;
-	int32_t mi = mdi_pack_lookup(pack, name);
-	if(mi < 0) {
-		pack = &mdi;
-		mi = mdi_pack_lookup(pack, name);
+	struct mkgui_svg_source *src = svg_find_source(name);
+	if(src && svg_rasterizer) {
+		return svg_rasterize_icon(cache_name, src->svg_data, src->svg_len, ctx->dialog_icon_size, 0);
 	}
-	if(mi < 0) {
-		return -1;
-	}
-
-	if(icon_count >= MKGUI_MAX_ICONS) {
-		return -1;
-	}
-	uint32_t sz = (uint32_t)pack->icon_size;
-	uint32_t pixel_count = sz * sz;
-	if(icon_pixels_used + pixel_count > MKGUI_ICON_PIXEL_POOL) {
-		return -1;
-	}
-
-	uint32_t *dst = &icon_pixels[icon_pixels_used];
-	mdi_pack_tint(pack, mi, color, dst, sz);
-	icon_pixels_used += pixel_count;
-
-	idx = (int32_t)icon_count;
-	struct mkgui_icon *ic = &icons[icon_count++];
-	strncpy(ic->name, cache_name, MKGUI_ICON_NAME_LEN - 1);
-	ic->name[MKGUI_ICON_NAME_LEN - 1] = '\0';
-	ic->pixels = dst;
-	ic->w = (int32_t)sz;
-	ic->h = (int32_t)sz;
-	ic->custom = 0;
-
-	return idx;
+	return icon_find_idx(name);
 }
 
 // [=]===^=[ dlg_wrap_text ]==========================================[=]
@@ -302,7 +270,7 @@ MKGUI_API uint32_t mkgui_message_box(struct mkgui_ctx *ctx, const char *title, c
 	if(!message) {
 		message = "";
 	}
-	int32_t icon_idx = dlg_icon_resolve(icon_type);
+	int32_t icon_idx = dlg_icon_resolve(ctx, icon_type);
 	int32_t icon_w = 0;
 	int32_t icon_h = 0;
 	if(icon_idx >= 0) {
@@ -418,7 +386,7 @@ MKGUI_API uint32_t mkgui_input_dialog(struct mkgui_ctx *ctx, const char *title, 
 	if(!out || out_size == 0) {
 		return 0;
 	}
-	int32_t icon_idx = dlg_icon_resolve(MKGUI_DLG_ICON_QUESTION);
+	int32_t icon_idx = dlg_icon_resolve(ctx, MKGUI_DLG_ICON_QUESTION);
 	int32_t icon_w = 0;
 	int32_t icon_h = 0;
 	if(icon_idx >= 0) {

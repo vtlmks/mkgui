@@ -76,13 +76,4 @@ fi
 	rm -f mkgui.o
 ) &
 
-# Build gen_icons tool and generate icon pack
-(
-	$CC -std=c99 -O2 -Wall tools/gen_icons.c -o tools/gen_icons $(pkg-config --cflags freetype2) $(pkg-config --libs freetype2)
-) &
-
 wait
-
-
-./tools/gen_icons ext/materialdesignicons-webfont.ttf 16 mdi_icons.dat
-./tools/gen_icons ext/materialdesignicons-webfont.ttf 40 mdi_icons_toolbar.dat

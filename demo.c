@@ -40,7 +40,7 @@ enum {
 	ID_PROG_HBOX, ID_PROG_LBL, ID_PROGRESS1, ID_SPINNER1,
 	ID_METER_HBOX, ID_METER_LBL, ID_METER1,
 	ID_COUNT_HBOX, ID_LBL_COUNT, ID_SPINBOX1,
-	ID_BTN_HBOX, ID_BUTTON1, ID_SPACER1, ID_THEME_CHECK,
+	ID_BTN_HBOX, ID_BUTTON1, ID_BTN_BROWSE, ID_SPACER1, ID_THEME_CHECK,
 	ID_CTL_RVBOX,
 	ID_GRP_EXTRA, ID_EXTRA_FORM,
 	ID_LBL_POWER, ID_TOGGLE1,
@@ -405,6 +405,12 @@ static void demo_event(struct mkgui_ctx *ctx, struct mkgui_event *ev, void *user
 			} else if(ev->id == ID_BUTTON1) {
 				mkgui_statusbar_set(ctx, ID_STATUSBAR, 0, "Applied!");
 
+			} else if(ev->id == ID_BTN_BROWSE) {
+				char icon_name[64];
+				if(mkgui_icon_browser_theme(ctx, "/usr/share/icons/Papirus", 16, icon_name, sizeof(icon_name))) {
+					mkgui_statusbar_set(ctx, ID_STATUSBAR, 0, icon_name);
+				}
+
 			} else if(ev->id == ID_TB_NEW || ev->id == ID_TB_OPEN || ev->id == ID_TB_SAVE) {
 				demo_handle_file_action(ctx, ev->id);
 
@@ -663,6 +669,7 @@ int main(void) {
 
 		{ MKGUI_HBOX,     ID_BTN_HBOX,  "",                  "", ID_CTL_LVBOX, 0, 28, MKGUI_FIXED, 0, 0 },
 		{ MKGUI_BUTTON,   ID_BUTTON1,   "Apply",             "document-save", ID_BTN_HBOX, 100, 0, MKGUI_FIXED, 0, 0 },
+		{ MKGUI_BUTTON,   ID_BTN_BROWSE, "Browse Icons",     "edit-find", ID_BTN_HBOX, 120, 0, MKGUI_FIXED, 0, 0 },
 		{ MKGUI_SPACER,   ID_SPACER1,   "",                  "", ID_BTN_HBOX, 0, 0, 0, 0, 1 },
 		{ MKGUI_CHECKBOX, ID_THEME_CHECK,"Light theme",      "brightness-6", ID_BTN_HBOX, 140, 0, MKGUI_FIXED, 0, 0 },
 
@@ -756,7 +763,6 @@ int main(void) {
 	};
 
 	uint32_t widget_count = sizeof(widgets) / sizeof(widgets[0]);
-	mkgui_icons_load("mdi_icons.dat", "mdi_icons_toolbar.dat");
 	struct mkgui_ctx *ctx = mkgui_create(widgets, widget_count);
 	if(!ctx) {
 		return 1;

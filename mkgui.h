@@ -387,9 +387,6 @@ typedef void (*mkgui_event_cb)(struct mkgui_ctx *ctx, struct mkgui_event *ev, vo
 // Lifecycle
 // ---------------------------------------------------------------------------
 
-MKGUI_API void mkgui_set_icon_data(const uint8_t *icons_dat, uint32_t icons_size, const uint8_t *toolbar_dat, uint32_t toolbar_size);
-MKGUI_API void mkgui_icons_load(const char *path, const char *toolbar_path);
-MKGUI_API void mkgui_icons_search(const char *app_name);
 MKGUI_API struct mkgui_ctx *mkgui_create(struct mkgui_widget *widgets, uint32_t count);
 MKGUI_API void mkgui_destroy(struct mkgui_ctx *ctx);
 MKGUI_API struct mkgui_ctx *mkgui_create_child(struct mkgui_ctx *parent, struct mkgui_widget *widgets, uint32_t count, const char *title, int32_t w, int32_t h);
@@ -448,7 +445,7 @@ MKGUI_API int32_t mkgui_icon_load_svg(struct mkgui_ctx *ctx, const char *name, c
 MKGUI_API uint32_t mkgui_icon_load_svg_dir(struct mkgui_ctx *ctx, const char *dir_path);
 MKGUI_API void mkgui_set_icon(struct mkgui_ctx *ctx, uint32_t widget_id, const char *icon_name);
 MKGUI_API void mkgui_set_treenode_icon(struct mkgui_ctx *ctx, uint32_t widget_id, uint32_t node_id, const char *icon_name);
-MKGUI_API uint32_t mkgui_icon_browser(struct mkgui_ctx *ctx, char *out, uint32_t out_size);
+MKGUI_API uint32_t mkgui_icon_browser_theme(struct mkgui_ctx *ctx, const char *theme_dir, int32_t size, char *out, uint32_t out_size);
 
 // ---------------------------------------------------------------------------
 // Button

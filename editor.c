@@ -3653,14 +3653,10 @@ static void ed_generate_code(struct mkgui_ctx *ctx) {
 	fprintf(f, "\t};\n\n");
 
 	{
-		const char *base = strrchr(out_path, '/');
-		base = base ? base + 1 : out_path;
-		const char *dot = strrchr(base, '.');
-		int32_t namelen = dot ? (int32_t)(dot - base) : (int32_t)strlen(base);
 		fprintf(f, "\tuint32_t widget_count = sizeof(widgets) / sizeof(widgets[0]);\n");
-		fprintf(f, "\tmkgui_icons_search(\"%.*s\");\n", namelen, base);
 		fprintf(f, "\tstruct mkgui_ctx *ctx = mkgui_create(widgets, widget_count);\n");
-		fprintf(f, "\tif(!ctx) {\n\t\treturn 1;\n\t}\n\n");
+		fprintf(f, "\tif(!ctx) {\n\t\treturn 1;\n\t}\n");
+		fprintf(f, "\tmkgui_icon_load_svg_dir(ctx, \"icons\");\n\n");
 	}
 
 	for(uint32_t i = 0; i < ed.widget_count; ++i) {
@@ -4373,7 +4369,6 @@ int main(void) {
 		pw->weight = 0;
 	}
 
-	mkgui_icons_load("mdi_icons.dat", "mdi_icons_toolbar.dat");
 	struct mkgui_ctx *ctx = mkgui_create(all_widgets, total);
 	if(!ctx) {
 		return 1;
@@ -4506,17 +4501,16 @@ int main(void) {
 								switch(ed_props[pi].action) {
 									case ED_ACT_ICON_BROWSE: {
 										char icon_name[64];
-										uint32_t is_tb_child = 0;
-										if(ed.selected >= 0) {
-											for(uint32_t wi = 0; wi < ed.widget_count; ++wi) {
-												if(ed.widgets[wi].id == ed.widgets[ed.selected].parent_id && ed.widgets[wi].type == MKGUI_TOOLBAR) {
-													is_tb_child = 1;
-													break;
+										if(mkgui_icon_browser_theme(ctx, "/usr/share/icons/Papirus", 16, icon_name, sizeof(icon_name))) {
+											uint32_t is_tb_child = 0;
+											if(ed.selected >= 0) {
+												for(uint32_t wi = 0; wi < ed.widget_count; ++wi) {
+													if(ed.widgets[wi].id == ed.widgets[ed.selected].parent_id && ed.widgets[wi].type == MKGUI_TOOLBAR) {
+														is_tb_child = 1;
+														break;
+													}
 												}
 											}
-										}
-										struct mdi_pack *browse_pack = is_tb_child ? &mdi_toolbar : &mdi;
-										if(mkgui_icon_browser_pack(ctx, browse_pack, icon_name, sizeof(icon_name))) {
 											if(is_tb_child) {
 												toolbar_icon_resolve_ctx(ctx, icon_name);
 											} else {

@@ -17,6 +17,7 @@
 #include <time.h>
 #include <math.h>
 #include <dirent.h>
+#include <sys/stat.h>
 
 #if defined(__SSE2__)
 #include <emmintrin.h>
@@ -50,8 +51,6 @@
 #define MKGUI_GLYPH_LAST      255
 #define MKGUI_GLYPH_COUNT     (MKGUI_GLYPH_LAST - MKGUI_GLYPH_FIRST + 1)
 #define MKGUI_GLYPH_MAX_BMP   4096
-#define MKGUI_ICON_PIXELS     (MKGUI_ICON_SIZE * MKGUI_ICON_SIZE)
-#define MKGUI_ICON_PIXEL_POOL (MKGUI_ICON_PIXELS * MKGUI_MAX_ICONS)
 
 // ---------------------------------------------------------------------------
 // Platform event types
@@ -463,12 +462,8 @@ struct mkgui_icon {
 	uint32_t custom;
 };
 
-static uint32_t icon_pixels[MKGUI_ICON_PIXEL_POOL];
-static uint32_t icon_pixels_used;
 static struct mkgui_icon icons[MKGUI_MAX_ICONS];
 static uint32_t icon_count;
-
-static uint32_t icon_text_color;
 
 #define MKGUI_ICON_HASH_SIZE 16384
 #define MKGUI_ICON_HASH_MASK (MKGUI_ICON_HASH_SIZE - 1)
@@ -515,21 +510,6 @@ static int32_t icon_hash_lookup(const char *name) {
 		h = (h + 1) & MKGUI_ICON_HASH_MASK;
 	}
 }
-
-struct mdi_pack {
-	uint8_t *dat;
-	uint32_t dat_size;
-	uint32_t dat_owned;
-	uint16_t icon_size;
-	uint16_t icon_count;
-	const char *name_block;
-	const uint32_t *name_offsets;
-	const uint8_t *pixel_data;
-};
-
-static struct mdi_pack mdi;
-static struct mdi_pack mdi_toolbar;
-
 
 struct mkgui_rect {
 	int32_t x, y, w, h;
@@ -1594,8 +1574,8 @@ static void lc_layout_node(struct mkgui_ctx *ctx, struct layout_ctx *lc, uint32_
 							break;
 						}
 					}
-					if(tb_has_icons && mdi_toolbar.icon_size > 0) {
-						int32_t ih = (int32_t)mdi_toolbar.icon_size;
+					if(tb_has_icons && ctx->toolbar_icon_size > 0) {
+						int32_t ih = ctx->toolbar_icon_size;
 						th = (tb_mode == MKGUI_TOOLBAR_ICONS_ONLY) ? ih + 10 : ((ih > ctx->font_height ? ih : ctx->font_height) + 10);
 					} else {
 						th = ctx->font_height + 10;
@@ -3746,7 +3726,6 @@ MKGUI_API struct mkgui_ctx *mkgui_create(struct mkgui_widget *widgets, uint32_t 
 
 	platform_font_init(ctx);
 	ctx->theme = default_theme();
-	icon_text_color = ctx->theme.text & 0x00ffffff;
 	mkgui_icon_init();
 	icon_load_from_widgets(ctx);
 	dirty_all(ctx);
@@ -3769,8 +3748,6 @@ MKGUI_API struct mkgui_ctx *mkgui_create(struct mkgui_widget *widgets, uint32_t 
 MKGUI_API void mkgui_set_theme(struct mkgui_ctx *ctx, struct mkgui_theme theme) {
 	MKGUI_CHECK(ctx);
 	ctx->theme = theme;
-	icon_text_color = theme.text & 0x00ffffff;
-	icon_reload_all();
 	svg_rerasterize_all(ctx);
 	dirty_all(ctx);
 }
@@ -3973,7 +3950,6 @@ MKGUI_API void mkgui_destroy(struct mkgui_ctx *ctx) {
 	mkgui_free_arrays(ctx);
 	platform_font_fini(ctx);
 	platform_destroy(ctx);
-	mdi_dat_free();
 	svg_cleanup();
 	if(window_registry_count == 0) {
 		text_cmd_fini();
