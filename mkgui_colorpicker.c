@@ -436,7 +436,7 @@ MKGUI_API uint32_t mkgui_color_dialog(struct mkgui_ctx *ctx, uint32_t initial_co
 
 				case MKGUI_EVENT_INPUT_SUBMIT: {
 					if(ev.id == CP_HEX_INPUT) {
-						const char *hex = mkgui_input_get(dlg, CP_HEX_INPUT);
+						char *hex = mkgui_input_get(dlg, CP_HEX_INPUT);
 						uint32_t hv = 0;
 						if(hex && sscanf(hex, "%x", &hv) == 1) {
 							cp_rgb_to_hsv(hv & 0xffffff, &cp_state.h, &cp_state.s, &cp_state.v);

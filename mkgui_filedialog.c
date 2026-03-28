@@ -93,7 +93,7 @@ struct fd_state {
 	int32_t sort_col;
 	int32_t sort_dir;
 
-	const struct mkgui_file_filter *filters;
+	struct mkgui_file_filter *filters;
 	uint32_t filter_count;
 	uint32_t active_filter;
 
@@ -112,7 +112,7 @@ static uint32_t fd_result_count;
 // ---------------------------------------------------------------------------
 
 // [=]===^=[ fd_strcasecmp ]======================================[=]
-static int32_t fd_strcasecmp(const char *a, const char *b) {
+static int32_t fd_strcasecmp(char *a, char *b) {
 	while(*a && *b) {
 		int32_t ca = (*a >= 'A' && *a <= 'Z') ? *a + 32 : *a;
 		int32_t cb = (*b >= 'A' && *b <= 'Z') ? *b + 32 : *b;
@@ -126,7 +126,7 @@ static int32_t fd_strcasecmp(const char *a, const char *b) {
 }
 
 // [=]===^=[ fd_url_decode ]======================================[=]
-static void fd_url_decode(char *dst, const char *src, uint32_t dst_size) {
+static void fd_url_decode(char *dst, char *src, uint32_t dst_size) {
 	uint32_t di = 0;
 	while(*src && di < dst_size - 1) {
 		if(*src == '%' && src[1] && src[2]) {
@@ -141,11 +141,11 @@ static void fd_url_decode(char *dst, const char *src, uint32_t dst_size) {
 }
 
 // [=]===^=[ fd_icon_for_name ]====================================[=]
-static const char *fd_icon_for_name(const char *name, uint32_t is_dir) {
+static char *fd_icon_for_name(char *name, uint32_t is_dir) {
 	if(is_dir) {
 		return "folder";
 	}
-	const char *dot = strrchr(name, '.');
+	char *dot = strrchr(name, '.');
 	if(!dot) {
 		return "text-x-generic";
 	}
@@ -171,7 +171,7 @@ static const char *fd_icon_for_name(const char *name, uint32_t is_dir) {
 }
 
 // [=]===^=[ fd_path_exists ]======================================[=]
-static uint32_t fd_path_exists(const char *path) {
+static uint32_t fd_path_exists(char *path) {
 #ifdef _WIN32
 	return GetFileAttributesA(path) != INVALID_FILE_ATTRIBUTES;
 #else
@@ -180,15 +180,15 @@ static uint32_t fd_path_exists(const char *path) {
 }
 
 // [=]===^=[ fd_get_home ]=========================================[=]
-static const char *fd_get_home(void) {
+static char *fd_get_home(void) {
 #ifdef _WIN32
-	const char *h = getenv("USERPROFILE");
+	char *h = getenv("USERPROFILE");
 	if(h) {
 		return h;
 	}
 	return "C:\\";
 #else
-	const char *h = getenv("HOME");
+	char *h = getenv("HOME");
 	if(h) {
 		return h;
 	}
@@ -201,7 +201,7 @@ static const char *fd_get_home(void) {
 // ---------------------------------------------------------------------------
 
 // [=]===^=[ fd_match_pattern ]====================================[=]
-static uint32_t fd_match_pattern(const char *name, const char *pattern) {
+static uint32_t fd_match_pattern(char *name, char *pattern) {
 	if(!pattern || pattern[0] == '\0' || strcmp(pattern, "*") == 0 || strcmp(pattern, "*.*") == 0) {
 		return 1;
 	}
@@ -227,8 +227,8 @@ static uint32_t fd_match_pattern(const char *name, const char *pattern) {
 
 		char *pat = tok;
 		if(pat[0] == '*' && pat[1] == '.') {
-			const char *ext = pat + 1;
-			const char *dot = strrchr(name, '.');
+			char *ext = pat + 1;
+			char *dot = strrchr(name, '.');
 			if(dot && fd_strcasecmp(dot, ext) == 0) {
 				return 1;
 			}
@@ -248,8 +248,8 @@ static uint32_t fd_match_pattern(const char *name, const char *pattern) {
 
 // [=]===^=[ fd_compare_entries ]=================================[=]
 static int fd_compare_entries(const void *a, const void *b) {
-	const struct fd_entry *ea = (const struct fd_entry *)a;
-	const struct fd_entry *eb = (const struct fd_entry *)b;
+	struct fd_entry *ea = (struct fd_entry *)a;
+	struct fd_entry *eb = (struct fd_entry *)b;
 	if(strcmp(ea->name, "..") == 0) {
 		return -1;
 	}
@@ -301,7 +301,7 @@ static int fd_compare_entries(const void *a, const void *b) {
 static void fd_scan_dir(void) {
 	fd.entry_count = 0;
 
-	const char *filter_pat = NULL;
+	char *filter_pat = NULL;
 	if(fd.filters && fd.active_filter < fd.filter_count) {
 		filter_pat = fd.filters[fd.active_filter].pattern;
 	}
@@ -416,7 +416,7 @@ static void fd_scan_dir(void) {
 // ---------------------------------------------------------------------------
 
 // [=]===^=[ fd_add_bookmark ]====================================[=]
-static void fd_add_bookmark(const char *label, const char *path) {
+static void fd_add_bookmark(char *label, char *path) {
 	if(fd.bookmark_count >= FD_MAX_BOOKMARKS) {
 		return;
 	}
@@ -429,7 +429,7 @@ static void fd_add_bookmark(const char *label, const char *path) {
 static void fd_load_bookmarks(void) {
 	fd.bookmark_count = 0;
 
-	const char *home = fd_get_home();
+	char *home = fd_get_home();
 	fd_add_bookmark("Home", home);
 
 	char buf[FD_PATH_SIZE];
@@ -528,7 +528,7 @@ static void fd_load_bookmarks(void) {
 				continue;
 			}
 
-			const char *label = strrchr(mp, '/');
+			char *label = strrchr(mp, '/');
 			label = label ? label + 1 : mp;
 			fd_add_bookmark(label, mp);
 		}
@@ -542,7 +542,7 @@ static void fd_load_bookmarks(void) {
 // ---------------------------------------------------------------------------
 
 // [=]===^=[ fd_history_push ]=====================================[=]
-static void fd_history_push(const char *path) {
+static void fd_history_push(char *path) {
 	if(fd.history_count > 0 && fd.history_pos > 0 && strcmp(fd.history[fd.history_pos - 1], path) == 0) {
 		return;
 	}
@@ -579,7 +579,7 @@ static uint32_t fd_history_can_fwd(void) {
 // ---------------------------------------------------------------------------
 
 // [=]===^=[ fd_strcasestr ]=======================================[=]
-static uint32_t fd_strcasestr(const char *haystack, const char *needle, uint32_t needle_len) {
+static uint32_t fd_strcasestr(char *haystack, char *needle, uint32_t needle_len) {
 	if(needle_len == 0) {
 		return 1;
 	}
@@ -662,7 +662,7 @@ static void fd_clear_filter(struct mkgui_ctx *dlg) {
 // ---------------------------------------------------------------------------
 
 // [=]===^=[ fd_navigate ]========================================[=]
-static void fd_navigate(struct mkgui_ctx *dlg, const char *newpath) {
+static void fd_navigate(struct mkgui_ctx *dlg, char *newpath) {
 #ifdef _WIN32
 	DWORD attr = GetFileAttributesA(newpath);
 	if(attr == INVALID_FILE_ATTRIBUTES || !(attr & FILE_ATTRIBUTE_DIRECTORY)) {
@@ -771,7 +771,7 @@ static void fd_navigate_back(struct mkgui_ctx *dlg) {
 		return;
 	}
 	--fd.history_pos;
-	const char *target = fd.history[fd.history_pos - 1];
+	char *target = fd.history[fd.history_pos - 1];
 	snprintf(fd.path, sizeof(fd.path), "%s", target);
 	fd_scan_dir();
 	mkgui_pathbar_set(dlg, FD_ID_PATHBAR, fd.path);
@@ -785,7 +785,7 @@ static void fd_navigate_fwd(struct mkgui_ctx *dlg) {
 	if(!fd_history_can_fwd()) {
 		return;
 	}
-	const char *target = fd.history[fd.history_pos];
+	char *target = fd.history[fd.history_pos];
 	++fd.history_pos;
 	snprintf(fd.path, sizeof(fd.path), "%s", target);
 	fd_scan_dir();
@@ -807,7 +807,7 @@ static void fd_append_filter_ext(char *name, uint32_t name_size) {
 	if(strchr(name, '.')) {
 		return;
 	}
-	const char *pat = fd.filters[fd.active_filter].pattern;
+	char *pat = fd.filters[fd.active_filter].pattern;
 	if(!pat) {
 		return;
 	}
@@ -817,7 +817,7 @@ static void fd_append_filter_ext(char *name, uint32_t name_size) {
 	}
 	if(pat[0] == '*' && pat[1] == '.') {
 		uint32_t nlen = (uint32_t)strlen(name);
-		const char *ext = pat + 1;
+		char *ext = pat + 1;
 		uint32_t elen = 0;
 		while(ext[elen] && ext[elen] != ';' && ext[elen] != ' ') {
 			++elen;
@@ -846,7 +846,7 @@ static void fd_build_results(struct mkgui_ctx *dlg) {
 	fd_result_count = 0;
 
 	if(fd.mode == 1) {
-		const char *name = mkgui_input_get(dlg, FD_ID_NAME_INPUT);
+		char *name = mkgui_input_get(dlg, FD_ID_NAME_INPUT);
 		if(name && name[0] != '\0') {
 			char fname[260];
 			snprintf(fname, sizeof(fname), "%s", name);
@@ -901,7 +901,7 @@ static uint32_t fd_confirm(struct mkgui_ctx *dlg) {
 	}
 
 	if(fd.mode == 1 && fd_path_exists(fd_results[0])) {
-		const char *fname = strrchr(fd_results[0], '/');
+		char *fname = strrchr(fd_results[0], '/');
 		if(!fname) {
 			fname = fd_results[0];
 		} else {
@@ -927,7 +927,7 @@ static void fd_bookmark_row_cb(uint32_t row, uint32_t col, char *buf, uint32_t b
 	(void)userdata;
 	(void)col;
 	if(row < fd.bookmark_count) {
-		const char *icon = "folder";
+		char *icon = "folder";
 		if(strcmp(fd.bookmarks[row].label, "Home") == 0) {
 			icon = "user-home";
 		} else if(strcmp(fd.bookmarks[row].label, "Desktop") == 0) {
@@ -1056,7 +1056,7 @@ static void fd_new_folder(struct mkgui_ctx *dlg) {
 // ---------------------------------------------------------------------------
 
 // [=]===^=[ fd_run_dialog ]=======================================[=]
-static uint32_t fd_run_dialog(struct mkgui_ctx *ctx, uint32_t mode, const struct mkgui_file_dialog_opts *opts) {
+static uint32_t fd_run_dialog(struct mkgui_ctx *ctx, uint32_t mode, struct mkgui_file_dialog_opts *opts) {
 	memset(&fd, 0, sizeof(fd));
 	fd.mode = mode;
 	fd.sort_col = 0;
@@ -1080,8 +1080,8 @@ static uint32_t fd_run_dialog(struct mkgui_ctx *ctx, uint32_t mode, const struct
 	popup_destroy_all(ctx);
 
 	uint32_t multi = (mode == 0 && opts && opts->multi_select) ? MKGUI_MULTI_SELECT : 0;
-	const char *confirm_label = (mode == 0) ? "Open" : "Save";
-	const char *title = (mode == 0) ? "Open File" : "Save File";
+	char *confirm_label = (mode == 0) ? "Open" : "Save";
+	char *title = (mode == 0) ? "Open File" : "Save File";
 
 	uint32_t has_filters = (fd.filter_count > 0) ? 0 : MKGUI_HIDDEN;
 
@@ -1157,7 +1157,7 @@ static uint32_t fd_run_dialog(struct mkgui_ctx *ctx, uint32_t mode, const struct
 	}
 
 	if(fd.filter_count > 0) {
-		const char *filter_labels[FD_MAX_FILTERS];
+		char *filter_labels[FD_MAX_FILTERS];
 		uint32_t fc = fd.filter_count < FD_MAX_FILTERS ? fd.filter_count : FD_MAX_FILTERS;
 		for(uint32_t i = 0; i < fc; ++i) {
 			filter_labels[i] = fd.filters[i].label;
@@ -1230,7 +1230,7 @@ static uint32_t fd_run_dialog(struct mkgui_ctx *ctx, uint32_t mode, const struct
 
 				case MKGUI_EVENT_PATHBAR_SUBMIT: {
 					if(ev.id == FD_ID_PATHBAR) {
-						const char *new_path = mkgui_pathbar_get(dlg, FD_ID_PATHBAR);
+						char *new_path = mkgui_pathbar_get(dlg, FD_ID_PATHBAR);
 						fd_navigate(dlg, new_path);
 					}
 				} break;
@@ -1369,19 +1369,19 @@ static uint32_t fd_run_dialog(struct mkgui_ctx *ctx, uint32_t mode, const struct
 // ---------------------------------------------------------------------------
 
 // [=]===^=[ mkgui_open_dialog ]==================================[=]
-MKGUI_API uint32_t mkgui_open_dialog(struct mkgui_ctx *ctx, const struct mkgui_file_dialog_opts *opts) {
+MKGUI_API uint32_t mkgui_open_dialog(struct mkgui_ctx *ctx, struct mkgui_file_dialog_opts *opts) {
 	MKGUI_CHECK_VAL(ctx, 0);
 	return fd_run_dialog(ctx, 0, opts);
 }
 
 // [=]===^=[ mkgui_save_dialog ]==================================[=]
-MKGUI_API uint32_t mkgui_save_dialog(struct mkgui_ctx *ctx, const struct mkgui_file_dialog_opts *opts) {
+MKGUI_API uint32_t mkgui_save_dialog(struct mkgui_ctx *ctx, struct mkgui_file_dialog_opts *opts) {
 	MKGUI_CHECK_VAL(ctx, 0);
 	return fd_run_dialog(ctx, 1, opts);
 }
 
 // [=]===^=[ mkgui_dialog_path ]==================================[=]
-MKGUI_API const char *mkgui_dialog_path(struct mkgui_ctx *ctx, uint32_t index) {
+MKGUI_API char *mkgui_dialog_path(struct mkgui_ctx *ctx, uint32_t index) {
 	MKGUI_CHECK_VAL(ctx, "");
 	(void)ctx;
 	if(index >= fd_result_count) {

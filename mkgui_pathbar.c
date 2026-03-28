@@ -138,7 +138,7 @@ static void render_pathbar(struct mkgui_ctx *ctx, uint32_t idx) {
 	draw_patch(ctx, MKGUI_STYLE_SUNKEN, rx, ry, rw, rh, ctx->theme.input_bg, focused ? ctx->theme.splitter : ctx->theme.widget_border);
 
 	if(pb->editing) {
-		const char *display = pb->edit_buf;
+		char *display = pb->edit_buf;
 		int32_t ty = ry + (rh - ctx->font_height) / 2;
 		uint32_t tc = ctx->theme.text;
 
@@ -287,7 +287,7 @@ static uint32_t handle_pathbar_click(struct mkgui_ctx *ctx, struct mkgui_event *
 }
 
 // [=]===^=[ handle_pathbar_key ]===================================[=]
-static uint32_t handle_pathbar_key(struct mkgui_ctx *ctx, struct mkgui_event *ev, uint32_t ks, uint32_t keymod, const char *buf, int32_t len) {
+static uint32_t handle_pathbar_key(struct mkgui_ctx *ctx, struct mkgui_event *ev, uint32_t ks, uint32_t keymod, char *buf, int32_t len) {
 	struct mkgui_pathbar_data *pb = find_pathbar_data(ctx, ctx->focus_id);
 	if(!pb) {
 		return 0;
@@ -443,7 +443,7 @@ static void pathbar_focus_lost(struct mkgui_ctx *ctx) {
 }
 
 // [=]===^=[ mkgui_pathbar_set ]=====================================[=]
-MKGUI_API void mkgui_pathbar_set(struct mkgui_ctx *ctx, uint32_t id, const char *path) {
+MKGUI_API void mkgui_pathbar_set(struct mkgui_ctx *ctx, uint32_t id, char *path) {
 	MKGUI_CHECK(ctx);
 	if(!path) {
 		path = "";
@@ -461,7 +461,7 @@ MKGUI_API void mkgui_pathbar_set(struct mkgui_ctx *ctx, uint32_t id, const char 
 }
 
 // [=]===^=[ mkgui_pathbar_get ]=====================================[=]
-MKGUI_API const char *mkgui_pathbar_get(struct mkgui_ctx *ctx, uint32_t id) {
+MKGUI_API char *mkgui_pathbar_get(struct mkgui_ctx *ctx, uint32_t id) {
 	MKGUI_CHECK_VAL(ctx, "");
 	struct mkgui_pathbar_data *pb = find_pathbar_data(ctx, id);
 	if(!pb) {

@@ -376,7 +376,7 @@ static void draw_patch(struct mkgui_ctx *ctx, uint32_t style, int32_t x, int32_t
 // ---------------------------------------------------------------------------
 
 // [=]===^=[ utf8_decode ]========================================[=]
-static uint32_t utf8_decode(const char *p, uint32_t *out_cp) {
+static uint32_t utf8_decode(char *p, uint32_t *out_cp) {
 	uint8_t b = (uint8_t)p[0];
 	if(b < 0x80) {
 		*out_cp = b;
@@ -399,9 +399,9 @@ static uint32_t utf8_decode(const char *p, uint32_t *out_cp) {
 }
 
 // [=]===^=[ draw_text_sw ]=======================================[=]
-static void draw_text_sw(struct mkgui_ctx *ctx, uint32_t *buf, int32_t bw, int32_t x, int32_t y, const char *text, uint32_t color, int32_t cx1, int32_t cy1, int32_t cx2, int32_t cy2) {
+static void draw_text_sw(struct mkgui_ctx *ctx, uint32_t *buf, int32_t bw, int32_t x, int32_t y, char *text, uint32_t color, int32_t cx1, int32_t cy1, int32_t cx2, int32_t cy2) {
 	int32_t cx = x;
-	for(const char *p = text; *p; ) {
+	for(char *p = text; *p; ) {
 		uint32_t ch;
 		uint32_t bytes = utf8_decode(p, &ch);
 		p += bytes;
@@ -532,7 +532,7 @@ static void text_cmd_fini(void) {
 }
 
 // [=]===^=[ push_text_clip ]=====================================[=]
-static void push_text_clip(int32_t x, int32_t y, const char *text, uint32_t color, int32_t cx1, int32_t cy1, int32_t cx2, int32_t cy2) {
+static void push_text_clip(int32_t x, int32_t y, char *text, uint32_t color, int32_t cx1, int32_t cy1, int32_t cx2, int32_t cy2) {
 	if(text_cmd_count >= MKGUI_VM_MAX_TEXT_CMDS) {
 		return;
 	}
@@ -568,7 +568,7 @@ static void push_text_clip(int32_t x, int32_t y, const char *text, uint32_t colo
 }
 
 // [=]===^=[ push_text ]=========================================[=]
-static void push_text(int32_t x, int32_t y, const char *text, uint32_t color) {
+static void push_text(int32_t x, int32_t y, char *text, uint32_t color) {
 	push_text_clip(x, y, text, color, render_clip_x1, render_clip_y1, render_clip_x2, render_clip_y2);
 }
 
@@ -614,9 +614,9 @@ static void flush_text_popup(struct mkgui_ctx *ctx, struct mkgui_popup *p) {
 }
 
 // [=]===^=[ text_width ]========================================[=]
-static int32_t text_width(struct mkgui_ctx *ctx, const char *text) {
+static int32_t text_width(struct mkgui_ctx *ctx, char *text) {
 	int32_t w = 0;
-	for(const char *p = text; *p; ) {
+	for(char *p = text; *p; ) {
 		uint32_t ch;
 		uint32_t bytes = utf8_decode(p, &ch);
 		p += bytes;
@@ -630,7 +630,7 @@ static int32_t text_width(struct mkgui_ctx *ctx, const char *text) {
 }
 
 // [=]===^=[ text_truncate ]=====================================[=]
-static const char *text_truncate(struct mkgui_ctx *ctx, const char *text, int32_t max_w) {
+static char *text_truncate(struct mkgui_ctx *ctx, char *text, int32_t max_w) {
 	static char buf[MKGUI_MAX_TEXT];
 	int32_t tw = text_width(ctx, text);
 	if(tw <= max_w) {
@@ -647,7 +647,7 @@ static const char *text_truncate(struct mkgui_ctx *ctx, const char *text, int32_
 	}
 	int32_t w = 0;
 	uint32_t n = 0;
-	for(const char *p = text; *p && n < MKGUI_MAX_TEXT - 4; ) {
+	for(char *p = text; *p && n < MKGUI_MAX_TEXT - 4; ) {
 		uint32_t ch;
 		uint32_t bytes = utf8_decode(p, &ch);
 		int32_t adv;

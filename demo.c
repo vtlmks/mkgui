@@ -93,13 +93,13 @@ enum {
 #define DEMO_GRID_ROWS 8
 static uint32_t demo_grid_order[DEMO_GRID_ROWS];
 
-static const char *demo_richlist_titles[] = {
+static char *demo_richlist_titles[] = {
 	"Bohemian Rhapsody", "Hotel California", "Stairway to Heaven",
 	"Imagine", "Smells Like Teen Spirit", "Hey Jude",
 	"Like a Rolling Stone", "Yesterday", "Purple Haze",
 	"Billie Jean", "Comfortably Numb", "Sweet Child O' Mine",
 };
-static const char *demo_richlist_artists[] = {
+static char *demo_richlist_artists[] = {
 	"Queen", "Eagles", "Led Zeppelin",
 	"John Lennon", "Nirvana", "The Beatles",
 	"Bob Dylan", "The Beatles", "Jimi Hendrix",
@@ -158,7 +158,7 @@ static void demo_row_cb(uint32_t row, uint32_t col, char *buf, uint32_t buf_size
 	}
 }
 
-static const char *demo_file_names[] = {
+static char *demo_file_names[] = {
 	"README.md", "Makefile", "main.c", "util.h", "render.cpp",
 	"build.sh", "style.css", "index.html", "app.js", "config.json",
 	"data.xml", "report.pdf", "photo.jpg", "logo.png", "banner.gif",
@@ -183,9 +183,9 @@ static void demo_itemview_label(uint32_t item, char *buf, uint32_t buf_size, voi
 // [=]===^=[ demo_itemview_icon ]==================================[=]
 static void demo_itemview_icon(uint32_t item, char *buf, uint32_t buf_size, void *userdata) {
 	(void)userdata;
-	const char *name = item < DEMO_FILE_COUNT ? demo_file_names[item] : "file.dat";
-	const char *dot = strrchr(name, '.');
-	const char *icon = "file-document-outline";
+	char *name = item < DEMO_FILE_COUNT ? demo_file_names[item] : "file.dat";
+	char *dot = strrchr(name, '.');
+	char *icon = "file-document-outline";
 	if(strcmp(name, "Makefile") == 0 || strcmp(name, "Dockerfile") == 0) {
 		icon = "file-cog";
 	} else if(dot) {
@@ -772,10 +772,10 @@ int main(void) {
 	mkgui_icon_load_svg_dir(ctx, "icons");
 
 	/* Controls tab setup */
-	const char *modes[] = { "Auto", "Manual", "Custom", "Debug" };
+	char *modes[] = { "Auto", "Manual", "Custom", "Debug" };
 	mkgui_dropdown_setup(ctx, ID_DROPDOWN1, modes, 4);
 
-	const char *search_items[] = { "Apple", "Banana", "Cherry", "Date", "Elderberry", "Fig", "Grape", "Honeydew" };
+	char *search_items[] = { "Apple", "Banana", "Cherry", "Date", "Elderberry", "Fig", "Grape", "Honeydew" };
 	mkgui_combobox_setup(ctx, ID_COMBOBOX1, search_items, 8);
 
 	mkgui_slider_setup(ctx, ID_SLIDER1, 0, 100, 50);
@@ -791,7 +791,7 @@ int main(void) {
 	mkgui_datepicker_set(ctx, ID_DATEPICKER1, today_y, today_m, today_d);
 	mkgui_ipinput_set(ctx, ID_IPINPUT1, "192.168.1.100");
 
-	const char *tb_modes[] = { "Icons + Text", "Icons Only", "Text Only" };
+	char *tb_modes[] = { "Icons + Text", "Icons Only", "Text Only" };
 	mkgui_dropdown_setup(ctx, ID_TBMODE_DROP, tb_modes, 3);
 
 	/* Statusbar setup */
@@ -859,7 +859,7 @@ int main(void) {
 	mkgui_textarea_set(ctx, ID_TEXTAREA1, "Type your notes here.\nLine 2.\nLine 3.");
 
 	/* Layout tab setup */
-	const char *form_cats[] = { "General", "Support", "Sales", "Billing" };
+	char *form_cats[] = { "General", "Support", "Sales", "Billing" };
 	mkgui_dropdown_setup(ctx, ID_FORM_DRP1, form_cats, 4);
 
 	/* Media tab setup */

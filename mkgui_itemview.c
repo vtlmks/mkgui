@@ -199,7 +199,7 @@ static void render_itemview_icon(struct mkgui_ctx *ctx, uint32_t idx, struct mkg
 				int32_t cell_cx2 = cx + cw - cell_pad < clip_x2 ? cx + cw - cell_pad : clip_x2;
 				uint32_t tc = (item == iv->selected) ? ctx->theme.sel_text : ((ctx->widgets[idx].flags & MKGUI_DISABLED) ? ctx->theme.text_disabled : ctx->theme.text);
 				int32_t ty = cy + ic_h + label_gap;
-				const char *p = label;
+				char *p = label;
 				for(uint32_t line = 0; line < MKGUI_ITEMVIEW_ICON_LINES && *p; ++line) {
 					int32_t w = 0;
 					int32_t brk = 0;

@@ -21,7 +21,7 @@ enum {
 	IB_TH_TAB_FIRST,
 };
 
-static const char *ib_theme_cat_names[] = {
+static char *ib_theme_cat_names[] = {
 	"actions", "places", "status", "devices", "mimetypes",
 	"emblems", "panel", "emotes", NULL
 };
@@ -50,7 +50,7 @@ static struct ib_theme_state ibt;
 // [=]===^=[ ibt_scan_category ]======================================[=]
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wformat-truncation"
-static void ibt_scan_category(const char *theme_dir, int32_t size, const char *category, uint32_t cat_idx) {
+static void ibt_scan_category(char *theme_dir, int32_t size, char *category, uint32_t cat_idx) {
 	char dir_path[2048];
 	snprintf(dir_path, sizeof(dir_path), "%s/%dx%d/%s", theme_dir, size, size, category);
 
@@ -65,7 +65,7 @@ static void ibt_scan_category(const char *theme_dir, int32_t size, const char *c
 
 	struct dirent *ent;
 	while((ent = readdir(d)) != NULL && ibt.total_count < IB_THEME_MAX_ICONS) {
-		const char *fname = ent->d_name;
+		char *fname = ent->d_name;
 		uint32_t len = (uint32_t)strlen(fname);
 		if(len < 5 || strcmp(fname + len - 4, ".svg") != 0) {
 			continue;
@@ -99,8 +99,8 @@ static void ibt_scan_category(const char *theme_dir, int32_t size, const char *c
 
 // [=]===^=[ ibt_sort_compare ]=======================================[=]
 static int ibt_sort_compare(const void *a, const void *b) {
-	uint32_t ia = *(const uint32_t *)a;
-	uint32_t ib = *(const uint32_t *)b;
+	uint32_t ia = *(uint32_t *)a;
+	uint32_t ib = *(uint32_t *)b;
 	return strcmp(ibt.names[ia], ibt.names[ib]);
 }
 
@@ -142,7 +142,7 @@ static void ibt_sort(void) {
 }
 
 // [=]===^=[ ibt_filter ]=============================================[=]
-static void ibt_filter(const char *search) {
+static void ibt_filter(char *search) {
 	ibt.filtered_count = 0;
 	uint32_t search_len = search ? (uint32_t)strlen(search) : 0;
 
@@ -151,7 +151,7 @@ static void ibt_filter(const char *search) {
 			continue;
 		}
 		if(search_len > 0) {
-			const char *p = ibt.names[i];
+			char *p = ibt.names[i];
 			uint32_t found = 0;
 			while(*p) {
 				uint32_t match = 1;
@@ -190,7 +190,7 @@ static void ibt_icon_cb(uint32_t item, char *buf, uint32_t buf_size, void *userd
 	struct mkgui_ctx *ctx = (struct mkgui_ctx *)userdata;
 	if(item < ibt.filtered_count) {
 		uint32_t idx = ibt.filtered_idx[item];
-		const char *name = ibt.names[idx];
+		char *name = ibt.names[idx];
 		strncpy(buf, name, buf_size - 1);
 		buf[buf_size - 1] = '\0';
 
@@ -203,7 +203,7 @@ static void ibt_icon_cb(uint32_t item, char *buf, uint32_t buf_size, void *userd
 }
 
 // [=]===^=[ mkgui_icon_browser_theme ]===============================[=]
-MKGUI_API uint32_t mkgui_icon_browser_theme(struct mkgui_ctx *ctx, const char *theme_dir, int32_t size, char *out, uint32_t out_size) {
+MKGUI_API uint32_t mkgui_icon_browser_theme(struct mkgui_ctx *ctx, char *theme_dir, int32_t size, char *out, uint32_t out_size) {
 	MKGUI_CHECK_VAL(ctx, 0);
 	if(!out || out_size == 0 || !theme_dir) {
 		return 0;
@@ -296,7 +296,7 @@ MKGUI_API uint32_t mkgui_icon_browser_theme(struct mkgui_ctx *ctx, const char *t
 
 				case MKGUI_EVENT_INPUT_CHANGED: {
 					if(ev.id == IB_TH_SEARCH) {
-						const char *filter = mkgui_input_get(dlg, IB_TH_SEARCH);
+						char *filter = mkgui_input_get(dlg, IB_TH_SEARCH);
 						ibt_filter(filter);
 						mkgui_itemview_set_items(dlg, iv_id, ibt.filtered_count);
 						mkgui_itemview_set_selected(dlg, iv_id, -1);
@@ -311,7 +311,7 @@ MKGUI_API uint32_t mkgui_icon_browser_theme(struct mkgui_ctx *ctx, const char *t
 						} else {
 							ibt.active_cat = tab_id - IB_TH_TAB_FIRST + 1;
 						}
-						const char *filter = mkgui_input_get(dlg, IB_TH_SEARCH);
+						char *filter = mkgui_input_get(dlg, IB_TH_SEARCH);
 						ibt_filter(filter);
 						mkgui_itemview_set_items(dlg, iv_id, ibt.filtered_count);
 						mkgui_itemview_set_selected(dlg, iv_id, -1);

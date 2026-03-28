@@ -112,7 +112,7 @@ enum {
 // ---------------------------------------------------------------------------
 
 struct ed_palette_entry {
-	const char *name;
+	char *name;
 	uint32_t type;
 };
 
@@ -215,7 +215,7 @@ static struct ed_type_event_map *ed_find_type_events(uint32_t widget_type) {
 }
 
 // [=]===^=[ ed_event_name ]=======================================[=]
-static const char *ed_event_name(uint32_t event_type) {
+static char *ed_event_name(uint32_t event_type) {
 	switch(event_type) {
 		case MKGUI_EVENT_CLICK:              { return "CLICK"; }
 		case MKGUI_EVENT_MENU:               { return "MENU"; }
@@ -276,8 +276,8 @@ static const char *ed_event_name(uint32_t event_type) {
 }
 
 // [=]===^=[ ed_event_from_name ]==================================[=]
-static uint32_t ed_event_from_name(const char *name) {
-	struct { const char *name; uint32_t type; } map[] = {
+static uint32_t ed_event_from_name(char *name) {
+	struct { char *name; uint32_t type; } map[] = {
 		{ "CLICK",              MKGUI_EVENT_CLICK },
 		{ "MENU",               MKGUI_EVENT_MENU },
 		{ "TAB_CHANGED",        MKGUI_EVENT_TAB_CHANGED },
@@ -346,7 +346,7 @@ static uint32_t ed_event_from_name(const char *name) {
 // ---------------------------------------------------------------------------
 
 // [=]===^=[ ed_type_name ]=======================================[=]
-static const char *ed_type_name(uint32_t type) {
+static char *ed_type_name(uint32_t type) {
 	for(uint32_t i = 0; i < ED_WIDGET_COUNT; ++i) {
 		if(ed_widgets[i].type == type) {
 			return ed_widgets[i].name;
@@ -472,11 +472,11 @@ static struct ed_config ed_cfg;
 
 // [=]===^=[ ed_config_dir ]=======================================[=]
 static void ed_config_dir(char *buf, uint32_t buf_size) {
-	const char *xdg = getenv("XDG_CONFIG_HOME");
+	char *xdg = getenv("XDG_CONFIG_HOME");
 	if(xdg && xdg[0]) {
 		snprintf(buf, buf_size, "%s/mkgui-editor", xdg);
 	} else {
-		const char *home = getenv("HOME");
+		char *home = getenv("HOME");
 		if(!home) {
 			home = "/tmp";
 		}
@@ -497,11 +497,11 @@ static void ed_config_ensure_dir(void) {
 	ed_config_dir(dir, sizeof(dir));
 
 	char parent[ED_CONFIG_PATH_LEN];
-	const char *xdg = getenv("XDG_CONFIG_HOME");
+	char *xdg = getenv("XDG_CONFIG_HOME");
 	if(xdg && xdg[0]) {
 		snprintf(parent, sizeof(parent), "%s", xdg);
 	} else {
-		const char *home = getenv("HOME");
+		char *home = getenv("HOME");
 		if(!home) {
 			home = "/tmp";
 		}
@@ -581,7 +581,7 @@ static void ed_config_save(void) {
 }
 
 // [=]===^=[ ed_config_add_recent ]================================[=]
-static void ed_config_add_recent(const char *filepath) {
+static void ed_config_add_recent(char *filepath) {
 	for(uint32_t i = 0; i < ed_cfg.recent_count; ++i) {
 		if(strcmp(ed_cfg.recent[i], filepath) == 0) {
 			for(uint32_t j = i; j > 0; --j) {
@@ -605,7 +605,7 @@ static void ed_config_add_recent(const char *filepath) {
 		++ed_cfg.recent_count;
 	}
 
-	const char *slash = strrchr(filepath, '/');
+	char *slash = strrchr(filepath, '/');
 	if(slash) {
 		size_t dir_len = (size_t)(slash - filepath);
 		if(dir_len >= ED_CONFIG_PATH_LEN) {
@@ -628,8 +628,8 @@ static void ed_sync_recent_menu(struct mkgui_ctx *ctx) {
 		}
 		if(i < ed_cfg.recent_count) {
 			w->flags &= ~MKGUI_HIDDEN;
-			const char *path = ed_cfg.recent[i];
-			const char *fname = strrchr(path, '/');
+			char *path = ed_cfg.recent[i];
+			char *fname = strrchr(path, '/');
 			if(fname) {
 				++fname;
 			} else {
@@ -648,7 +648,7 @@ static void ed_sync_recent_menu(struct mkgui_ctx *ctx) {
 
 struct ed_help_entry {
 	uint32_t type;
-	const char *text;
+	char *text;
 };
 
 static struct ed_help_entry ed_help[] = {
@@ -693,11 +693,11 @@ static struct ed_help_entry ed_help[] = {
 };
 #define ED_HELP_COUNT (sizeof(ed_help) / sizeof(ed_help[0]))
 
-static const char *ed_help_text;
+static char *ed_help_text;
 static uint32_t ed_help_widget_id;
 
 // [=]===^=[ ed_find_help ]========================================[=]
-static const char *ed_find_help(uint32_t type) {
+static char *ed_find_help(uint32_t type) {
 	for(uint32_t i = 0; i < ED_HELP_COUNT; ++i) {
 		if(ed_help[i].type == type) {
 			return ed_help[i].text;
@@ -724,13 +724,13 @@ static void ed_render_help_popup(struct mkgui_ctx *ctx, void *userdata) {
 	int32_t pad = 8;
 	int32_t line_h = ctx->font_height + 2;
 
-	const char *src = ed_help_text;
+	char *src = ed_help_text;
 	int32_t lines = 0;
 	int32_t actual_w = 0;
 	while(*src) {
 		int32_t line_w = 0;
-		const char *line_start = src;
-		const char *last_break = NULL;
+		char *line_start = src;
+		char *last_break = NULL;
 		while(*src && *src != '\n') {
 			char tmp[2] = { *src, 0 };
 			int32_t cw = text_width(ctx, tmp);
@@ -780,9 +780,9 @@ static void ed_render_help_popup(struct mkgui_ctx *ctx, void *userdata) {
 	int32_t ty = by + pad;
 	while(*src) {
 		int32_t line_w = 0;
-		const char *line_start = src;
-		const char *last_break = NULL;
-		const char *line_end = src;
+		char *line_start = src;
+		char *last_break = NULL;
+		char *line_end = src;
 		while(*src && *src != '\n') {
 			char tmp[2] = { *src, 0 };
 			int32_t cw = text_width(ctx, tmp);
@@ -873,7 +873,7 @@ enum {
 
 struct ed_prop_desc {
 	uint32_t kind;
-	const char *label;
+	char *label;
 	uint32_t offset;
 	uint32_t flag_bit;
 	int32_t min_val, max_val;
@@ -1024,7 +1024,7 @@ static void ed_sync_prop_value(struct mkgui_ctx *ctx, struct ed_prop_desc *p, st
 
 		case ED_PK_STRING:
 		case ED_PK_STRING_BROWSE: {
-			const char *val = (const char *)((char *)w + p->offset);
+			char *val = (char *)((char *)w + p->offset);
 			mkgui_input_set(ctx, p->widget_id, val);
 		} break;
 
@@ -1071,7 +1071,7 @@ static void ed_read_prop_value(struct mkgui_ctx *ctx, struct ed_prop_desc *p, st
 	switch(p->kind) {
 		case ED_PK_STRING:
 		case ED_PK_STRING_BROWSE: {
-			const char *val = mkgui_input_get(ctx, p->widget_id);
+			char *val = mkgui_input_get(ctx, p->widget_id);
 			if(val) {
 				char *dst = (char *)w + p->offset;
 				size_t cap;
@@ -1268,7 +1268,7 @@ static int32_t ed_find_widget(uint32_t id) {
 
 // [=]===^=[ ed_gen_id_name ]=====================================[=]
 static void ed_gen_id_name(struct ed_widget *w) {
-	const char *prefix = "ID";
+	char *prefix = "ID";
 	switch(w->type) {
 		case MKGUI_WINDOW:     { prefix = "ID_WINDOW"; } break;
 		case MKGUI_BUTTON:     { prefix = "ID_BUTTON"; } break;
@@ -2369,7 +2369,7 @@ static void ed_render_canvas(struct mkgui_ctx *ctx, uint32_t id, uint32_t *pixel
 			continue;
 		}
 		uint32_t t = ed.widgets[i].type;
-		static const uint64_t ed_real_render =
+		static uint64_t ed_real_render =
 			(1ull << MKGUI_BUTTON) | (1ull << MKGUI_LABEL) |
 			(1ull << MKGUI_CHECKBOX) | (1ull << MKGUI_RADIO) |
 			(1ull << MKGUI_GROUP) | (1ull << MKGUI_PANEL) |
@@ -2441,7 +2441,7 @@ static void ed_render_canvas(struct mkgui_ctx *ctx, uint32_t id, uint32_t *pixel
 	draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, rx - hs, by - hs, hs * 2, hs * 2, hc);
 
 	if(ed.placement_type) {
-		const char *placing = ed_type_name(ed.placement_type);
+		char *placing = ed_type_name(ed.placement_type);
 		char buf[64];
 		snprintf(buf, sizeof(buf), "Placing: %s (click canvas, Esc to cancel)", placing);
 		push_text(cx + 4, cy + 4, buf, 0xFFFFFF00);
@@ -2572,7 +2572,7 @@ static uint32_t ed_is_container_type(uint32_t type) {
 
 // [=]===^=[ ed_sync_parent_dropdown ]=============================[=]
 static void ed_sync_parent_dropdown(struct mkgui_ctx *ctx) {
-	const char *items[ED_MAX_WIDGETS];
+	char *items[ED_MAX_WIDGETS];
 	static char item_bufs[ED_MAX_WIDGETS][80];
 	uint32_t count = 0;
 
@@ -2736,7 +2736,7 @@ static void ed_sync_data(struct mkgui_ctx *ctx) {
 	}
 
 	ed_set_widget_vis(ctx, ED_DATA_GROUP, 1);
-	const char *group_label = (w->type == MKGUI_STATUSBAR) ? "Sections" : "Data";
+	char *group_label = (w->type == MKGUI_STATUSBAR) ? "Sections" : "Data";
 	struct mkgui_widget *dg = find_widget(ctx, ED_DATA_GROUP);
 	if(dg) {
 		strncpy(dg->label, group_label, MKGUI_MAX_TEXT - 1);
@@ -3045,7 +3045,7 @@ static void ed_save_project(struct mkgui_ctx *ctx, uint32_t save_as) {
 		if(!mkgui_save_dialog(ctx, &save_opts)) {
 			return;
 		}
-		const char *path = mkgui_dialog_path(ctx, 0);
+		char *path = mkgui_dialog_path(ctx, 0);
 		snprintf(ed.project_path, sizeof(ed.project_path), "%s", path);
 	}
 
@@ -3098,7 +3098,7 @@ static void ed_save_project(struct mkgui_ctx *ctx, uint32_t save_as) {
 	fclose(f);
 
 	char buf[FD_PATH_SIZE + 320];
-	const char *fname = strrchr(ed.project_path, '/');
+	char *fname = strrchr(ed.project_path, '/');
 	if(!fname) {
 		fname = ed.project_path;
 	} else {
@@ -3112,7 +3112,7 @@ static void ed_save_project(struct mkgui_ctx *ctx, uint32_t save_as) {
 }
 
 // [=]===^=[ ed_load_file ]========================================[=]
-static void ed_load_file(struct mkgui_ctx *ctx, const char *path) {
+static void ed_load_file(struct mkgui_ctx *ctx, char *path) {
 	FILE *f = fopen(path, "r");
 	if(!f) {
 		return;
@@ -3268,7 +3268,7 @@ static void ed_load_file(struct mkgui_ctx *ctx, const char *path) {
 	ed_sync_recent_menu(ctx);
 
 	char buf[256];
-	const char *fname = strrchr(path, '/');
+	char *fname = strrchr(path, '/');
 	if(!fname) {
 		fname = path;
 	} else {
@@ -3306,7 +3306,7 @@ static void ed_load_recent(struct mkgui_ctx *ctx, uint32_t index) {
 // ---------------------------------------------------------------------------
 
 // [=]===^=[ ed_type_name_upper ]==================================[=]
-static const char *ed_type_name_upper(uint32_t type) {
+static char *ed_type_name_upper(uint32_t type) {
 	switch(type) {
 		case MKGUI_WINDOW:     { return "MKGUI_WINDOW"; }
 		case MKGUI_BUTTON:     { return "MKGUI_BUTTON"; }
@@ -3355,12 +3355,12 @@ static const char *ed_type_name_upper(uint32_t type) {
 }
 
 // [=]===^=[ ed_flags_to_str ]=====================================[=]
-static const char *ed_flags_to_str(uint32_t flags, char *buf, uint32_t buf_size) {
+static char *ed_flags_to_str(uint32_t flags, char *buf, uint32_t buf_size) {
 	if(flags == 0) {
 		return "0";
 	}
 
-	static const struct { uint32_t bit; const char *name; } single_bits[] = {
+	static struct { uint32_t bit; char *name; } single_bits[] = {
 		{ MKGUI_REGION_TOP,      "MKGUI_REGION_TOP" },
 		{ MKGUI_REGION_BOTTOM,   "MKGUI_REGION_BOTTOM" },
 		{ MKGUI_REGION_LEFT,     "MKGUI_REGION_LEFT" },
@@ -3389,7 +3389,7 @@ static const char *ed_flags_to_str(uint32_t flags, char *buf, uint32_t buf_size)
 
 	uint32_t align = flags & MKGUI_ALIGN_MASK;
 	if(align) {
-		const char *name = NULL;
+		char *name = NULL;
 		if(align == MKGUI_ALIGN_START)       { name = "MKGUI_ALIGN_START"; }
 		else if(align == MKGUI_ALIGN_CENTER) { name = "MKGUI_ALIGN_CENTER"; }
 		else if(align == MKGUI_ALIGN_END)    { name = "MKGUI_ALIGN_END"; }
@@ -3414,12 +3414,12 @@ static const char *ed_flags_to_str(uint32_t flags, char *buf, uint32_t buf_size)
 }
 
 // [=]===^=[ ed_style_to_str ]=====================================[=]
-static const char *ed_style_to_str(uint32_t style, uint32_t widget_type, char *buf, uint32_t buf_size) {
+static char *ed_style_to_str(uint32_t style, uint32_t widget_type, char *buf, uint32_t buf_size) {
 	if(style == 0) {
 		return "0";
 	}
 
-	static const struct { uint32_t bit; const char *name; } single_bits[] = {
+	static struct { uint32_t bit; char *name; } single_bits[] = {
 		{ MKGUI_CHECKED,         "MKGUI_CHECKED" },
 		{ MKGUI_PASSWORD,        "MKGUI_PASSWORD" },
 		{ MKGUI_READONLY,        "MKGUI_READONLY" },
@@ -3454,7 +3454,7 @@ static const char *ed_style_to_str(uint32_t style, uint32_t widget_type, char *b
 	}
 
 	if(style & MKGUI_SLIDER_MIXER) {
-		const char *name = (widget_type == MKGUI_METER) ? "MKGUI_METER_TEXT" : "MKGUI_SLIDER_MIXER";
+		char *name = (widget_type == MKGUI_METER) ? "MKGUI_METER_TEXT" : "MKGUI_SLIDER_MIXER";
 		if(pos > 0) {
 			pos += (uint32_t)snprintf(buf + pos, buf_size - pos, " | ");
 		}
@@ -3464,7 +3464,7 @@ static const char *ed_style_to_str(uint32_t style, uint32_t widget_type, char *b
 
 	uint32_t tbmode = style & MKGUI_TOOLBAR_MODE_MASK;
 	if(tbmode) {
-		const char *name = NULL;
+		char *name = NULL;
 		if(tbmode == MKGUI_TOOLBAR_ICONS_ONLY)      { name = "MKGUI_TOOLBAR_ICONS_ONLY"; }
 		else if(tbmode == MKGUI_TOOLBAR_TEXT_ONLY)   { name = "MKGUI_TOOLBAR_TEXT_ONLY"; }
 		if(name) {
@@ -3500,7 +3500,7 @@ static void ed_generate_code(struct mkgui_ctx *ctx) {
 	if(!mkgui_save_dialog(ctx, &gen_opts)) {
 		return;
 	}
-	const char *out_path = mkgui_dialog_path(ctx, 0);
+	char *out_path = mkgui_dialog_path(ctx, 0);
 	FILE *f = fopen(out_path, "w");
 	if(!f) {
 		return;
@@ -3625,7 +3625,7 @@ static void ed_generate_code(struct mkgui_ctx *ctx) {
 		struct ed_widget *w = &ed.widgets[i];
 		int32_t lx, ly, lw, lh;
 		ed_convert_to_layout(i, &lx, &ly, &lw, &lh);
-		const char *parent_name = "0";
+		char *parent_name = "0";
 		if(w->parent_id != 0) {
 			int32_t pidx = ed_find_widget(w->parent_id);
 			if(pidx >= 0) {
@@ -3759,7 +3759,7 @@ static void ed_generate_code(struct mkgui_ctx *ctx) {
 	char tb_icon_path[FD_PATH_SIZE];
 	{
 		size_t plen = strlen(out_path);
-		const char *dot = strrchr(out_path, '.');
+		char *dot = strrchr(out_path, '.');
 		size_t base_len = dot ? (size_t)(dot - out_path) : plen;
 		snprintf(icon_path, sizeof(icon_path), "%.*s_icons.txt", (int32_t)base_len, out_path);
 		snprintf(tb_icon_path, sizeof(tb_icon_path), "%.*s_icons_toolbar.txt", (int32_t)base_len, out_path);
@@ -3840,7 +3840,7 @@ static void ed_generate_code(struct mkgui_ctx *ctx) {
 	}
 
 	char buf[FD_PATH_SIZE + 320];
-	const char *fname = strrchr(out_path, '/');
+	char *fname = strrchr(out_path, '/');
 	if(!fname) {
 		fname = out_path;
 	} else {
@@ -3864,7 +3864,7 @@ static void ed_generate_snippet(struct mkgui_ctx *ctx) {
 	if(!mkgui_save_dialog(ctx, &gen_opts)) {
 		return;
 	}
-	const char *out_path = mkgui_dialog_path(ctx, 0);
+	char *out_path = mkgui_dialog_path(ctx, 0);
 	FILE *f = fopen(out_path, "w");
 	if(!f) {
 		return;
@@ -3884,7 +3884,7 @@ static void ed_generate_snippet(struct mkgui_ctx *ctx) {
 		struct ed_widget *w = &ed.widgets[i];
 		int32_t lx, ly, lw, lh;
 		ed_convert_to_layout(i, &lx, &ly, &lw, &lh);
-		const char *parent_name = "0";
+		char *parent_name = "0";
 		if(w->parent_id != 0) {
 			int32_t pidx = ed_find_widget(w->parent_id);
 			if(pidx >= 0) {
@@ -3910,7 +3910,7 @@ static void ed_generate_snippet(struct mkgui_ctx *ctx) {
 	fclose(f);
 
 	char buf[FD_PATH_SIZE + 320];
-	const char *fname = strrchr(out_path, '/');
+	char *fname = strrchr(out_path, '/');
 	if(!fname) {
 		fname = out_path;
 	} else {
@@ -3985,7 +3985,7 @@ static void ed_test_gui(struct mkgui_ctx *editor_ctx) {
 	}
 
 	int32_t test_w = 800, test_h = 600;
-	const char *test_title = "Test";
+	char *test_title = "Test";
 	for(uint32_t i = 0; i < ed.widget_count; ++i) {
 		if(test_widgets[i].type == MKGUI_WINDOW) {
 			if(test_widgets[i].w > 0) {
@@ -4012,7 +4012,7 @@ static void ed_test_gui(struct mkgui_ctx *editor_ctx) {
 		switch(ew->type) {
 			case MKGUI_DROPDOWN: {
 				if(d && d->item_count > 0) {
-					const char *items[ED_MAX_DATA_ITEMS];
+					char *items[ED_MAX_DATA_ITEMS];
 					for(uint32_t j = 0; j < d->item_count; ++j) {
 						items[j] = d->items[j];
 					}
@@ -4022,7 +4022,7 @@ static void ed_test_gui(struct mkgui_ctx *editor_ctx) {
 
 			case MKGUI_COMBOBOX: {
 				if(d && d->item_count > 0) {
-					const char *items[ED_MAX_DATA_ITEMS];
+					char *items[ED_MAX_DATA_ITEMS];
 					for(uint32_t j = 0; j < d->item_count; ++j) {
 						items[j] = d->items[j];
 					}
@@ -4404,7 +4404,7 @@ int main(void) {
 	}
 
 	{
-		const char *align_items[] = { "Stretch", "Start", "Center", "End" };
+		char *align_items[] = { "Stretch", "Start", "Center", "End" };
 		mkgui_dropdown_setup(ctx, ED_PROP_ALIGN_DRP, align_items, 4);
 	}
 
@@ -4797,7 +4797,7 @@ int main(void) {
 						struct ed_widget_data *d = ed_find_widget_data(ed_data_widget_id);
 						int32_t dsel = mkgui_listview_get_selected(ctx, ED_DATA_LIST);
 						if(d && dsel >= 0 && (uint32_t)dsel < d->item_count) {
-							const char *val = mkgui_input_get(ctx, ED_DATA_ITEM_INP);
+							char *val = mkgui_input_get(ctx, ED_DATA_ITEM_INP);
 							if(val) {
 								snprintf(d->items[dsel], MKGUI_MAX_TEXT, "%s", val);
 								dirty_all(ctx);
@@ -4837,7 +4837,7 @@ int main(void) {
 
 				case MKGUI_EVENT_LISTVIEW_SELECT: {
 					if(ev.id == ED_EVT_LIST && ed.selected >= 0 && (uint32_t)ed.selected < ed.widget_count) {
-						const int32_t *sel;
+						int32_t *sel;
 						uint32_t sel_count = mkgui_listview_get_multi_sel(ctx, ED_EVT_LIST, &sel);
 						uint64_t mask = 0;
 						for(uint32_t si = 0; si < sel_count; ++si) {

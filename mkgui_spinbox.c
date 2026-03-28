@@ -82,7 +82,7 @@ static void render_spinbox(struct mkgui_ctx *ctx, uint32_t idx) {
 	struct mkgui_spinbox_data *sd = find_spinbox_data(ctx, w->id);
 	uint32_t tc = disabled ? ctx->theme.text_disabled : ctx->theme.text;
 	if(sd) {
-		const char *display;
+		char *display;
 		char val_buf[64];
 		if(sd->editing && focused) {
 			sd->edit_buf[sd->edit_len] = '\0';
@@ -160,7 +160,7 @@ static uint32_t spinbox_adjust(struct mkgui_ctx *ctx, struct mkgui_event *ev, ui
 }
 
 // [=]===^=[ handle_spinbox_key ]=================================[=]
-static uint32_t handle_spinbox_key(struct mkgui_ctx *ctx, struct mkgui_event *ev, uint32_t ks, const char *text, int32_t text_len) {
+static uint32_t handle_spinbox_key(struct mkgui_ctx *ctx, struct mkgui_event *ev, uint32_t ks, char *text, int32_t text_len) {
 	struct mkgui_spinbox_data *sd = find_spinbox_data(ctx, ctx->focus_id);
 	if(!sd) {
 		return 0;

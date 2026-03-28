@@ -12,7 +12,7 @@ static struct mkgui_image_data *find_image_data(struct mkgui_ctx *ctx, uint32_t 
 }
 
 // [=]===^=[ mkgui_image_set ]====================================[=]
-MKGUI_API void mkgui_image_set(struct mkgui_ctx *ctx, uint32_t id, const uint32_t *pixels, int32_t w, int32_t h) {
+MKGUI_API void mkgui_image_set(struct mkgui_ctx *ctx, uint32_t id, uint32_t *pixels, int32_t w, int32_t h) {
 	MKGUI_CHECK(ctx);
 	if(!pixels) {
 		return;
@@ -115,7 +115,7 @@ static void render_image(struct mkgui_ctx *ctx, uint32_t idx) {
 		if(sy < 0 || sy >= ih) {
 			continue;
 		}
-		const uint32_t *src_row = &img->pixels[sy * iw];
+		uint32_t *src_row = &img->pixels[sy * iw];
 		uint32_t *dst_row = &ctx->pixels[py * ctx->win_w];
 		for(int32_t px = cx1; px < cx2; ++px) {
 			int32_t sx = (int32_t)((int64_t)(px - dx) * iw / dw);

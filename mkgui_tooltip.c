@@ -14,7 +14,7 @@ static void render_tooltip(struct mkgui_ctx *ctx) {
 		return;
 	}
 
-	const char *text = ctx->tooltip_texts[idx];
+	char *text = ctx->tooltip_texts[idx];
 	if(text[0] == '\0') {
 		return;
 	}
@@ -58,7 +58,7 @@ static void tooltip_update(struct mkgui_ctx *ctx, uint32_t hover_id, int32_t mx,
 }
 
 // [=]===^=[ mkgui_set_tooltip ]==================================[=]
-MKGUI_API void mkgui_set_tooltip(struct mkgui_ctx *ctx, uint32_t id, const char *text) {
+MKGUI_API void mkgui_set_tooltip(struct mkgui_ctx *ctx, uint32_t id, char *text) {
 	MKGUI_CHECK(ctx);
 	int32_t idx = find_widget_idx(ctx, id);
 	if(idx < 0) {

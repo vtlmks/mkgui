@@ -121,7 +121,7 @@ static void format_size(int64_t bytes, char *buf, uint32_t buf_size) {
 }
 
 // [=]===^=[ format_date ]========================================[=]
-static void format_date(const char *timestamp_str, char *buf, uint32_t buf_size) {
+static void format_date(char *timestamp_str, char *buf, uint32_t buf_size) {
 	time_t ts = (time_t)strtoll(timestamp_str, NULL, 10);
 	if(ts <= 0) {
 		snprintf(buf, buf_size, "%s", timestamp_str);
@@ -136,13 +136,13 @@ static void format_date(const char *timestamp_str, char *buf, uint32_t buf_size)
 }
 
 // [=]===^=[ render_cell ]========================================[=]
-static void render_cell(struct mkgui_ctx *ctx, struct mkgui_listview_data *lv, uint32_t col, const char *cell_buf, int32_t cx, int32_t ty, int32_t col_w, int32_t clip_left, int32_t clip_right, int32_t clip_top, int32_t clip_bottom, uint32_t tc, int32_t row_y) {
+static void render_cell(struct mkgui_ctx *ctx, struct mkgui_listview_data *lv, uint32_t col, char *cell_buf, int32_t cx, int32_t ty, int32_t col_w, int32_t clip_left, int32_t clip_right, int32_t clip_top, int32_t clip_bottom, uint32_t tc, int32_t row_y) {
 	int32_t cell_pad = sc(ctx, 4);
 	switch(lv->columns[col].cell_type) {
 		case MKGUI_CELL_PROGRESS: {
 			int32_t val = 0;
 			int32_t max = 100;
-			const char *slash = strchr(cell_buf, '/');
+			char *slash = strchr(cell_buf, '/');
 			if(slash) {
 				val = (int32_t)strtol(cell_buf, NULL, 10);
 				max = (int32_t)strtol(slash + 1, NULL, 10);
@@ -187,7 +187,7 @@ static void render_cell(struct mkgui_ctx *ctx, struct mkgui_listview_data *lv, u
 		} break;
 
 		case MKGUI_CELL_ICON_TEXT: {
-			const char *tab = strchr(cell_buf, '\t');
+			char *tab = strchr(cell_buf, '\t');
 			if(tab) {
 				char icon_name[64];
 				uint32_t len = (uint32_t)(tab - cell_buf);
@@ -266,7 +266,7 @@ static void listview_autosize_col(struct mkgui_ctx *ctx, struct mkgui_listview_d
 		int32_t cell_w = 0;
 		switch(lv->columns[col].cell_type) {
 			case MKGUI_CELL_ICON_TEXT: {
-				const char *tab = strchr(buf, '\t');
+				char *tab = strchr(buf, '\t');
 				cell_w = text_width(ctx, tab ? tab + 1 : buf) + ctx->icon_size + cell_pad;
 			} break;
 
@@ -1069,7 +1069,7 @@ MKGUI_API int32_t mkgui_listview_get_selected(struct mkgui_ctx *ctx, uint32_t id
 }
 
 // [=]===^=[ mkgui_listview_get_multi_sel ]======================[=]
-MKGUI_API uint32_t mkgui_listview_get_multi_sel(struct mkgui_ctx *ctx, uint32_t id, const int32_t **out) {
+MKGUI_API uint32_t mkgui_listview_get_multi_sel(struct mkgui_ctx *ctx, uint32_t id, int32_t **out) {
 	MKGUI_CHECK_VAL(ctx, 0);
 	struct mkgui_listview_data *lv = find_listv_data(ctx, id);
 	if(!lv) {
@@ -1105,14 +1105,14 @@ MKGUI_API void mkgui_listview_clear_selection(struct mkgui_ctx *ctx, uint32_t id
 }
 
 // [=]===^=[ mkgui_listview_get_col_order ]======================[=]
-MKGUI_API const uint32_t *mkgui_listview_get_col_order(struct mkgui_ctx *ctx, uint32_t id) {
+MKGUI_API uint32_t *mkgui_listview_get_col_order(struct mkgui_ctx *ctx, uint32_t id) {
 	MKGUI_CHECK_VAL(ctx, NULL);
 	struct mkgui_listview_data *lv = find_listv_data(ctx, id);
 	return lv ? lv->col_order : NULL;
 }
 
 // [=]===^=[ mkgui_listview_set_col_order ]======================[=]
-MKGUI_API void mkgui_listview_set_col_order(struct mkgui_ctx *ctx, uint32_t id, const uint32_t *order, uint32_t count) {
+MKGUI_API void mkgui_listview_set_col_order(struct mkgui_ctx *ctx, uint32_t id, uint32_t *order, uint32_t count) {
 	MKGUI_CHECK(ctx);
 	struct mkgui_listview_data *lv = find_listv_data(ctx, id);
 	if(!lv) {

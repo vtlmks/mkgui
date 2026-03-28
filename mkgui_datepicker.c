@@ -9,7 +9,7 @@
 
 // [=]===^=[ datepicker_days_in_month ]============================[=]
 static uint32_t datepicker_days_in_month(int32_t year, int32_t month) {
-	static const uint32_t days[] = { 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
+	static uint32_t days[] = { 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
 	if(month < 1 || month > 12) {
 		return 30;
 	}
@@ -36,7 +36,7 @@ static void datepicker_format(struct mkgui_datepicker_data *dp, char *buf, uint3
 }
 
 // [=]===^=[ datepicker_parse ]====================================[=]
-static uint32_t datepicker_parse(const char *text, int32_t *year, int32_t *month, int32_t *day) {
+static uint32_t datepicker_parse(char *text, int32_t *year, int32_t *month, int32_t *day) {
 	int32_t y = 0, m = 0, d = 0;
 	if(sscanf(text, "%d-%d-%d", &y, &m, &d) != 3) {
 		return 0;
@@ -148,8 +148,8 @@ static void render_datepicker_popup(struct mkgui_ctx *ctx, struct mkgui_popup *p
 	int32_t arrow_w = sc(ctx, 20);
 	int32_t hdr_y = cy + (hdr_h - ctx->font_height) / 2;
 
-	static const char *month_names[] = { "January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December" };
-	const char *mname = (dp->view_month >= 1 && dp->view_month <= 12) ? month_names[dp->view_month - 1] : "?";
+	static char *month_names[] = { "January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December" };
+	char *mname = (dp->view_month >= 1 && dp->view_month <= 12) ? month_names[dp->view_month - 1] : "?";
 
 	int32_t left_x = popup_pad;
 	int32_t right_x = p->w - popup_pad - arrow_w;
@@ -251,7 +251,7 @@ static void render_datepicker_popup(struct mkgui_ctx *ctx, struct mkgui_popup *p
 			push_text_clip(p->x + list_pad, ty + p->y, month_names[mi], tc, p->x + 1, p->y + cy, p->x + p->w - 1, p->y + p->h - 1);
 		}
 	} else {
-		static const char *dow[] = { "Mo", "Tu", "We", "Th", "Fr", "Sa", "Su" };
+		static char *dow[] = { "Mo", "Tu", "We", "Th", "Fr", "Sa", "Su" };
 		int32_t cw = cell_size;
 		for(uint32_t d = 0; d < 7; ++d) {
 			int32_t dx = (int32_t)d * cw;
@@ -459,7 +459,7 @@ static void handle_datepicker_click(struct mkgui_ctx *ctx, uint32_t widget_id) {
 }
 
 // [=]===^=[ handle_datepicker_key ]===============================[=]
-static uint32_t handle_datepicker_key(struct mkgui_ctx *ctx, struct mkgui_event *ev, uint32_t ks, uint32_t keymod, const char *buf, int32_t len) {
+static uint32_t handle_datepicker_key(struct mkgui_ctx *ctx, struct mkgui_event *ev, uint32_t ks, uint32_t keymod, char *buf, int32_t len) {
 	struct mkgui_datepicker_data *dp = find_datepicker_data(ctx, ctx->focus_id);
 	if(!dp) {
 		return 0;
@@ -559,7 +559,7 @@ MKGUI_API void mkgui_datepicker_get(struct mkgui_ctx *ctx, uint32_t id, int32_t 
 }
 
 // [=]===^=[ mkgui_datepicker_get_text ]===========================[=]
-MKGUI_API const char *mkgui_datepicker_get_text(struct mkgui_ctx *ctx, uint32_t id) {
+MKGUI_API char *mkgui_datepicker_get_text(struct mkgui_ctx *ctx, uint32_t id) {
 	MKGUI_CHECK_VAL(ctx, "");
 	static char datepicker_buf[16];
 	struct mkgui_datepicker_data *dp = find_datepicker_data(ctx, id);

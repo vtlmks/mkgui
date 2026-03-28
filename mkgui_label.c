@@ -10,7 +10,7 @@ static void render_label_wrap(struct mkgui_ctx *ctx, uint32_t idx, uint32_t tc) 
 	int32_t rh = ctx->rects[idx].h;
 	int32_t line_h = ctx->font_height + sc(ctx, 2);
 	int32_t cy = ry;
-	const char *p = w->label;
+	char *p = w->label;
 	char line_buf[MKGUI_MAX_TEXT];
 
 	while(*p && cy + line_h <= ry + rh) {
@@ -76,7 +76,7 @@ static void render_label(struct mkgui_ctx *ctx, uint32_t idx) {
 	}
 	int32_t ty = ry + (rh - ctx->font_height) / 2;
 	int32_t tx = rx;
-	const char *text = w->label;
+	char *text = w->label;
 	if(w->style & MKGUI_TRUNCATE) {
 		text = text_truncate(ctx, text, rw);
 	}
@@ -103,7 +103,7 @@ static void render_label(struct mkgui_ctx *ctx, uint32_t idx) {
 }
 
 // [=]===^=[ mkgui_label_set ]===================================[=]
-MKGUI_API void mkgui_label_set(struct mkgui_ctx *ctx, uint32_t id, const char *text) {
+MKGUI_API void mkgui_label_set(struct mkgui_ctx *ctx, uint32_t id, char *text) {
 	MKGUI_CHECK(ctx);
 	struct mkgui_widget *w = find_widget(ctx, id);
 	if(!w) {
@@ -118,7 +118,7 @@ MKGUI_API void mkgui_label_set(struct mkgui_ctx *ctx, uint32_t id, const char *t
 }
 
 // [=]===^=[ mkgui_label_get ]===================================[=]
-MKGUI_API const char *mkgui_label_get(struct mkgui_ctx *ctx, uint32_t id) {
+MKGUI_API char *mkgui_label_get(struct mkgui_ctx *ctx, uint32_t id) {
 	MKGUI_CHECK_VAL(ctx, "");
 	struct mkgui_widget *w = find_widget(ctx, id);
 	return w ? w->label : "";

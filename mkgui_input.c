@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 // [=]===^=[ utf8_prev ]==============================================[=]
-static uint32_t utf8_prev(const char *text, uint32_t pos) {
+static uint32_t utf8_prev(char *text, uint32_t pos) {
 	if(pos == 0) {
 		return 0;
 	}
@@ -14,7 +14,7 @@ static uint32_t utf8_prev(const char *text, uint32_t pos) {
 }
 
 // [=]===^=[ utf8_next ]==============================================[=]
-static uint32_t utf8_next(const char *text, uint32_t pos) {
+static uint32_t utf8_next(char *text, uint32_t pos) {
 	if(!text[pos]) {
 		return pos;
 	}
@@ -75,7 +75,7 @@ static void input_scroll_to_cursor(struct mkgui_ctx *ctx, uint32_t widget_id) {
 		return;
 	}
 
-	const char *display = inp->text;
+	char *display = inp->text;
 	char masked[MKGUI_MAX_TEXT];
 	struct mkgui_widget *w = &ctx->widgets[widx];
 	if(w->style & MKGUI_PASSWORD) {
@@ -114,7 +114,7 @@ static void input_scroll_to_cursor(struct mkgui_ctx *ctx, uint32_t widget_id) {
 }
 
 // [=]===^=[ input_hit_cursor ]=======================================[=]
-static uint32_t input_hit_cursor(struct mkgui_ctx *ctx, struct mkgui_input_data *inp, const char *display, int32_t rx, int32_t mx) {
+static uint32_t input_hit_cursor(struct mkgui_ctx *ctx, struct mkgui_input_data *inp, char *display, int32_t rx, int32_t mx) {
 	int32_t base_x = rx + sc(ctx, 4) - inp->scroll_x;
 	uint32_t len = (uint32_t)strlen(display);
 	char tmp[MKGUI_MAX_TEXT];
@@ -152,7 +152,7 @@ static void render_input(struct mkgui_ctx *ctx, uint32_t idx) {
 		return;
 	}
 
-	const char *display = inp->text;
+	char *display = inp->text;
 	char masked[MKGUI_MAX_TEXT];
 	if(w->style & MKGUI_PASSWORD) {
 		uint32_t len = (uint32_t)strlen(inp->text);
@@ -217,7 +217,7 @@ static void render_input(struct mkgui_ctx *ctx, uint32_t idx) {
 }
 
 // [=]===^=[ handle_input_key ]======================================[=]
-static uint32_t handle_input_key(struct mkgui_ctx *ctx, struct mkgui_event *ev, uint32_t ks, uint32_t keymod, const char *buf, int32_t len) {
+static uint32_t handle_input_key(struct mkgui_ctx *ctx, struct mkgui_event *ev, uint32_t ks, uint32_t keymod, char *buf, int32_t len) {
 	struct mkgui_input_data *inp = find_input_data(ctx, ctx->focus_id);
 	if(!inp) {
 		return 0;
@@ -366,7 +366,7 @@ static uint32_t handle_input_key(struct mkgui_ctx *ctx, struct mkgui_event *ev, 
 }
 
 // [=]===^=[ mkgui_input_set ]=======================================[=]
-MKGUI_API void mkgui_input_set(struct mkgui_ctx *ctx, uint32_t id, const char *text) {
+MKGUI_API void mkgui_input_set(struct mkgui_ctx *ctx, uint32_t id, char *text) {
 	MKGUI_CHECK(ctx);
 	if(!text) {
 		text = "";
@@ -384,7 +384,7 @@ MKGUI_API void mkgui_input_set(struct mkgui_ctx *ctx, uint32_t id, const char *t
 }
 
 // [=]===^=[ mkgui_input_get ]=======================================[=]
-MKGUI_API const char *mkgui_input_get(struct mkgui_ctx *ctx, uint32_t id) {
+MKGUI_API char *mkgui_input_get(struct mkgui_ctx *ctx, uint32_t id) {
 	MKGUI_CHECK_VAL(ctx, "");
 	struct mkgui_input_data *inp = find_input_data(ctx, id);
 	if(!inp) {

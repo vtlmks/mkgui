@@ -471,9 +471,9 @@ static uint32_t icon_count;
 static uint32_t icon_hash[MKGUI_ICON_HASH_SIZE];
 
 // [=]===^=[ icon_hash_fn ]===========================================[=]
-static uint32_t icon_hash_fn(const char *name) {
+static uint32_t icon_hash_fn(char *name) {
 	uint32_t h = 2166136261u;
-	for(const char *p = name; *p; ++p) {
+	for(char *p = name; *p; ++p) {
 		h ^= (uint32_t)(uint8_t)*p;
 		h *= 16777619u;
 	}
@@ -497,7 +497,7 @@ static void icon_hash_insert(uint32_t idx) {
 }
 
 // [=]===^=[ icon_hash_lookup ]=======================================[=]
-static int32_t icon_hash_lookup(const char *name) {
+static int32_t icon_hash_lookup(char *name) {
 	uint32_t h = icon_hash_fn(name);
 	for(;;) {
 		uint32_t idx = icon_hash[h];
@@ -3697,7 +3697,7 @@ MKGUI_API struct mkgui_ctx *mkgui_create(struct mkgui_widget *widgets, uint32_t 
 	ctx->widget_count = count;
 
 	int32_t init_w = 800, init_h = 600;
-	const char *title = "mkgui";
+	char *title = "mkgui";
 	for(uint32_t i = 0; i < count; ++i) {
 		if(widgets[i].type == MKGUI_WINDOW) {
 			if(widgets[i].w > 0) {
@@ -3884,7 +3884,7 @@ MKGUI_API uint32_t mkgui_has_focus(struct mkgui_ctx *ctx, uint32_t id) {
 }
 
 // [=]===^=[ mkgui_get_tooltip ]====================================[=]
-MKGUI_API const char *mkgui_get_tooltip(struct mkgui_ctx *ctx, uint32_t id) {
+MKGUI_API char *mkgui_get_tooltip(struct mkgui_ctx *ctx, uint32_t id) {
 	MKGUI_CHECK_VAL(ctx, "");
 	int32_t idx = find_widget_idx(ctx, id);
 	if(idx < 0) {
@@ -3977,7 +3977,7 @@ MKGUI_API void mkgui_destroy(struct mkgui_ctx *ctx) {
 }
 
 // [=]===^=[ mkgui_create_child ]=================================[=]
-MKGUI_API struct mkgui_ctx *mkgui_create_child(struct mkgui_ctx *parent, struct mkgui_widget *widgets, uint32_t count, const char *title, int32_t w, int32_t h) {
+MKGUI_API struct mkgui_ctx *mkgui_create_child(struct mkgui_ctx *parent, struct mkgui_widget *widgets, uint32_t count, char *title, int32_t w, int32_t h) {
 	if(!parent || (!widgets && count > 0)) {
 		return NULL;
 	}
@@ -4312,7 +4312,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 					if(dsi >= 0 && ctx->widgets[dsi].type == MKGUI_INPUT) {
 						struct mkgui_input_data *inp = find_input_data(ctx, ctx->drag_select_id);
 						if(inp) {
-							const char *display = inp->text;
+							char *display = inp->text;
 							char masked_buf[MKGUI_MAX_TEXT];
 							if(ctx->widgets[dsi].style & MKGUI_PASSWORD) {
 								uint32_t mlen = (uint32_t)strlen(inp->text);
@@ -5543,7 +5543,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 								inp->cursor = len;
 								ctx->dblclick_id = 0;
 							} else {
-								const char *display = inp->text;
+								char *display = inp->text;
 								char masked_buf[MKGUI_MAX_TEXT];
 								if(hw->style & MKGUI_PASSWORD) {
 									uint32_t mlen = (uint32_t)strlen(inp->text);

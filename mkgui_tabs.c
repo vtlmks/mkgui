@@ -230,7 +230,7 @@ MKGUI_API uint32_t mkgui_tabs_get_count(struct mkgui_ctx *ctx, uint32_t id) {
 }
 
 // [=]===^=[ mkgui_tabs_set_text ]==================================[=]
-MKGUI_API void mkgui_tabs_set_text(struct mkgui_ctx *ctx, uint32_t tabs_id, uint32_t tab_id, const char *text) {
+MKGUI_API void mkgui_tabs_set_text(struct mkgui_ctx *ctx, uint32_t tabs_id, uint32_t tab_id, char *text) {
 	MKGUI_CHECK(ctx);
 	if(!text) {
 		text = "";
@@ -246,7 +246,7 @@ MKGUI_API void mkgui_tabs_set_text(struct mkgui_ctx *ctx, uint32_t tabs_id, uint
 }
 
 // [=]===^=[ mkgui_tabs_get_text ]==================================[=]
-MKGUI_API const char *mkgui_tabs_get_text(struct mkgui_ctx *ctx, uint32_t tabs_id, uint32_t tab_id) {
+MKGUI_API char *mkgui_tabs_get_text(struct mkgui_ctx *ctx, uint32_t tabs_id, uint32_t tab_id) {
 	MKGUI_CHECK_VAL(ctx, "");
 	(void)tabs_id;
 	struct mkgui_widget *w = find_widget(ctx, tab_id);

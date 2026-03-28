@@ -50,7 +50,7 @@ static void render_statusbar(struct mkgui_ctx *ctx, uint32_t idx) {
 }
 
 // [=]===^=[ mkgui_statusbar_setup ]==============================[=]
-MKGUI_API void mkgui_statusbar_setup(struct mkgui_ctx *ctx, uint32_t id, uint32_t section_count, const int32_t *widths) {
+MKGUI_API void mkgui_statusbar_setup(struct mkgui_ctx *ctx, uint32_t id, uint32_t section_count, int32_t *widths) {
 	MKGUI_CHECK(ctx);
 	struct mkgui_statusbar_data *sb = find_statusbar_data(ctx, id);
 	if(!sb) {
@@ -65,7 +65,7 @@ MKGUI_API void mkgui_statusbar_setup(struct mkgui_ctx *ctx, uint32_t id, uint32_
 }
 
 // [=]===^=[ mkgui_statusbar_set ]================================[=]
-MKGUI_API void mkgui_statusbar_set(struct mkgui_ctx *ctx, uint32_t id, uint32_t section, const char *text) {
+MKGUI_API void mkgui_statusbar_set(struct mkgui_ctx *ctx, uint32_t id, uint32_t section, char *text) {
 	MKGUI_CHECK(ctx);
 	if(!text) {
 		text = "";
@@ -84,7 +84,7 @@ MKGUI_API void mkgui_statusbar_set(struct mkgui_ctx *ctx, uint32_t id, uint32_t 
 }
 
 // [=]===^=[ mkgui_statusbar_get ]=================================[=]
-MKGUI_API const char *mkgui_statusbar_get(struct mkgui_ctx *ctx, uint32_t id, uint32_t section) {
+MKGUI_API char *mkgui_statusbar_get(struct mkgui_ctx *ctx, uint32_t id, uint32_t section) {
 	MKGUI_CHECK_VAL(ctx, "");
 	struct mkgui_statusbar_data *sb = find_statusbar_data(ctx, id);
 	if(!sb || section >= sb->section_count) {

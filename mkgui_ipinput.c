@@ -151,7 +151,7 @@ static void handle_ipinput_click(struct mkgui_ctx *ctx, uint32_t widget_id, int3
 }
 
 // [=]===^=[ handle_ipinput_key ]==================================[=]
-static uint32_t handle_ipinput_key(struct mkgui_ctx *ctx, struct mkgui_event *ev, uint32_t ks, uint32_t keymod, const char *buf, int32_t len) {
+static uint32_t handle_ipinput_key(struct mkgui_ctx *ctx, struct mkgui_event *ev, uint32_t ks, uint32_t keymod, char *buf, int32_t len) {
 	struct mkgui_ipinput_data *ip = find_ipinput_data(ctx, ctx->focus_id);
 	if(!ip) {
 		return 0;
@@ -288,7 +288,7 @@ static uint32_t handle_ipinput_key(struct mkgui_ctx *ctx, struct mkgui_event *ev
 }
 
 // [=]===^=[ mkgui_ipinput_set ]===================================[=]
-MKGUI_API void mkgui_ipinput_set(struct mkgui_ctx *ctx, uint32_t id, const char *ip_string) {
+MKGUI_API void mkgui_ipinput_set(struct mkgui_ctx *ctx, uint32_t id, char *ip_string) {
 	MKGUI_CHECK(ctx);
 	if(!ip_string) {
 		ip_string = "";
@@ -309,7 +309,7 @@ MKGUI_API void mkgui_ipinput_set(struct mkgui_ctx *ctx, uint32_t id, const char 
 }
 
 // [=]===^=[ mkgui_ipinput_get ]===================================[=]
-MKGUI_API const char *mkgui_ipinput_get(struct mkgui_ctx *ctx, uint32_t id) {
+MKGUI_API char *mkgui_ipinput_get(struct mkgui_ctx *ctx, uint32_t id) {
 	MKGUI_CHECK_VAL(ctx, "");
 	static char ipinput_buf[16];
 	struct mkgui_ipinput_data *ip = find_ipinput_data(ctx, id);
