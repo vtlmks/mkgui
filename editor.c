@@ -4373,6 +4373,7 @@ int main(void) {
 	if(!ctx) {
 		return 1;
 	}
+	mkgui_icon_load_svg_dir(ctx, "icons");
 
 	struct mkgui_split_data *sd_main = find_split_data(ctx, ED_SPLIT_MAIN);
 	if(sd_main) {

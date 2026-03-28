@@ -168,11 +168,12 @@ static void ensure_dir(const char *path) {
 
 int main(int argc, char **argv) {
 	if(argc < 4) {
-		fprintf(stderr, "usage: extract_icons <theme_dir> <icons_used.txt> <output_dir> [size]\n");
-		fprintf(stderr, "  theme_dir     - icon theme root (e.g. /usr/share/icons/Papirus)\n");
+		fprintf(stderr, "usage: extract_icons <theme_dir> <icons_used.txt> <output_dir> [size] [toolbar_size]\n");
+		fprintf(stderr, "  theme_dir      - icon theme root (e.g. /usr/share/icons/Papirus)\n");
 		fprintf(stderr, "  icons_used.txt - list of icon names, one per line\n");
-		fprintf(stderr, "  output_dir    - flat output directory for SVG files\n");
-		fprintf(stderr, "  size          - preferred source size (default: 16)\n");
+		fprintf(stderr, "  output_dir     - output directory (creates toolbar/ subdirectory)\n");
+		fprintf(stderr, "  size           - preferred small icon size (default: 16)\n");
+		fprintf(stderr, "  toolbar_size   - preferred toolbar icon size (default: 22)\n");
 		return 1;
 	}
 
@@ -180,9 +181,13 @@ int main(int argc, char **argv) {
 	const char *list_path = argv[2];
 	const char *output_dir = argv[3];
 	int preferred_size = argc > 4 ? atoi(argv[4]) : 16;
+	int toolbar_size = argc > 5 ? atoi(argv[5]) : 22;
 
 	if(preferred_size <= 0) {
 		preferred_size = 16;
+	}
+	if(toolbar_size <= 0) {
+		toolbar_size = 22;
 	}
 
 	if(!read_icon_list(list_path)) {
@@ -218,6 +223,29 @@ int main(int argc, char **argv) {
 		}
 	}
 
-	fprintf(stderr, "extract_icons: %u found, %u missing, output: %s\n", found, missing, output_dir);
+	fprintf(stderr, "extract_icons: %u found, %u missing (small %dx%d)\n", found, missing, preferred_size, preferred_size);
+
+	char toolbar_dir[MAX_PATH];
+	snprintf(toolbar_dir, sizeof(toolbar_dir), "%s/toolbar", output_dir);
+	ensure_dir(toolbar_dir);
+
+	uint32_t tb_found = 0;
+	uint32_t tb_missing = 0;
+	for(uint32_t i = 0; i < icon_count; ++i) {
+		char src_path[MAX_PATH];
+		if(find_icon_in_theme(theme_dir, icon_names[i], toolbar_size, src_path)) {
+			resolve_symlink(src_path);
+			char dst_path[MAX_PATH];
+			snprintf(dst_path, sizeof(dst_path), "%s/%s.svg", toolbar_dir, icon_names[i]);
+			if(copy_file(src_path, dst_path)) {
+				++tb_found;
+			}
+		} else {
+			++tb_missing;
+		}
+	}
+
+	fprintf(stderr, "extract_icons: %u found, %u missing (toolbar %dx%d)\n", tb_found, tb_missing, toolbar_size, toolbar_size);
+	fprintf(stderr, "extract_icons: output: %s\n", output_dir);
 	return missing > 0 ? 1 : 0;
 }

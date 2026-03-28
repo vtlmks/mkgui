@@ -2449,18 +2449,36 @@ static void draw_icon_popup(struct mkgui_popup *p, struct mkgui_icon *icon, int3
 }
 
 // ---------------------------------------------------------------------------
-// nanosvg (SVG parsing + rasterization)
+// PlutoVG + PlutoSVG (SVG parsing + rasterization)
 // ---------------------------------------------------------------------------
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wsign-conversion"
 #pragma GCC diagnostic ignored "-Wconversion"
 #pragma GCC diagnostic ignored "-Wmissing-prototypes"
-#define NANOSVG_ALL_COLOR_KEYWORDS
-#define NANOSVG_IMPLEMENTATION
-#include "nanosvg.h"
-#define NANOSVGRAST_IMPLEMENTATION
-#include "nanosvgrast.h"
+#pragma GCC diagnostic ignored "-Wunused-function"
+#pragma GCC diagnostic ignored "-Wsign-compare"
+#define PLUTOSVG_BUILD_STATIC
+#define PLUTOSVG_BUILD
+#define PLUTOVG_BUILD_STATIC
+#define PLUTOVG_BUILD
+#include "plutovg/plutovg.h"
+#include "plutovg/plutovg-private.h"
+#include "plutovg/plutovg-utils.h"
+#include "plutovg/plutovg-ft-math.c"
+#include "plutovg/plutovg-ft-raster.c"
+#include "plutovg/plutovg-ft-stroker.c"
+#include "plutovg/plutovg-blend.c"
+#include "plutovg/plutovg-canvas.c"
+#include "plutovg/plutovg-font.c"
+#include "plutovg/plutovg-matrix.c"
+#include "plutovg/plutovg-paint.c"
+#include "plutovg/plutovg-path.c"
+#include "plutovg/plutovg-rasterize.c"
+#include "plutovg/plutovg-surface.c"
+#undef MAX_NAME
+#include "plutosvg/plutosvg.h"
+#include "plutosvg/plutosvg.c"
 #pragma GCC diagnostic pop
 
 // ---------------------------------------------------------------------------

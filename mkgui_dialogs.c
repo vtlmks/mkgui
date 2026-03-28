@@ -105,8 +105,8 @@ static int32_t dlg_icon_resolve(struct mkgui_ctx *ctx, uint32_t icon_type) {
 		return idx;
 	}
 	struct mkgui_svg_source *src = svg_find_source(name);
-	if(src && svg_rasterizer) {
-		return svg_rasterize_icon(cache_name, src->svg_data, src->svg_len, ctx->dialog_icon_size, 0);
+	if(src) {
+		return svg_rasterize_icon_ex(cache_name, src->svg_data, src->svg_len, ctx->dialog_icon_size, 0, 0);
 	}
 	return icon_find_idx(name);
 }
