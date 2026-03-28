@@ -40,6 +40,18 @@ static void platform_fb_destroy(struct mkgui_platform *plat, XShmSegmentInfo *sh
 }
 
 // ---------------------------------------------------------------------------
+// WM_CLASS
+// ---------------------------------------------------------------------------
+
+// [=]===^=[ platform_set_class_hint ]==============================[=]
+static void platform_set_class_hint(struct mkgui_platform *plat, char *instance, char *cls) {
+	XClassHint hint;
+	hint.res_name = instance;
+	hint.res_class = cls;
+	XSetClassHint(plat->dpy, plat->win, &hint);
+}
+
+// ---------------------------------------------------------------------------
 // Platform init / destroy
 // ---------------------------------------------------------------------------
 
@@ -64,6 +76,7 @@ static uint32_t platform_init(struct mkgui_ctx *ctx, const char *title, int32_t 
 	plat->win = XCreateWindow(plat->dpy, plat->root, 0, 0, (uint32_t)w, (uint32_t)h, 0,
 		(int)plat->depth, InputOutput, plat->visual, CWBackPixmap | CWBitGravity, &wa);
 	XStoreName(plat->dpy, plat->win, title);
+	platform_set_class_hint(plat, "main", ctx->app_class[0] ? ctx->app_class : "mkgui");
 
 	plat->wm_delete = XInternAtom(plat->dpy, "WM_DELETE_WINDOW", False);
 	plat->clipboard = XInternAtom(plat->dpy, "CLIPBOARD", False);
@@ -138,6 +151,7 @@ static uint32_t platform_init_child(struct mkgui_ctx *ctx, struct mkgui_ctx *par
 	plat->win = XCreateWindow(plat->dpy, plat->root, 0, 0, (uint32_t)w, (uint32_t)h, 0,
 		(int)plat->depth, InputOutput, plat->visual, CWBackPixmap | CWBitGravity, &wa);
 	XStoreName(plat->dpy, plat->win, title);
+	platform_set_class_hint(plat, "dialog", parent->app_class[0] ? parent->app_class : "mkgui");
 
 	XSetTransientForHint(plat->dpy, plat->win, pplat->win);
 

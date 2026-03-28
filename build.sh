@@ -4,7 +4,7 @@ CC=gcc
 WINCC=x86_64-w64-mingw32-gcc
 
 CFLAGS="-std=c99 "
-CFLAGS+="-O2 "
+CFLAGS+="-Os "
 CFLAGS+="-fwrapv "
 CFLAGS+="-Wall "
 CFLAGS+="-Wextra "

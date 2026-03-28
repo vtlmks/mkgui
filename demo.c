@@ -337,7 +337,7 @@ static void demo_gl_render(struct mkgui_ctx *ctx, struct demo_state *state) {
 	if(!state->gl_ctx || !widget_visible(ctx, (uint32_t)find_widget_idx(ctx, ID_GLVIEW1))) {
 		return;
 	}
-	int32_t glw, glh;
+	int32_t glw = 0, glh = 0;
 	mkgui_glview_get_size(ctx, ID_GLVIEW1, &glw, &glh);
 	if(glw <= 0 || glh <= 0) {
 		return;
@@ -768,6 +768,7 @@ int main(void) {
 		return 1;
 	}
 
+	mkgui_set_app_class(ctx, "mkgui_demo");
 	mkgui_set_scale(ctx, 1.0f);
 	mkgui_icon_load_svg_dir(ctx, "icons");
 

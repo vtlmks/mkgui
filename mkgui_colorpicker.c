@@ -396,6 +396,7 @@ MKGUI_API uint32_t mkgui_color_dialog(struct mkgui_ctx *ctx, uint32_t initial_co
 	if(!dlg) {
 		return 0;
 	}
+	mkgui_set_window_instance(dlg, "colorpicker");
 	dlg->render_cb = cp_render_cb;
 
 	mkgui_spinbox_setup(dlg, CP_R_SPN, 0, 255, 0, 1);

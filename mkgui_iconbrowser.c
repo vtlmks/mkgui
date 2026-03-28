@@ -263,6 +263,7 @@ MKGUI_API uint32_t mkgui_icon_browser_theme(struct mkgui_ctx *ctx, char *theme_d
 	if(!dlg) {
 		return 0;
 	}
+	mkgui_set_window_instance(dlg, "iconbrowser");
 
 	ibt.active_cat = 0;
 	ibt_filter(NULL);

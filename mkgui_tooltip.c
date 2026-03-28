@@ -1,11 +1,15 @@
 // Copyright (c) 2026, Peter Fors
 // SPDX-License-Identifier: MIT
 
-#define MKGUI_TOOLTIP_DELAY 30
+#define MKGUI_TOOLTIP_DELAY_MS 500
 
 // [=]===^=[ render_tooltip ]=====================================[=]
 static void render_tooltip(struct mkgui_ctx *ctx) {
-	if(!ctx->tooltip_id || ctx->tooltip_timer < MKGUI_TOOLTIP_DELAY) {
+	if(!ctx->tooltip_id) {
+		return;
+	}
+	uint32_t elapsed = mkgui_time_ms() - ctx->tooltip_start_ms;
+	if(elapsed < MKGUI_TOOLTIP_DELAY_MS) {
 		return;
 	}
 
@@ -32,6 +36,7 @@ static void render_tooltip(struct mkgui_ctx *ctx) {
 		ty = ctx->tooltip_y - th - sc(ctx, 4);
 	}
 
+	ctx->tooltip_shown = 1;
 	draw_rounded_rect(ctx->pixels, ctx->win_w, ctx->win_h, tx, ty, tw, th, ctx->theme.widget_bg, ctx->theme.widget_border, ctx->theme.corner_radius);
 	push_text_clip(tx + pad, ty + pad, text, ctx->theme.text, tx, ty, tx + tw, ty + th);
 }
@@ -39,21 +44,14 @@ static void render_tooltip(struct mkgui_ctx *ctx) {
 // [=]===^=[ tooltip_update ]=====================================[=]
 static void tooltip_update(struct mkgui_ctx *ctx, uint32_t hover_id, int32_t mx, int32_t my) {
 	if(hover_id != ctx->tooltip_id) {
-		if(ctx->tooltip_timer >= MKGUI_TOOLTIP_DELAY) {
+		if(ctx->tooltip_shown) {
 			dirty_all(ctx);
 		}
 		ctx->tooltip_id = hover_id;
-		ctx->tooltip_timer = 0;
+		ctx->tooltip_start_ms = hover_id ? mkgui_time_ms() : 0;
+		ctx->tooltip_shown = 0;
 		ctx->tooltip_x = mx;
 		ctx->tooltip_y = my;
-
-	} else if(ctx->tooltip_id) {
-		if(ctx->tooltip_timer < MKGUI_TOOLTIP_DELAY) {
-			++ctx->tooltip_timer;
-			if(ctx->tooltip_timer == MKGUI_TOOLTIP_DELAY) {
-				dirty_all(ctx);
-			}
-		}
 	}
 }
 

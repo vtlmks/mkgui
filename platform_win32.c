@@ -361,6 +361,13 @@ static void platform_register_class(void) {
 	wc_registered = 1;
 }
 
+// [=]===^=[ platform_set_class_hint ]==============================[=]
+static void platform_set_class_hint(struct mkgui_platform *plat, char *instance, char *cls) {
+	(void)plat;
+	(void)instance;
+	(void)cls;
+}
+
 // [=]===^=[ platform_init ]=======================================[=]
 static uint32_t platform_init(struct mkgui_ctx *ctx, const char *title, int32_t w, int32_t h) {
 	struct mkgui_platform *plat = &ctx->plat;

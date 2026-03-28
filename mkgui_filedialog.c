@@ -298,6 +298,8 @@ static int fd_compare_entries(const void *a, const void *b) {
 }
 
 // [=]===^=[ fd_scan_dir ]========================================[=]
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wformat-truncation"
 static void fd_scan_dir(void) {
 	fd.entry_count = 0;
 
@@ -410,6 +412,7 @@ static void fd_scan_dir(void) {
 		qsort(fd.entries, fd.entry_count, sizeof(fd.entries[0]), fd_compare_entries);
 	}
 }
+#pragma GCC diagnostic pop
 
 // ---------------------------------------------------------------------------
 // Bookmarks
@@ -1131,6 +1134,7 @@ static uint32_t fd_run_dialog(struct mkgui_ctx *ctx, uint32_t mode, struct mkgui
 	if(!dlg) {
 		return 0;
 	}
+	mkgui_set_window_instance(dlg, "filedialog");
 
 	mkgui_pathbar_set(dlg, FD_ID_PATHBAR, fd.path);
 

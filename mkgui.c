@@ -635,7 +635,8 @@ struct mkgui_ctx {
 	uint32_t dirty_full;
 
 	uint32_t tooltip_id;
-	uint32_t tooltip_timer;
+	uint32_t tooltip_start_ms;
+	uint32_t tooltip_shown;
 	int32_t tooltip_x, tooltip_y;
 
 	struct mkgui_theme theme;
@@ -693,6 +694,8 @@ struct mkgui_ctx {
 	struct mkgui_ctxmenu_item ctxmenu_items[MKGUI_MAX_CTXMENU];
 	uint32_t ctxmenu_count;
 	int32_t ctxmenu_x, ctxmenu_y;
+
+	char app_class[64];
 };
 
 // ---------------------------------------------------------------------------
@@ -2200,7 +2203,7 @@ static int32_t hit_test(struct mkgui_ctx *ctx, int32_t mx, int32_t my) {
 			continue;
 		}
 		struct mkgui_widget *w = &ctx->widgets[i];
-		if(w->type == MKGUI_WINDOW || w->type == MKGUI_TAB || w->type == MKGUI_PANEL || w->type == MKGUI_SPINNER || w->type == MKGUI_GLVIEW || w->type == MKGUI_VBOX || w->type == MKGUI_HBOX || w->type == MKGUI_FORM || w->type == MKGUI_DIVIDER) {
+		if(w->type == MKGUI_WINDOW || w->type == MKGUI_TAB || w->type == MKGUI_PANEL || w->type == MKGUI_SPINNER || w->type == MKGUI_GLVIEW || w->type == MKGUI_VBOX || w->type == MKGUI_HBOX || w->type == MKGUI_FORM || w->type == MKGUI_DIVIDER || w->type == MKGUI_TOOLBAR) {
 			continue;
 		}
 		if(w->type == MKGUI_GROUP) {
@@ -3764,6 +3767,27 @@ MKGUI_API struct mkgui_ctx *mkgui_create(struct mkgui_widget *widgets, uint32_t 
 	window_register(ctx);
 
 	return ctx;
+}
+
+// [=]===^=[ mkgui_set_app_class ]================================[=]
+MKGUI_API void mkgui_set_app_class(struct mkgui_ctx *ctx, char *app_class) {
+	MKGUI_CHECK(ctx);
+	MKGUI_CHECK(app_class);
+	snprintf(ctx->app_class, sizeof(ctx->app_class), "%s", app_class);
+	platform_set_class_hint(&ctx->plat, "main", ctx->app_class);
+}
+
+// [=]===^=[ mkgui_set_window_instance ]============================[=]
+MKGUI_API void mkgui_set_window_instance(struct mkgui_ctx *ctx, char *instance) {
+	MKGUI_CHECK(ctx);
+	MKGUI_CHECK(instance);
+	char *cls = "mkgui";
+	if(ctx->app_class[0]) {
+		cls = ctx->app_class;
+	} else if(ctx->parent && ctx->parent->app_class[0]) {
+		cls = ctx->parent->app_class;
+	}
+	platform_set_class_hint(&ctx->plat, instance, cls);
 }
 
 // [=]===^=[ mkgui_set_theme ]====================================[=]
@@ -6738,6 +6762,13 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 		}
 	}
 
+	if(ctx->tooltip_id && !ctx->tooltip_shown) {
+		uint32_t elapsed = mkgui_time_ms() - ctx->tooltip_start_ms;
+		if(elapsed >= MKGUI_TOOLTIP_DELAY_MS) {
+			dirty_all(ctx);
+		}
+	}
+
 	return ev->type != MKGUI_EVENT_NONE;
 }
 
@@ -6897,7 +6928,17 @@ MKGUI_API void mkgui_wait(struct mkgui_ctx *ctx) {
 			}
 		}
 	}
-	platform_wait_event(ctx, any_anim ? 16 : -1);
+	int32_t timeout = any_anim ? 16 : -1;
+	if(ctx->tooltip_id && !ctx->tooltip_shown) {
+		uint32_t elapsed = mkgui_time_ms() - ctx->tooltip_start_ms;
+		if(elapsed < MKGUI_TOOLTIP_DELAY_MS) {
+			int32_t remaining = (int32_t)(MKGUI_TOOLTIP_DELAY_MS - elapsed);
+			if(timeout < 0 || remaining < timeout) {
+				timeout = remaining;
+			}
+		}
+	}
+	platform_wait_event(ctx, timeout);
 }
 
 // [=]===^=[ mkgui_add_timer ]=====================================[=]

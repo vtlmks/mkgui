@@ -211,6 +211,7 @@ static uint32_t dlg_run(struct mkgui_ctx *parent, struct mkgui_widget *widgets, 
 	if(!dlg) {
 		return MKGUI_DLG_RESULT_NONE;
 	}
+	mkgui_set_window_instance(dlg, "dialog");
 
 	dlg->render_cb = dlg_render;
 
@@ -483,6 +484,7 @@ MKGUI_API uint32_t mkgui_input_dialog(struct mkgui_ctx *ctx, char *title, char *
 	if(!dlg) {
 		return 0;
 	}
+	mkgui_set_window_instance(dlg, "dialog");
 
 	dlg->render_cb = dlg_render;
 
