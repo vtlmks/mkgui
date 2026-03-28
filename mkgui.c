@@ -2462,7 +2462,11 @@ static void draw_icon_popup(struct mkgui_popup *p, struct mkgui_icon *icon, int3
 #define PLUTOSVG_BUILD
 #define PLUTOVG_BUILD_STATIC
 #define PLUTOVG_BUILD
+#define PLUTOVG_NO_IMAGE_IO
 #include "plutovg/plutovg.h"
+plutovg_surface_t *plutovg_surface_load_from_image_base64(const char *d, int l) { (void)d; (void)l; return NULL; }
+plutovg_surface_t *plutovg_surface_load_from_image_file(const char *f) { (void)f; return NULL; }
+plutovg_surface_t *plutovg_surface_load_from_image_data(const void *d, int l) { (void)d; (void)l; return NULL; }
 #include "plutovg/plutovg-private.h"
 #include "plutovg/plutovg-utils.h"
 #include "plutovg/plutovg-ft-math.c"

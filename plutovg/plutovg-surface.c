@@ -1,6 +1,7 @@
 #include "plutovg-private.h"
 #include "plutovg-utils.h"
 
+#ifndef PLUTOVG_NO_IMAGE_IO
 #define STB_IMAGE_WRITE_STATIC
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "plutovg-stb-image-write.h"
@@ -8,6 +9,7 @@
 #define STB_IMAGE_STATIC
 #define STB_IMAGE_IMPLEMENTATION
 #include "plutovg-stb-image.h"
+#endif
 
 static plutovg_surface_t* plutovg_surface_create_uninitialized(int width, int height)
 {
@@ -45,6 +47,7 @@ plutovg_surface_t* plutovg_surface_create_for_data(unsigned char* data, int widt
     return surface;
 }
 
+#ifndef PLUTOVG_NO_IMAGE_IO
 static plutovg_surface_t* plutovg_surface_load_from_image(stbi_uc* image, int width, int height)
 {
     plutovg_surface_t* surface = plutovg_surface_create_uninitialized(width, height);
@@ -148,6 +151,7 @@ cleanup:
     return surface;
 }
 
+#endif /* PLUTOVG_NO_IMAGE_IO */
 plutovg_surface_t* plutovg_surface_reference(plutovg_surface_t* surface)
 {
     plutovg_increment_reference(surface);
@@ -195,6 +199,7 @@ void plutovg_surface_clear(plutovg_surface_t* surface, const plutovg_color_t* co
     }
 }
 
+#ifndef PLUTOVG_NO_IMAGE_IO
 static void plutovg_surface_write_begin(const plutovg_surface_t* surface)
 {
     plutovg_convert_argb_to_rgba(surface->data, surface->data, surface->width, surface->height, surface->stride);
@@ -237,6 +242,7 @@ bool plutovg_surface_write_to_jpg_stream(const plutovg_surface_t* surface, pluto
     return success;
 }
 
+#endif /* PLUTOVG_NO_IMAGE_IO */
 void plutovg_convert_argb_to_rgba(unsigned char* dst, const unsigned char* src, int width, int height, int stride)
 {
     for(int y = 0; y < height; y++) {
