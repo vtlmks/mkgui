@@ -205,7 +205,7 @@ static void render_treeview(struct mkgui_ctx *ctx, uint32_t idx) {
 			} else {
 				draw_vline(ctx->pixels, ctx->win_w, ctx->win_h, lx, row_y, ctx->row_height, line_color);
 			}
-			int32_t hlen = tv->nodes[i].has_children ? tree_indent / 2 - 1 : tree_indent + tree_indent / 2 - 1;
+			int32_t hlen = tv->nodes[i].has_children ? tree_indent / 2 - 1 : tree_indent + tree_indent / 2 - sc(ctx, 4) - 1;
 			draw_hline(ctx->pixels, ctx->win_w, ctx->win_h, lx + 1, cy, hlen, line_color);
 		}
 
@@ -220,15 +220,13 @@ static void render_treeview(struct mkgui_ctx *ctx, uint32_t idx) {
 			int32_t ay = row_y + ctx->row_height / 2;
 
 			if(ay >= clip_top && ay < clip_bottom) {
+				int32_t as = arrow_size;
 				if(tv->nodes[i].expanded) {
-					for(uint32_t j = 0; j < (uint32_t)arrow_size; ++j) {
-						draw_hline(ctx->pixels, ctx->win_w, ctx->win_h, ax + (int32_t)j, ay - arrow_size / 2 + (int32_t)j, arrow_size - (int32_t)j, ctx->theme.text);
-					}
-
+					draw_triangle_aa(ctx->pixels, ctx->win_w, ctx->win_h,
+						ax, ay - as / 2, ax + as, ay - as / 2, ax + as / 2, ay + as / 2, ctx->theme.text);
 				} else {
-					for(uint32_t j = 0; j < (uint32_t)arrow_size; ++j) {
-						draw_vline(ctx->pixels, ctx->win_w, ctx->win_h, ax + (int32_t)j, ay - arrow_size / 2 + (int32_t)j, arrow_size - (int32_t)j * 2, ctx->theme.text);
-					}
+					draw_triangle_aa(ctx->pixels, ctx->win_w, ctx->win_h,
+						ax, ay - as / 2, ax + as, ay, ax, ay + as / 2, ctx->theme.text);
 				}
 			}
 		}

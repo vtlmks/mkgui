@@ -194,11 +194,10 @@ static void render_datepicker_popup(struct mkgui_ctx *ctx, struct mkgui_popup *p
 	draw_rounded_rect(p->pixels, p->w, p->h, inner_x, btn_y, month_w, btn_h, mbg, ctx->theme.widget_border, ctx->theme.corner_radius);
 	int32_t mname_tw = text_width(ctx, mname);
 	push_text_clip(p->x + inner_x + text_pad, hdr_y + p->y, mname, ctx->theme.text, p->x + inner_x, p->y, p->x + inner_x + month_w - drop_icon_w, p->y + p->h);
-	int32_t drop_ax = inner_x + month_w - drop_icon_w;
-	int32_t drop_ay = acy - gap2;
-	for(uint32_t j = 0; j < (uint32_t)(arr_half + 1); ++j) {
-		draw_hline(p->pixels, p->w, p->h, drop_ax + (int32_t)j, drop_ay + (int32_t)j, (arr_half + 1) * 2 - 1 - (int32_t)j * 2, ctx->theme.text);
-	}
+	int32_t drop_acx = inner_x + month_w - drop_icon_w + arr_half;
+	int32_t drop_acy = acy - gap2 + arr_half / 2;
+	draw_triangle_aa(p->pixels, p->w, p->h,
+		drop_acx - arr_half, drop_acy - arr_half / 2, drop_acx + arr_half, drop_acy - arr_half / 2, drop_acx, drop_acy + arr_half / 2, ctx->theme.text);
 	(void)mname_tw;
 
 	int32_t yr = ctx->theme.corner_radius;
@@ -215,16 +214,14 @@ static void render_datepicker_popup(struct mkgui_ctx *ctx, struct mkgui_popup *p
 	draw_rounded_rect(p->pixels, p->w, p->h, sbx, btn_y, year_btn_w, year_half, up_bg, ctx->theme.widget_border, yr);
 	int32_t sacx = sbx + year_btn_w / 2;
 	int32_t sacy_up = btn_y + year_half / 2 - gap2;
-	for(uint32_t j = 0; j < (uint32_t)(arr_half + 1); ++j) {
-		draw_hline(p->pixels, p->w, p->h, sacx - (int32_t)j, sacy_up + (int32_t)j, 1 + (int32_t)j * 2, ctx->theme.text);
-	}
+	draw_triangle_aa(p->pixels, p->w, p->h,
+		sacx, sacy_up, sacx - arr_half, sacy_up + arr_half, sacx + arr_half, sacy_up + arr_half, ctx->theme.text);
 
 	uint32_t dn_bg = year_dn_hover ? ctx->theme.widget_hover : ctx->theme.widget_bg;
 	draw_rounded_rect(p->pixels, p->w, p->h, sbx, btn_y + year_half, year_btn_w, btn_h - year_half, dn_bg, ctx->theme.widget_border, yr);
 	int32_t sacy_dn = btn_y + year_half + (btn_h - year_half) / 2 - gap2;
-	for(uint32_t j = 0; j < (uint32_t)(arr_half + 1); ++j) {
-		draw_hline(p->pixels, p->w, p->h, sacx - (int32_t)(arr_half - (int32_t)j), sacy_dn + (int32_t)j, 1 + (int32_t)(arr_half - (int32_t)j) * 2, ctx->theme.text);
-	}
+	draw_triangle_aa(p->pixels, p->w, p->h,
+		sacx - arr_half, sacy_dn, sacx + arr_half, sacy_dn, sacx, sacy_dn + arr_half, ctx->theme.text);
 
 	cy += hdr_h;
 

@@ -298,6 +298,82 @@ static inline void draw_vline(uint32_t *buf, int32_t bw, int32_t bh, int32_t x, 
 	}
 }
 
+// [=]===^=[ draw_triangle_aa ]====================================[=]
+static void draw_triangle_aa(uint32_t *buf, int32_t bw, int32_t bh,
+	int32_t x0, int32_t y0, int32_t x1, int32_t y1, int32_t x2, int32_t y2, uint32_t color) {
+	int32_t tmp;
+	if(y0 > y1) { tmp = x0; x0 = x1; x1 = tmp; tmp = y0; y0 = y1; y1 = tmp; }
+	if(y0 > y2) { tmp = x0; x0 = x2; x2 = tmp; tmp = y0; y0 = y2; y2 = tmp; }
+	if(y1 > y2) { tmp = x1; x1 = x2; x2 = tmp; tmp = y1; y1 = y2; y2 = tmp; }
+	if(y0 == y2) {
+		return;
+	}
+	int32_t min_x = x0 < x1 ? x0 : x1;
+	if(x2 < min_x) { min_x = x2; }
+	int32_t max_x = x0 > x1 ? x0 : x1;
+	if(x2 > max_x) { max_x = x2; }
+	int32_t span = max_x - min_x + 2;
+	if(span > 256) { span = 256; }
+	int32_t min_y = y0 < render_clip_y1 ? render_clip_y1 : y0;
+	int32_t max_y = (y2 + 1) > render_clip_y2 ? render_clip_y2 : (y2 + 1);
+	if(min_y < 0) { min_y = 0; }
+	if(max_y > bh) { max_y = bh; }
+	int32_t y0_4 = y0 * 4;
+	int32_t y1_4 = y1 * 4;
+	int32_t y2_4 = y2 * 4;
+	int32_t x0_8 = x0 * 8;
+	int32_t x1_8 = x1 * 8;
+	int32_t x2_8 = x2 * 8;
+	for(int32_t sy = min_y; sy < max_y; ++sy) {
+		int32_t cov[256];
+		memset(cov, 0, (size_t)span * sizeof(int32_t));
+		for(uint32_t sub = 0; sub < 4; ++sub) {
+			int32_t sy4 = sy * 4 + (int32_t)sub;
+			if(sy4 < y0_4 || sy4 >= y2_4) {
+				continue;
+			}
+			int32_t el, er;
+			int32_t la = (x2_8 - x0_8) * (sy4 - y0_4) / (y2_4 - y0_4) + x0_8;
+			if(sy4 < y1_4) {
+				if(y1_4 == y0_4) { continue; }
+				int32_t s = (x1_8 - x0_8) * (sy4 - y0_4) / (y1_4 - y0_4) + x0_8;
+				if(s < la) { el = s; er = la; } else { el = la; er = s; }
+			} else {
+				if(y2_4 == y1_4) { continue; }
+				int32_t s = (x2_8 - x1_8) * (sy4 - y1_4) / (y2_4 - y1_4) + x1_8;
+				if(s < la) { el = s; er = la; } else { el = la; er = s; }
+			}
+			int32_t px_l = el / 8;
+			int32_t px_r = (er + 7) / 8;
+			if(px_l < min_x) { px_l = min_x; }
+			if(px_r > max_x + 2) { px_r = max_x + 2; }
+			for(int32_t px = px_l; px < px_r; ++px) {
+				int32_t ci = px - min_x;
+				if(ci < 0 || ci >= span) { continue; }
+				int32_t pl = px * 8;
+				int32_t pr = pl + 8;
+				int32_t cl = el > pl ? el : pl;
+				int32_t cr = er < pr ? er : pr;
+				if(cr > cl) {
+					cov[ci] += cr - cl;
+				}
+			}
+		}
+		for(int32_t ci = 0; ci < span; ++ci) {
+			if(cov[ci] <= 0) { continue; }
+			int32_t px = min_x + ci;
+			if(px < 0 || px >= bw || px < render_clip_x1 || px >= render_clip_x2) { continue; }
+			uint32_t idx = (uint32_t)(sy * bw + px);
+			int32_t alpha = cov[ci] * 255 / 32;
+			if(alpha >= 255) {
+				buf[idx] = color;
+			} else {
+				buf[idx] = blend_pixel(buf[idx], color, (uint8_t)alpha);
+			}
+		}
+	}
+}
+
 // [=]===^=[ draw_rect_border ]==================================[=]
 static void draw_rect_border(uint32_t *buf, int32_t bw, int32_t bh, int32_t x, int32_t y, int32_t w, int32_t h, uint32_t color) {
 	draw_hline(buf, bw, bh, x, y, w, color);

@@ -30,11 +30,11 @@ static void render_dropdown(struct mkgui_ctx *ctx, uint32_t idx) {
 	int32_t arrow_margin = sc(ctx, 14);
 	push_text_clip(rx + text_pad, ty, text, tc, rx + 1, ry + 1, rx + rw - arrow_margin - sc(ctx, 2), ry + rh - 1);
 
-	int32_t ax = rx + rw - arrow_margin;
-	int32_t ay = ry + rh / 2 - 2;
-	for(uint32_t j = 0; j < 5; ++j) {
-		draw_hline(ctx->pixels, ctx->win_w, ctx->win_h, ax + (int32_t)j, ay + (int32_t)j, 9 - (int32_t)j * 2, tc);
-	}
+	int32_t as = sc(ctx, 4);
+	int32_t acx = rx + rw - arrow_margin + as;
+	int32_t acy = ry + rh / 2;
+	draw_triangle_aa(ctx->pixels, ctx->win_w, ctx->win_h,
+		acx - as, acy - as / 2, acx + as, acy - as / 2, acx, acy + as / 2, tc);
 }
 
 // [=]===^=[ dropdown_clamp_scroll ]=============================[=]

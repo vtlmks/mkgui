@@ -50,21 +50,15 @@ static void render_group(struct mkgui_ctx *ctx, uint32_t idx) {
 	}
 
 	uint32_t ac = ctx->theme.text;
-	int32_t ax = rx + group_pad - sc(ctx, 4);
+	int32_t as = sc(ctx, 4);
+	int32_t ax = rx + group_pad - sc(ctx, 3);
 	int32_t ay = label_y + ctx->font_height / 2;
 	if(collapsed) {
-		draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, ax, ay - sc(ctx, 3), sc(ctx, 1), sc(ctx, 1), ac);
-		draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, ax, ay - sc(ctx, 2), sc(ctx, 2), sc(ctx, 1), ac);
-		draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, ax, ay - sc(ctx, 1), sc(ctx, 3), sc(ctx, 1), ac);
-		draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, ax, ay, sc(ctx, 4), sc(ctx, 1), ac);
-		draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, ax, ay + sc(ctx, 1), sc(ctx, 3), sc(ctx, 1), ac);
-		draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, ax, ay + sc(ctx, 2), sc(ctx, 2), sc(ctx, 1), ac);
-		draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, ax, ay + sc(ctx, 3), sc(ctx, 1), sc(ctx, 1), ac);
+		draw_triangle_aa(ctx->pixels, ctx->win_w, ctx->win_h,
+			ax, ay - as, ax + as, ay, ax, ay + as, ac);
 	} else {
-		draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, ax - sc(ctx, 2), ay - sc(ctx, 1), sc(ctx, 7), sc(ctx, 1), ac);
-		draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, ax - sc(ctx, 1), ay, sc(ctx, 5), sc(ctx, 1), ac);
-		draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, ax, ay + sc(ctx, 1), sc(ctx, 3), sc(ctx, 1), ac);
-		draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, ax + sc(ctx, 1), ay + sc(ctx, 2), sc(ctx, 1), sc(ctx, 1), ac);
+		draw_triangle_aa(ctx->pixels, ctx->win_w, ctx->win_h,
+			ax - as, ay - as / 2, ax + as, ay - as / 2, ax, ay + as / 2, ac);
 	}
 }
 

@@ -160,11 +160,11 @@ static void render_combobox(struct mkgui_ctx *ctx, uint32_t idx) {
 	draw_patch(ctx, MKGUI_STYLE_RAISED, rx + text_w, ry, btn_w, rh, btn_bg, border);
 
 	uint32_t tc = disabled ? ctx->theme.text_disabled : ctx->theme.text;
-	int32_t ax = rx + text_w + (btn_w - 9) / 2;
-	int32_t ay = ry + rh / 2 - 2;
-	for(uint32_t j = 0; j < 5; ++j) {
-		draw_hline(ctx->pixels, ctx->win_w, ctx->win_h, ax + (int32_t)j, ay + (int32_t)j, 9 - (int32_t)j * 2, tc);
-	}
+	int32_t as = sc(ctx, 4);
+	int32_t acx = rx + text_w + btn_w / 2;
+	int32_t acy = ry + rh / 2;
+	draw_triangle_aa(ctx->pixels, ctx->win_w, ctx->win_h,
+		acx - as, acy - as / 2, acx + as, acy - as / 2, acx, acy + as / 2, tc);
 
 	struct mkgui_combobox_data *cb = find_combobox_data(ctx, w->id);
 	if(!cb) {

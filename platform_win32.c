@@ -345,11 +345,36 @@ static void platform_fb_destroy_dib(HDC *hdc_mem, HBITMAP *hbmp, HBITMAP *hbmp_o
 
 static uint32_t wc_registered;
 
+// [=]===^=[ platform_set_dpi_aware ]===============================[=]
+static void platform_set_dpi_aware(void) {
+	typedef BOOL (WINAPI *SetProcessDpiAwarenessContext_t)(HANDLE);
+	typedef HRESULT (WINAPI *SetProcessDpiAwareness_t)(int);
+
+	HMODULE user32 = GetModuleHandleA("user32.dll");
+	if(user32) {
+		SetProcessDpiAwarenessContext_t fn = (SetProcessDpiAwarenessContext_t)(void *)GetProcAddress(user32, "SetProcessDpiAwarenessContext");
+		if(fn) {
+			fn((HANDLE)-4);
+			return;
+		}
+	}
+
+	HMODULE shcore = LoadLibraryA("shcore.dll");
+	if(shcore) {
+		SetProcessDpiAwareness_t fn = (SetProcessDpiAwareness_t)(void *)GetProcAddress(shcore, "SetProcessDpiAwareness");
+		if(fn) {
+			fn(2);
+		}
+		FreeLibrary(shcore);
+	}
+}
+
 // [=]===^=[ platform_register_class ]=============================[=]
 static void platform_register_class(void) {
 	if(wc_registered) {
 		return;
 	}
+	platform_set_dpi_aware();
 	WNDCLASSEXA wc;
 	memset(&wc, 0, sizeof(wc));
 	wc.cbSize = sizeof(wc);
@@ -703,14 +728,14 @@ static void platform_font_rasterize(struct mkgui_ctx *ctx, int32_t pixel_size) {
 	plat_font_handle = CreateFontA(
 		-pixel_size, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
 		DEFAULT_CHARSET, OUT_TT_PRECIS, CLIP_DEFAULT_PRECIS,
-		ANTIALIASED_QUALITY, DEFAULT_PITCH | FF_DONTCARE,
+		CLEARTYPE_NATURAL_QUALITY, DEFAULT_PITCH | FF_DONTCARE,
 		"Segoe UI");
 
 	if(!plat_font_handle) {
 		plat_font_handle = CreateFontA(
 			-pixel_size, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
 			DEFAULT_CHARSET, OUT_TT_PRECIS, CLIP_DEFAULT_PRECIS,
-			ANTIALIASED_QUALITY, DEFAULT_PITCH | FF_DONTCARE,
+			CLEARTYPE_NATURAL_QUALITY, DEFAULT_PITCH | FF_DONTCARE,
 			"Tahoma");
 	}
 

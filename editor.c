@@ -1906,11 +1906,11 @@ static void ed_draw_widget_fallback(struct mkgui_ctx *ctx, uint32_t idx) {
 			int32_t text_w = rw - 20;
 			draw_patch(ctx, MKGUI_STYLE_SUNKEN, rx, ry, text_w, rh, ctx->theme.input_bg, ctx->theme.widget_border);
 			draw_patch(ctx, MKGUI_STYLE_RAISED, rx + text_w, ry, 20, rh, ctx->theme.widget_bg, ctx->theme.widget_border);
-			int32_t ax = rx + text_w + 3;
-			int32_t ay = ry + rh / 2 - 2;
-			for(uint32_t j = 0; j < 5; ++j) {
-				draw_hline(ctx->pixels, ctx->win_w, ctx->win_h, ax + (int32_t)j, ay + (int32_t)j, 9 - (int32_t)j * 2, ctx->theme.text);
-			}
+			int32_t as = 4;
+			int32_t acx = rx + text_w + 10;
+			int32_t acy = ry + rh / 2;
+			draw_triangle_aa(ctx->pixels, ctx->win_w, ctx->win_h,
+				acx - as, acy - as / 2, acx + as, acy - as / 2, acx, acy + as / 2, ctx->theme.text);
 			if(ew->label[0]) {
 				int32_t cty = ry + (rh - ctx->font_height) / 2;
 				push_text_clip(rx + 4, cty, ew->label, ctx->theme.text_disabled, rx + 1, ry + 1, rx + text_w - 1, ry + rh - 1);
@@ -1950,11 +1950,11 @@ static void ed_draw_widget_fallback(struct mkgui_ctx *ctx, uint32_t idx) {
 			draw_patch(ctx, MKGUI_STYLE_RAISED, rx, ry, rw, rh, ctx->theme.widget_bg, ctx->theme.widget_border);
 			int32_t ty = ry + (rh - ctx->font_height) / 2;
 			push_text_clip(rx + 4, ty, ew->label, ctx->theme.text, rx + 1, ry + 1, rx + rw - 16, ry + rh - 1);
-			int32_t ax = rx + rw - 14;
-			int32_t ay = ry + rh / 2 - 2;
-			for(uint32_t j = 0; j < 5; ++j) {
-				draw_hline(buf, bw, bh, ax + (int32_t)j, ay + (int32_t)j, 9 - (int32_t)j * 2, ctx->theme.text);
-			}
+			int32_t as2 = 4;
+			int32_t acx2 = rx + rw - 10;
+			int32_t acy2 = ry + rh / 2;
+			draw_triangle_aa(buf, bw, bh,
+				acx2 - as2, acy2 - as2 / 2, acx2 + as2, acy2 - as2 / 2, acx2, acy2 + as2 / 2, ctx->theme.text);
 		} break;
 
 		case MKGUI_SPINBOX: {
@@ -1968,12 +1968,11 @@ static void ed_draw_widget_fallback(struct mkgui_ctx *ctx, uint32_t idx) {
 			draw_patch(ctx, MKGUI_STYLE_RAISED, bx, ry, 20, half, ctx->theme.widget_bg, ctx->theme.widget_border);
 			draw_patch(ctx, MKGUI_STYLE_RAISED, bx, ry + half, 20, rh - half, ctx->theme.widget_bg, ctx->theme.widget_border);
 			int32_t ac = bx + 10;
-			for(uint32_t j = 0; j < 3; ++j) {
-				draw_hline(buf, bw, bh, ac - (int32_t)j, ry + half / 2 - (int32_t)j, (int32_t)j * 2 + 1, ctx->theme.text);
-			}
-			for(uint32_t j = 0; j < 3; ++j) {
-				draw_hline(buf, bw, bh, ac - (int32_t)j, ry + half + (rh - half) / 2 + (int32_t)j, (int32_t)j * 2 + 1, ctx->theme.text);
-			}
+			int32_t sas = 3;
+			draw_triangle_aa(buf, bw, bh,
+				ac, ry + half / 2 - sas, ac - sas, ry + half / 2 + sas / 2, ac + sas, ry + half / 2 + sas / 2, ctx->theme.text);
+			draw_triangle_aa(buf, bw, bh,
+				ac - sas, ry + half + (rh - half) / 2 - sas / 2, ac + sas, ry + half + (rh - half) / 2 - sas / 2, ac, ry + half + (rh - half) / 2 + sas, ctx->theme.text);
 		} break;
 
 		case MKGUI_PROGRESS: {

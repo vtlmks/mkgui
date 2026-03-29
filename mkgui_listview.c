@@ -381,7 +381,6 @@ static void render_listview(struct mkgui_ctx *ctx, uint32_t idx) {
 	int32_t sort_icon_w = sc(ctx, 12);
 	int32_t sort_arr_w = sc(ctx, 7);
 	int32_t sort_arr_h = sc(ctx, 4);
-	int32_t sort_arr_off = sc(ctx, 2);
 
 	int32_t cx = rx + 1 - sx;
 	for(uint32_t d = 0; d < lv->col_count; ++d) {
@@ -400,17 +399,15 @@ static void render_listview(struct mkgui_ctx *ctx, uint32_t idx) {
 			push_text_clip(cx + hdr_pad, ty, lv->columns[c].label, ctx->theme.text, col_left, ry, col_right, ry + hh);
 
 			if(lv->sort_col == (int32_t)c) {
-				int32_t ax = cx + cw - sort_icon_w;
-				int32_t ay = ry + hh / 2;
-				if(ax >= clip_left && ax + sort_arr_w <= clip_right) {
+				int32_t sacx = cx + cw - sort_icon_w + sort_arr_w / 2;
+				int32_t say = ry + hh / 2;
+				if(sacx - sort_arr_w / 2 >= clip_left && sacx + sort_arr_w / 2 <= clip_right) {
 					if(lv->sort_dir > 0) {
-						for(uint32_t j = 0; j < (uint32_t)sort_arr_h; ++j) {
-							draw_hline(ctx->pixels, ctx->win_w, ctx->win_h, ax + (int32_t)j, ay - (int32_t)j + sort_arr_off, sort_arr_w - (int32_t)j * 2, ctx->theme.text);
-						}
+						draw_triangle_aa(ctx->pixels, ctx->win_w, ctx->win_h,
+							sacx, say - sort_arr_h / 2, sacx - sort_arr_w / 2, say + sort_arr_h / 2, sacx + sort_arr_w / 2, say + sort_arr_h / 2, ctx->theme.text);
 					} else {
-						for(uint32_t j = 0; j < (uint32_t)sort_arr_h; ++j) {
-							draw_hline(ctx->pixels, ctx->win_w, ctx->win_h, ax + (int32_t)j, ay + (int32_t)j - sort_arr_off, sort_arr_w - (int32_t)j * 2, ctx->theme.text);
-						}
+						draw_triangle_aa(ctx->pixels, ctx->win_w, ctx->win_h,
+							sacx - sort_arr_w / 2, say - sort_arr_h / 2, sacx + sort_arr_w / 2, say - sort_arr_h / 2, sacx, say + sort_arr_h / 2, ctx->theme.text);
 					}
 				}
 			}

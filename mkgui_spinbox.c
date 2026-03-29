@@ -120,19 +120,18 @@ static void render_spinbox(struct mkgui_ctx *ctx, uint32_t idx) {
 	uint32_t up_bg = (hover_btn == 1) ? ctx->theme.widget_hover : ctx->theme.widget_bg;
 	draw_patch(ctx, MKGUI_STYLE_RAISED, bx, ry, btn_w, half, up_bg, ctx->theme.widget_border);
 
+	int32_t as = sc(ctx, 3);
 	int32_t acx = bx + btn_w / 2;
-	int32_t acy = ry + half / 2 - 2;
-	for(uint32_t j = 0; j < 4; ++j) {
-		draw_hline(ctx->pixels, ctx->win_w, ctx->win_h, acx - (int32_t)j, acy + (int32_t)j, 1 + (int32_t)j * 2, tc);
-	}
+	int32_t acy = ry + half / 2;
+	draw_triangle_aa(ctx->pixels, ctx->win_w, ctx->win_h,
+		acx, acy - as / 2, acx - as, acy + as / 2, acx + as, acy + as / 2, tc);
 
 	uint32_t dn_bg = (hover_btn == -1) ? ctx->theme.widget_hover : ctx->theme.widget_bg;
 	draw_patch(ctx, MKGUI_STYLE_RAISED, bx, ry + half, btn_w, rh - half, dn_bg, ctx->theme.widget_border);
 
-	int32_t acy2 = ry + half + (rh - half) / 2 - 2;
-	for(uint32_t j = 0; j < 4; ++j) {
-		draw_hline(ctx->pixels, ctx->win_w, ctx->win_h, acx - (int32_t)(3 - j), acy2 + (int32_t)j, 1 + (int32_t)(3 - j) * 2, tc);
-	}
+	int32_t acy2 = ry + half + (rh - half) / 2;
+	draw_triangle_aa(ctx->pixels, ctx->win_w, ctx->win_h,
+		acx - as, acy2 - as / 2, acx + as, acy2 - as / 2, acx, acy2 + as / 2, tc);
 }
 
 // [=]===^=[ spinbox_adjust ]=====================================[=]
