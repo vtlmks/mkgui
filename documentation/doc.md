@@ -397,6 +397,48 @@ mkgui_add_timer(ctx, 33333333, refresh, NULL);  // 33.3ms = 30Hz
 ```
 
 
+### Window icon
+
+```c
+struct mkgui_icon_size {
+    uint32_t *pixels;
+    int32_t w, h;
+};
+
+void mkgui_set_window_icon(struct mkgui_ctx *ctx, struct mkgui_icon_size *sizes, uint32_t count);
+```
+
+Sets the application icon displayed in the window title bar, taskbar, and task switcher. Call after `mkgui_create` (or `mkgui_create_child`), before or after `mkgui_run`. Pass one or more ARGB32 pixel buffers at different resolutions so the window manager can pick the best match for each context.
+
+**Recommended sizes:**
+
+| Size | Used for |
+|---|---|
+| 16x16 | Window title bar, system tray (Win32 `ICON_SMALL`) |
+| 24x24 | Title bar on HiDPI / some Linux WMs |
+| 32x32 | Taskbar, alt-tab (Win32 `ICON_BIG` at 100% scale) |
+| 48x48 | Taskbar at 150% scale, KDE/GNOME app grid |
+| 64x64 | Alt-tab on HiDPI, large taskbar icons |
+| 256x256 | Windows Explorer details view, GNOME Activities |
+
+For best cross-platform results, provide at least **16x16, 32x32, and 48x48**. Adding 64x64 and 256x256 covers HiDPI and high-res contexts.
+
+On X11, all sizes are packed into the `_NET_WM_ICON` property and the window manager selects the closest match. On Win32, the two closest matches to `SM_CXSMICON` and `SM_CXICON` are used for `ICON_SMALL` and `ICON_BIG`.
+
+Pixel format is ARGB32 (same as the rest of mkgui): `0xAARRGGBB`.
+
+**Example:**
+
+```c
+// icon_16, icon_32, icon_48 are uint32_t arrays with premade pixel data
+struct mkgui_icon_size app_icons[] = {
+    { icon_16, 16, 16 },
+    { icon_32, 32, 32 },
+    { icon_48, 48, 48 },
+};
+mkgui_set_window_icon(ctx, app_icons, 3);
+```
+
 ### Runtime widget management
 
 ```c

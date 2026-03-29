@@ -366,6 +366,11 @@ struct mkgui_richlist_row {
 	int32_t thumb_w, thumb_h;
 };
 
+struct mkgui_icon_size {
+	uint32_t *pixels;
+	int32_t w, h;
+};
+
 // Opaque context
 struct mkgui_ctx;
 
@@ -394,6 +399,7 @@ MKGUI_API struct mkgui_ctx *mkgui_create_child(struct mkgui_ctx *parent, struct 
 MKGUI_API void mkgui_destroy_child(struct mkgui_ctx *ctx);
 MKGUI_API void mkgui_set_app_class(struct mkgui_ctx *ctx, char *app_class);
 MKGUI_API void mkgui_set_window_instance(struct mkgui_ctx *ctx, char *instance);
+MKGUI_API void mkgui_set_window_icon(struct mkgui_ctx *ctx, struct mkgui_icon_size *sizes, uint32_t count);
 MKGUI_API void mkgui_run(struct mkgui_ctx *ctx, mkgui_event_cb cb, void *userdata);
 MKGUI_API void mkgui_quit(struct mkgui_ctx *ctx);
 MKGUI_API uint32_t mkgui_add_timer(struct mkgui_ctx *ctx, uint64_t interval_ns, mkgui_timer_cb cb, void *userdata);

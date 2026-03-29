@@ -14,6 +14,7 @@
 #include <sys/timerfd.h>
 #include <ft2build.h>
 #include FT_FREETYPE_H
+#include <fontconfig/fontconfig.h>
 
 #define MKGUI_DEFERRED_SIZE 64
 

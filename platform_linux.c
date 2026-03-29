@@ -52,6 +52,36 @@ static void platform_set_class_hint(struct mkgui_platform *plat, char *instance,
 }
 
 // ---------------------------------------------------------------------------
+// Window icon
+// ---------------------------------------------------------------------------
+
+// [=]===^=[ platform_set_window_icon ]=============================[=]
+static void platform_set_window_icon(struct mkgui_platform *plat, struct mkgui_icon_size *sizes, uint32_t count) {
+	Atom net_wm_icon = XInternAtom(plat->dpy, "_NET_WM_ICON", False);
+	size_t total = 0;
+	for(uint32_t s = 0; s < count; ++s) {
+		total += 2 + (size_t)(sizes[s].w * sizes[s].h);
+	}
+	unsigned long *buf = (unsigned long *)malloc(total * sizeof(unsigned long));
+	if(!buf) {
+		return;
+	}
+	size_t off = 0;
+	for(uint32_t s = 0; s < count; ++s) {
+		uint32_t npx = (uint32_t)(sizes[s].w * sizes[s].h);
+		buf[off++] = (unsigned long)sizes[s].w;
+		buf[off++] = (unsigned long)sizes[s].h;
+		for(uint32_t i = 0; i < npx; ++i) {
+			buf[off++] = (unsigned long)sizes[s].pixels[i];
+		}
+	}
+	XChangeProperty(plat->dpy, plat->win, net_wm_icon, XA_CARDINAL, 32,
+		PropModeReplace, (unsigned char *)buf, (int)total);
+	XFlush(plat->dpy);
+	free(buf);
+}
+
+// ---------------------------------------------------------------------------
 // Platform init / destroy
 // ---------------------------------------------------------------------------
 
@@ -687,16 +717,7 @@ static void platform_next_event(struct mkgui_ctx *ctx, struct mkgui_plat_event *
 static FT_Library plat_ft_lib;
 static FT_Face plat_ft_face;
 
-static const char *plat_font_paths[] = {
-	"/usr/share/fonts/noto/NotoSans-Regular.ttf",
-	"/usr/share/fonts/TTF/IBMPlexSans-Regular.ttf",
-	"/usr/share/fonts/TTF/DejaVuSans.ttf",
-	"/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf",
-	"/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-	"/usr/share/fonts/liberation-sans/LiberationSans-Regular.ttf",
-	"/usr/share/fonts/liberation/LiberationSans-Regular.ttf",
-	"/usr/share/fonts/Adwaita/Adwaita-Regular.ttf",
-};
+static char plat_fc_font_path[4096];
 
 // [=]===^=[ platform_find_font ]==================================[=]
 static const char *platform_find_font(void) {
@@ -704,13 +725,31 @@ static const char *platform_find_font(void) {
 	if(env) {
 		return env;
 	}
-	for(uint32_t i = 0; i < sizeof(plat_font_paths) / sizeof(plat_font_paths[0]); ++i) {
-		FILE *f = fopen(plat_font_paths[i], "rb");
-		if(f) {
-			fclose(f);
-			return plat_font_paths[i];
+
+	FcConfig *config = FcInitLoadConfigAndFonts();
+	if(config) {
+		FcPattern *pat = FcNameParse((FcChar8 *)"sans-serif");
+		if(pat) {
+			FcConfigSubstitute(config, pat, FcMatchPattern);
+			FcDefaultSubstitute(pat);
+			FcResult result;
+			FcPattern *match = FcFontMatch(config, pat, &result);
+			if(match) {
+				FcChar8 *file = NULL;
+				if(FcPatternGetString(match, FC_FILE, 0, &file) == FcResultMatch && file) {
+					snprintf(plat_fc_font_path, sizeof(plat_fc_font_path), "%s", (char *)file);
+				}
+				FcPatternDestroy(match);
+			}
+			FcPatternDestroy(pat);
+		}
+		FcConfigDestroy(config);
+		FcFini();
+		if(plat_fc_font_path[0]) {
+			return plat_fc_font_path;
 		}
 	}
+
 	return NULL;
 }
 

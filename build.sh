@@ -15,7 +15,7 @@ CFLAGS+="-Wformat-truncation "
 CFLAGS+="-Wno-stringop-truncation "
 CFLAGS+="-Wsign-conversion "
 
-LINUX_LIBS="$(pkg-config --cflags freetype2) -lX11 -lXext $(pkg-config --libs freetype2) -lm "
+LINUX_LIBS="$(pkg-config --cflags freetype2 fontconfig) -lX11 -lXext $(pkg-config --libs freetype2 fontconfig) -lm "
 LINUX_DEMO_LIBS="$LINUX_LIBS -lGL "
 WINDOWS_LIBS="-lgdi32 -mwindows "
 WINDOWS_DEMO_LIBS="$WINDOWS_LIBS -lopengl32 "

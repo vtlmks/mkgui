@@ -3851,6 +3851,16 @@ MKGUI_API void mkgui_set_window_instance(struct mkgui_ctx *ctx, char *instance) 
 	platform_set_class_hint(&ctx->plat, instance, cls);
 }
 
+// [=]===^=[ mkgui_set_window_icon ]================================[=]
+MKGUI_API void mkgui_set_window_icon(struct mkgui_ctx *ctx, struct mkgui_icon_size *sizes, uint32_t count) {
+	MKGUI_CHECK(ctx);
+	MKGUI_CHECK(sizes);
+	if(count == 0) {
+		return;
+	}
+	platform_set_window_icon(&ctx->plat, sizes, count);
+}
+
 // [=]===^=[ mkgui_set_theme ]====================================[=]
 MKGUI_API void mkgui_set_theme(struct mkgui_ctx *ctx, struct mkgui_theme theme) {
 	MKGUI_CHECK(ctx);

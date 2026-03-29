@@ -393,6 +393,80 @@ static void platform_set_class_hint(struct mkgui_platform *plat, char *instance,
 	(void)cls;
 }
 
+// [=]===^=[ platform_make_hicon ]=================================[=]
+static HICON platform_make_hicon(uint32_t *pixels, int32_t w, int32_t h) {
+	BITMAPV5HEADER bi;
+	memset(&bi, 0, sizeof(bi));
+	bi.bV5Size = sizeof(bi);
+	bi.bV5Width = w;
+	bi.bV5Height = -h;
+	bi.bV5Planes = 1;
+	bi.bV5BitCount = 32;
+	bi.bV5Compression = BI_BITFIELDS;
+	bi.bV5RedMask   = 0x00ff0000;
+	bi.bV5GreenMask = 0x0000ff00;
+	bi.bV5BlueMask  = 0x000000ff;
+	bi.bV5AlphaMask = 0xff000000;
+
+	uint32_t *dib_bits = NULL;
+	HDC hdc = GetDC(NULL);
+	HBITMAP color = CreateDIBSection(hdc, (BITMAPINFO *)&bi, DIB_RGB_COLORS, (void **)&dib_bits, NULL, 0);
+	ReleaseDC(NULL, hdc);
+	if(!color) {
+		return NULL;
+	}
+	memcpy(dib_bits, pixels, (size_t)(w * h) * 4);
+
+	HBITMAP mask = CreateBitmap(w, h, 1, 1, NULL);
+	if(!mask) {
+		DeleteObject(color);
+		return NULL;
+	}
+
+	ICONINFO ii;
+	ii.fIcon = TRUE;
+	ii.xHotspot = 0;
+	ii.yHotspot = 0;
+	ii.hbmMask = mask;
+	ii.hbmColor = color;
+	HICON icon = CreateIconIndirect(&ii);
+	DeleteObject(color);
+	DeleteObject(mask);
+	return icon;
+}
+
+// [=]===^=[ platform_set_window_icon ]=============================[=]
+static void platform_set_window_icon(struct mkgui_platform *plat, struct mkgui_icon_size *sizes, uint32_t count) {
+	int32_t sm_big = GetSystemMetrics(SM_CXICON);
+	int32_t sm_small = GetSystemMetrics(SM_CXSMICON);
+	uint32_t best_big = 0;
+	uint32_t best_small = 0;
+	int32_t dist_big = 0x7fffffff;
+	int32_t dist_small = 0x7fffffff;
+	for(uint32_t i = 0; i < count; ++i) {
+		int32_t d = sizes[i].w - sm_big;
+		if(d < 0) { d = -d; }
+		if(d < dist_big) {
+			dist_big = d;
+			best_big = i;
+		}
+		d = sizes[i].w - sm_small;
+		if(d < 0) { d = -d; }
+		if(d < dist_small) {
+			dist_small = d;
+			best_small = i;
+		}
+	}
+	HICON big = platform_make_hicon(sizes[best_big].pixels, sizes[best_big].w, sizes[best_big].h);
+	HICON small = platform_make_hicon(sizes[best_small].pixels, sizes[best_small].w, sizes[best_small].h);
+	if(big) {
+		SendMessageA(plat->hwnd, WM_SETICON, ICON_BIG, (LPARAM)big);
+	}
+	if(small) {
+		SendMessageA(plat->hwnd, WM_SETICON, ICON_SMALL, (LPARAM)small);
+	}
+}
+
 // [=]===^=[ platform_init ]=======================================[=]
 static uint32_t platform_init(struct mkgui_ctx *ctx, const char *title, int32_t w, int32_t h) {
 	struct mkgui_platform *plat = &ctx->plat;
