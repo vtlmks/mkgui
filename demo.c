@@ -656,7 +656,7 @@ int main(void) {
 
 		{ MKGUI_HBOX,     ID_PROG_HBOX, "",                  "", ID_CTL_LVBOX, 0, 28, MKGUI_FIXED, 0, 0 },
 		{ MKGUI_LABEL,    ID_PROG_LBL,  "Progress:",         "", ID_PROG_HBOX, 80, 0, MKGUI_FIXED, 0, 0 },
-		{ MKGUI_PROGRESS, ID_PROGRESS1, "",                  "", ID_PROG_HBOX, 0, 0, 0, 0, 1 },
+		{ MKGUI_PROGRESS, ID_PROGRESS1, "",                  "", ID_PROG_HBOX, 0, 0, 0, MKGUI_SHIMMER, 1 },
 		{ MKGUI_SPINNER,  ID_SPINNER1,  "",                  "", ID_PROG_HBOX, 28, 0, MKGUI_FIXED, 0, 0 },
 
 		{ MKGUI_HBOX,     ID_METER_HBOX,"",                  "", ID_CTL_LVBOX, 0, 28, MKGUI_FIXED, 0, 0 },

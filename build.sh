@@ -36,7 +36,7 @@ case "$BUILD_TYPE" in
 		CFLAGS+="-g -O0 "
 		;;
 	"clean")
-		rm -f demo editor demo.exe editor.exe mkgui.o libmkgui.a tools/extract_icons
+		rm -f demo editor demo.exe editor.exe mkgui.o libmkgui.a tools/extract_icons tests/test_layout
 		exit 0
 		;;
 	*)
@@ -79,6 +79,11 @@ fi
 # Build extract_icons tool
 (
 	$CC -std=gnu99 -O2 -Wall -Wextra -Wno-stringop-truncation -Wno-format-truncation tools/extract_icons.c -o tools/extract_icons
+) &
+
+# Build layout tests
+(
+	$CC $CFLAGS tests/test_layout.c -o tests/test_layout $LINUX_LIBS
 ) &
 
 wait

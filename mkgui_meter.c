@@ -3,9 +3,10 @@
 
 // [=]===^=[ meter_zone_color ]=====================================[=]
 static uint32_t meter_zone_color(struct mkgui_meter_data *md, int32_t pos) {
-	if(pos < md->zone_t1) {
+	int32_t pct = md->max_val > 0 ? (int32_t)((int64_t)pos * 100 / md->max_val) : 0;
+	if(pct < md->zone_t1) {
 		return md->zone_c1;
-	} else if(pos < md->zone_t2) {
+	} else if(pct < md->zone_t2) {
 		return md->zone_c2;
 	}
 	return md->zone_c3;
@@ -42,9 +43,9 @@ static void render_meter(struct mkgui_ctx *ctx, uint32_t idx) {
 	int32_t ih = rh - 2;
 
 	if(vertical) {
-		// zone boundaries in pixels from bottom
-		int32_t z1_px = (int32_t)((int64_t)ih * md->zone_t1 / md->max_val);
-		int32_t z2_px = (int32_t)((int64_t)ih * md->zone_t2 / md->max_val);
+		// zone boundaries in pixels from bottom (thresholds are 0-100 percent)
+		int32_t z1_px = ih * md->zone_t1 / 100;
+		int32_t z2_px = ih * md->zone_t2 / 100;
 		if(z1_px > ih) {
 			z1_px = ih;
 		}
@@ -148,9 +149,9 @@ static void render_meter(struct mkgui_ctx *ctx, uint32_t idx) {
 			push_text_clip(tx, ty, buf, ctx->theme.text, rx + 1, ry + 1, rx + rw - 1, ry + rh - 1);
 		}
 	} else {
-		// horizontal: zones left-to-right
-		int32_t z1_px = (int32_t)((int64_t)iw * md->zone_t1 / md->max_val);
-		int32_t z2_px = (int32_t)((int64_t)iw * md->zone_t2 / md->max_val);
+		// horizontal: zones left-to-right (thresholds are 0-100 percent)
+		int32_t z1_px = iw * md->zone_t1 / 100;
+		int32_t z2_px = iw * md->zone_t2 / 100;
 		if(z1_px > iw) {
 			z1_px = iw;
 		}
@@ -250,8 +251,8 @@ MKGUI_API void mkgui_meter_setup(struct mkgui_ctx *ctx, uint32_t id, int32_t max
 	if(md) {
 		md->max_val = max_val;
 		md->value = 0;
-		md->zone_t1 = max_val * 75 / 100;
-		md->zone_t2 = max_val * 90 / 100;
+		md->zone_t1 = 75;
+		md->zone_t2 = 90;
 		dirty_widget_id(ctx, id);
 	}
 }

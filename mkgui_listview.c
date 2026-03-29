@@ -1114,6 +1114,7 @@ MKGUI_API uint32_t *mkgui_listview_get_col_order(struct mkgui_ctx *ctx, uint32_t
 // [=]===^=[ mkgui_listview_set_col_order ]======================[=]
 MKGUI_API void mkgui_listview_set_col_order(struct mkgui_ctx *ctx, uint32_t id, uint32_t *order, uint32_t count) {
 	MKGUI_CHECK(ctx);
+	MKGUI_CHECK(order);
 	struct mkgui_listview_data *lv = find_listv_data(ctx, id);
 	if(!lv) {
 		return;

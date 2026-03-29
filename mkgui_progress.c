@@ -24,7 +24,7 @@ static void render_progress(struct mkgui_ctx *ctx, uint32_t idx) {
 		uint32_t bar_color = pd->color ? pd->color : ctx->theme.accent;
 		draw_rounded_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, rx + 1, ry + 1, fill_w, rh - 2, bar_color, fill_r);
 
-		if(pd->value > 0 && pd->value < pd->max_val) {
+		if((w->style & MKGUI_SHIMMER) && pd->value > 0 && pd->value < pd->max_val) {
 			int32_t shimmer_w = fill_w / 4;
 			if(shimmer_w < sc(ctx, 16)) {
 				shimmer_w = sc(ctx, 16);

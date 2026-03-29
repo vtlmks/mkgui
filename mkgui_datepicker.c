@@ -547,15 +547,12 @@ MKGUI_API void mkgui_datepicker_set(struct mkgui_ctx *ctx, uint32_t id, int32_t 
 MKGUI_API void mkgui_datepicker_get(struct mkgui_ctx *ctx, uint32_t id, int32_t *year, int32_t *month, int32_t *day) {
 	MKGUI_CHECK(ctx);
 	struct mkgui_datepicker_data *dp = find_datepicker_data(ctx, id);
-	if(!dp) {
-		*year = 2026;
-		*month = 1;
-		*day = 1;
-		return;
-	}
-	*year = dp->year;
-	*month = dp->month;
-	*day = dp->day;
+	int32_t y = dp ? dp->year : 2026;
+	int32_t m = dp ? dp->month : 1;
+	int32_t d = dp ? dp->day : 1;
+	if(year) { *year = y; }
+	if(month) { *month = m; }
+	if(day) { *day = d; }
 }
 
 // [=]===^=[ mkgui_datepicker_get_text ]===========================[=]

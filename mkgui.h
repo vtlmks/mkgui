@@ -167,6 +167,7 @@ enum {
 #define MKGUI_WRAP                 (1u << 17)
 #define MKGUI_NUMERIC              (1u << 18)
 #define MKGUI_COLLAPSIBLE          (1u << 19)
+#define MKGUI_SHIMMER              (1u << 20)
 
 // ---------------------------------------------------------------------------
 // Event types
