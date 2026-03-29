@@ -473,6 +473,43 @@ static void platform_fb_resize(struct mkgui_ctx *ctx) {
 	ReleaseDC(plat->hwnd, hdc);
 }
 
+// [=]===^=[ platform_detect_scale ]================================[=]
+static float platform_detect_scale(struct mkgui_ctx *ctx) {
+	typedef UINT (WINAPI *GetDpiForWindow_t)(HWND);
+	HMODULE user32 = GetModuleHandleA("user32.dll");
+	if(user32) {
+		GetDpiForWindow_t fn = (GetDpiForWindow_t)(void *)GetProcAddress(user32, "GetDpiForWindow");
+		if(fn) {
+			UINT dpi = fn(ctx->plat.hwnd);
+			if(dpi > 0) {
+				return (float)dpi / 96.0f;
+			}
+		}
+	}
+
+	HDC hdc = GetDC(NULL);
+	if(hdc) {
+		int32_t dpi = GetDeviceCaps(hdc, LOGPIXELSX);
+		ReleaseDC(NULL, hdc);
+		if(dpi > 0) {
+			return (float)dpi / 96.0f;
+		}
+	}
+
+	return 1.0f;
+}
+
+// [=]===^=[ platform_resize_window ]===============================[=]
+static void platform_resize_window(struct mkgui_ctx *ctx, int32_t w, int32_t h) {
+	RECT rc = { 0, 0, w, h };
+	AdjustWindowRect(&rc, WS_OVERLAPPEDWINDOW, FALSE);
+	SetWindowPos(ctx->plat.hwnd, NULL, 0, 0, rc.right - rc.left, rc.bottom - rc.top,
+		SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
+	ctx->win_w = w;
+	ctx->win_h = h;
+	platform_fb_resize(ctx);
+}
+
 // ---------------------------------------------------------------------------
 // Blit / flush
 // ---------------------------------------------------------------------------

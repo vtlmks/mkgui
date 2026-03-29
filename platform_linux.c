@@ -243,6 +243,53 @@ static void platform_fb_resize(struct mkgui_ctx *ctx) {
 	platform_fb_create(plat, &plat->shm, &plat->img, &ctx->pixels, ctx->win_w, ctx->win_h);
 }
 
+// [=]===^=[ platform_detect_scale ]================================[=]
+static float platform_detect_scale(struct mkgui_ctx *ctx) {
+	Display *dpy = ctx->plat.dpy;
+
+	XrmInitialize();
+	char *rms = XResourceManagerString(dpy);
+	if(rms) {
+		XrmDatabase db = XrmGetStringDatabase(rms);
+		if(db) {
+			char *type = NULL;
+			XrmValue val;
+			if(XrmGetResource(db, "Xft.dpi", "Xft.Dpi", &type, &val)) {
+				if(type && strcmp(type, "String") == 0 && val.addr) {
+					double dpi = atof(val.addr);
+					if(dpi > 48.0 && dpi < 960.0) {
+						XrmDestroyDatabase(db);
+						return (float)(dpi / 96.0);
+					}
+				}
+			}
+			XrmDestroyDatabase(db);
+		}
+	}
+
+	int32_t width_px = DisplayWidth(dpy, ctx->plat.screen);
+	int32_t width_mm = DisplayWidthMM(dpy, ctx->plat.screen);
+	if(width_mm > 0) {
+		float dpi = (float)width_px * 25.4f / (float)width_mm;
+		if(dpi > 48.0f && dpi < 960.0f) {
+			float scale = dpi / 96.0f;
+			if(scale >= 1.2f) {
+				return scale;
+			}
+		}
+	}
+
+	return 1.0f;
+}
+
+// [=]===^=[ platform_resize_window ]===============================[=]
+static void platform_resize_window(struct mkgui_ctx *ctx, int32_t w, int32_t h) {
+	XResizeWindow(ctx->plat.dpy, ctx->plat.win, (uint32_t)w, (uint32_t)h);
+	ctx->win_w = w;
+	ctx->win_h = h;
+	platform_fb_resize(ctx);
+}
+
 // ---------------------------------------------------------------------------
 // Blit / flush
 // ---------------------------------------------------------------------------

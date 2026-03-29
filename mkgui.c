@@ -3781,6 +3781,15 @@ MKGUI_API struct mkgui_ctx *mkgui_create(struct mkgui_widget *widgets, uint32_t 
 		return NULL;
 	}
 
+	float detected = platform_detect_scale(ctx);
+	if(detected > 1.01f) {
+		ctx->scale = detected;
+		mkgui_recompute_metrics(ctx);
+		int32_t new_w = (int32_t)(init_w * detected + 0.5f);
+		int32_t new_h = (int32_t)(init_h * detected + 0.5f);
+		platform_resize_window(ctx, new_w, new_h);
+	}
+
 	render_clip_x1 = 0;
 	render_clip_y1 = 0;
 	render_clip_x2 = ctx->win_w;

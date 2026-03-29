@@ -769,7 +769,6 @@ int main(void) {
 	}
 
 	mkgui_set_app_class(ctx, "mkgui_demo");
-	mkgui_set_scale(ctx, 1.0f);
 	mkgui_icon_load_svg_dir(ctx, "icons");
 
 	/* Controls tab setup */
