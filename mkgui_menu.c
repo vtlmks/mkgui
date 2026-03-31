@@ -88,7 +88,7 @@ static int32_t menu_popup_child_metrics(struct mkgui_ctx *ctx, uint32_t parent_i
 			*content_h += sep_h;
 		} else {
 			*content_h += ctx->row_height;
-			int32_t tw = text_width(ctx, sub->label) + icon_col + text_rpad;
+			int32_t tw = label_text_width(ctx, sub) + icon_col + text_rpad;
 			if(menu_item_has_children(ctx, sub->id)) {
 				tw += submenu_w;
 			}
@@ -139,7 +139,7 @@ static void render_menu_bar(struct mkgui_ctx *ctx, uint32_t idx) {
 		if(mi->type != MKGUI_MENUITEM) {
 			continue;
 		}
-		int32_t iw = text_width(ctx, mi->label) + menu_pad * 2;
+		int32_t iw = label_text_width(ctx, mi) + menu_pad * 2;
 		uint32_t bg = (ctx->hover_id == mi->id) ? ctx->theme.menu_hover : ctx->theme.menu_bg;
 		draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, mx, ry, iw, rh, bg);
 		int32_t ty = ry + (rh - ctx->font_height) / 2;

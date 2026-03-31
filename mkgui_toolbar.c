@@ -43,7 +43,7 @@ static void render_toolbar(struct mkgui_ctx *ctx, uint32_t idx) {
 
 		int32_t ii = show_icons ? toolbar_icon_idx(ctx, btn) : -1;
 		uint32_t has_icon = (ii >= 0);
-		int32_t tw = show_text ? text_width(ctx, btn->label) : 0;
+		int32_t tw = show_text ? label_text_width(ctx, btn) : 0;
 		int32_t icon_w = has_icon ? icons[ii].w + 4 : 0;
 		int32_t content_w = icon_w + tw;
 		int32_t bw = content_w + 12;

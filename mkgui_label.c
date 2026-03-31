@@ -114,6 +114,7 @@ MKGUI_API void mkgui_label_set(struct mkgui_ctx *ctx, uint32_t id, char *text) {
 	}
 	strncpy(w->label, text, MKGUI_MAX_TEXT - 1);
 	w->label[MKGUI_MAX_TEXT - 1] = '\0';
+	w->label_tw = -1;
 	dirty_widget_id(ctx, id);
 }
 

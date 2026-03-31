@@ -357,38 +357,38 @@ MKGUI_API uint32_t mkgui_color_dialog(struct mkgui_ctx *ctx, uint32_t initial_co
 	int32_t dh = 440;
 
 	struct mkgui_widget widgets[] = {
-		{ MKGUI_WINDOW,  CP_WINDOW,     "Color Picker",  "", 0,            dw, dh, 0, 0, 0 },
-		{ MKGUI_VBOX,    CP_VBOX,       "",              "", CP_WINDOW,    0, 0, 0, 0, 0 },
+		MKGUI_W(MKGUI_WINDOW,  CP_WINDOW,     "Color Picker",  "", 0,            dw, dh, 0, 0, 0),
+		MKGUI_W(MKGUI_VBOX,    CP_VBOX,       "",              "", CP_WINDOW,    0, 0, 0, 0, 0),
 
-		{ MKGUI_TABS,    CP_TABS,       "",              "", CP_VBOX,      0, 0, 0, 0, 1 },
-		{ MKGUI_TAB,     CP_TAB_SV,     "Square",        "", CP_TABS,      0, 0, 0, 0, 0 },
-		{ MKGUI_TAB,     CP_TAB_WHEEL,  "Wheel",         "", CP_TABS,      0, 0, 0, 0, 0 },
-		{ MKGUI_TAB,     CP_TAB_RGB,    "Sliders",       "", CP_TABS,      0, 0, 0, 0, 0 },
+		MKGUI_W(MKGUI_TABS,    CP_TABS,       "",              "", CP_VBOX,      0, 0, 0, 0, 1),
+		MKGUI_W(MKGUI_TAB,     CP_TAB_SV,     "Square",        "", CP_TABS,      0, 0, 0, 0, 0),
+		MKGUI_W(MKGUI_TAB,     CP_TAB_WHEEL,  "Wheel",         "", CP_TABS,      0, 0, 0, 0, 0),
+		MKGUI_W(MKGUI_TAB,     CP_TAB_RGB,    "Sliders",       "", CP_TABS,      0, 0, 0, 0, 0),
 
-		{ MKGUI_HBOX,    CP_SV_HBOX,    "",              "", CP_TAB_SV,    0, 0, 0, 0, 0 },
-		{ MKGUI_CANVAS,  CP_SV_CANVAS,  "",              "", CP_SV_HBOX,   0, 0, 0, MKGUI_PANEL_BORDER, 1 },
-		{ MKGUI_CANVAS,  CP_HUE_CANVAS, "",              "", CP_SV_HBOX,   28, 0, MKGUI_FIXED, MKGUI_PANEL_BORDER, 0 },
+		MKGUI_W(MKGUI_HBOX,    CP_SV_HBOX,    "",              "", CP_TAB_SV,    0, 0, 0, 0, 0),
+		MKGUI_W(MKGUI_CANVAS,  CP_SV_CANVAS,  "",              "", CP_SV_HBOX,   0, 0, 0, MKGUI_PANEL_BORDER, 1),
+		MKGUI_W(MKGUI_CANVAS,  CP_HUE_CANVAS, "",              "", CP_SV_HBOX,   28, 0, MKGUI_FIXED, MKGUI_PANEL_BORDER, 0),
 
-		{ MKGUI_CANVAS,  CP_WH_CANVAS,  "",              "", CP_TAB_WHEEL,  0, 0, 0, MKGUI_PANEL_BORDER, 0 },
-		{ MKGUI_CANVAS,  CP_RGB_CANVAS, "",              "", CP_TAB_RGB,    0, 0, 0, MKGUI_PANEL_BORDER, 0 },
+		MKGUI_W(MKGUI_CANVAS,  CP_WH_CANVAS,  "",              "", CP_TAB_WHEEL,  0, 0, 0, MKGUI_PANEL_BORDER, 0),
+		MKGUI_W(MKGUI_CANVAS,  CP_RGB_CANVAS, "",              "", CP_TAB_RGB,    0, 0, 0, MKGUI_PANEL_BORDER, 0),
 
-		{ MKGUI_DIVIDER, CP_DIVIDER,    "",              "", CP_VBOX,      0, 0, MKGUI_FIXED, 0, 0 },
+		MKGUI_W(MKGUI_DIVIDER, CP_DIVIDER,    "",              "", CP_VBOX,      0, 0, MKGUI_FIXED, 0, 0),
 
-		{ MKGUI_HBOX,    CP_CTL_HBOX,   "",              "", CP_VBOX,      0, 0, MKGUI_FIXED, 0, 0 },
-		{ MKGUI_CANVAS,  CP_PREVIEW,    "",              "", CP_CTL_HBOX,  28, 0, MKGUI_FIXED, MKGUI_PANEL_BORDER, 0 },
-		{ MKGUI_LABEL,   CP_HEX_LBL,    "#",             "", CP_CTL_HBOX,  16, 0, MKGUI_FIXED, 0, 0 },
-		{ MKGUI_INPUT,   CP_HEX_INPUT,  "",              "", CP_CTL_HBOX,  68, 0, MKGUI_FIXED, 0, 0 },
-		{ MKGUI_LABEL,   CP_R_LBL,      "R:",            "", CP_CTL_HBOX,  20, 0, MKGUI_FIXED, 0, 0 },
-		{ MKGUI_SPINBOX, CP_R_SPN,      "",              "", CP_CTL_HBOX,  56, 0, MKGUI_FIXED, 0, 0 },
-		{ MKGUI_LABEL,   CP_G_LBL,      "G:",            "", CP_CTL_HBOX,  20, 0, MKGUI_FIXED, 0, 0 },
-		{ MKGUI_SPINBOX, CP_G_SPN,      "",              "", CP_CTL_HBOX,  56, 0, MKGUI_FIXED, 0, 0 },
-		{ MKGUI_LABEL,   CP_B_LBL,      "B:",            "", CP_CTL_HBOX,  20, 0, MKGUI_FIXED, 0, 0 },
-		{ MKGUI_SPINBOX, CP_B_SPN,      "",              "", CP_CTL_HBOX,  56, 0, MKGUI_FIXED, 0, 0 },
+		MKGUI_W(MKGUI_HBOX,    CP_CTL_HBOX,   "",              "", CP_VBOX,      0, 0, MKGUI_FIXED, 0, 0),
+		MKGUI_W(MKGUI_CANVAS,  CP_PREVIEW,    "",              "", CP_CTL_HBOX,  28, 0, MKGUI_FIXED, MKGUI_PANEL_BORDER, 0),
+		MKGUI_W(MKGUI_LABEL,   CP_HEX_LBL,    "#",             "", CP_CTL_HBOX,  16, 0, MKGUI_FIXED, 0, 0),
+		MKGUI_W(MKGUI_INPUT,   CP_HEX_INPUT,  "",              "", CP_CTL_HBOX,  68, 0, MKGUI_FIXED, 0, 0),
+		MKGUI_W(MKGUI_LABEL,   CP_R_LBL,      "R:",            "", CP_CTL_HBOX,  20, 0, MKGUI_FIXED, 0, 0),
+		MKGUI_W(MKGUI_SPINBOX, CP_R_SPN,      "",              "", CP_CTL_HBOX,  56, 0, MKGUI_FIXED, 0, 0),
+		MKGUI_W(MKGUI_LABEL,   CP_G_LBL,      "G:",            "", CP_CTL_HBOX,  20, 0, MKGUI_FIXED, 0, 0),
+		MKGUI_W(MKGUI_SPINBOX, CP_G_SPN,      "",              "", CP_CTL_HBOX,  56, 0, MKGUI_FIXED, 0, 0),
+		MKGUI_W(MKGUI_LABEL,   CP_B_LBL,      "B:",            "", CP_CTL_HBOX,  20, 0, MKGUI_FIXED, 0, 0),
+		MKGUI_W(MKGUI_SPINBOX, CP_B_SPN,      "",              "", CP_CTL_HBOX,  56, 0, MKGUI_FIXED, 0, 0),
 
-		{ MKGUI_HBOX,    CP_BTN_HBOX,   "",              "", CP_VBOX,      0, 0, MKGUI_FIXED, 0, 0 },
-		{ MKGUI_SPACER,  CP_BTN_SPACER, "",              "", CP_BTN_HBOX,  0, 0, 0, 0, 1 },
-		{ MKGUI_BUTTON,  CP_BTN_OK,     "OK",            "", CP_BTN_HBOX,  80, 0, MKGUI_FIXED, 0, 0 },
-		{ MKGUI_BUTTON,  CP_BTN_CANCEL, "Cancel",        "", CP_BTN_HBOX,  80, 0, MKGUI_FIXED, 0, 0 },
+		MKGUI_W(MKGUI_HBOX,    CP_BTN_HBOX,   "",              "", CP_VBOX,      0, 0, MKGUI_FIXED, 0, 0),
+		MKGUI_W(MKGUI_SPACER,  CP_BTN_SPACER, "",              "", CP_BTN_HBOX,  0, 0, 0, 0, 1),
+		MKGUI_W(MKGUI_BUTTON,  CP_BTN_OK,     "OK",            "", CP_BTN_HBOX,  80, 0, MKGUI_FIXED, 0, 0),
+		MKGUI_W(MKGUI_BUTTON,  CP_BTN_CANCEL, "Cancel",        "", CP_BTN_HBOX,  80, 0, MKGUI_FIXED, 0, 0),
 	};
 	uint32_t wcount = sizeof(widgets) / sizeof(widgets[0]);
 

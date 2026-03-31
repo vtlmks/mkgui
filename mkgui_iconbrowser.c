@@ -239,11 +239,11 @@ MKGUI_API uint32_t mkgui_icon_browser_theme(struct mkgui_ctx *ctx, char *theme_d
 	}
 
 	uint32_t wi = 0;
-	widgets[wi++] = (struct mkgui_widget){ MKGUI_WINDOW, IB_TH_WINDOW, "Icon Browser", "", 0, IB_WIN_W, IB_WIN_H, 0, 0, 0 };
-	widgets[wi++] = (struct mkgui_widget){ MKGUI_VBOX, IB_TH_VBOX, "", "", IB_TH_WINDOW, 0, 0, 0, 0, 0 };
-	widgets[wi++] = (struct mkgui_widget){ MKGUI_INPUT, IB_TH_SEARCH, "", "edit-find", IB_TH_VBOX, 0, 24, MKGUI_FIXED, 0, 0 };
-	widgets[wi++] = (struct mkgui_widget){ MKGUI_TABS, IB_TH_TABS, "", "", IB_TH_VBOX, 0, 28, MKGUI_FIXED, 0, 0 };
-	widgets[wi++] = (struct mkgui_widget){ MKGUI_TAB, IB_TH_TAB_ALL, "All", "", IB_TH_TABS, 0, 0, 0, 0, 0 };
+	widgets[wi++] = (struct mkgui_widget)MKGUI_W(MKGUI_WINDOW, IB_TH_WINDOW, "Icon Browser", "", 0, IB_WIN_W, IB_WIN_H, 0, 0, 0);
+	widgets[wi++] = (struct mkgui_widget)MKGUI_W(MKGUI_VBOX, IB_TH_VBOX, "", "", IB_TH_WINDOW, 0, 0, 0, 0, 0);
+	widgets[wi++] = (struct mkgui_widget)MKGUI_W(MKGUI_INPUT, IB_TH_SEARCH, "", "edit-find", IB_TH_VBOX, 0, 24, MKGUI_FIXED, 0, 0);
+	widgets[wi++] = (struct mkgui_widget)MKGUI_W(MKGUI_TABS, IB_TH_TABS, "", "", IB_TH_VBOX, 0, 28, MKGUI_FIXED, 0, 0);
+	widgets[wi++] = (struct mkgui_widget)MKGUI_W(MKGUI_TAB, IB_TH_TAB_ALL, "All", "", IB_TH_TABS, 0, 0, 0, 0, 0);
 
 	for(uint32_t ci = 0; ci < cat_count; ++ci) {
 		char label[64];
@@ -252,11 +252,11 @@ MKGUI_API uint32_t mkgui_icon_browser_theme(struct mkgui_ctx *ctx, char *theme_d
 		if(label[0] >= 'a' && label[0] <= 'z') {
 			label[0] = (char)(label[0] - 32);
 		}
-		widgets[wi] = (struct mkgui_widget){ MKGUI_TAB, (uint32_t)(IB_TH_TAB_FIRST + ci), "", "", IB_TH_TABS, 0, 0, 0, 0, 0 };
+		widgets[wi] = (struct mkgui_widget)MKGUI_W(MKGUI_TAB, (uint32_t)(IB_TH_TAB_FIRST + ci), "", "", IB_TH_TABS, 0, 0, 0, 0, 0);
 		strncpy(widgets[wi].label, label, MKGUI_MAX_TEXT - 1);
 		++wi;
 	}
-	widgets[wi++] = (struct mkgui_widget){ MKGUI_ITEMVIEW, iv_id, "", "", IB_TH_VBOX, 0, 0, 0, 0, 1 };
+	widgets[wi++] = (struct mkgui_widget)MKGUI_W(MKGUI_ITEMVIEW, iv_id, "", "", IB_TH_VBOX, 0, 0, 0, 0, 1);
 
 	struct mkgui_ctx *dlg = mkgui_create_child(ctx, widgets, wcount, "Icon Browser", IB_WIN_W, IB_WIN_H);
 	free(widgets);

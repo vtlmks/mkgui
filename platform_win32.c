@@ -862,6 +862,8 @@ static void platform_font_rasterize(struct mkgui_ctx *ctx, int32_t pixel_size) {
 			bmp_size = MKGUI_GLYPH_MAX_BMP;
 		}
 
+		uint32_t glyph_idx = c - MKGUI_GLYPH_FIRST;
+		memset(glyph_staging[glyph_idx], 0, MKGUI_GLYPH_MAX_BMP);
 		for(uint32_t y = 0; y < (uint32_t)g->height && y * (uint32_t)g->width < bmp_size; ++y) {
 			for(uint32_t x = 0; x < (uint32_t)g->width; ++x) {
 				uint32_t idx = y * (uint32_t)g->width + x;
@@ -869,7 +871,7 @@ static void platform_font_rasterize(struct mkgui_ctx *ctx, int32_t pixel_size) {
 					break;
 				}
 				uint8_t val = tmp[y * pitch + x];
-				g->bitmap[idx] = (uint8_t)(val * 255 / 64);
+				glyph_staging[glyph_idx][idx] = (uint8_t)(val * 255 / 64);
 			}
 		}
 
@@ -880,6 +882,7 @@ static void platform_font_rasterize(struct mkgui_ctx *ctx, int32_t pixel_size) {
 	if(ctx->char_width == 0) {
 		ctx->char_width = sc(ctx, 7);
 	}
+	glyph_atlas_build(ctx);
 }
 
 // [=]===^=[ platform_font_init ]==================================[=]

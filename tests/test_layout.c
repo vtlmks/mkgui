@@ -116,11 +116,11 @@ static void test_vbox_basic(void) {
 	TEST_BEGIN("vbox: children get positive size and don't overlap");
 	enum { WIN = 1, VBOX1 = 2, BTN1 = 3, BTN2 = 4, BTN3 = 5 };
 	struct mkgui_widget widgets[] = {
-		{ MKGUI_WINDOW, WIN,   "Test", "", 0,    600, 400, 0, 0, 0 },
-		{ MKGUI_VBOX,   VBOX1, "",     "", WIN,  0,   0,   0, 0, 0 },
-		{ MKGUI_BUTTON, BTN1,  "A",    "", VBOX1, 0,  0,   0, 0, 0 },
-		{ MKGUI_BUTTON, BTN2,  "B",    "", VBOX1, 0,  0,   0, 0, 0 },
-		{ MKGUI_BUTTON, BTN3,  "C",    "", VBOX1, 0,  0,   0, 0, 0 },
+		MKGUI_W(MKGUI_WINDOW, WIN,   "Test", "", 0,    600, 400, 0, 0, 0),
+		MKGUI_W(MKGUI_VBOX,   VBOX1, "",     "", WIN,  0,   0,   0, 0, 0),
+		MKGUI_W(MKGUI_BUTTON, BTN1,  "A",    "", VBOX1, 0,  0,   0, 0, 0),
+		MKGUI_W(MKGUI_BUTTON, BTN2,  "B",    "", VBOX1, 0,  0,   0, 0, 0),
+		MKGUI_W(MKGUI_BUTTON, BTN3,  "C",    "", VBOX1, 0,  0,   0, 0, 0),
 	};
 	struct mkgui_ctx *ctx = create_and_layout(widgets, 5);
 	CHECK(ctx, "create failed");
@@ -142,11 +142,11 @@ static void test_hbox_basic(void) {
 	TEST_BEGIN("hbox: children get positive size and don't overlap");
 	enum { WIN = 1, HBOX1 = 2, BTN1 = 3, BTN2 = 4, BTN3 = 5 };
 	struct mkgui_widget widgets[] = {
-		{ MKGUI_WINDOW, WIN,   "Test", "", 0,     600, 400, 0, 0, 0 },
-		{ MKGUI_HBOX,   HBOX1, "",     "", WIN,   0,   0,   0, 0, 0 },
-		{ MKGUI_BUTTON, BTN1,  "A",    "", HBOX1, 0,   0,   0, 0, 0 },
-		{ MKGUI_BUTTON, BTN2,  "B",    "", HBOX1, 0,   0,   0, 0, 0 },
-		{ MKGUI_BUTTON, BTN3,  "C",    "", HBOX1, 0,   0,   0, 0, 0 },
+		MKGUI_W(MKGUI_WINDOW, WIN,   "Test", "", 0,     600, 400, 0, 0, 0),
+		MKGUI_W(MKGUI_HBOX,   HBOX1, "",     "", WIN,   0,   0,   0, 0, 0),
+		MKGUI_W(MKGUI_BUTTON, BTN1,  "A",    "", HBOX1, 0,   0,   0, 0, 0),
+		MKGUI_W(MKGUI_BUTTON, BTN2,  "B",    "", HBOX1, 0,   0,   0, 0, 0),
+		MKGUI_W(MKGUI_BUTTON, BTN3,  "C",    "", HBOX1, 0,   0,   0, 0, 0),
 	};
 	struct mkgui_ctx *ctx = create_and_layout(widgets, 5);
 	CHECK(ctx, "create failed");
@@ -168,10 +168,10 @@ static void test_weights(void) {
 	TEST_BEGIN("vbox: weight=2 gets roughly double the extra space of weight=1");
 	enum { WIN = 1, VBOX1 = 2, LBL1 = 3, LBL2 = 4 };
 	struct mkgui_widget widgets[] = {
-		{ MKGUI_WINDOW, WIN,   "Test", "", 0,     600, 400, 0, 0, 0 },
-		{ MKGUI_VBOX,   VBOX1, "",     "", WIN,   0,   0,   0, 0, 0 },
-		{ MKGUI_LABEL,  LBL1,  "A",    "", VBOX1, 0,   0,   0, 0, 1 },
-		{ MKGUI_LABEL,  LBL2,  "B",    "", VBOX1, 0,   0,   0, 0, 2 },
+		MKGUI_W(MKGUI_WINDOW, WIN,   "Test", "", 0,     600, 400, 0, 0, 0),
+		MKGUI_W(MKGUI_VBOX,   VBOX1, "",     "", WIN,   0,   0,   0, 0, 0),
+		MKGUI_W(MKGUI_LABEL,  LBL1,  "A",    "", VBOX1, 0,   0,   0, 0, 1),
+		MKGUI_W(MKGUI_LABEL,  LBL2,  "B",    "", VBOX1, 0,   0,   0, 0, 2),
 	};
 	struct mkgui_ctx *ctx = create_and_layout(widgets, 4);
 	CHECK(ctx, "create failed");
@@ -198,10 +198,10 @@ static void test_fixed_width(void) {
 	TEST_BEGIN("hbox: FIXED widget gets its declared width");
 	enum { WIN = 1, HBOX1 = 2, BTN1 = 3, BTN2 = 4 };
 	struct mkgui_widget widgets[] = {
-		{ MKGUI_WINDOW, WIN,   "Test", "", 0,     600, 400, 0, 0, 0 },
-		{ MKGUI_HBOX,   HBOX1, "",     "", WIN,   0,   0,   0, 0, 0 },
-		{ MKGUI_BUTTON, BTN1,  "Fix",  "", HBOX1, 120, 0, MKGUI_FIXED, 0, 0 },
-		{ MKGUI_BUTTON, BTN2,  "Flex", "", HBOX1, 0,   0,   0, 0, 0 },
+		MKGUI_W(MKGUI_WINDOW, WIN,   "Test", "", 0,     600, 400, 0, 0, 0),
+		MKGUI_W(MKGUI_HBOX,   HBOX1, "",     "", WIN,   0,   0,   0, 0, 0),
+		MKGUI_W(MKGUI_BUTTON, BTN1,  "Fix",  "", HBOX1, 120, 0, MKGUI_FIXED, 0, 0),
+		MKGUI_W(MKGUI_BUTTON, BTN2,  "Flex", "", HBOX1, 0,   0,   0, 0, 0),
 	};
 	struct mkgui_ctx *ctx = create_and_layout(widgets, 4);
 	CHECK(ctx, "create failed");
@@ -220,11 +220,11 @@ static void test_hidden_no_space(void) {
 	TEST_BEGIN("vbox: hidden widgets get zero rect and don't affect siblings");
 	enum { WIN = 1, VBOX1 = 2, BTN1 = 3, BTN2 = 4, BTN3 = 5 };
 	struct mkgui_widget widgets[] = {
-		{ MKGUI_WINDOW, WIN,   "Test", "", 0,     600, 400, 0, 0, 0 },
-		{ MKGUI_VBOX,   VBOX1, "",     "", WIN,   0,   0,   0, 0, 0 },
-		{ MKGUI_BUTTON, BTN1,  "A",    "", VBOX1, 0,   0,   0, 0, 0 },
-		{ MKGUI_BUTTON, BTN2,  "Hid",  "", VBOX1, 0,   0,   MKGUI_HIDDEN, 0, 0 },
-		{ MKGUI_BUTTON, BTN3,  "C",    "", VBOX1, 0,   0,   0, 0, 0 },
+		MKGUI_W(MKGUI_WINDOW, WIN,   "Test", "", 0,     600, 400, 0, 0, 0),
+		MKGUI_W(MKGUI_VBOX,   VBOX1, "",     "", WIN,   0,   0,   0, 0, 0),
+		MKGUI_W(MKGUI_BUTTON, BTN1,  "A",    "", VBOX1, 0,   0,   0, 0, 0),
+		MKGUI_W(MKGUI_BUTTON, BTN2,  "Hid",  "", VBOX1, 0,   0,   MKGUI_HIDDEN, 0, 0),
+		MKGUI_W(MKGUI_BUTTON, BTN3,  "C",    "", VBOX1, 0,   0,   0, 0, 0),
 	};
 	struct mkgui_ctx *ctx = create_and_layout(widgets, 5);
 	CHECK(ctx, "create failed");
@@ -245,14 +245,14 @@ static void test_chrome_no_overlap(void) {
 	TEST_BEGIN("window: chrome (menu, toolbar, statusbar) does not overlap content");
 	enum { WIN = 1, MENU1 = 2, MI1 = 3, TB = 4, TB_BTN = 5, SB = 6, VBOX1 = 7, BTN1 = 8 };
 	struct mkgui_widget widgets[] = {
-		{ MKGUI_WINDOW,    WIN,    "Test",  "", 0,   600, 400, 0, 0, 0 },
-		{ MKGUI_MENU,      MENU1,  "",      "", WIN, 0,   0,   0, 0, 0 },
-		{ MKGUI_MENUITEM,  MI1,    "File",  "", MENU1, 0, 0,   0, 0, 0 },
-		{ MKGUI_TOOLBAR,   TB,     "",      "", WIN, 0,   0,   0, 0, 0 },
-		{ MKGUI_BUTTON,    TB_BTN, "Save",  "", TB,  0,   0,   0, 0, 0 },
-		{ MKGUI_STATUSBAR, SB,     "",      "", WIN, 0,   0,   0, 0, 0 },
-		{ MKGUI_VBOX,      VBOX1,  "",      "", WIN, 0,   0,   0, 0, 0 },
-		{ MKGUI_BUTTON,    BTN1,   "Click", "", VBOX1, 0, 0,   0, 0, 0 },
+		MKGUI_W(MKGUI_WINDOW,    WIN,    "Test",  "", 0,   600, 400, 0, 0, 0),
+		MKGUI_W(MKGUI_MENU,      MENU1,  "",      "", WIN, 0,   0,   0, 0, 0),
+		MKGUI_W(MKGUI_MENUITEM,  MI1,    "File",  "", MENU1, 0, 0,   0, 0, 0),
+		MKGUI_W(MKGUI_TOOLBAR,   TB,     "",      "", WIN, 0,   0,   0, 0, 0),
+		MKGUI_W(MKGUI_BUTTON,    TB_BTN, "Save",  "", TB,  0,   0,   0, 0, 0),
+		MKGUI_W(MKGUI_STATUSBAR, SB,     "",      "", WIN, 0,   0,   0, 0, 0),
+		MKGUI_W(MKGUI_VBOX,      VBOX1,  "",      "", WIN, 0,   0,   0, 0, 0),
+		MKGUI_W(MKGUI_BUTTON,    BTN1,   "Click", "", VBOX1, 0, 0,   0, 0, 0),
 	};
 	struct mkgui_ctx *ctx = create_and_layout(widgets, 8);
 	CHECK(ctx, "create failed");
@@ -285,14 +285,14 @@ static void test_nested_containers(void) {
 	TEST_BEGIN("nested: vbox inside hbox inside tab inside window");
 	enum { WIN = 1, TABS = 2, TAB1 = 3, HBOX1 = 4, VBOX1 = 5, BTN1 = 6, BTN2 = 7, BTN3 = 8 };
 	struct mkgui_widget widgets[] = {
-		{ MKGUI_WINDOW, WIN,   "Test", "", 0,     600, 400, 0, 0, 0 },
-		{ MKGUI_TABS,   TABS,  "",     "", WIN,   0,   0,   0, 0, 0 },
-		{ MKGUI_TAB,    TAB1,  "Tab1", "", TABS,  0,   0,   0, 0, 0 },
-		{ MKGUI_HBOX,   HBOX1, "",     "", TAB1,  0,   0,   0, 0, 0 },
-		{ MKGUI_VBOX,   VBOX1, "",     "", HBOX1, 0,   0,   0, 0, 0 },
-		{ MKGUI_BUTTON, BTN1,  "A",    "", VBOX1, 0,   0,   0, 0, 0 },
-		{ MKGUI_BUTTON, BTN2,  "B",    "", HBOX1, 0,   0,   0, 0, 0 },
-		{ MKGUI_BUTTON, BTN3,  "C",    "", HBOX1, 0,   0,   0, 0, 0 },
+		MKGUI_W(MKGUI_WINDOW, WIN,   "Test", "", 0,     600, 400, 0, 0, 0),
+		MKGUI_W(MKGUI_TABS,   TABS,  "",     "", WIN,   0,   0,   0, 0, 0),
+		MKGUI_W(MKGUI_TAB,    TAB1,  "Tab1", "", TABS,  0,   0,   0, 0, 0),
+		MKGUI_W(MKGUI_HBOX,   HBOX1, "",     "", TAB1,  0,   0,   0, 0, 0),
+		MKGUI_W(MKGUI_VBOX,   VBOX1, "",     "", HBOX1, 0,   0,   0, 0, 0),
+		MKGUI_W(MKGUI_BUTTON, BTN1,  "A",    "", VBOX1, 0,   0,   0, 0, 0),
+		MKGUI_W(MKGUI_BUTTON, BTN2,  "B",    "", HBOX1, 0,   0,   0, 0, 0),
+		MKGUI_W(MKGUI_BUTTON, BTN3,  "C",    "", HBOX1, 0,   0,   0, 0, 0),
 	};
 	struct mkgui_ctx *ctx = create_and_layout(widgets, 8);
 	CHECK(ctx, "create failed");
@@ -314,10 +314,10 @@ static void test_split_children_positive(void) {
 	TEST_BEGIN("vsplit: both panes get positive dimensions");
 	enum { WIN = 1, SPLIT = 2, LEFT = 3, RIGHT = 4 };
 	struct mkgui_widget widgets[] = {
-		{ MKGUI_WINDOW, WIN,   "Test", "", 0,     600, 400, 0, 0, 0 },
-		{ MKGUI_VSPLIT, SPLIT, "",     "", WIN,   0,   0,   0, 0, 0 },
-		{ MKGUI_VBOX,   LEFT,  "",     "", SPLIT, 0,   0,   MKGUI_REGION_LEFT, 0, 0 },
-		{ MKGUI_VBOX,   RIGHT, "",     "", SPLIT, 0,   0,   MKGUI_REGION_RIGHT, 0, 0 },
+		MKGUI_W(MKGUI_WINDOW, WIN,   "Test", "", 0,     600, 400, 0, 0, 0),
+		MKGUI_W(MKGUI_VSPLIT, SPLIT, "",     "", WIN,   0,   0,   0, 0, 0),
+		MKGUI_W(MKGUI_VBOX,   LEFT,  "",     "", SPLIT, 0,   0,   MKGUI_REGION_LEFT, 0, 0),
+		MKGUI_W(MKGUI_VBOX,   RIGHT, "",     "", SPLIT, 0,   0,   MKGUI_REGION_RIGHT, 0, 0),
 	};
 	struct mkgui_ctx *ctx = create_and_layout(widgets, 4);
 	CHECK(ctx, "create failed");
@@ -339,10 +339,10 @@ static void test_hsplit_children_positive(void) {
 	TEST_BEGIN("hsplit: both panes get positive dimensions");
 	enum { WIN = 1, SPLIT = 2, TOP = 3, BOT = 4 };
 	struct mkgui_widget widgets[] = {
-		{ MKGUI_WINDOW, WIN,   "Test", "", 0,     600, 400, 0, 0, 0 },
-		{ MKGUI_HSPLIT, SPLIT, "",     "", WIN,   0,   0,   0, 0, 0 },
-		{ MKGUI_VBOX,   TOP,   "",     "", SPLIT, 0,   0,   MKGUI_REGION_TOP, 0, 0 },
-		{ MKGUI_VBOX,   BOT,   "",     "", SPLIT, 0,   0,   MKGUI_REGION_BOTTOM, 0, 0 },
+		MKGUI_W(MKGUI_WINDOW, WIN,   "Test", "", 0,     600, 400, 0, 0, 0),
+		MKGUI_W(MKGUI_HSPLIT, SPLIT, "",     "", WIN,   0,   0,   0, 0, 0),
+		MKGUI_W(MKGUI_VBOX,   TOP,   "",     "", SPLIT, 0,   0,   MKGUI_REGION_TOP, 0, 0),
+		MKGUI_W(MKGUI_VBOX,   BOT,   "",     "", SPLIT, 0,   0,   MKGUI_REGION_BOTTOM, 0, 0),
 	};
 	struct mkgui_ctx *ctx = create_and_layout(widgets, 4);
 	CHECK(ctx, "create failed");
@@ -364,10 +364,10 @@ static void test_many_children_no_zero(void) {
 	TEST_BEGIN("vbox: 20 flex children all get positive height");
 	enum { WIN = 1, VBOX1 = 2 };
 	struct mkgui_widget widgets[22];
-	widgets[0] = (struct mkgui_widget){ MKGUI_WINDOW, WIN, "Test", "", 0, 600, 400, 0, 0, 0 };
-	widgets[1] = (struct mkgui_widget){ MKGUI_VBOX, VBOX1, "", "", WIN, 0, 0, 0, 0, 0 };
+	widgets[0] = (struct mkgui_widget)MKGUI_W(MKGUI_WINDOW, WIN, "Test", "", 0, 600, 400, 0, 0, 0);
+	widgets[1] = (struct mkgui_widget)MKGUI_W(MKGUI_VBOX, VBOX1, "", "", WIN, 0, 0, 0, 0, 0);
 	for(uint32_t i = 0; i < 20; ++i) {
-		widgets[2 + i] = (struct mkgui_widget){ MKGUI_BUTTON, 10 + i, "Btn", "", VBOX1, 0, 0, 0, 0, 0 };
+		widgets[2 + i] = (struct mkgui_widget)MKGUI_W(MKGUI_BUTTON, 10 + i, "Btn", "", VBOX1, 0, 0, 0, 0, 0);
 	}
 	struct mkgui_ctx *ctx = create_and_layout(widgets, 22);
 	CHECK(ctx, "create failed");
@@ -388,12 +388,12 @@ static void test_small_window_no_zero(void) {
 	TEST_BEGIN("small window: widgets compress but stay positive");
 	enum { WIN = 1, VBOX1 = 2, BTN1 = 3, BTN2 = 4, LV = 5, BTN3 = 6 };
 	struct mkgui_widget widgets[] = {
-		{ MKGUI_WINDOW,   WIN,   "Test", "", 0,     200, 100, 0, 0, 0 },
-		{ MKGUI_VBOX,     VBOX1, "",     "", WIN,   0,   0,   0, 0, 0 },
-		{ MKGUI_BUTTON,   BTN1,  "A",    "", VBOX1, 0,   0,   0, 0, 0 },
-		{ MKGUI_BUTTON,   BTN2,  "B",    "", VBOX1, 0,   0,   0, 0, 0 },
-		{ MKGUI_LISTVIEW, LV,    "",     "", VBOX1, 0,   0,   0, 0, 0 },
-		{ MKGUI_BUTTON,   BTN3,  "C",    "", VBOX1, 0,   0,   0, 0, 0 },
+		MKGUI_W(MKGUI_WINDOW,   WIN,   "Test", "", 0,     200, 100, 0, 0, 0),
+		MKGUI_W(MKGUI_VBOX,     VBOX1, "",     "", WIN,   0,   0,   0, 0, 0),
+		MKGUI_W(MKGUI_BUTTON,   BTN1,  "A",    "", VBOX1, 0,   0,   0, 0, 0),
+		MKGUI_W(MKGUI_BUTTON,   BTN2,  "B",    "", VBOX1, 0,   0,   0, 0, 0),
+		MKGUI_W(MKGUI_LISTVIEW, LV,    "",     "", VBOX1, 0,   0,   0, 0, 0),
+		MKGUI_W(MKGUI_BUTTON,   BTN3,  "C",    "", VBOX1, 0,   0,   0, 0, 0),
 	};
 	struct mkgui_ctx *ctx = create_and_layout(widgets, 6);
 	CHECK(ctx, "create failed");
@@ -416,12 +416,12 @@ static void test_form_layout(void) {
 	TEST_BEGIN("form: label+control pairs don't overlap and stay inside form");
 	enum { WIN = 1, FORM1 = 2, LBL1 = 3, INP1 = 4, LBL2 = 5, INP2 = 6 };
 	struct mkgui_widget widgets[] = {
-		{ MKGUI_WINDOW, WIN,   "Test",  "", 0,     600, 400, 0, 0, 0 },
-		{ MKGUI_FORM,   FORM1, "",      "", WIN,   0,   0,   0, 0, 0 },
-		{ MKGUI_LABEL,  LBL1,  "Name",  "", FORM1, 0,   0,   0, 0, 0 },
-		{ MKGUI_INPUT,  INP1,  "",       "", FORM1, 0,   0,   0, 0, 0 },
-		{ MKGUI_LABEL,  LBL2,  "Email", "", FORM1, 0,   0,   0, 0, 0 },
-		{ MKGUI_INPUT,  INP2,  "",       "", FORM1, 0,   0,   0, 0, 0 },
+		MKGUI_W(MKGUI_WINDOW, WIN,   "Test",  "", 0,     600, 400, 0, 0, 0),
+		MKGUI_W(MKGUI_FORM,   FORM1, "",      "", WIN,   0,   0,   0, 0, 0),
+		MKGUI_W(MKGUI_LABEL,  LBL1,  "Name",  "", FORM1, 0,   0,   0, 0, 0),
+		MKGUI_W(MKGUI_INPUT,  INP1,  "",       "", FORM1, 0,   0,   0, 0, 0),
+		MKGUI_W(MKGUI_LABEL,  LBL2,  "Email", "", FORM1, 0,   0,   0, 0, 0),
+		MKGUI_W(MKGUI_INPUT,  INP2,  "",       "", FORM1, 0,   0,   0, 0, 0),
 	};
 	struct mkgui_ctx *ctx = create_and_layout(widgets, 6);
 	CHECK(ctx, "create failed");
@@ -444,11 +444,11 @@ static void test_group_collapsed(void) {
 	TEST_BEGIN("group: collapsed group in vbox uses only header height");
 	enum { WIN = 1, VBOX1 = 2, GRP = 3, BTN1 = 4, BTN2 = 5 };
 	struct mkgui_widget widgets[] = {
-		{ MKGUI_WINDOW, WIN,   "Test", "", 0,     600, 400, 0, 0, 0 },
-		{ MKGUI_VBOX,   VBOX1, "",     "", WIN,   0,   0,   0, 0, 0 },
-		{ MKGUI_GROUP,  GRP,   "Grp",  "", VBOX1, 0,   0,   MKGUI_FIXED, MKGUI_COLLAPSIBLE | MKGUI_COLLAPSED, 0 },
-		{ MKGUI_BUTTON, BTN1,  "A",    "", GRP,   0,   0,   0, 0, 0 },
-		{ MKGUI_BUTTON, BTN2,  "B",    "", VBOX1, 0,   0,   0, 0, 0 },
+		MKGUI_W(MKGUI_WINDOW, WIN,   "Test", "", 0,     600, 400, 0, 0, 0),
+		MKGUI_W(MKGUI_VBOX,   VBOX1, "",     "", WIN,   0,   0,   0, 0, 0),
+		MKGUI_W(MKGUI_GROUP,  GRP,   "Grp",  "", VBOX1, 0,   0,   MKGUI_FIXED, MKGUI_COLLAPSIBLE | MKGUI_COLLAPSED, 0),
+		MKGUI_W(MKGUI_BUTTON, BTN1,  "A",    "", GRP,   0,   0,   0, 0, 0),
+		MKGUI_W(MKGUI_BUTTON, BTN2,  "B",    "", VBOX1, 0,   0,   0, 0, 0),
 	};
 	struct mkgui_ctx *ctx = create_and_layout(widgets, 5);
 	CHECK(ctx, "create failed");
@@ -469,10 +469,10 @@ static void test_hbox_many_children_no_zero(void) {
 	TEST_BEGIN("hbox: 15 flex children all get positive width");
 	enum { WIN = 1, HBOX1 = 2 };
 	struct mkgui_widget widgets[17];
-	widgets[0] = (struct mkgui_widget){ MKGUI_WINDOW, WIN, "Test", "", 0, 600, 400, 0, 0, 0 };
-	widgets[1] = (struct mkgui_widget){ MKGUI_HBOX, HBOX1, "", "", WIN, 0, 0, 0, 0, 0 };
+	widgets[0] = (struct mkgui_widget)MKGUI_W(MKGUI_WINDOW, WIN, "Test", "", 0, 600, 400, 0, 0, 0);
+	widgets[1] = (struct mkgui_widget)MKGUI_W(MKGUI_HBOX, HBOX1, "", "", WIN, 0, 0, 0, 0, 0);
 	for(uint32_t i = 0; i < 15; ++i) {
-		widgets[2 + i] = (struct mkgui_widget){ MKGUI_BUTTON, 10 + i, "B", "", HBOX1, 0, 0, 0, 0, 0 };
+		widgets[2 + i] = (struct mkgui_widget)MKGUI_W(MKGUI_BUTTON, 10 + i, "B", "", HBOX1, 0, 0, 0, 0, 0);
 	}
 	struct mkgui_ctx *ctx = create_and_layout(widgets, 17);
 	CHECK(ctx, "create failed");
@@ -493,11 +493,11 @@ static void test_mixed_fixed_flex(void) {
 	TEST_BEGIN("vbox: mixed fixed + flex children, flex gets remaining space");
 	enum { WIN = 1, VBOX1 = 2, BTN1 = 3, LV = 4, BTN2 = 5 };
 	struct mkgui_widget widgets[] = {
-		{ MKGUI_WINDOW,   WIN,   "Test", "", 0,     600, 400, 0, 0, 0 },
-		{ MKGUI_VBOX,     VBOX1, "",     "", WIN,   0,   0,   0, 0, 0 },
-		{ MKGUI_BUTTON,   BTN1,  "Top",  "", VBOX1, 0,   40,  MKGUI_FIXED, 0, 0 },
-		{ MKGUI_LISTVIEW, LV,    "",     "", VBOX1, 0,   0,   0, 0, 0 },
-		{ MKGUI_BUTTON,   BTN2,  "Bot",  "", VBOX1, 0,   40,  MKGUI_FIXED, 0, 0 },
+		MKGUI_W(MKGUI_WINDOW,   WIN,   "Test", "", 0,     600, 400, 0, 0, 0),
+		MKGUI_W(MKGUI_VBOX,     VBOX1, "",     "", WIN,   0,   0,   0, 0, 0),
+		MKGUI_W(MKGUI_BUTTON,   BTN1,  "Top",  "", VBOX1, 0,   40,  MKGUI_FIXED, 0, 0),
+		MKGUI_W(MKGUI_LISTVIEW, LV,    "",     "", VBOX1, 0,   0,   0, 0, 0),
+		MKGUI_W(MKGUI_BUTTON,   BTN2,  "Bot",  "", VBOX1, 0,   40,  MKGUI_FIXED, 0, 0),
 	};
 	struct mkgui_ctx *ctx = create_and_layout(widgets, 5);
 	CHECK(ctx, "create failed");
@@ -520,12 +520,12 @@ static void test_tabs_content_inside(void) {
 	TEST_BEGIN("tabs: tab content stays inside tab area");
 	enum { WIN = 1, TABS1 = 2, TAB1 = 3, TAB2 = 4, BTN1 = 5, BTN2 = 6 };
 	struct mkgui_widget widgets[] = {
-		{ MKGUI_WINDOW, WIN,   "Test", "", 0,    600, 400, 0, 0, 0 },
-		{ MKGUI_TABS,   TABS1, "",     "", WIN,  0,   0,   0, 0, 0 },
-		{ MKGUI_TAB,    TAB1,  "T1",   "", TABS1, 0,  0,   0, 0, 0 },
-		{ MKGUI_TAB,    TAB2,  "T2",   "", TABS1, 0,  0,   0, 0, 0 },
-		{ MKGUI_BUTTON, BTN1,  "A",    "", TAB1, 0,   0,   0, 0, 0 },
-		{ MKGUI_BUTTON, BTN2,  "B",    "", TAB2, 0,   0,   0, 0, 0 },
+		MKGUI_W(MKGUI_WINDOW, WIN,   "Test", "", 0,    600, 400, 0, 0, 0),
+		MKGUI_W(MKGUI_TABS,   TABS1, "",     "", WIN,  0,   0,   0, 0, 0),
+		MKGUI_W(MKGUI_TAB,    TAB1,  "T1",   "", TABS1, 0,  0,   0, 0, 0),
+		MKGUI_W(MKGUI_TAB,    TAB2,  "T2",   "", TABS1, 0,  0,   0, 0, 0),
+		MKGUI_W(MKGUI_BUTTON, BTN1,  "A",    "", TAB1, 0,   0,   0, 0, 0),
+		MKGUI_W(MKGUI_BUTTON, BTN2,  "B",    "", TAB2, 0,   0,   0, 0, 0),
 	};
 	struct mkgui_ctx *ctx = create_and_layout(widgets, 6);
 	CHECK(ctx, "create failed");
@@ -550,11 +550,11 @@ static void test_resize_smaller(void) {
 	TEST_BEGIN("resize: shrinking window keeps all widgets positive");
 	enum { WIN = 1, VBOX1 = 2, BTN1 = 3, LV = 4, BTN2 = 5 };
 	struct mkgui_widget widgets[] = {
-		{ MKGUI_WINDOW,   WIN,   "Test", "", 0,     600, 400, 0, 0, 0 },
-		{ MKGUI_VBOX,     VBOX1, "",     "", WIN,   0,   0,   0, 0, 0 },
-		{ MKGUI_BUTTON,   BTN1,  "A",    "", VBOX1, 0,   0,   0, 0, 0 },
-		{ MKGUI_LISTVIEW, LV,    "",     "", VBOX1, 0,   0,   0, 0, 0 },
-		{ MKGUI_BUTTON,   BTN2,  "B",    "", VBOX1, 0,   0,   0, 0, 0 },
+		MKGUI_W(MKGUI_WINDOW,   WIN,   "Test", "", 0,     600, 400, 0, 0, 0),
+		MKGUI_W(MKGUI_VBOX,     VBOX1, "",     "", WIN,   0,   0,   0, 0, 0),
+		MKGUI_W(MKGUI_BUTTON,   BTN1,  "A",    "", VBOX1, 0,   0,   0, 0, 0),
+		MKGUI_W(MKGUI_LISTVIEW, LV,    "",     "", VBOX1, 0,   0,   0, 0, 0),
+		MKGUI_W(MKGUI_BUTTON,   BTN2,  "B",    "", VBOX1, 0,   0,   0, 0, 0),
 	};
 	struct mkgui_ctx *ctx = create_and_layout(widgets, 5);
 	CHECK(ctx, "create failed");
@@ -583,12 +583,12 @@ static void test_split_resize_no_negative(void) {
 	TEST_BEGIN("vsplit: small window doesn't produce negative pane sizes");
 	enum { WIN = 1, SPLIT = 2, LEFT = 3, RIGHT = 4, BTN1 = 5, BTN2 = 6 };
 	struct mkgui_widget widgets[] = {
-		{ MKGUI_WINDOW, WIN,   "Test", "", 0,     200, 150, 0, 0, 0 },
-		{ MKGUI_VSPLIT, SPLIT, "",     "", WIN,   0,   0,   0, 0, 0 },
-		{ MKGUI_VBOX,   LEFT,  "",     "", SPLIT, 0,   0,   MKGUI_REGION_LEFT, 0, 0 },
-		{ MKGUI_VBOX,   RIGHT, "",     "", SPLIT, 0,   0,   MKGUI_REGION_RIGHT, 0, 0 },
-		{ MKGUI_BUTTON, BTN1,  "L",    "", LEFT,  0,   0,   0, 0, 0 },
-		{ MKGUI_BUTTON, BTN2,  "R",    "", RIGHT, 0,   0,   0, 0, 0 },
+		MKGUI_W(MKGUI_WINDOW, WIN,   "Test", "", 0,     200, 150, 0, 0, 0),
+		MKGUI_W(MKGUI_VSPLIT, SPLIT, "",     "", WIN,   0,   0,   0, 0, 0),
+		MKGUI_W(MKGUI_VBOX,   LEFT,  "",     "", SPLIT, 0,   0,   MKGUI_REGION_LEFT, 0, 0),
+		MKGUI_W(MKGUI_VBOX,   RIGHT, "",     "", SPLIT, 0,   0,   MKGUI_REGION_RIGHT, 0, 0),
+		MKGUI_W(MKGUI_BUTTON, BTN1,  "L",    "", LEFT,  0,   0,   0, 0, 0),
+		MKGUI_W(MKGUI_BUTTON, BTN2,  "R",    "", RIGHT, 0,   0,   0, 0, 0),
 	};
 	struct mkgui_ctx *ctx = create_and_layout(widgets, 6);
 	CHECK(ctx, "create failed");
@@ -611,15 +611,15 @@ static void test_full_chrome_stack(void) {
 	TEST_BEGIN("window: menu + toolbar + pathbar + statusbar leaves positive content area");
 	enum { WIN = 1, MENU1 = 2, MI1 = 3, TB = 4, TB_BTN = 5, PB = 6, SB = 7, VBOX1 = 8, BTN1 = 9 };
 	struct mkgui_widget widgets[] = {
-		{ MKGUI_WINDOW,    WIN,    "Test",  "", 0,   600, 400, 0, 0, 0 },
-		{ MKGUI_MENU,      MENU1,  "",      "", WIN, 0,   0,   0, 0, 0 },
-		{ MKGUI_MENUITEM,  MI1,    "File",  "", MENU1, 0, 0,   0, 0, 0 },
-		{ MKGUI_TOOLBAR,   TB,     "",      "", WIN, 0,   0,   0, 0, 0 },
-		{ MKGUI_BUTTON,    TB_BTN, "Save",  "", TB,  0,   0,   0, 0, 0 },
-		{ MKGUI_PATHBAR,   PB,     "",      "", WIN, 0,   0,   0, 0, 0 },
-		{ MKGUI_STATUSBAR, SB,     "",      "", WIN, 0,   0,   0, 0, 0 },
-		{ MKGUI_VBOX,      VBOX1,  "",      "", WIN, 0,   0,   0, 0, 0 },
-		{ MKGUI_BUTTON,    BTN1,   "Click", "", VBOX1, 0, 0,   0, 0, 0 },
+		MKGUI_W(MKGUI_WINDOW,    WIN,    "Test",  "", 0,   600, 400, 0, 0, 0),
+		MKGUI_W(MKGUI_MENU,      MENU1,  "",      "", WIN, 0,   0,   0, 0, 0),
+		MKGUI_W(MKGUI_MENUITEM,  MI1,    "File",  "", MENU1, 0, 0,   0, 0, 0),
+		MKGUI_W(MKGUI_TOOLBAR,   TB,     "",      "", WIN, 0,   0,   0, 0, 0),
+		MKGUI_W(MKGUI_BUTTON,    TB_BTN, "Save",  "", TB,  0,   0,   0, 0, 0),
+		MKGUI_W(MKGUI_PATHBAR,   PB,     "",      "", WIN, 0,   0,   0, 0, 0),
+		MKGUI_W(MKGUI_STATUSBAR, SB,     "",      "", WIN, 0,   0,   0, 0, 0),
+		MKGUI_W(MKGUI_VBOX,      VBOX1,  "",      "", WIN, 0,   0,   0, 0, 0),
+		MKGUI_W(MKGUI_BUTTON,    BTN1,   "Click", "", VBOX1, 0, 0,   0, 0, 0),
 	};
 	struct mkgui_ctx *ctx = create_and_layout(widgets, 9);
 	CHECK(ctx, "create failed");
@@ -641,10 +641,10 @@ static void test_panel_border(void) {
 	TEST_BEGIN("panel: children stay inside bordered panel");
 	enum { WIN = 1, PANEL1 = 2, BTN1 = 3, BTN2 = 4 };
 	struct mkgui_widget widgets[] = {
-		{ MKGUI_WINDOW, WIN,    "Test", "", 0,      600, 400, 0, 0, 0 },
-		{ MKGUI_PANEL,  PANEL1, "",     "", WIN,    0,   0,   0, MKGUI_PANEL_BORDER, 0 },
-		{ MKGUI_BUTTON, BTN1,   "A",    "", PANEL1, 0,   0,   0, 0, 0 },
-		{ MKGUI_BUTTON, BTN2,   "B",    "", PANEL1, 0,   0,   0, 0, 0 },
+		MKGUI_W(MKGUI_WINDOW, WIN,    "Test", "", 0,      600, 400, 0, 0, 0),
+		MKGUI_W(MKGUI_PANEL,  PANEL1, "",     "", WIN,    0,   0,   0, MKGUI_PANEL_BORDER, 0),
+		MKGUI_W(MKGUI_BUTTON, BTN1,   "A",    "", PANEL1, 0,   0,   0, 0, 0),
+		MKGUI_W(MKGUI_BUTTON, BTN2,   "B",    "", PANEL1, 0,   0,   0, 0, 0),
 	};
 	struct mkgui_ctx *ctx = create_and_layout(widgets, 4);
 	CHECK(ctx, "create failed");
@@ -661,15 +661,15 @@ static void test_no_widget_zero_size(void) {
 	TEST_BEGIN("universal: no visible widget should have zero width or height");
 	enum { WIN = 1, VBOX1 = 2, BTN1 = 3, INP1 = 4, CB = 5, DD = 6, SL = 7, PG = 8, LBL1 = 9 };
 	struct mkgui_widget widgets[] = {
-		{ MKGUI_WINDOW,   WIN,   "Test",   "", 0,     600, 400, 0, 0, 0 },
-		{ MKGUI_VBOX,     VBOX1, "",        "", WIN,   0,   0,   0, 0, 0 },
-		{ MKGUI_BUTTON,   BTN1,  "Button",  "", VBOX1, 0,   0,   0, 0, 0 },
-		{ MKGUI_INPUT,    INP1,  "",        "", VBOX1, 0,   0,   0, 0, 0 },
-		{ MKGUI_CHECKBOX, CB,    "Check",   "", VBOX1, 0,   0,   0, 0, 0 },
-		{ MKGUI_DROPDOWN, DD,    "",        "", VBOX1, 0,   0,   0, 0, 0 },
-		{ MKGUI_SLIDER,   SL,    "",        "", VBOX1, 0,   0,   0, 0, 0 },
-		{ MKGUI_PROGRESS, PG,    "",        "", VBOX1, 0,   0,   0, 0, 0 },
-		{ MKGUI_LABEL,    LBL1,  "Label",   "", VBOX1, 0,   0,   0, 0, 0 },
+		MKGUI_W(MKGUI_WINDOW,   WIN,   "Test",   "", 0,     600, 400, 0, 0, 0),
+		MKGUI_W(MKGUI_VBOX,     VBOX1, "",        "", WIN,   0,   0,   0, 0, 0),
+		MKGUI_W(MKGUI_BUTTON,   BTN1,  "Button",  "", VBOX1, 0,   0,   0, 0, 0),
+		MKGUI_W(MKGUI_INPUT,    INP1,  "",        "", VBOX1, 0,   0,   0, 0, 0),
+		MKGUI_W(MKGUI_CHECKBOX, CB,    "Check",   "", VBOX1, 0,   0,   0, 0, 0),
+		MKGUI_W(MKGUI_DROPDOWN, DD,    "",        "", VBOX1, 0,   0,   0, 0, 0),
+		MKGUI_W(MKGUI_SLIDER,   SL,    "",        "", VBOX1, 0,   0,   0, 0, 0),
+		MKGUI_W(MKGUI_PROGRESS, PG,    "",        "", VBOX1, 0,   0,   0, 0, 0),
+		MKGUI_W(MKGUI_LABEL,    LBL1,  "Label",   "", VBOX1, 0,   0,   0, 0, 0),
 	};
 	struct mkgui_ctx *ctx = create_and_layout(widgets, 9);
 	CHECK(ctx, "create failed");
@@ -695,14 +695,14 @@ static void test_listview_min_height(void) {
 	TEST_BEGIN("vbox: listview under pressure keeps minimum height (3 rows)");
 	enum { WIN = 1, VBOX1 = 2, BTN1 = 3, BTN2 = 4, BTN3 = 5, BTN4 = 6, BTN5 = 7, LV = 8 };
 	struct mkgui_widget widgets[] = {
-		{ MKGUI_WINDOW,   WIN,   "Test", "", 0,     300, 200, 0, 0, 0 },
-		{ MKGUI_VBOX,     VBOX1, "",     "", WIN,   0,   0,   0, 0, 0 },
-		{ MKGUI_BUTTON,   BTN1,  "A",    "", VBOX1, 0,   0,   0, 0, 0 },
-		{ MKGUI_BUTTON,   BTN2,  "B",    "", VBOX1, 0,   0,   0, 0, 0 },
-		{ MKGUI_BUTTON,   BTN3,  "C",    "", VBOX1, 0,   0,   0, 0, 0 },
-		{ MKGUI_BUTTON,   BTN4,  "D",    "", VBOX1, 0,   0,   0, 0, 0 },
-		{ MKGUI_BUTTON,   BTN5,  "E",    "", VBOX1, 0,   0,   0, 0, 0 },
-		{ MKGUI_LISTVIEW, LV,    "",     "", VBOX1, 0,   0,   0, 0, 0 },
+		MKGUI_W(MKGUI_WINDOW,   WIN,   "Test", "", 0,     300, 200, 0, 0, 0),
+		MKGUI_W(MKGUI_VBOX,     VBOX1, "",     "", WIN,   0,   0,   0, 0, 0),
+		MKGUI_W(MKGUI_BUTTON,   BTN1,  "A",    "", VBOX1, 0,   0,   0, 0, 0),
+		MKGUI_W(MKGUI_BUTTON,   BTN2,  "B",    "", VBOX1, 0,   0,   0, 0, 0),
+		MKGUI_W(MKGUI_BUTTON,   BTN3,  "C",    "", VBOX1, 0,   0,   0, 0, 0),
+		MKGUI_W(MKGUI_BUTTON,   BTN4,  "D",    "", VBOX1, 0,   0,   0, 0, 0),
+		MKGUI_W(MKGUI_BUTTON,   BTN5,  "E",    "", VBOX1, 0,   0,   0, 0, 0),
+		MKGUI_W(MKGUI_LISTVIEW, LV,    "",     "", VBOX1, 0,   0,   0, 0, 0),
 	};
 	struct mkgui_ctx *ctx = create_and_layout(widgets, 8);
 	CHECK(ctx, "create failed");
@@ -720,13 +720,13 @@ static void test_textarea_min_height(void) {
 	TEST_BEGIN("vbox: textarea under pressure keeps minimum height");
 	enum { WIN = 1, VBOX1 = 2, BTN1 = 3, BTN2 = 4, BTN3 = 5, BTN4 = 6, TA = 7 };
 	struct mkgui_widget widgets[] = {
-		{ MKGUI_WINDOW,   WIN,   "Test", "", 0,     300, 200, 0, 0, 0 },
-		{ MKGUI_VBOX,     VBOX1, "",     "", WIN,   0,   0,   0, 0, 0 },
-		{ MKGUI_BUTTON,   BTN1,  "A",    "", VBOX1, 0,   0,   0, 0, 0 },
-		{ MKGUI_BUTTON,   BTN2,  "B",    "", VBOX1, 0,   0,   0, 0, 0 },
-		{ MKGUI_BUTTON,   BTN3,  "C",    "", VBOX1, 0,   0,   0, 0, 0 },
-		{ MKGUI_BUTTON,   BTN4,  "D",    "", VBOX1, 0,   0,   0, 0, 0 },
-		{ MKGUI_TEXTAREA, TA,    "",     "", VBOX1, 0,   0,   0, 0, 0 },
+		MKGUI_W(MKGUI_WINDOW,   WIN,   "Test", "", 0,     300, 200, 0, 0, 0),
+		MKGUI_W(MKGUI_VBOX,     VBOX1, "",     "", WIN,   0,   0,   0, 0, 0),
+		MKGUI_W(MKGUI_BUTTON,   BTN1,  "A",    "", VBOX1, 0,   0,   0, 0, 0),
+		MKGUI_W(MKGUI_BUTTON,   BTN2,  "B",    "", VBOX1, 0,   0,   0, 0, 0),
+		MKGUI_W(MKGUI_BUTTON,   BTN3,  "C",    "", VBOX1, 0,   0,   0, 0, 0),
+		MKGUI_W(MKGUI_BUTTON,   BTN4,  "D",    "", VBOX1, 0,   0,   0, 0, 0),
+		MKGUI_W(MKGUI_TEXTAREA, TA,    "",     "", VBOX1, 0,   0,   0, 0, 0),
 	};
 	struct mkgui_ctx *ctx = create_and_layout(widgets, 7);
 	CHECK(ctx, "create failed");
@@ -744,10 +744,10 @@ static void test_hbox_min_width(void) {
 	TEST_BEGIN("hbox: flex children keep minimum width under pressure");
 	enum { WIN = 1, HBOX1 = 2 };
 	struct mkgui_widget widgets[22];
-	widgets[0] = (struct mkgui_widget){ MKGUI_WINDOW, WIN, "Test", "", 0, 200, 200, 0, 0, 0 };
-	widgets[1] = (struct mkgui_widget){ MKGUI_HBOX, HBOX1, "", "", WIN, 0, 0, 0, 0, 0 };
+	widgets[0] = (struct mkgui_widget)MKGUI_W(MKGUI_WINDOW, WIN, "Test", "", 0, 200, 200, 0, 0, 0);
+	widgets[1] = (struct mkgui_widget)MKGUI_W(MKGUI_HBOX, HBOX1, "", "", WIN, 0, 0, 0, 0, 0);
 	for(uint32_t i = 0; i < 20; ++i) {
-		widgets[2 + i] = (struct mkgui_widget){ MKGUI_BUTTON, 10 + i, "B", "", HBOX1, 0, 0, 0, 0, 0 };
+		widgets[2 + i] = (struct mkgui_widget)MKGUI_W(MKGUI_BUTTON, 10 + i, "B", "", HBOX1, 0, 0, 0, 0, 0);
 	}
 	struct mkgui_ctx *ctx = create_and_layout(widgets, 22);
 	CHECK(ctx, "create failed");
@@ -767,14 +767,14 @@ static void test_tabs_min_height(void) {
 	TEST_BEGIN("vbox: tabs widget keeps minimum height under pressure");
 	enum { WIN = 1, VBOX1 = 2, BTN1 = 3, BTN2 = 4, BTN3 = 5, TABS1 = 6, TAB1 = 7, BTN4 = 8 };
 	struct mkgui_widget widgets[] = {
-		{ MKGUI_WINDOW, WIN,   "Test", "", 0,     300, 180, 0, 0, 0 },
-		{ MKGUI_VBOX,   VBOX1, "",     "", WIN,   0,   0,   0, 0, 0 },
-		{ MKGUI_BUTTON, BTN1,  "A",    "", VBOX1, 0,   0,   0, 0, 0 },
-		{ MKGUI_BUTTON, BTN2,  "B",    "", VBOX1, 0,   0,   0, 0, 0 },
-		{ MKGUI_BUTTON, BTN3,  "C",    "", VBOX1, 0,   0,   0, 0, 0 },
-		{ MKGUI_TABS,   TABS1, "",     "", VBOX1, 0,   0,   0, 0, 0 },
-		{ MKGUI_TAB,    TAB1,  "Tab",  "", TABS1, 0,   0,   0, 0, 0 },
-		{ MKGUI_BUTTON, BTN4,  "In",   "", TAB1,  0,   0,   0, 0, 0 },
+		MKGUI_W(MKGUI_WINDOW, WIN,   "Test", "", 0,     300, 180, 0, 0, 0),
+		MKGUI_W(MKGUI_VBOX,   VBOX1, "",     "", WIN,   0,   0,   0, 0, 0),
+		MKGUI_W(MKGUI_BUTTON, BTN1,  "A",    "", VBOX1, 0,   0,   0, 0, 0),
+		MKGUI_W(MKGUI_BUTTON, BTN2,  "B",    "", VBOX1, 0,   0,   0, 0, 0),
+		MKGUI_W(MKGUI_BUTTON, BTN3,  "C",    "", VBOX1, 0,   0,   0, 0, 0),
+		MKGUI_W(MKGUI_TABS,   TABS1, "",     "", VBOX1, 0,   0,   0, 0, 0),
+		MKGUI_W(MKGUI_TAB,    TAB1,  "Tab",  "", TABS1, 0,   0,   0, 0, 0),
+		MKGUI_W(MKGUI_BUTTON, BTN4,  "In",   "", TAB1,  0,   0,   0, 0, 0),
 	};
 	struct mkgui_ctx *ctx = create_and_layout(widgets, 8);
 	CHECK(ctx, "create failed");
@@ -792,14 +792,14 @@ static void test_split_pane_min_height(void) {
 	TEST_BEGIN("vbox: split widget keeps minimum height under pressure");
 	enum { WIN = 1, VBOX1 = 2, BTN1 = 3, BTN2 = 4, BTN3 = 5, SPLIT = 6, TOP = 7, BOT = 8 };
 	struct mkgui_widget widgets[] = {
-		{ MKGUI_WINDOW, WIN,   "Test", "", 0,     300, 180, 0, 0, 0 },
-		{ MKGUI_VBOX,   VBOX1, "",     "", WIN,   0,   0,   0, 0, 0 },
-		{ MKGUI_BUTTON, BTN1,  "A",    "", VBOX1, 0,   0,   0, 0, 0 },
-		{ MKGUI_BUTTON, BTN2,  "B",    "", VBOX1, 0,   0,   0, 0, 0 },
-		{ MKGUI_BUTTON, BTN3,  "C",    "", VBOX1, 0,   0,   0, 0, 0 },
-		{ MKGUI_HSPLIT, SPLIT, "",     "", VBOX1, 0,   0,   0, 0, 0 },
-		{ MKGUI_VBOX,   TOP,   "",     "", SPLIT, 0,   0,   MKGUI_REGION_TOP, 0, 0 },
-		{ MKGUI_VBOX,   BOT,   "",     "", SPLIT, 0,   0,   MKGUI_REGION_BOTTOM, 0, 0 },
+		MKGUI_W(MKGUI_WINDOW, WIN,   "Test", "", 0,     300, 180, 0, 0, 0),
+		MKGUI_W(MKGUI_VBOX,   VBOX1, "",     "", WIN,   0,   0,   0, 0, 0),
+		MKGUI_W(MKGUI_BUTTON, BTN1,  "A",    "", VBOX1, 0,   0,   0, 0, 0),
+		MKGUI_W(MKGUI_BUTTON, BTN2,  "B",    "", VBOX1, 0,   0,   0, 0, 0),
+		MKGUI_W(MKGUI_BUTTON, BTN3,  "C",    "", VBOX1, 0,   0,   0, 0, 0),
+		MKGUI_W(MKGUI_HSPLIT, SPLIT, "",     "", VBOX1, 0,   0,   0, 0, 0),
+		MKGUI_W(MKGUI_VBOX,   TOP,   "",     "", SPLIT, 0,   0,   MKGUI_REGION_TOP, 0, 0),
+		MKGUI_W(MKGUI_VBOX,   BOT,   "",     "", SPLIT, 0,   0,   MKGUI_REGION_BOTTOM, 0, 0),
 	};
 	struct mkgui_ctx *ctx = create_and_layout(widgets, 8);
 	CHECK(ctx, "create failed");
@@ -817,11 +817,11 @@ static void test_hbox_label_progress_spinner(void) {
 	TEST_BEGIN("hbox: label(fixed) + progress(flex) + spinner(fixed) all fit");
 	enum { WIN = 1, HBOX1 = 2, LBL = 3, PG = 4, SP = 5 };
 	struct mkgui_widget widgets[] = {
-		{ MKGUI_WINDOW,   WIN,   "Test", "", 0,     600, 400, 0, 0, 0 },
-		{ MKGUI_HBOX,     HBOX1, "",     "", WIN,   0,   28,  MKGUI_FIXED, 0, 0 },
-		{ MKGUI_LABEL,    LBL,   "Progress:", "", HBOX1, 80, 0, MKGUI_FIXED, 0, 0 },
-		{ MKGUI_PROGRESS, PG,    "",     "", HBOX1, 0,   0,   0, 0, 1 },
-		{ MKGUI_SPINNER,  SP,    "",     "", HBOX1, 28,  0,   MKGUI_FIXED, 0, 0 },
+		MKGUI_W(MKGUI_WINDOW,   WIN,   "Test", "", 0,     600, 400, 0, 0, 0),
+		MKGUI_W(MKGUI_HBOX,     HBOX1, "",     "", WIN,   0,   28,  MKGUI_FIXED, 0, 0),
+		MKGUI_W(MKGUI_LABEL,    LBL,   "Progress:", "", HBOX1, 80, 0, MKGUI_FIXED, 0, 0),
+		MKGUI_W(MKGUI_PROGRESS, PG,    "",     "", HBOX1, 0,   0,   0, 0, 1),
+		MKGUI_W(MKGUI_SPINNER,  SP,    "",     "", HBOX1, 28,  0,   MKGUI_FIXED, 0, 0),
 	};
 	struct mkgui_ctx *ctx = create_and_layout(widgets, 5);
 	CHECK(ctx, "create failed");
@@ -848,11 +848,11 @@ static void test_vbox_shrink_no_overlap(void) {
 	TEST_BEGIN("vbox: children shrink proportionally and don't overlap");
 	enum { WIN = 1, VBOX1 = 2, BTN1 = 3, LV = 4, BTN2 = 5 };
 	struct mkgui_widget widgets[] = {
-		{ MKGUI_WINDOW,   WIN,   "Test", "", 0,     300, 200, 0, 0, 0 },
-		{ MKGUI_VBOX,     VBOX1, "",     "", WIN,   0,   0,   0, 0, 0 },
-		{ MKGUI_BUTTON,   BTN1,  "A",    "", VBOX1, 0,   0,   0, 0, 0 },
-		{ MKGUI_LISTVIEW, LV,    "",     "", VBOX1, 0,   0,   0, 0, 0 },
-		{ MKGUI_BUTTON,   BTN2,  "B",    "", VBOX1, 0,   0,   0, 0, 0 },
+		MKGUI_W(MKGUI_WINDOW,   WIN,   "Test", "", 0,     300, 200, 0, 0, 0),
+		MKGUI_W(MKGUI_VBOX,     VBOX1, "",     "", WIN,   0,   0,   0, 0, 0),
+		MKGUI_W(MKGUI_BUTTON,   BTN1,  "A",    "", VBOX1, 0,   0,   0, 0, 0),
+		MKGUI_W(MKGUI_LISTVIEW, LV,    "",     "", VBOX1, 0,   0,   0, 0, 0),
+		MKGUI_W(MKGUI_BUTTON,   BTN2,  "B",    "", VBOX1, 0,   0,   0, 0, 0),
 	};
 	struct mkgui_ctx *ctx = create_and_layout(widgets, 5);
 	CHECK(ctx, "create failed");
@@ -876,11 +876,11 @@ static void test_hbox_shrink_stays_inside(void) {
 	TEST_BEGIN("hbox: children shrink proportionally and stay inside parent");
 	enum { WIN = 1, HBOX1 = 2, LBL = 3, INP = 4, CB = 5 };
 	struct mkgui_widget widgets[] = {
-		{ MKGUI_WINDOW, WIN,   "Test", "", 0,     200, 200, 0, 0, 0 },
-		{ MKGUI_HBOX,   HBOX1, "",     "", WIN,   0,   0,   0, 0, 0 },
-		{ MKGUI_LABEL,  LBL,   "Search:", "", HBOX1, 60, 0, MKGUI_FIXED, 0, 0 },
-		{ MKGUI_INPUT,  INP,   "",     "", HBOX1, 0,   0,   0, 0, 0 },
-		{ MKGUI_COMBOBOX, CB,  "",     "", HBOX1, 0,   0,   0, 0, 0 },
+		MKGUI_W(MKGUI_WINDOW, WIN,   "Test", "", 0,     200, 200, 0, 0, 0),
+		MKGUI_W(MKGUI_HBOX,   HBOX1, "",     "", WIN,   0,   0,   0, 0, 0),
+		MKGUI_W(MKGUI_LABEL,  LBL,   "Search:", "", HBOX1, 60, 0, MKGUI_FIXED, 0, 0),
+		MKGUI_W(MKGUI_INPUT,  INP,   "",     "", HBOX1, 0,   0,   0, 0, 0),
+		MKGUI_W(MKGUI_COMBOBOX, CB,  "",     "", HBOX1, 0,   0,   0, 0, 0),
 	};
 	struct mkgui_ctx *ctx = create_and_layout(widgets, 5);
 	CHECK(ctx, "create failed");
@@ -906,14 +906,14 @@ static void test_form_shrink_no_overlap(void) {
 	TEST_BEGIN("form: shrunk window keeps labels and controls from overlapping");
 	enum { WIN = 1, FORM1 = 2, LBL1 = 3, INP1 = 4, LBL2 = 5, DD = 6, LBL3 = 7, CB = 8 };
 	struct mkgui_widget widgets[] = {
-		{ MKGUI_WINDOW,   WIN,   "Test",    "", 0,     200, 150, 0, 0, 0 },
-		{ MKGUI_FORM,     FORM1, "",        "", WIN,   0,   0,   0, 0, 0 },
-		{ MKGUI_LABEL,    LBL1,  "Name",    "", FORM1, 0,   0,   0, 0, 0 },
-		{ MKGUI_INPUT,    INP1,  "",        "", FORM1, 0,   0,   0, 0, 0 },
-		{ MKGUI_LABEL,    LBL2,  "Enable",  "", FORM1, 0,   0,   0, 0, 0 },
-		{ MKGUI_DROPDOWN, DD,    "",        "", FORM1, 0,   0,   0, 0, 0 },
-		{ MKGUI_LABEL,    LBL3,  "Search",  "", FORM1, 0,   0,   0, 0, 0 },
-		{ MKGUI_COMBOBOX, CB,    "",        "", FORM1, 0,   0,   0, 0, 0 },
+		MKGUI_W(MKGUI_WINDOW,   WIN,   "Test",    "", 0,     200, 150, 0, 0, 0),
+		MKGUI_W(MKGUI_FORM,     FORM1, "",        "", WIN,   0,   0,   0, 0, 0),
+		MKGUI_W(MKGUI_LABEL,    LBL1,  "Name",    "", FORM1, 0,   0,   0, 0, 0),
+		MKGUI_W(MKGUI_INPUT,    INP1,  "",        "", FORM1, 0,   0,   0, 0, 0),
+		MKGUI_W(MKGUI_LABEL,    LBL2,  "Enable",  "", FORM1, 0,   0,   0, 0, 0),
+		MKGUI_W(MKGUI_DROPDOWN, DD,    "",        "", FORM1, 0,   0,   0, 0, 0),
+		MKGUI_W(MKGUI_LABEL,    LBL3,  "Search",  "", FORM1, 0,   0,   0, 0, 0),
+		MKGUI_W(MKGUI_COMBOBOX, CB,    "",        "", FORM1, 0,   0,   0, 0, 0),
 	};
 	struct mkgui_ctx *ctx = create_and_layout(widgets, 8);
 	CHECK(ctx, "create failed");

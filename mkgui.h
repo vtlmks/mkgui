@@ -288,15 +288,20 @@ enum {
 struct mkgui_widget {
 	uint32_t type;
 	uint32_t id;
-	char label[MKGUI_MAX_TEXT];
-	char icon[MKGUI_ICON_NAME_LEN];
 	uint32_t parent_id;
 	int32_t w, h;
 	uint32_t flags;
 	uint32_t style;
 	uint32_t weight;
 	int32_t margin_l, margin_r, margin_t, margin_b;
+	int32_t label_tw;
+	char label[MKGUI_MAX_TEXT];
+	char icon[MKGUI_ICON_NAME_LEN];
 };
+
+// Positional initializer: type, id, label, icon, parent_id, w, h, flags, style, weight
+#define MKGUI_W(t, i, lbl, ico, pid, ww, hh, fl, st, wt) \
+	{ (t), (i), (pid), (ww), (hh), (fl), (st), (wt), 0, 0, 0, 0, 0, lbl, ico }
 
 struct mkgui_event {
 	uint32_t type;

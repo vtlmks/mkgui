@@ -25,6 +25,7 @@
 #if defined(__SSE4_1__)
 #include <smmintrin.h>
 #endif
+#include <immintrin.h>
 
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
@@ -438,8 +439,14 @@ struct mkgui_glyph {
 	int32_t bearing_x;
 	int32_t bearing_y;
 	int32_t advance;
-	uint8_t bitmap[MKGUI_GLYPH_MAX_BMP];
+	int32_t atlas_x;
+	int32_t atlas_y;
 };
+
+// Glyph atlas: packed uint8_t alpha bitmaps for all 224 glyphs
+static uint8_t *glyph_atlas;
+static int32_t glyph_atlas_w, glyph_atlas_h;
+static uint8_t glyph_staging[MKGUI_GLYPH_COUNT][MKGUI_GLYPH_MAX_BMP];
 
 struct mkgui_popup {
 	struct mkgui_popup_platform plat;
@@ -459,8 +466,13 @@ struct mkgui_icon {
 	char name[MKGUI_ICON_NAME_LEN];
 	uint32_t *pixels;
 	int32_t w, h;
+	int32_t atlas_x, atlas_y;
 	uint32_t custom;
 };
+
+// Icon atlas: packed uint32_t ARGB pixels for all loaded icons
+static uint32_t *icon_atlas;
+static int32_t icon_atlas_w, icon_atlas_h;
 
 static struct mkgui_icon icons[MKGUI_MAX_ICONS];
 static uint32_t icon_count;
@@ -918,6 +930,94 @@ static void mkgui_recompute_metrics(struct mkgui_ctx *ctx) {
 	ctx->toolbar_btn_w   = sc(ctx, MKGUI_TOOLBAR_BTN_W);
 	ctx->toolbar_sep_w   = sc(ctx, MKGUI_TOOLBAR_SEP_W);
 	ctx->statusbar_height = sc(ctx, MKGUI_STATUSBAR_HEIGHT);
+	for(uint32_t i = 0; i < ctx->widget_count; ++i) {
+		ctx->widgets[i].label_tw = -1;
+	}
+}
+
+#include "mkgui_atlas.c"
+
+// [=]===^=[ glyph_atlas_build ]====================================[=]
+static void glyph_atlas_build(struct mkgui_ctx *ctx) {
+	// Collect glyph sizes for packing (idx tracks original glyph index through sort)
+	struct atlas_rect rects[MKGUI_GLYPH_COUNT];
+	for(uint32_t i = 0; i < MKGUI_GLYPH_COUNT; ++i) {
+		struct mkgui_glyph *g = &ctx->glyphs[i];
+		rects[i].w = g->width > 0 ? g->width : 1;
+		rects[i].h = g->height > 0 ? g->height : 1;
+		rects[i].idx = i;
+	}
+
+	struct atlas_result res;
+	atlas_pack(rects, MKGUI_GLYPH_COUNT, &res);
+
+	// Allocate or reallocate atlas buffer
+	free(glyph_atlas);
+	glyph_atlas_w = res.w;
+	glyph_atlas_h = res.h;
+	glyph_atlas = (uint8_t *)calloc((size_t)glyph_atlas_w * (size_t)glyph_atlas_h, 1);
+	if(!glyph_atlas) {
+		return;
+	}
+
+	// Blit each glyph from staging into atlas (use idx to map back to original glyph)
+	for(uint32_t i = 0; i < MKGUI_GLYPH_COUNT; ++i) {
+		uint32_t gi = rects[i].idx;
+		struct mkgui_glyph *g = &ctx->glyphs[gi];
+		g->atlas_x = rects[i].x;
+		g->atlas_y = rects[i].y;
+		for(int32_t row = 0; row < g->height; ++row) {
+			uint8_t *src = &glyph_staging[gi][row * g->width];
+			uint8_t *dst = &glyph_atlas[(g->atlas_y + row) * glyph_atlas_w + g->atlas_x];
+			memcpy(dst, src, (size_t)g->width);
+		}
+	}
+}
+
+// [=]===^=[ icon_atlas_rebuild ]====================================[=]
+static void icon_atlas_rebuild(void) {
+	if(icon_count == 0) {
+		return;
+	}
+
+	// Collect icon sizes for packing (idx tracks original icon index through sort)
+	struct atlas_rect rects[MKGUI_MAX_ICONS];
+	for(uint32_t i = 0; i < icon_count; ++i) {
+		rects[i].w = icons[i].w > 0 ? icons[i].w : 1;
+		rects[i].h = icons[i].h > 0 ? icons[i].h : 1;
+		rects[i].idx = i;
+	}
+
+	struct atlas_result res;
+	if(!atlas_pack(rects, icon_count, &res)) {
+		return;
+	}
+
+	// Allocate atlas
+	free(icon_atlas);
+	icon_atlas_w = res.w;
+	icon_atlas_h = res.h;
+	icon_atlas = (uint32_t *)calloc((size_t)icon_atlas_w * (size_t)icon_atlas_h, sizeof(uint32_t));
+	if(!icon_atlas) {
+		return;
+	}
+
+	// Blit each icon from its staging pixels into atlas, then free staging
+	for(uint32_t i = 0; i < icon_count; ++i) {
+		uint32_t ii = rects[i].idx;
+		struct mkgui_icon *ic = &icons[ii];
+		ic->atlas_x = rects[i].x;
+		ic->atlas_y = rects[i].y;
+		if(ic->pixels) {
+			for(int32_t row = 0; row < ic->h; ++row) {
+				uint32_t *src = &ic->pixels[row * ic->w];
+				uint32_t *dst = &icon_atlas[(ic->atlas_y + row) * icon_atlas_w + ic->atlas_x];
+				memcpy(dst, src, (size_t)ic->w * sizeof(uint32_t));
+			}
+			free(ic->pixels);
+			ic->pixels = NULL;
+		}
+	}
 }
 
 #include "mkgui_render.c"
@@ -1900,7 +2000,7 @@ static void lc_layout_node(struct mkgui_ctx *ctx, struct layout_ctx *lc, uint32_
 			uint32_t pair_idx = 0;
 			for(uint32_t j = lc->first_child[idx]; j < lc->widget_count; j = lc->next_sibling[j]) {
 				if((pair_idx & 1) == 0) {
-					int32_t tw = text_width(ctx, lw_get(lc, j)->label) + 8;
+					int32_t tw = label_text_width(ctx, lw_get(lc, j)) + 8;
 					if(tw > label_w) {
 						label_w = tw;
 					}
@@ -2437,64 +2537,7 @@ static void draw_icon(uint32_t *buf, int32_t bw, int32_t bh, struct mkgui_icon *
 		col1 = bw - x;
 	}
 	for(int32_t row = row0; row < row1; ++row) {
-		uint32_t *rowp = &buf[(y + row) * bw];
-		uint32_t *src = &icon->pixels[row * icon->w];
-		int32_t col = col0;
-#if defined(__SSE2__)
-		__m128i round_rb = _mm_set1_epi32(0x00800080);
-		__m128i round_g = _mm_set1_epi32(0x00000080);
-		__m128i mask_rb = _mm_set1_epi32(0x00ff00ff);
-		__m128i mask_byte = _mm_set1_epi32(0x000000ff);
-		__m128i mask_a = _mm_set1_epi32((int32_t)0xff000000u);
-		__m128i val_255 = _mm_set1_epi32(255);
-		__m128i zero = _mm_setzero_si128();
-		for(; col + 4 <= col1; col += 4) {
-			__m128i spx = _mm_loadu_si128((__m128i *)&src[col]);
-			__m128i alphas = _mm_srli_epi32(spx, 24);
-			__m128i any_zero = _mm_cmpeq_epi32(alphas, zero);
-			if(_mm_movemask_epi8(any_zero) == 0xffff) {
-				continue;
-			}
-			int32_t px = x + col;
-			__m128i dst = _mm_loadu_si128((__m128i *)&rowp[px]);
-			__m128i ia = _mm_sub_epi32(val_255, alphas);
-			__m128i ia16 = _mm_or_si128(ia, _mm_slli_epi32(ia, 16));
-			__m128i src_rb = _mm_and_si128(spx, mask_rb);
-			__m128i src_g8 = _mm_and_si128(_mm_srli_epi32(spx, 8), mask_byte);
-			__m128i dst_rb = _mm_and_si128(dst, mask_rb);
-			__m128i dst_g8 = _mm_and_si128(_mm_srli_epi32(dst, 8), mask_byte);
-			__m128i d_rb = _mm_add_epi32(_mm_mullo_epi16(dst_rb, ia16), round_rb);
-			d_rb = _mm_and_si128(_mm_srli_epi32(_mm_add_epi32(d_rb, _mm_and_si128(_mm_srli_epi32(d_rb, 8), mask_rb)), 8), mask_rb);
-			__m128i d_gv = _mm_add_epi32(_mm_mullo_epi16(dst_g8, ia), round_g);
-			d_gv = _mm_slli_epi32(_mm_and_si128(_mm_srli_epi32(_mm_add_epi32(d_gv, _mm_and_si128(_mm_srli_epi32(d_gv, 8), mask_byte)), 8), mask_byte), 8);
-			__m128i rb = _mm_add_epi32(src_rb, d_rb);
-			__m128i gv = _mm_add_epi32(_mm_slli_epi32(src_g8, 8), d_gv);
-			__m128i result = _mm_or_si128(_mm_and_si128(_mm_or_si128(rb, gv), _mm_set1_epi32(0x00ffffff)), mask_a);
-			__m128i full = _mm_cmpeq_epi32(alphas, val_255);
-			result = _mm_or_si128(_mm_and_si128(full, spx), _mm_andnot_si128(full, result));
-			__m128i skip = _mm_cmpeq_epi32(alphas, zero);
-			result = _mm_or_si128(_mm_andnot_si128(skip, result), _mm_and_si128(skip, dst));
-			_mm_storeu_si128((__m128i *)&rowp[px], result);
-		}
-#endif
-		for(; col < col1; ++col) {
-			uint32_t spx = src[col];
-			uint32_t a = spx >> 24;
-			int32_t px = x + col;
-			if(a == 255) {
-				rowp[px] = spx;
-			} else if(a > 0) {
-				uint32_t ia = 255 - a;
-				uint32_t d = rowp[px];
-				uint32_t d_rb = (d & 0x00ff00ff) * ia + 0x00800080;
-				d_rb = ((d_rb + ((d_rb >> 8) & 0x00ff00ff)) >> 8) & 0x00ff00ff;
-				uint32_t d_g = (d & 0x0000ff00) * ia + 0x00008000;
-				d_g = ((d_g + ((d_g >> 8) & 0x0000ff00)) >> 8) & 0x0000ff00;
-				uint32_t s_rb = spx & 0x00ff00ff;
-				uint32_t s_g = spx & 0x0000ff00;
-				rowp[px] = 0xff000000 | ((s_rb + d_rb) & 0x00ff00ff) | ((s_g + d_g) & 0x0000ff00);
-			}
-		}
+		blend_icon_row(&buf[(y + row) * bw], &icon_atlas[(icon->atlas_y + row) * icon_atlas_w + icon->atlas_x], col0, col1, x);
 	}
 }
 
@@ -3187,6 +3230,7 @@ MKGUI_API uint32_t mkgui_add_widget(struct mkgui_ctx *ctx, struct mkgui_widget w
 	}
 
 	ctx->widgets[pos] = w;
+	ctx->widgets[pos].label_tw = -1;
 	memset(&ctx->rects[pos], 0, sizeof(struct mkgui_rect));
 	ctx->tooltip_texts[pos][0] = '\0';
 	++ctx->widget_count;

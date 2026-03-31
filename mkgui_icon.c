@@ -226,6 +226,7 @@ MKGUI_API int32_t mkgui_icon_add(char *name, uint32_t *pixels, int32_t w, int32_
 		ic->w = w;
 		ic->h = h;
 		ic->custom = 1;
+		icon_atlas_rebuild();
 		return existing;
 	}
 
@@ -245,6 +246,7 @@ MKGUI_API int32_t mkgui_icon_add(char *name, uint32_t *pixels, int32_t w, int32_
 	ic->h = h;
 	ic->custom = 1;
 	icon_hash_insert((uint32_t)idx);
+	icon_atlas_rebuild();
 
 	return idx;
 }
@@ -456,6 +458,7 @@ MKGUI_API uint32_t mkgui_icon_load_svg_dir(struct mkgui_ctx *ctx, char *dir_path
 		}
 	}
 
+	icon_atlas_rebuild();
 	return loaded;
 }
 
@@ -477,6 +480,7 @@ static void svg_rerasterize_all(struct mkgui_ctx *ctx) {
 			svg_rasterize_icon_ex(tb_name, svg_sources[i].svg_data, svg_sources[i].svg_len, tb_size, theme_color, 0);
 		}
 	}
+	icon_atlas_rebuild();
 }
 #pragma GCC diagnostic pop
 

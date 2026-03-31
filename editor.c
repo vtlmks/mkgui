@@ -373,14 +373,15 @@ static char *ed_type_name(uint32_t type) {
 struct ed_widget {
 	uint32_t type;
 	uint32_t id;
-	char label[MKGUI_MAX_TEXT];
-	char icon[MKGUI_ICON_NAME_LEN];
 	uint32_t parent_id;
 	int32_t w, h;
 	uint32_t flags;
 	uint32_t style;
 	uint32_t weight;
 	int32_t margin_l, margin_r, margin_t, margin_b;
+	int32_t label_tw;
+	char label[MKGUI_MAX_TEXT];
+	char icon[MKGUI_ICON_NAME_LEN];
 	char id_name[64];
 	int32_t x, y;
 	uint32_t tab_order;
@@ -636,6 +637,7 @@ static void ed_sync_recent_menu(struct mkgui_ctx *ctx) {
 				fname = path;
 			}
 			snprintf(w->label, MKGUI_MAX_TEXT, "%s", fname);
+			w->label_tw = -1;
 		} else {
 			w->flags |= MKGUI_HIDDEN;
 		}
@@ -1088,6 +1090,9 @@ static void ed_read_prop_value(struct mkgui_ctx *ctx, struct ed_prop_desc *p, st
 				}
 				memcpy(dst, val, slen);
 				dst[slen] = '\0';
+				if(p->offset == offsetof(struct ed_widget, label)) {
+					w->label_tw = -1;
+				}
 			}
 		} break;
 
@@ -1327,6 +1332,7 @@ static int32_t ed_add_widget(uint32_t type, int32_t x, int32_t y) {
 
 	struct ed_widget *w = &ed.widgets[ed.widget_count];
 	memset(w, 0, sizeof(*w));
+	w->label_tw = -1;
 	w->type = type;
 	w->id = ed.next_id++;
 	w->x = x;
@@ -3154,6 +3160,7 @@ static void ed_load_file(struct mkgui_ctx *ctx, char *path) {
 				if(ed.widget_count < ED_MAX_WIDGETS) {
 					cur_widget = (int32_t)ed.widget_count;
 					memset(&ed.widgets[cur_widget], 0, sizeof(struct ed_widget));
+					ed.widgets[cur_widget].label_tw = -1;
 					++ed.widget_count;
 					cur_data_id = 0;
 				}
@@ -3981,6 +3988,7 @@ static void ed_test_gui(struct mkgui_ctx *editor_ctx) {
 		tw->margin_t = ew->margin_t;
 		tw->margin_r = ew->margin_r;
 		tw->margin_b = ew->margin_b;
+		tw->label_tw = -1;
 	}
 
 	int32_t test_w = 800, test_h = 600;
@@ -4145,181 +4153,181 @@ int main(void) {
 	int32_t win_h = (ed_cfg.window_h > 0) ? ed_cfg.window_h : 800;
 
 	struct mkgui_widget widgets[] = {
-		{ MKGUI_WINDOW,   ED_WINDOW,      "mkgui editor",    "", 0,          win_w, win_h, 0, 0, 0 },
+		MKGUI_W(MKGUI_WINDOW,   ED_WINDOW,      "mkgui editor",    "", 0,          win_w, win_h, 0, 0, 0 ),
 
-		{ MKGUI_MENU,     ED_MENU,        "",                 "", ED_WINDOW,  0, 0, 0, 0, 0 },
-		{ MKGUI_MENUITEM, ED_FILE_MENU,   "File",             "", ED_MENU,    0, 0, 0, 0, 0 },
-		{ MKGUI_MENUITEM, ED_EDIT_MENU,   "Edit",             "", ED_MENU,    0, 0, 0, 0, 0 },
-		{ MKGUI_MENUITEM, ED_MI_NEW,      "New",              "document-new",  ED_FILE_MENU, 0, 0, 0, 0, 0 },
-		{ MKGUI_MENUITEM, ED_MI_OPEN,     "Open",             "document-open", ED_FILE_MENU, 0, 0, 0, 0, 0 },
-		{ MKGUI_MENUITEM, ED_MI_SAVE,     "Save",             "document-save", ED_FILE_MENU, 0, 0, 0, 0, 0 },
-		{ MKGUI_MENUITEM, ED_MI_SAVEAS,   "Save As...",       "", ED_FILE_MENU, 0, 0, 0, 0, 0 },
-		{ MKGUI_MENUITEM, ED_MI_SEP1,     "",                 "", ED_FILE_MENU, 0, 0, 0, MKGUI_SEPARATOR, 0 },
-		{ MKGUI_MENUITEM, ED_MI_RECENT,   "Recent Files",     "", ED_FILE_MENU, 0, 0, 0, 0, 0 },
-		{ MKGUI_MENUITEM, ED_RECENT_FIRST + 0, "", "", ED_MI_RECENT, 0, 0, MKGUI_HIDDEN, 0, 0 },
-		{ MKGUI_MENUITEM, ED_RECENT_FIRST + 1, "", "", ED_MI_RECENT, 0, 0, MKGUI_HIDDEN, 0, 0 },
-		{ MKGUI_MENUITEM, ED_RECENT_FIRST + 2, "", "", ED_MI_RECENT, 0, 0, MKGUI_HIDDEN, 0, 0 },
-		{ MKGUI_MENUITEM, ED_RECENT_FIRST + 3, "", "", ED_MI_RECENT, 0, 0, MKGUI_HIDDEN, 0, 0 },
-		{ MKGUI_MENUITEM, ED_RECENT_FIRST + 4, "", "", ED_MI_RECENT, 0, 0, MKGUI_HIDDEN, 0, 0 },
-		{ MKGUI_MENUITEM, ED_RECENT_FIRST + 5, "", "", ED_MI_RECENT, 0, 0, MKGUI_HIDDEN, 0, 0 },
-		{ MKGUI_MENUITEM, ED_RECENT_FIRST + 6, "", "", ED_MI_RECENT, 0, 0, MKGUI_HIDDEN, 0, 0 },
-		{ MKGUI_MENUITEM, ED_RECENT_FIRST + 7, "", "", ED_MI_RECENT, 0, 0, MKGUI_HIDDEN, 0, 0 },
-		{ MKGUI_MENUITEM, ED_RECENT_FIRST + 8, "", "", ED_MI_RECENT, 0, 0, MKGUI_HIDDEN, 0, 0 },
-		{ MKGUI_MENUITEM, ED_RECENT_FIRST + 9, "", "", ED_MI_RECENT, 0, 0, MKGUI_HIDDEN, 0, 0 },
-		{ MKGUI_MENUITEM, ED_MI_SEP2,     "",                 "", ED_FILE_MENU, 0, 0, 0, MKGUI_SEPARATOR, 0 },
-		{ MKGUI_MENUITEM, ED_MI_GENERATE, "Generate Code",    "", ED_FILE_MENU, 0, 0, 0, 0, 0 },
-		{ MKGUI_MENUITEM, ED_MI_SNIPPET,  "Generate Snippet", "", ED_FILE_MENU, 0, 0, 0, 0, 0 },
-		{ MKGUI_MENUITEM, ED_MI_SEP3,     "",                 "", ED_FILE_MENU, 0, 0, 0, MKGUI_SEPARATOR, 0 },
-		{ MKGUI_MENUITEM, ED_MI_EXIT,     "Exit",             "application-exit", ED_FILE_MENU, 0, 0, 0, 0, 0 },
-		{ MKGUI_MENUITEM, ED_MI_UNDO,     "Undo",             "edit-undo", ED_EDIT_MENU, 0, 0, 0, 0, 0 },
-		{ MKGUI_MENUITEM, ED_MI_REDO,     "Redo",             "edit-redo", ED_EDIT_MENU, 0, 0, 0, 0, 0 },
-		{ MKGUI_MENUITEM, ED_MI_SEP4,     "",                 "", ED_EDIT_MENU, 0, 0, 0, MKGUI_SEPARATOR, 0 },
-		{ MKGUI_MENUITEM, ED_MI_DELETE,   "Delete",           "edit-delete", ED_EDIT_MENU, 0, 0, 0, 0, 0 },
+		MKGUI_W(MKGUI_MENU,     ED_MENU,        "",                 "", ED_WINDOW,  0, 0, 0, 0, 0 ),
+		MKGUI_W(MKGUI_MENUITEM, ED_FILE_MENU,   "File",             "", ED_MENU,    0, 0, 0, 0, 0 ),
+		MKGUI_W(MKGUI_MENUITEM, ED_EDIT_MENU,   "Edit",             "", ED_MENU,    0, 0, 0, 0, 0 ),
+		MKGUI_W(MKGUI_MENUITEM, ED_MI_NEW,      "New",              "document-new",  ED_FILE_MENU, 0, 0, 0, 0, 0 ),
+		MKGUI_W(MKGUI_MENUITEM, ED_MI_OPEN,     "Open",             "document-open", ED_FILE_MENU, 0, 0, 0, 0, 0 ),
+		MKGUI_W(MKGUI_MENUITEM, ED_MI_SAVE,     "Save",             "document-save", ED_FILE_MENU, 0, 0, 0, 0, 0 ),
+		MKGUI_W(MKGUI_MENUITEM, ED_MI_SAVEAS,   "Save As...",       "", ED_FILE_MENU, 0, 0, 0, 0, 0 ),
+		MKGUI_W(MKGUI_MENUITEM, ED_MI_SEP1,     "",                 "", ED_FILE_MENU, 0, 0, 0, MKGUI_SEPARATOR, 0 ),
+		MKGUI_W(MKGUI_MENUITEM, ED_MI_RECENT,   "Recent Files",     "", ED_FILE_MENU, 0, 0, 0, 0, 0 ),
+		MKGUI_W(MKGUI_MENUITEM, ED_RECENT_FIRST + 0, "", "", ED_MI_RECENT, 0, 0, MKGUI_HIDDEN, 0, 0 ),
+		MKGUI_W(MKGUI_MENUITEM, ED_RECENT_FIRST + 1, "", "", ED_MI_RECENT, 0, 0, MKGUI_HIDDEN, 0, 0 ),
+		MKGUI_W(MKGUI_MENUITEM, ED_RECENT_FIRST + 2, "", "", ED_MI_RECENT, 0, 0, MKGUI_HIDDEN, 0, 0 ),
+		MKGUI_W(MKGUI_MENUITEM, ED_RECENT_FIRST + 3, "", "", ED_MI_RECENT, 0, 0, MKGUI_HIDDEN, 0, 0 ),
+		MKGUI_W(MKGUI_MENUITEM, ED_RECENT_FIRST + 4, "", "", ED_MI_RECENT, 0, 0, MKGUI_HIDDEN, 0, 0 ),
+		MKGUI_W(MKGUI_MENUITEM, ED_RECENT_FIRST + 5, "", "", ED_MI_RECENT, 0, 0, MKGUI_HIDDEN, 0, 0 ),
+		MKGUI_W(MKGUI_MENUITEM, ED_RECENT_FIRST + 6, "", "", ED_MI_RECENT, 0, 0, MKGUI_HIDDEN, 0, 0 ),
+		MKGUI_W(MKGUI_MENUITEM, ED_RECENT_FIRST + 7, "", "", ED_MI_RECENT, 0, 0, MKGUI_HIDDEN, 0, 0 ),
+		MKGUI_W(MKGUI_MENUITEM, ED_RECENT_FIRST + 8, "", "", ED_MI_RECENT, 0, 0, MKGUI_HIDDEN, 0, 0 ),
+		MKGUI_W(MKGUI_MENUITEM, ED_RECENT_FIRST + 9, "", "", ED_MI_RECENT, 0, 0, MKGUI_HIDDEN, 0, 0 ),
+		MKGUI_W(MKGUI_MENUITEM, ED_MI_SEP2,     "",                 "", ED_FILE_MENU, 0, 0, 0, MKGUI_SEPARATOR, 0 ),
+		MKGUI_W(MKGUI_MENUITEM, ED_MI_GENERATE, "Generate Code",    "", ED_FILE_MENU, 0, 0, 0, 0, 0 ),
+		MKGUI_W(MKGUI_MENUITEM, ED_MI_SNIPPET,  "Generate Snippet", "", ED_FILE_MENU, 0, 0, 0, 0, 0 ),
+		MKGUI_W(MKGUI_MENUITEM, ED_MI_SEP3,     "",                 "", ED_FILE_MENU, 0, 0, 0, MKGUI_SEPARATOR, 0 ),
+		MKGUI_W(MKGUI_MENUITEM, ED_MI_EXIT,     "Exit",             "application-exit", ED_FILE_MENU, 0, 0, 0, 0, 0 ),
+		MKGUI_W(MKGUI_MENUITEM, ED_MI_UNDO,     "Undo",             "edit-undo", ED_EDIT_MENU, 0, 0, 0, 0, 0 ),
+		MKGUI_W(MKGUI_MENUITEM, ED_MI_REDO,     "Redo",             "edit-redo", ED_EDIT_MENU, 0, 0, 0, 0, 0 ),
+		MKGUI_W(MKGUI_MENUITEM, ED_MI_SEP4,     "",                 "", ED_EDIT_MENU, 0, 0, 0, MKGUI_SEPARATOR, 0 ),
+		MKGUI_W(MKGUI_MENUITEM, ED_MI_DELETE,   "Delete",           "edit-delete", ED_EDIT_MENU, 0, 0, 0, 0, 0 ),
 
-		{ MKGUI_TOOLBAR,  ED_TOOLBAR,     "",                 "", ED_WINDOW,  0, 0, 0, 0, 0 },
-		{ MKGUI_BUTTON,   ED_TB_NEW,      "New",              "document-new",  ED_TOOLBAR, 0, 0, 0, 0, 0 },
-		{ MKGUI_BUTTON,   ED_TB_OPEN,     "Open",             "document-open", ED_TOOLBAR, 0, 0, 0, 0, 0 },
-		{ MKGUI_BUTTON,   ED_TB_SAVE,     "Save",             "document-save", ED_TOOLBAR, 0, 0, 0, 0, 0 },
-		{ MKGUI_BUTTON,   ED_TB_SEP1,     "",                 "", ED_TOOLBAR, 0, 0, 0, MKGUI_SEPARATOR, 0 },
-		{ MKGUI_BUTTON,   ED_TB_GEN,      "Gen",              "system-run", ED_TOOLBAR, 0, 0, 0, 0, 0 },
-		{ MKGUI_BUTTON,   ED_TB_TEST,     "Test",             "media-playback-start", ED_TOOLBAR, 0, 0, 0, 0, 0 },
-		{ MKGUI_BUTTON,   ED_TB_SEP2,     "",                 "", ED_TOOLBAR, 0, 0, 0, MKGUI_SEPARATOR, 0 },
-		{ MKGUI_BUTTON,   ED_TB_UNDO,     "Undo",             "edit-undo", ED_TOOLBAR, 0, 0, 0, 0, 0 },
-		{ MKGUI_BUTTON,   ED_TB_REDO,     "Redo",             "edit-redo", ED_TOOLBAR, 0, 0, 0, 0, 0 },
+		MKGUI_W(MKGUI_TOOLBAR,  ED_TOOLBAR,     "",                 "", ED_WINDOW,  0, 0, 0, 0, 0 ),
+		MKGUI_W(MKGUI_BUTTON,   ED_TB_NEW,      "New",              "document-new",  ED_TOOLBAR, 0, 0, 0, 0, 0 ),
+		MKGUI_W(MKGUI_BUTTON,   ED_TB_OPEN,     "Open",             "document-open", ED_TOOLBAR, 0, 0, 0, 0, 0 ),
+		MKGUI_W(MKGUI_BUTTON,   ED_TB_SAVE,     "Save",             "document-save", ED_TOOLBAR, 0, 0, 0, 0, 0 ),
+		MKGUI_W(MKGUI_BUTTON,   ED_TB_SEP1,     "",                 "", ED_TOOLBAR, 0, 0, 0, MKGUI_SEPARATOR, 0 ),
+		MKGUI_W(MKGUI_BUTTON,   ED_TB_GEN,      "Gen",              "system-run", ED_TOOLBAR, 0, 0, 0, 0, 0 ),
+		MKGUI_W(MKGUI_BUTTON,   ED_TB_TEST,     "Test",             "media-playback-start", ED_TOOLBAR, 0, 0, 0, 0, 0 ),
+		MKGUI_W(MKGUI_BUTTON,   ED_TB_SEP2,     "",                 "", ED_TOOLBAR, 0, 0, 0, MKGUI_SEPARATOR, 0 ),
+		MKGUI_W(MKGUI_BUTTON,   ED_TB_UNDO,     "Undo",             "edit-undo", ED_TOOLBAR, 0, 0, 0, 0, 0 ),
+		MKGUI_W(MKGUI_BUTTON,   ED_TB_REDO,     "Redo",             "edit-redo", ED_TOOLBAR, 0, 0, 0, 0, 0 ),
 
-		{ MKGUI_VSPLIT, ED_SPLIT_MAIN, "",              "", ED_WINDOW,  0, 0, 0, 0, 0 },
-		{ MKGUI_TREEVIEW, ED_TREE,        "",                 "", ED_SPLIT_MAIN, 0, 0, MKGUI_REGION_LEFT, 0, 0 },
-		{ MKGUI_VSPLIT, ED_SPLIT_RIGHT, "",              "", ED_SPLIT_MAIN, 0, 0, MKGUI_REGION_RIGHT, 0, 0 },
-		{ MKGUI_CANVAS,   ED_CANVAS_LBL,  "",                 "", ED_SPLIT_RIGHT, 0, 0, MKGUI_REGION_LEFT, 0, 0 },
-		{ MKGUI_VBOX,     ED_RIGHT_PANEL, "",                 "", ED_SPLIT_RIGHT, 0, 0, MKGUI_REGION_RIGHT | MKGUI_SCROLL, 0, 0 },
+		MKGUI_W(MKGUI_VSPLIT, ED_SPLIT_MAIN, "",              "", ED_WINDOW,  0, 0, 0, 0, 0 ),
+		MKGUI_W(MKGUI_TREEVIEW, ED_TREE,        "",                 "", ED_SPLIT_MAIN, 0, 0, MKGUI_REGION_LEFT, 0, 0 ),
+		MKGUI_W(MKGUI_VSPLIT, ED_SPLIT_RIGHT, "",              "", ED_SPLIT_MAIN, 0, 0, MKGUI_REGION_RIGHT, 0, 0 ),
+		MKGUI_W(MKGUI_CANVAS,   ED_CANVAS_LBL,  "",                 "", ED_SPLIT_RIGHT, 0, 0, MKGUI_REGION_LEFT, 0, 0 ),
+		MKGUI_W(MKGUI_VBOX,     ED_RIGHT_PANEL, "",                 "", ED_SPLIT_RIGHT, 0, 0, MKGUI_REGION_RIGHT | MKGUI_SCROLL, 0, 0 ),
 
-		{ MKGUI_GROUP,    ED_PAL_GROUP,   "Widgets",          "", ED_RIGHT_PANEL, 0, ED_PALETTE_H, MKGUI_FIXED, 0, 0 },
-		{ MKGUI_HBOX,     ED_PAL_HBOX,   "",                 "", ED_PAL_GROUP,   0, 0, 0, 0, 0 },
-		{ MKGUI_VBOX,     ED_PAL_COL0,   "",                 "", ED_PAL_HBOX,    0, 0, 0, 0, 1 },
-		{ MKGUI_VBOX,     ED_PAL_COL1,   "",                 "", ED_PAL_HBOX,    0, 0, 0, 0, 1 },
-		{ MKGUI_VBOX,     ED_PAL_COL2,   "",                 "", ED_PAL_HBOX,    0, 0, 0, 0, 1 },
+		MKGUI_W(MKGUI_GROUP,    ED_PAL_GROUP,   "Widgets",          "", ED_RIGHT_PANEL, 0, ED_PALETTE_H, MKGUI_FIXED, 0, 0 ),
+		MKGUI_W(MKGUI_HBOX,     ED_PAL_HBOX,   "",                 "", ED_PAL_GROUP,   0, 0, 0, 0, 0 ),
+		MKGUI_W(MKGUI_VBOX,     ED_PAL_COL0,   "",                 "", ED_PAL_HBOX,    0, 0, 0, 0, 1 ),
+		MKGUI_W(MKGUI_VBOX,     ED_PAL_COL1,   "",                 "", ED_PAL_HBOX,    0, 0, 0, 0, 1 ),
+		MKGUI_W(MKGUI_VBOX,     ED_PAL_COL2,   "",                 "", ED_PAL_HBOX,    0, 0, 0, 0, 1 ),
 
-		{ MKGUI_GROUP,    ED_CTN_GROUP,   "Containers",       "", ED_RIGHT_PANEL, 0, ED_CTN_H, MKGUI_FIXED, 0, 0 },
-		{ MKGUI_HBOX,     ED_CTN_HBOX,   "",                 "", ED_CTN_GROUP,   0, 0, 0, 0, 0 },
-		{ MKGUI_VBOX,     ED_CTN_COL0,   "",                 "", ED_CTN_HBOX,    0, 0, 0, 0, 1 },
-		{ MKGUI_VBOX,     ED_CTN_COL1,   "",                 "", ED_CTN_HBOX,    0, 0, 0, 0, 1 },
-		{ MKGUI_VBOX,     ED_CTN_COL2,   "",                 "", ED_CTN_HBOX,    0, 0, 0, 0, 1 },
+		MKGUI_W(MKGUI_GROUP,    ED_CTN_GROUP,   "Containers",       "", ED_RIGHT_PANEL, 0, ED_CTN_H, MKGUI_FIXED, 0, 0 ),
+		MKGUI_W(MKGUI_HBOX,     ED_CTN_HBOX,   "",                 "", ED_CTN_GROUP,   0, 0, 0, 0, 0 ),
+		MKGUI_W(MKGUI_VBOX,     ED_CTN_COL0,   "",                 "", ED_CTN_HBOX,    0, 0, 0, 0, 1 ),
+		MKGUI_W(MKGUI_VBOX,     ED_CTN_COL1,   "",                 "", ED_CTN_HBOX,    0, 0, 0, 0, 1 ),
+		MKGUI_W(MKGUI_VBOX,     ED_CTN_COL2,   "",                 "", ED_CTN_HBOX,    0, 0, 0, 0, 1 ),
 
 		/* Palette buttons generated below */
 
 		/* Properties section */
-		{ MKGUI_GROUP,    ED_PROP_GROUP,     "Properties",      "", ED_RIGHT_PANEL, 0, 0, MKGUI_FIXED, 0, 0 },
-		{ MKGUI_VBOX,     ED_PROP_VBOX,      "",                "", ED_PROP_GROUP, 0, 0, 0, 0, 0 },
+		MKGUI_W(MKGUI_GROUP,    ED_PROP_GROUP,     "Properties",      "", ED_RIGHT_PANEL, 0, 0, MKGUI_FIXED, 0, 0 ),
+		MKGUI_W(MKGUI_VBOX,     ED_PROP_VBOX,      "",                "", ED_PROP_GROUP, 0, 0, 0, 0, 0 ),
 
 		/* Form: label+control pairs */
-		{ MKGUI_FORM,     ED_PROP_FORM,      "",                "", ED_PROP_VBOX, 0, 0, MKGUI_FIXED, 0, 0 },
-		{ MKGUI_LABEL,    ED_PROP_TYPE_LBL,  "Type:",           "", ED_PROP_FORM, 0, 0, 0, 0, 0 },
-		{ MKGUI_LABEL,    ED_PROP_TYPE_VAL,  "(none)",          "", ED_PROP_FORM, 0, 0, 0, 0, 0 },
-		{ MKGUI_LABEL,    ED_PROP_ID_LBL,    "ID:",             "", ED_PROP_FORM, 0, 0, 0, 0, 0 },
-		{ MKGUI_INPUT,    ED_PROP_ID_INP,    "",                "", ED_PROP_FORM, 0, 0, 0, 0, 0 },
-		{ MKGUI_LABEL,    ED_PROP_LABEL_LBL, "Label:",          "", ED_PROP_FORM, 0, 0, 0, 0, 0 },
-		{ MKGUI_INPUT,    ED_PROP_LABEL_INP, "",                "", ED_PROP_FORM, 0, 0, 0, 0, 0 },
-		{ MKGUI_LABEL,    ED_PROP_ICON_LBL,  "Icon:",           "", ED_PROP_FORM, 0, 0, 0, 0, 0 },
-		{ MKGUI_HBOX,     ED_PROP_ICON_HBOX, "",                "", ED_PROP_FORM, 0, 0, 0, 0, 0 },
-		{ MKGUI_INPUT,    ED_PROP_ICON_INP,  "",                "", ED_PROP_ICON_HBOX, 0, 0, 0, 0, 1 },
-		{ MKGUI_BUTTON,   ED_PROP_ICON_BROWSE, "...",           "", ED_PROP_ICON_HBOX, 26, 0, MKGUI_FIXED, 0, 0 },
-		{ MKGUI_LABEL,    ED_PROP_PARENT_LBL, "Parent:",        "", ED_PROP_FORM, 0, 0, 0, 0, 0 },
-		{ MKGUI_DROPDOWN, ED_PROP_PARENT_DRP, "",               "", ED_PROP_FORM, 0, 0, 0, 0, 0 },
-		{ MKGUI_LABEL,    ED_PROP_TAB_LBL,   "Tab#:",           "", ED_PROP_FORM, 0, 0, 0, 0, 0 },
-		{ MKGUI_SPINBOX,  ED_PROP_TAB_SPN,   "",                "", ED_PROP_FORM, 0, 0, 0, 0, 0 },
+		MKGUI_W(MKGUI_FORM,     ED_PROP_FORM,      "",                "", ED_PROP_VBOX, 0, 0, MKGUI_FIXED, 0, 0 ),
+		MKGUI_W(MKGUI_LABEL,    ED_PROP_TYPE_LBL,  "Type:",           "", ED_PROP_FORM, 0, 0, 0, 0, 0 ),
+		MKGUI_W(MKGUI_LABEL,    ED_PROP_TYPE_VAL,  "(none)",          "", ED_PROP_FORM, 0, 0, 0, 0, 0 ),
+		MKGUI_W(MKGUI_LABEL,    ED_PROP_ID_LBL,    "ID:",             "", ED_PROP_FORM, 0, 0, 0, 0, 0 ),
+		MKGUI_W(MKGUI_INPUT,    ED_PROP_ID_INP,    "",                "", ED_PROP_FORM, 0, 0, 0, 0, 0 ),
+		MKGUI_W(MKGUI_LABEL,    ED_PROP_LABEL_LBL, "Label:",          "", ED_PROP_FORM, 0, 0, 0, 0, 0 ),
+		MKGUI_W(MKGUI_INPUT,    ED_PROP_LABEL_INP, "",                "", ED_PROP_FORM, 0, 0, 0, 0, 0 ),
+		MKGUI_W(MKGUI_LABEL,    ED_PROP_ICON_LBL,  "Icon:",           "", ED_PROP_FORM, 0, 0, 0, 0, 0 ),
+		MKGUI_W(MKGUI_HBOX,     ED_PROP_ICON_HBOX, "",                "", ED_PROP_FORM, 0, 0, 0, 0, 0 ),
+		MKGUI_W(MKGUI_INPUT,    ED_PROP_ICON_INP,  "",                "", ED_PROP_ICON_HBOX, 0, 0, 0, 0, 1 ),
+		MKGUI_W(MKGUI_BUTTON,   ED_PROP_ICON_BROWSE, "...",           "", ED_PROP_ICON_HBOX, 26, 0, MKGUI_FIXED, 0, 0 ),
+		MKGUI_W(MKGUI_LABEL,    ED_PROP_PARENT_LBL, "Parent:",        "", ED_PROP_FORM, 0, 0, 0, 0, 0 ),
+		MKGUI_W(MKGUI_DROPDOWN, ED_PROP_PARENT_DRP, "",               "", ED_PROP_FORM, 0, 0, 0, 0, 0 ),
+		MKGUI_W(MKGUI_LABEL,    ED_PROP_TAB_LBL,   "Tab#:",           "", ED_PROP_FORM, 0, 0, 0, 0, 0 ),
+		MKGUI_W(MKGUI_SPINBOX,  ED_PROP_TAB_SPN,   "",                "", ED_PROP_FORM, 0, 0, 0, 0, 0 ),
 
 		/* Size row: W/H */
-		{ MKGUI_HBOX,     ED_PROP_SIZE_HBOX, "",                "", ED_PROP_VBOX, 0, 22, MKGUI_FIXED, 0, 0 },
-		{ MKGUI_LABEL,    ED_PROP_W_LBL,     "W:",              "", ED_PROP_SIZE_HBOX, 22, 0, MKGUI_FIXED, 0, 0 },
-		{ MKGUI_SPINBOX,  ED_PROP_W_SPN,     "",                "", ED_PROP_SIZE_HBOX, 0, 0, 0, 0, 1 },
-		{ MKGUI_LABEL,    ED_PROP_H_LBL,     "H:",              "", ED_PROP_SIZE_HBOX, 22, 0, MKGUI_FIXED, 0, 0 },
-		{ MKGUI_SPINBOX,  ED_PROP_H_SPN,     "",                "", ED_PROP_SIZE_HBOX, 0, 0, 0, 0, 1 },
+		MKGUI_W(MKGUI_HBOX,     ED_PROP_SIZE_HBOX, "",                "", ED_PROP_VBOX, 0, 22, MKGUI_FIXED, 0, 0 ),
+		MKGUI_W(MKGUI_LABEL,    ED_PROP_W_LBL,     "W:",              "", ED_PROP_SIZE_HBOX, 22, 0, MKGUI_FIXED, 0, 0 ),
+		MKGUI_W(MKGUI_SPINBOX,  ED_PROP_W_SPN,     "",                "", ED_PROP_SIZE_HBOX, 0, 0, 0, 0, 1 ),
+		MKGUI_W(MKGUI_LABEL,    ED_PROP_H_LBL,     "H:",              "", ED_PROP_SIZE_HBOX, 22, 0, MKGUI_FIXED, 0, 0 ),
+		MKGUI_W(MKGUI_SPINBOX,  ED_PROP_H_SPN,     "",                "", ED_PROP_SIZE_HBOX, 0, 0, 0, 0, 1 ),
 
 		/* Margin rows: ML/MR and MT/MB */
-		{ MKGUI_HBOX,     ED_PROP_MARGIN_LR_HBOX, "",            "", ED_PROP_VBOX, 0, 22, MKGUI_FIXED, 0, 0 },
-		{ MKGUI_LABEL,    ED_PROP_ML_LBL,    "ML:",             "", ED_PROP_MARGIN_LR_HBOX, 26, 0, MKGUI_FIXED, 0, 0 },
-		{ MKGUI_SPINBOX,  ED_PROP_ML_SPN,    "",                "", ED_PROP_MARGIN_LR_HBOX, 0, 0, 0, 0, 1 },
-		{ MKGUI_LABEL,    ED_PROP_MR_LBL,    "MR:",             "", ED_PROP_MARGIN_LR_HBOX, 26, 0, MKGUI_FIXED, 0, 0 },
-		{ MKGUI_SPINBOX,  ED_PROP_MR_SPN,    "",                "", ED_PROP_MARGIN_LR_HBOX, 0, 0, 0, 0, 1 },
-		{ MKGUI_HBOX,     ED_PROP_MARGIN_TB_HBOX, "",            "", ED_PROP_VBOX, 0, 22, MKGUI_FIXED, 0, 0 },
-		{ MKGUI_LABEL,    ED_PROP_MT_LBL,    "MT:",             "", ED_PROP_MARGIN_TB_HBOX, 26, 0, MKGUI_FIXED, 0, 0 },
-		{ MKGUI_SPINBOX,  ED_PROP_MT_SPN,    "",                "", ED_PROP_MARGIN_TB_HBOX, 0, 0, 0, 0, 1 },
-		{ MKGUI_LABEL,    ED_PROP_MB_LBL,    "MB:",             "", ED_PROP_MARGIN_TB_HBOX, 26, 0, MKGUI_FIXED, 0, 0 },
-		{ MKGUI_SPINBOX,  ED_PROP_MB_SPN,    "",                "", ED_PROP_MARGIN_TB_HBOX, 0, 0, 0, 0, 1 },
+		MKGUI_W(MKGUI_HBOX,     ED_PROP_MARGIN_LR_HBOX, "",            "", ED_PROP_VBOX, 0, 22, MKGUI_FIXED, 0, 0 ),
+		MKGUI_W(MKGUI_LABEL,    ED_PROP_ML_LBL,    "ML:",             "", ED_PROP_MARGIN_LR_HBOX, 26, 0, MKGUI_FIXED, 0, 0 ),
+		MKGUI_W(MKGUI_SPINBOX,  ED_PROP_ML_SPN,    "",                "", ED_PROP_MARGIN_LR_HBOX, 0, 0, 0, 0, 1 ),
+		MKGUI_W(MKGUI_LABEL,    ED_PROP_MR_LBL,    "MR:",             "", ED_PROP_MARGIN_LR_HBOX, 26, 0, MKGUI_FIXED, 0, 0 ),
+		MKGUI_W(MKGUI_SPINBOX,  ED_PROP_MR_SPN,    "",                "", ED_PROP_MARGIN_LR_HBOX, 0, 0, 0, 0, 1 ),
+		MKGUI_W(MKGUI_HBOX,     ED_PROP_MARGIN_TB_HBOX, "",            "", ED_PROP_VBOX, 0, 22, MKGUI_FIXED, 0, 0 ),
+		MKGUI_W(MKGUI_LABEL,    ED_PROP_MT_LBL,    "MT:",             "", ED_PROP_MARGIN_TB_HBOX, 26, 0, MKGUI_FIXED, 0, 0 ),
+		MKGUI_W(MKGUI_SPINBOX,  ED_PROP_MT_SPN,    "",                "", ED_PROP_MARGIN_TB_HBOX, 0, 0, 0, 0, 1 ),
+		MKGUI_W(MKGUI_LABEL,    ED_PROP_MB_LBL,    "MB:",             "", ED_PROP_MARGIN_TB_HBOX, 26, 0, MKGUI_FIXED, 0, 0 ),
+		MKGUI_W(MKGUI_SPINBOX,  ED_PROP_MB_SPN,    "",                "", ED_PROP_MARGIN_TB_HBOX, 0, 0, 0, 0, 1 ),
 
 		/* Weight (visible when parent is HBOX/VBOX) */
-		{ MKGUI_HBOX,     ED_PROP_WEIGHT_HBOX, "",               "", ED_PROP_VBOX, 0, 22, MKGUI_HIDDEN | MKGUI_FIXED, 0, 0 },
-		{ MKGUI_LABEL,    ED_PROP_WEIGHT_LBL, "Weight:",         "", ED_PROP_WEIGHT_HBOX, 50, 0, MKGUI_FIXED, 0, 0 },
-		{ MKGUI_SPINBOX,  ED_PROP_WEIGHT_SPN, "",                "", ED_PROP_WEIGHT_HBOX, 0, 0, 0, 0, 1 },
+		MKGUI_W(MKGUI_HBOX,     ED_PROP_WEIGHT_HBOX, "",               "", ED_PROP_VBOX, 0, 22, MKGUI_HIDDEN | MKGUI_FIXED, 0, 0 ),
+		MKGUI_W(MKGUI_LABEL,    ED_PROP_WEIGHT_LBL, "Weight:",         "", ED_PROP_WEIGHT_HBOX, 50, 0, MKGUI_FIXED, 0, 0 ),
+		MKGUI_W(MKGUI_SPINBOX,  ED_PROP_WEIGHT_SPN, "",                "", ED_PROP_WEIGHT_HBOX, 0, 0, 0, 0, 1 ),
 
 		/* Flags */
-		{ MKGUI_LABEL,    ED_PROP_FLAGS_LBL, "Flags:",           "", ED_PROP_VBOX, 0, 20, MKGUI_FIXED, 0, 0 },
-		{ MKGUI_HBOX,     ED_PROP_FL_HBOX,   "",                "", ED_PROP_VBOX, 0, ED_PROP_FL_H, MKGUI_FIXED, 0, 0 },
-		{ MKGUI_VBOX,     ED_PROP_FL_COL0,   "",                "", ED_PROP_FL_HBOX, 0, 0, 0, 0, 1 },
-		{ MKGUI_VBOX,     ED_PROP_FL_COL1,   "",                "", ED_PROP_FL_HBOX, 0, 0, 0, 0, 1 },
-		{ MKGUI_VBOX,     ED_PROP_FL_COL2,   "",                "", ED_PROP_FL_HBOX, 0, 0, 0, 0, 1 },
-		{ MKGUI_VBOX,     ED_PROP_FL_COL3,   "",                "", ED_PROP_FL_HBOX, 0, 0, 0, 0, 1 },
-		{ MKGUI_CHECKBOX, ED_PROP_FL_REGTOP,  "RgnTop",         "", ED_PROP_FL_COL0, 0, 20, MKGUI_FIXED, 0, 0 },
-		{ MKGUI_CHECKBOX, ED_PROP_FL_CHECKED, "Checked",        "", ED_PROP_FL_COL0, 0, 20, MKGUI_FIXED, 0, 0 },
-		{ MKGUI_CHECKBOX, ED_PROP_FL_REGBOT,  "RgnBot",         "", ED_PROP_FL_COL1, 0, 20, MKGUI_FIXED, 0, 0 },
-		{ MKGUI_CHECKBOX, ED_PROP_FL_HIDDEN,  "Hidden",         "", ED_PROP_FL_COL1, 0, 20, MKGUI_FIXED, 0, 0 },
-		{ MKGUI_CHECKBOX, ED_PROP_FL_SEPARATOR,"Sep",            "", ED_PROP_FL_COL1, 0, 20, MKGUI_FIXED, 0, 0 },
-		{ MKGUI_CHECKBOX, ED_PROP_FL_REGLEFT, "RgnLeft",        "", ED_PROP_FL_COL2, 0, 20, MKGUI_FIXED, 0, 0 },
-		{ MKGUI_CHECKBOX, ED_PROP_FL_DISABLED,"Disabled",       "", ED_PROP_FL_COL2, 0, 20, MKGUI_FIXED, 0, 0 },
-		{ MKGUI_CHECKBOX, ED_PROP_FL_MENUCHECK,"MChk",          "", ED_PROP_FL_COL2, 0, 20, MKGUI_FIXED, 0, 0 },
-		{ MKGUI_CHECKBOX, ED_PROP_FL_REGRIGHT,"RgnRight",       "", ED_PROP_FL_COL3, 0, 20, MKGUI_FIXED, 0, 0 },
-		{ MKGUI_CHECKBOX, ED_PROP_FL_MENURADIO,"MRad",          "", ED_PROP_FL_COL3, 0, 20, MKGUI_FIXED, 0, 0 },
-		{ MKGUI_CHECKBOX, ED_PROP_FL_SCROLL,  "Scroll",         "", ED_PROP_FL_COL0, 0, 20, MKGUI_FIXED, 0, 0 },
-		{ MKGUI_CHECKBOX, ED_PROP_FL_BORDER,  "Border",         "", ED_PROP_FL_COL1, 0, 20, MKGUI_FIXED, 0, 0 },
-		{ MKGUI_CHECKBOX, ED_PROP_FL_SUNKEN,  "Sunken",         "", ED_PROP_FL_COL2, 0, 20, MKGUI_FIXED, 0, 0 },
-		{ MKGUI_CHECKBOX, ED_PROP_FL_NOPAD,   "No Pad",         "", ED_PROP_FL_COL3, 0, 20, MKGUI_FIXED, 0, 0 },
-		{ MKGUI_CHECKBOX, ED_PROP_FL_PASSWORD, "Password",      "", ED_PROP_FL_COL0, 0, 20, MKGUI_FIXED, 0, 0 },
-		{ MKGUI_CHECKBOX, ED_PROP_FL_READONLY, "Readonly",      "", ED_PROP_FL_COL1, 0, 20, MKGUI_FIXED, 0, 0 },
-		{ MKGUI_CHECKBOX, ED_PROP_FL_FIXED,    "Fixed",         "", ED_PROP_FL_COL2, 0, 20, MKGUI_FIXED, 0, 0 },
-		{ MKGUI_CHECKBOX, ED_PROP_FL_TBSEP,    "TbSep",         "", ED_PROP_FL_COL3, 0, 20, MKGUI_FIXED, 0, 0 },
-		{ MKGUI_CHECKBOX, ED_PROP_FL_VERTICAL, "Vertical",      "", ED_PROP_FL_COL0, 0, 20, MKGUI_FIXED, 0, 0 },
-		{ MKGUI_CHECKBOX, ED_PROP_FL_MIXER,    "Mixer",         "", ED_PROP_FL_COL1, 0, 20, MKGUI_FIXED, 0, 0 },
-		{ MKGUI_CHECKBOX, ED_PROP_FL_TRUNCATE, "Truncate",      "", ED_PROP_FL_COL2, 0, 20, MKGUI_FIXED, 0, 0 },
-		{ MKGUI_CHECKBOX, ED_PROP_FL_METER_TEXT,"Show %",       "", ED_PROP_FL_COL3, 0, 20, MKGUI_FIXED, 0, 0 },
-		{ MKGUI_CHECKBOX, ED_PROP_FL_LINK,     "Link",          "", ED_PROP_FL_COL0, 0, 20, MKGUI_FIXED, 0, 0 },
-		{ MKGUI_CHECKBOX, ED_PROP_FL_WRAP,     "Wrap",          "", ED_PROP_FL_COL1, 0, 20, MKGUI_FIXED, 0, 0 },
-		{ MKGUI_CHECKBOX, ED_PROP_FL_COLLAPSIBLE,"Collapsible", "", ED_PROP_FL_COL2, 0, 20, MKGUI_FIXED, 0, 0 },
-		{ MKGUI_CHECKBOX, ED_PROP_FL_COLLAPSED,"Collapsed",     "", ED_PROP_FL_COL3, 0, 20, MKGUI_FIXED, 0, 0 },
-		{ MKGUI_CHECKBOX, ED_PROP_FL_NUMERIC,  "Numeric",       "", ED_PROP_FL_COL0, 0, 20, MKGUI_FIXED, 0, 0 },
+		MKGUI_W(MKGUI_LABEL,    ED_PROP_FLAGS_LBL, "Flags:",           "", ED_PROP_VBOX, 0, 20, MKGUI_FIXED, 0, 0 ),
+		MKGUI_W(MKGUI_HBOX,     ED_PROP_FL_HBOX,   "",                "", ED_PROP_VBOX, 0, ED_PROP_FL_H, MKGUI_FIXED, 0, 0 ),
+		MKGUI_W(MKGUI_VBOX,     ED_PROP_FL_COL0,   "",                "", ED_PROP_FL_HBOX, 0, 0, 0, 0, 1 ),
+		MKGUI_W(MKGUI_VBOX,     ED_PROP_FL_COL1,   "",                "", ED_PROP_FL_HBOX, 0, 0, 0, 0, 1 ),
+		MKGUI_W(MKGUI_VBOX,     ED_PROP_FL_COL2,   "",                "", ED_PROP_FL_HBOX, 0, 0, 0, 0, 1 ),
+		MKGUI_W(MKGUI_VBOX,     ED_PROP_FL_COL3,   "",                "", ED_PROP_FL_HBOX, 0, 0, 0, 0, 1 ),
+		MKGUI_W(MKGUI_CHECKBOX, ED_PROP_FL_REGTOP,  "RgnTop",         "", ED_PROP_FL_COL0, 0, 20, MKGUI_FIXED, 0, 0 ),
+		MKGUI_W(MKGUI_CHECKBOX, ED_PROP_FL_CHECKED, "Checked",        "", ED_PROP_FL_COL0, 0, 20, MKGUI_FIXED, 0, 0 ),
+		MKGUI_W(MKGUI_CHECKBOX, ED_PROP_FL_REGBOT,  "RgnBot",         "", ED_PROP_FL_COL1, 0, 20, MKGUI_FIXED, 0, 0 ),
+		MKGUI_W(MKGUI_CHECKBOX, ED_PROP_FL_HIDDEN,  "Hidden",         "", ED_PROP_FL_COL1, 0, 20, MKGUI_FIXED, 0, 0 ),
+		MKGUI_W(MKGUI_CHECKBOX, ED_PROP_FL_SEPARATOR,"Sep",            "", ED_PROP_FL_COL1, 0, 20, MKGUI_FIXED, 0, 0 ),
+		MKGUI_W(MKGUI_CHECKBOX, ED_PROP_FL_REGLEFT, "RgnLeft",        "", ED_PROP_FL_COL2, 0, 20, MKGUI_FIXED, 0, 0 ),
+		MKGUI_W(MKGUI_CHECKBOX, ED_PROP_FL_DISABLED,"Disabled",       "", ED_PROP_FL_COL2, 0, 20, MKGUI_FIXED, 0, 0 ),
+		MKGUI_W(MKGUI_CHECKBOX, ED_PROP_FL_MENUCHECK,"MChk",          "", ED_PROP_FL_COL2, 0, 20, MKGUI_FIXED, 0, 0 ),
+		MKGUI_W(MKGUI_CHECKBOX, ED_PROP_FL_REGRIGHT,"RgnRight",       "", ED_PROP_FL_COL3, 0, 20, MKGUI_FIXED, 0, 0 ),
+		MKGUI_W(MKGUI_CHECKBOX, ED_PROP_FL_MENURADIO,"MRad",          "", ED_PROP_FL_COL3, 0, 20, MKGUI_FIXED, 0, 0 ),
+		MKGUI_W(MKGUI_CHECKBOX, ED_PROP_FL_SCROLL,  "Scroll",         "", ED_PROP_FL_COL0, 0, 20, MKGUI_FIXED, 0, 0 ),
+		MKGUI_W(MKGUI_CHECKBOX, ED_PROP_FL_BORDER,  "Border",         "", ED_PROP_FL_COL1, 0, 20, MKGUI_FIXED, 0, 0 ),
+		MKGUI_W(MKGUI_CHECKBOX, ED_PROP_FL_SUNKEN,  "Sunken",         "", ED_PROP_FL_COL2, 0, 20, MKGUI_FIXED, 0, 0 ),
+		MKGUI_W(MKGUI_CHECKBOX, ED_PROP_FL_NOPAD,   "No Pad",         "", ED_PROP_FL_COL3, 0, 20, MKGUI_FIXED, 0, 0 ),
+		MKGUI_W(MKGUI_CHECKBOX, ED_PROP_FL_PASSWORD, "Password",      "", ED_PROP_FL_COL0, 0, 20, MKGUI_FIXED, 0, 0 ),
+		MKGUI_W(MKGUI_CHECKBOX, ED_PROP_FL_READONLY, "Readonly",      "", ED_PROP_FL_COL1, 0, 20, MKGUI_FIXED, 0, 0 ),
+		MKGUI_W(MKGUI_CHECKBOX, ED_PROP_FL_FIXED,    "Fixed",         "", ED_PROP_FL_COL2, 0, 20, MKGUI_FIXED, 0, 0 ),
+		MKGUI_W(MKGUI_CHECKBOX, ED_PROP_FL_TBSEP,    "TbSep",         "", ED_PROP_FL_COL3, 0, 20, MKGUI_FIXED, 0, 0 ),
+		MKGUI_W(MKGUI_CHECKBOX, ED_PROP_FL_VERTICAL, "Vertical",      "", ED_PROP_FL_COL0, 0, 20, MKGUI_FIXED, 0, 0 ),
+		MKGUI_W(MKGUI_CHECKBOX, ED_PROP_FL_MIXER,    "Mixer",         "", ED_PROP_FL_COL1, 0, 20, MKGUI_FIXED, 0, 0 ),
+		MKGUI_W(MKGUI_CHECKBOX, ED_PROP_FL_TRUNCATE, "Truncate",      "", ED_PROP_FL_COL2, 0, 20, MKGUI_FIXED, 0, 0 ),
+		MKGUI_W(MKGUI_CHECKBOX, ED_PROP_FL_METER_TEXT,"Show %",       "", ED_PROP_FL_COL3, 0, 20, MKGUI_FIXED, 0, 0 ),
+		MKGUI_W(MKGUI_CHECKBOX, ED_PROP_FL_LINK,     "Link",          "", ED_PROP_FL_COL0, 0, 20, MKGUI_FIXED, 0, 0 ),
+		MKGUI_W(MKGUI_CHECKBOX, ED_PROP_FL_WRAP,     "Wrap",          "", ED_PROP_FL_COL1, 0, 20, MKGUI_FIXED, 0, 0 ),
+		MKGUI_W(MKGUI_CHECKBOX, ED_PROP_FL_COLLAPSIBLE,"Collapsible", "", ED_PROP_FL_COL2, 0, 20, MKGUI_FIXED, 0, 0 ),
+		MKGUI_W(MKGUI_CHECKBOX, ED_PROP_FL_COLLAPSED,"Collapsed",     "", ED_PROP_FL_COL3, 0, 20, MKGUI_FIXED, 0, 0 ),
+		MKGUI_W(MKGUI_CHECKBOX, ED_PROP_FL_NUMERIC,  "Numeric",       "", ED_PROP_FL_COL0, 0, 20, MKGUI_FIXED, 0, 0 ),
 
 		/* Cross-axis alignment (visible when parent is HBOX/VBOX) */
-		{ MKGUI_LABEL,    ED_PROP_ALIGN_LBL,  "Align:",         "", ED_PROP_VBOX, 0, 24, MKGUI_HIDDEN | MKGUI_FIXED, 0, 0 },
-		{ MKGUI_DROPDOWN, ED_PROP_ALIGN_DRP,  "",               "", ED_PROP_VBOX, 0, 24, MKGUI_HIDDEN | MKGUI_FIXED, 0, 0 },
+		MKGUI_W(MKGUI_LABEL,    ED_PROP_ALIGN_LBL,  "Align:",         "", ED_PROP_VBOX, 0, 24, MKGUI_HIDDEN | MKGUI_FIXED, 0, 0 ),
+		MKGUI_W(MKGUI_DROPDOWN, ED_PROP_ALIGN_DRP,  "",               "", ED_PROP_VBOX, 0, 24, MKGUI_HIDDEN | MKGUI_FIXED, 0, 0 ),
 
 		/* Add/Remove buttons */
-		{ MKGUI_HBOX,     ED_PROP_BTN_HBOX,  "",                "", ED_PROP_VBOX, 0, 22, MKGUI_HIDDEN | MKGUI_FIXED, 0, 0 },
-		{ MKGUI_BUTTON,   ED_PROP_ADD_TAB,   "Add Tab",         "", ED_PROP_BTN_HBOX, 0, 0, MKGUI_HIDDEN, 0, 1 },
-		{ MKGUI_BUTTON,   ED_PROP_REM_TAB,   "Remove Tab",      "", ED_PROP_BTN_HBOX, 0, 0, MKGUI_HIDDEN, 0, 1 },
-		{ MKGUI_BUTTON,   ED_PROP_ADD_ITEM,  "Add Item",        "", ED_PROP_BTN_HBOX, 0, 0, MKGUI_HIDDEN, 0, 1 },
-		{ MKGUI_BUTTON,   ED_PROP_REM_ITEM,  "Remove Item",     "", ED_PROP_BTN_HBOX, 0, 0, MKGUI_HIDDEN, 0, 1 },
-		{ MKGUI_BUTTON,   ED_PROP_ADD_TB_BTN, "Add Button",     "", ED_PROP_BTN_HBOX, 0, 0, MKGUI_HIDDEN, 0, 1 },
-		{ MKGUI_BUTTON,   ED_PROP_REM_TB_BTN, "Remove Button",  "", ED_PROP_BTN_HBOX, 0, 0, MKGUI_HIDDEN, 0, 1 },
+		MKGUI_W(MKGUI_HBOX,     ED_PROP_BTN_HBOX,  "",                "", ED_PROP_VBOX, 0, 22, MKGUI_HIDDEN | MKGUI_FIXED, 0, 0 ),
+		MKGUI_W(MKGUI_BUTTON,   ED_PROP_ADD_TAB,   "Add Tab",         "", ED_PROP_BTN_HBOX, 0, 0, MKGUI_HIDDEN, 0, 1 ),
+		MKGUI_W(MKGUI_BUTTON,   ED_PROP_REM_TAB,   "Remove Tab",      "", ED_PROP_BTN_HBOX, 0, 0, MKGUI_HIDDEN, 0, 1 ),
+		MKGUI_W(MKGUI_BUTTON,   ED_PROP_ADD_ITEM,  "Add Item",        "", ED_PROP_BTN_HBOX, 0, 0, MKGUI_HIDDEN, 0, 1 ),
+		MKGUI_W(MKGUI_BUTTON,   ED_PROP_REM_ITEM,  "Remove Item",     "", ED_PROP_BTN_HBOX, 0, 0, MKGUI_HIDDEN, 0, 1 ),
+		MKGUI_W(MKGUI_BUTTON,   ED_PROP_ADD_TB_BTN, "Add Button",     "", ED_PROP_BTN_HBOX, 0, 0, MKGUI_HIDDEN, 0, 1 ),
+		MKGUI_W(MKGUI_BUTTON,   ED_PROP_REM_TB_BTN, "Remove Button",  "", ED_PROP_BTN_HBOX, 0, 0, MKGUI_HIDDEN, 0, 1 ),
 
 		/* Menu tree */
-		{ MKGUI_TREEVIEW, ED_MENU_TREE,      "",                "", ED_PROP_VBOX, 0, 200, MKGUI_HIDDEN | MKGUI_FIXED, 0, 0 },
+		MKGUI_W(MKGUI_TREEVIEW, ED_MENU_TREE,      "",                "", ED_PROP_VBOX, 0, 200, MKGUI_HIDDEN | MKGUI_FIXED, 0, 0 ),
 
 		/* Events section */
-		{ MKGUI_GROUP,    ED_EVT_GROUP,      "Events",          "", ED_RIGHT_PANEL, 0, 200, MKGUI_HIDDEN | MKGUI_FIXED, 0, 0 },
-		{ MKGUI_VBOX,     ED_EVT_VBOX,       "",                "", ED_EVT_GROUP,   0, 0, 0, 0, 0 },
-		{ MKGUI_LISTVIEW, ED_EVT_LIST,       "",                "", ED_EVT_VBOX,    0, 0, 0, MKGUI_MULTI_SELECT, 1 },
+		MKGUI_W(MKGUI_GROUP,    ED_EVT_GROUP,      "Events",          "", ED_RIGHT_PANEL, 0, 200, MKGUI_HIDDEN | MKGUI_FIXED, 0, 0 ),
+		MKGUI_W(MKGUI_VBOX,     ED_EVT_VBOX,       "",                "", ED_EVT_GROUP,   0, 0, 0, 0, 0 ),
+		MKGUI_W(MKGUI_LISTVIEW, ED_EVT_LIST,       "",                "", ED_EVT_VBOX,    0, 0, 0, MKGUI_MULTI_SELECT, 1 ),
 
 		/* Data section */
-		{ MKGUI_GROUP,    ED_DATA_GROUP,     "Data",            "", ED_RIGHT_PANEL, 0, 250, MKGUI_HIDDEN | MKGUI_FIXED, 0, 0 },
-		{ MKGUI_VBOX,     ED_DATA_VBOX,      "",                "", ED_DATA_GROUP,  0, 0, 0, 0, 0 },
-		{ MKGUI_LISTVIEW, ED_DATA_LIST,      "",                "", ED_DATA_VBOX,   0, 0, 0, 0, 1 },
-		{ MKGUI_INPUT,    ED_DATA_ITEM_INP,  "",                "", ED_DATA_VBOX,   0, 24, MKGUI_FIXED, 0, 0 },
-		{ MKGUI_HBOX,     ED_DATA_BTN_HBOX,  "",                "", ED_DATA_VBOX,   0, 22, MKGUI_FIXED, 0, 0 },
-		{ MKGUI_BUTTON,   ED_DATA_ADD_BTN,   "Add",             "", ED_DATA_BTN_HBOX, 0, 0, 0, 0, 1 },
-		{ MKGUI_BUTTON,   ED_DATA_REM_BTN,   "Remove",          "", ED_DATA_BTN_HBOX, 0, 0, 0, 0, 1 },
-		{ MKGUI_BUTTON,   ED_DATA_UP_BTN,    "Up",              "", ED_DATA_BTN_HBOX, 0, 0, 0, 0, 1 },
-		{ MKGUI_BUTTON,   ED_DATA_DOWN_BTN,  "Down",            "", ED_DATA_BTN_HBOX, 0, 0, 0, 0, 1 },
+		MKGUI_W(MKGUI_GROUP,    ED_DATA_GROUP,     "Data",            "", ED_RIGHT_PANEL, 0, 250, MKGUI_HIDDEN | MKGUI_FIXED, 0, 0 ),
+		MKGUI_W(MKGUI_VBOX,     ED_DATA_VBOX,      "",                "", ED_DATA_GROUP,  0, 0, 0, 0, 0 ),
+		MKGUI_W(MKGUI_LISTVIEW, ED_DATA_LIST,      "",                "", ED_DATA_VBOX,   0, 0, 0, 0, 1 ),
+		MKGUI_W(MKGUI_INPUT,    ED_DATA_ITEM_INP,  "",                "", ED_DATA_VBOX,   0, 24, MKGUI_FIXED, 0, 0 ),
+		MKGUI_W(MKGUI_HBOX,     ED_DATA_BTN_HBOX,  "",                "", ED_DATA_VBOX,   0, 22, MKGUI_FIXED, 0, 0 ),
+		MKGUI_W(MKGUI_BUTTON,   ED_DATA_ADD_BTN,   "Add",             "", ED_DATA_BTN_HBOX, 0, 0, 0, 0, 1 ),
+		MKGUI_W(MKGUI_BUTTON,   ED_DATA_REM_BTN,   "Remove",          "", ED_DATA_BTN_HBOX, 0, 0, 0, 0, 1 ),
+		MKGUI_W(MKGUI_BUTTON,   ED_DATA_UP_BTN,    "Up",              "", ED_DATA_BTN_HBOX, 0, 0, 0, 0, 1 ),
+		MKGUI_W(MKGUI_BUTTON,   ED_DATA_DOWN_BTN,  "Down",            "", ED_DATA_BTN_HBOX, 0, 0, 0, 0, 1 ),
 
-		{ MKGUI_STATUSBAR, ED_STATUSBAR,   "",                 "", ED_WINDOW,  0, 0, 0, 0, 0 },
+		MKGUI_W(MKGUI_STATUSBAR, ED_STATUSBAR,   "",                 "", ED_WINDOW,  0, 0, 0, 0, 0 ),
 	};
 
 	uint32_t base_count = sizeof(widgets) / sizeof(widgets[0]);

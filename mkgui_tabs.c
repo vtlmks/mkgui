@@ -6,7 +6,7 @@ static int32_t tab_calc_width(struct mkgui_ctx *ctx, struct mkgui_widget *child)
 	int32_t tab_pad = sc(ctx, 10);
 	int32_t icon_gap = sc(ctx, 4);
 	int32_t close_w = sc(ctx, 16);
-	int32_t tw = text_width(ctx, child->label) + tab_pad * 2;
+	int32_t tw = label_text_width(ctx, child) + tab_pad * 2;
 	int32_t ii = widget_icon_idx(child);
 	if(ii >= 0) {
 		tw += icons[ii].w + icon_gap;
@@ -242,6 +242,7 @@ MKGUI_API void mkgui_tabs_set_text(struct mkgui_ctx *ctx, uint32_t tabs_id, uint
 	}
 	strncpy(w->label, text, MKGUI_MAX_TEXT - 1);
 	w->label[MKGUI_MAX_TEXT - 1] = '\0';
+	w->label_tw = -1;
 	dirty_widget_id(ctx, tabs_id);
 }
 

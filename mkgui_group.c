@@ -13,7 +13,7 @@ static void render_group(struct mkgui_ctx *ctx, uint32_t idx) {
 	uint32_t collapsed = (w->style & MKGUI_COLLAPSED);
 	int32_t label_y = ry + sc(ctx, 2);
 	int32_t label_x = rx + group_pad + sc(ctx, 4);
-	int32_t tw = text_width(ctx, w->label);
+	int32_t tw = label_text_width(ctx, w);
 	int32_t gap_left = label_x - sc(ctx, 4);
 	int32_t gap_right = label_x + tw + sc(ctx, 4);
 

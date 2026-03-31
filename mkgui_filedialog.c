@@ -1089,34 +1089,34 @@ static uint32_t fd_run_dialog(struct mkgui_ctx *ctx, uint32_t mode, struct mkgui
 	uint32_t has_filters = (fd.filter_count > 0) ? 0 : MKGUI_HIDDEN;
 
 	struct mkgui_widget widgets[] = {
-		{ MKGUI_WINDOW,   FD_ID_WINDOW,        "",              "",             0,                  FD_INIT_W, FD_INIT_H, 0, 0, 0 },
+		MKGUI_W(MKGUI_WINDOW,   FD_ID_WINDOW,        "",              "",             0,                  FD_INIT_W, FD_INIT_H, 0, 0, 0),
 
-		{ MKGUI_TOOLBAR,  FD_ID_TOOLBAR,        "",              "",             FD_ID_WINDOW,       0, 0, 0, 0, 0 },
-		{ MKGUI_BUTTON,   FD_ID_BTN_BACK,       "",              "go-previous",  FD_ID_TOOLBAR,      0, 0, 0, 0, 0 },
-		{ MKGUI_BUTTON,   FD_ID_BTN_FWD,        "",              "go-next",      FD_ID_TOOLBAR,      0, 0, 0, 0, 0 },
-		{ MKGUI_BUTTON,   FD_ID_BTN_UP,         "",              "go-up",        FD_ID_TOOLBAR,      0, 0, 0, 0, 0 },
-		{ MKGUI_BUTTON,   FD_ID_TB_SEP1,        "",              "",             FD_ID_TOOLBAR,      0, 0, 0, MKGUI_SEPARATOR, 0 },
-		{ MKGUI_BUTTON,   FD_ID_BTN_NEWFOLDER,  "",              "folder-new",   FD_ID_TOOLBAR,      0, 0, 0, 0, 0 },
+		MKGUI_W(MKGUI_TOOLBAR,  FD_ID_TOOLBAR,        "",              "",             FD_ID_WINDOW,       0, 0, 0, 0, 0),
+		MKGUI_W(MKGUI_BUTTON,   FD_ID_BTN_BACK,       "",              "go-previous",  FD_ID_TOOLBAR,      0, 0, 0, 0, 0),
+		MKGUI_W(MKGUI_BUTTON,   FD_ID_BTN_FWD,        "",              "go-next",      FD_ID_TOOLBAR,      0, 0, 0, 0, 0),
+		MKGUI_W(MKGUI_BUTTON,   FD_ID_BTN_UP,         "",              "go-up",        FD_ID_TOOLBAR,      0, 0, 0, 0, 0),
+		MKGUI_W(MKGUI_BUTTON,   FD_ID_TB_SEP1,        "",              "",             FD_ID_TOOLBAR,      0, 0, 0, MKGUI_SEPARATOR, 0),
+		MKGUI_W(MKGUI_BUTTON,   FD_ID_BTN_NEWFOLDER,  "",              "folder-new",   FD_ID_TOOLBAR,      0, 0, 0, 0, 0),
 
-		{ MKGUI_PATHBAR,  FD_ID_PATHBAR,        "",              "",             FD_ID_WINDOW,       0, 0, 0, 0, 0 },
+		MKGUI_W(MKGUI_PATHBAR,  FD_ID_PATHBAR,        "",              "",             FD_ID_WINDOW,       0, 0, 0, 0, 0),
 
-		{ MKGUI_VBOX,     FD_ID_CONTENT_VBOX,   "",              "",             FD_ID_WINDOW,       0, 0, 0, 0, 0 },
-		{ MKGUI_VSPLIT,   FD_ID_SPLIT,          "",              "",             FD_ID_CONTENT_VBOX, 0, 0, 0, 0, 1 },
-		{ MKGUI_LISTVIEW, FD_ID_BOOKMARKS,      "",              "",             FD_ID_SPLIT,        0, 0, MKGUI_REGION_LEFT, 0, 0 },
-		{ MKGUI_LISTVIEW, FD_ID_FILES,          "",              "",             FD_ID_SPLIT,        0, 0, MKGUI_REGION_RIGHT, multi, 0 },
+		MKGUI_W(MKGUI_VBOX,     FD_ID_CONTENT_VBOX,   "",              "",             FD_ID_WINDOW,       0, 0, 0, 0, 0),
+		MKGUI_W(MKGUI_VSPLIT,   FD_ID_SPLIT,          "",              "",             FD_ID_CONTENT_VBOX, 0, 0, 0, 0, 1),
+		MKGUI_W(MKGUI_LISTVIEW, FD_ID_BOOKMARKS,      "",              "",             FD_ID_SPLIT,        0, 0, MKGUI_REGION_LEFT, 0, 0),
+		MKGUI_W(MKGUI_LISTVIEW, FD_ID_FILES,          "",              "",             FD_ID_SPLIT,        0, 0, MKGUI_REGION_RIGHT, multi, 0),
 
-		{ MKGUI_HBOX,     FD_ID_NAME_HBOX,      "",              "",             FD_ID_CONTENT_VBOX, 0, 24, MKGUI_FIXED, 0, 0 },
-		{ MKGUI_LABEL,    FD_ID_NAME_LABEL,     "File name:",    "",             FD_ID_NAME_HBOX,    80, 0, MKGUI_FIXED, 0, 0 },
-		{ MKGUI_INPUT,    FD_ID_NAME_INPUT,     "",              "",             FD_ID_NAME_HBOX,    0, 0, 0, 0, 1 },
-		{ MKGUI_LABEL,    FD_ID_FILTER_LABEL,   "Filter:",       "",             FD_ID_NAME_HBOX,    50, 0, MKGUI_FIXED | has_filters, 0, 0 },
-		{ MKGUI_DROPDOWN, FD_ID_FILTER_DROP,    "",              "",             FD_ID_NAME_HBOX,    170, 0, MKGUI_FIXED | has_filters, 0, 0 },
+		MKGUI_W(MKGUI_HBOX,     FD_ID_NAME_HBOX,      "",              "",             FD_ID_CONTENT_VBOX, 0, 24, MKGUI_FIXED, 0, 0),
+		MKGUI_W(MKGUI_LABEL,    FD_ID_NAME_LABEL,     "File name:",    "",             FD_ID_NAME_HBOX,    80, 0, MKGUI_FIXED, 0, 0),
+		MKGUI_W(MKGUI_INPUT,    FD_ID_NAME_INPUT,     "",              "",             FD_ID_NAME_HBOX,    0, 0, 0, 0, 1),
+		MKGUI_W(MKGUI_LABEL,    FD_ID_FILTER_LABEL,   "Filter:",       "",             FD_ID_NAME_HBOX,    50, 0, MKGUI_FIXED | has_filters, 0, 0),
+		MKGUI_W(MKGUI_DROPDOWN, FD_ID_FILTER_DROP,    "",              "",             FD_ID_NAME_HBOX,    170, 0, MKGUI_FIXED | has_filters, 0, 0),
 
-		{ MKGUI_HBOX,     FD_ID_BTN_HBOX,       "",              "",             FD_ID_CONTENT_VBOX, 0, 28, MKGUI_FIXED, 0, 0 },
-		{ MKGUI_CHECKBOX, FD_ID_CHK_HIDDEN,     "Show hidden",   "",             FD_ID_BTN_HBOX,     110, 0, MKGUI_FIXED, 0, 0 },
-		{ MKGUI_LABEL,    FD_ID_SEARCH_LABEL,   "",              "edit-find",    FD_ID_BTN_HBOX,     200, 0, MKGUI_FIXED | MKGUI_HIDDEN, 0, 0 },
-		{ MKGUI_LABEL,    FD_ID_SPACER,         "",              "",             FD_ID_BTN_HBOX,     0, 0, 0, 0, 1 },
-		{ MKGUI_BUTTON,   FD_ID_BTN_CONFIRM,    "",              "",             FD_ID_BTN_HBOX,     80, 0, MKGUI_FIXED, 0, 0 },
-		{ MKGUI_BUTTON,   FD_ID_BTN_CANCEL,     "Cancel",        "",             FD_ID_BTN_HBOX,     80, 0, MKGUI_FIXED, 0, 0 },
+		MKGUI_W(MKGUI_HBOX,     FD_ID_BTN_HBOX,       "",              "",             FD_ID_CONTENT_VBOX, 0, 28, MKGUI_FIXED, 0, 0),
+		MKGUI_W(MKGUI_CHECKBOX, FD_ID_CHK_HIDDEN,     "Show hidden",   "",             FD_ID_BTN_HBOX,     110, 0, MKGUI_FIXED, 0, 0),
+		MKGUI_W(MKGUI_LABEL,    FD_ID_SEARCH_LABEL,   "",              "edit-find",    FD_ID_BTN_HBOX,     200, 0, MKGUI_FIXED | MKGUI_HIDDEN, 0, 0),
+		MKGUI_W(MKGUI_LABEL,    FD_ID_SPACER,         "",              "",             FD_ID_BTN_HBOX,     0, 0, 0, 0, 1),
+		MKGUI_W(MKGUI_BUTTON,   FD_ID_BTN_CONFIRM,    "",              "",             FD_ID_BTN_HBOX,     80, 0, MKGUI_FIXED, 0, 0),
+		MKGUI_W(MKGUI_BUTTON,   FD_ID_BTN_CANCEL,     "Cancel",        "",             FD_ID_BTN_HBOX,     80, 0, MKGUI_FIXED, 0, 0),
 	};
 
 	uint32_t confirm_idx = 0;

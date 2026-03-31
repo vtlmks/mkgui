@@ -282,8 +282,8 @@ static void test_remove_window_blocked(struct mkgui_ctx *ctx) {
 // [=]===^=[ main ]=================================================[=]
 int32_t main(void) {
 	struct mkgui_widget initial[] = {
-		{ MKGUI_WINDOW, 1, "Test", "", 0, 200, 100, 0, 0, 0 },
-		{ MKGUI_VBOX,   2, "",     "", 1, 0,   0,   0, 0, 0 },
+		MKGUI_W(MKGUI_WINDOW, 1, "Test", "", 0, 200, 100, 0, 0, 0),
+		MKGUI_W(MKGUI_VBOX,   2, "",     "", 1, 0,   0,   0, 0, 0),
 	};
 
 	struct mkgui_ctx *ctx = mkgui_create(initial, 2);

@@ -2,6 +2,367 @@
 // SPDX-License-Identifier: MIT
 
 // ---------------------------------------------------------------------------
+// SIMD runtime dispatch (SSE2 baseline, AVX2 optional)
+// ---------------------------------------------------------------------------
+
+static uint32_t cpu_has_avx2;
+
+// [=]===^=[ detect_cpu ]===========================================[=]
+static void detect_cpu(void) {
+	uint32_t eax, ebx, ecx, edx;
+	__asm__ __volatile__("cpuid" : "=a"(eax), "=b"(ebx), "=c"(ecx), "=d"(edx) : "a"(7), "c"(0));
+	cpu_has_avx2 = (ebx >> 5) & 1;
+}
+
+// [=]===^=[ fill_pixels_sse2 ]=====================================[=]
+static void fill_pixels_sse2(uint32_t *dst, uint32_t count, uint32_t color) {
+	uint32_t i = 0;
+	__m128i cv = _mm_set1_epi32((int32_t)color);
+	for(; i + 4 <= count; i += 4) {
+		_mm_storeu_si128((__m128i *)&dst[i], cv);
+	}
+	for(; i < count; ++i) {
+		dst[i] = color;
+	}
+}
+
+// [=]===^=[ fill_pixels_avx2 ]=====================================[=]
+__attribute__((target("avx2")))
+static void fill_pixels_avx2(uint32_t *dst, uint32_t count, uint32_t color) {
+	uint32_t i = 0;
+	__m256i cv = _mm256_set1_epi32((int32_t)color);
+	for(; i + 8 <= count; i += 8) {
+		_mm256_storeu_si256((__m256i *)&dst[i], cv);
+	}
+	__m128i cv4 = _mm_set1_epi32((int32_t)color);
+	for(; i + 4 <= count; i += 4) {
+		_mm_storeu_si128((__m128i *)&dst[i], cv4);
+	}
+	for(; i < count; ++i) {
+		dst[i] = color;
+	}
+}
+
+// [=]===^=[ blend_glyph_row_sse2 ]=================================[=]
+static void blend_glyph_row_sse2(uint32_t *rowp, uint8_t *bmp, int32_t col0, int32_t col1, int32_t gx, uint32_t rb_src, uint32_t g_src) {
+	int32_t col = col0;
+	__m128i src_rb = _mm_set1_epi32((int32_t)rb_src);
+	__m128i src_g8 = _mm_set1_epi32((int32_t)(g_src >> 8));
+	__m128i round_rb = _mm_set1_epi32(0x00800080);
+	__m128i round_g = _mm_set1_epi32(0x00000080);
+	__m128i mask_rb = _mm_set1_epi32(0x00ff00ff);
+	__m128i mask_byte = _mm_set1_epi32(0x000000ff);
+	__m128i mask_a = _mm_set1_epi32((int32_t)0xff000000u);
+	__m128i val_255 = _mm_set1_epi32(255);
+	__m128i zero = _mm_setzero_si128();
+	for(; col + 4 <= col1; col += 4) {
+		__m128i alphas = _mm_cvtsi32_si128(*(int32_t *)&bmp[col]);
+		alphas = _mm_unpacklo_epi8(alphas, zero);
+		alphas = _mm_unpacklo_epi16(alphas, zero);
+		__m128i any = _mm_cmpeq_epi32(alphas, zero);
+		if(_mm_movemask_epi8(any) == 0xffff) {
+			continue;
+		}
+		int32_t px = gx + col;
+		__m128i dst = _mm_loadu_si128((__m128i *)&rowp[px]);
+		__m128i ia = _mm_sub_epi32(val_255, alphas);
+		__m128i a16 = _mm_or_si128(alphas, _mm_slli_epi32(alphas, 16));
+		__m128i ia16 = _mm_or_si128(ia, _mm_slli_epi32(ia, 16));
+		__m128i dst_rb = _mm_and_si128(dst, mask_rb);
+		__m128i dst_g8 = _mm_and_si128(_mm_srli_epi32(dst, 8), mask_byte);
+		__m128i rb = _mm_add_epi32(_mm_add_epi32(_mm_mullo_epi16(src_rb, a16), _mm_mullo_epi16(dst_rb, ia16)), round_rb);
+		rb = _mm_and_si128(_mm_srli_epi32(_mm_add_epi32(rb, _mm_and_si128(_mm_srli_epi32(rb, 8), mask_rb)), 8), mask_rb);
+		__m128i gv = _mm_add_epi32(_mm_add_epi32(_mm_mullo_epi16(src_g8, alphas), _mm_mullo_epi16(dst_g8, ia)), round_g);
+		gv = _mm_slli_epi32(_mm_and_si128(_mm_srli_epi32(_mm_add_epi32(gv, _mm_and_si128(_mm_srli_epi32(gv, 8), mask_byte)), 8), mask_byte), 8);
+		__m128i result = _mm_or_si128(_mm_or_si128(rb, gv), mask_a);
+		__m128i skip = _mm_cmpeq_epi32(alphas, zero);
+		result = _mm_or_si128(_mm_andnot_si128(skip, result), _mm_and_si128(skip, dst));
+		_mm_storeu_si128((__m128i *)&rowp[px], result);
+	}
+	for(; col < col1; ++col) {
+		uint32_t a = bmp[col];
+		if(a == 0) {
+			continue;
+		}
+		int32_t px = gx + col;
+		uint32_t ia = 255 - a;
+		uint32_t d = rowp[px];
+		uint32_t rb = (rb_src * a + (d & 0x00ff00ff) * ia + 0x00800080);
+		rb = ((rb + ((rb >> 8) & 0x00ff00ff)) >> 8) & 0x00ff00ff;
+		uint32_t gv = (g_src * a + (d & 0x0000ff00) * ia + 0x00008000);
+		gv = ((gv + ((gv >> 8) & 0x0000ff00)) >> 8) & 0x0000ff00;
+		rowp[px] = 0xff000000 | rb | gv;
+	}
+}
+
+// [=]===^=[ blend_glyph_row_avx2 ]=================================[=]
+__attribute__((target("avx2")))
+static void blend_glyph_row_avx2(uint32_t *rowp, uint8_t *bmp, int32_t col0, int32_t col1, int32_t gx, uint32_t rb_src, uint32_t g_src) {
+	int32_t col = col0;
+	__m256i src_rb = _mm256_set1_epi32((int32_t)rb_src);
+	__m256i src_g8 = _mm256_set1_epi32((int32_t)(g_src >> 8));
+	__m256i round_rb = _mm256_set1_epi32(0x00800080);
+	__m256i round_g = _mm256_set1_epi32(0x00000080);
+	__m256i mask_rb = _mm256_set1_epi32(0x00ff00ff);
+	__m256i mask_byte = _mm256_set1_epi32(0x000000ff);
+	__m256i mask_a = _mm256_set1_epi32((int32_t)0xff000000u);
+	__m256i val_255 = _mm256_set1_epi32(255);
+	__m256i zero = _mm256_setzero_si256();
+	for(; col + 8 <= col1; col += 8) {
+		__m128i alpha8 = _mm_loadl_epi64((__m128i *)&bmp[col]);
+		__m128i alpha16 = _mm_unpacklo_epi8(alpha8, _mm_setzero_si128());
+		__m256i alphas = _mm256_cvtepu16_epi32(alpha16);
+		__m256i any = _mm256_cmpeq_epi32(alphas, zero);
+		if(_mm256_movemask_epi8(any) == -1) {
+			continue;
+		}
+		int32_t px = gx + col;
+		__m256i dst = _mm256_loadu_si256((__m256i *)&rowp[px]);
+		__m256i ia = _mm256_sub_epi32(val_255, alphas);
+		__m256i a16 = _mm256_or_si256(alphas, _mm256_slli_epi32(alphas, 16));
+		__m256i ia16 = _mm256_or_si256(ia, _mm256_slli_epi32(ia, 16));
+		__m256i dst_rb = _mm256_and_si256(dst, mask_rb);
+		__m256i dst_g8 = _mm256_and_si256(_mm256_srli_epi32(dst, 8), mask_byte);
+		__m256i rb = _mm256_add_epi32(_mm256_add_epi32(_mm256_mullo_epi16(src_rb, a16), _mm256_mullo_epi16(dst_rb, ia16)), round_rb);
+		rb = _mm256_and_si256(_mm256_srli_epi32(_mm256_add_epi32(rb, _mm256_and_si256(_mm256_srli_epi32(rb, 8), mask_rb)), 8), mask_rb);
+		__m256i gv = _mm256_add_epi32(_mm256_add_epi32(_mm256_mullo_epi16(src_g8, alphas), _mm256_mullo_epi16(dst_g8, ia)), round_g);
+		gv = _mm256_slli_epi32(_mm256_and_si256(_mm256_srli_epi32(_mm256_add_epi32(gv, _mm256_and_si256(_mm256_srli_epi32(gv, 8), mask_byte)), 8), mask_byte), 8);
+		__m256i result = _mm256_or_si256(_mm256_or_si256(rb, gv), mask_a);
+		__m256i skip = _mm256_cmpeq_epi32(alphas, zero);
+		result = _mm256_or_si256(_mm256_andnot_si256(skip, result), _mm256_and_si256(skip, dst));
+		_mm256_storeu_si256((__m256i *)&rowp[px], result);
+	}
+	// SSE2 tail for remaining 4+ pixels
+	__m128i src_rb4 = _mm_set1_epi32((int32_t)rb_src);
+	__m128i src_g84 = _mm_set1_epi32((int32_t)(g_src >> 8));
+	__m128i round_rb4 = _mm_set1_epi32(0x00800080);
+	__m128i round_g4 = _mm_set1_epi32(0x00000080);
+	__m128i mask_rb4 = _mm_set1_epi32(0x00ff00ff);
+	__m128i mask_byte4 = _mm_set1_epi32(0x000000ff);
+	__m128i mask_a4 = _mm_set1_epi32((int32_t)0xff000000u);
+	__m128i val_2554 = _mm_set1_epi32(255);
+	__m128i zero4 = _mm_setzero_si128();
+	for(; col + 4 <= col1; col += 4) {
+		__m128i alphas4 = _mm_cvtsi32_si128(*(int32_t *)&bmp[col]);
+		alphas4 = _mm_unpacklo_epi8(alphas4, zero4);
+		alphas4 = _mm_unpacklo_epi16(alphas4, zero4);
+		__m128i any4 = _mm_cmpeq_epi32(alphas4, zero4);
+		if(_mm_movemask_epi8(any4) == 0xffff) {
+			continue;
+		}
+		int32_t px = gx + col;
+		__m128i dst4 = _mm_loadu_si128((__m128i *)&rowp[px]);
+		__m128i ia4 = _mm_sub_epi32(val_2554, alphas4);
+		__m128i a164 = _mm_or_si128(alphas4, _mm_slli_epi32(alphas4, 16));
+		__m128i ia164 = _mm_or_si128(ia4, _mm_slli_epi32(ia4, 16));
+		__m128i dst_rb4 = _mm_and_si128(dst4, mask_rb4);
+		__m128i dst_g84 = _mm_and_si128(_mm_srli_epi32(dst4, 8), mask_byte4);
+		__m128i rb4 = _mm_add_epi32(_mm_add_epi32(_mm_mullo_epi16(src_rb4, a164), _mm_mullo_epi16(dst_rb4, ia164)), round_rb4);
+		rb4 = _mm_and_si128(_mm_srli_epi32(_mm_add_epi32(rb4, _mm_and_si128(_mm_srli_epi32(rb4, 8), mask_rb4)), 8), mask_rb4);
+		__m128i gv4 = _mm_add_epi32(_mm_add_epi32(_mm_mullo_epi16(src_g84, alphas4), _mm_mullo_epi16(dst_g84, ia4)), round_g4);
+		gv4 = _mm_slli_epi32(_mm_and_si128(_mm_srli_epi32(_mm_add_epi32(gv4, _mm_and_si128(_mm_srli_epi32(gv4, 8), mask_byte4)), 8), mask_byte4), 8);
+		__m128i result4 = _mm_or_si128(_mm_or_si128(rb4, gv4), mask_a4);
+		__m128i skip4 = _mm_cmpeq_epi32(alphas4, zero4);
+		result4 = _mm_or_si128(_mm_andnot_si128(skip4, result4), _mm_and_si128(skip4, dst4));
+		_mm_storeu_si128((__m128i *)&rowp[px], result4);
+	}
+	for(; col < col1; ++col) {
+		uint32_t a = bmp[col];
+		if(a == 0) {
+			continue;
+		}
+		int32_t px = gx + col;
+		uint32_t ia = 255 - a;
+		uint32_t d = rowp[px];
+		uint32_t rb = (rb_src * a + (d & 0x00ff00ff) * ia + 0x00800080);
+		rb = ((rb + ((rb >> 8) & 0x00ff00ff)) >> 8) & 0x00ff00ff;
+		uint32_t gv = (g_src * a + (d & 0x0000ff00) * ia + 0x00008000);
+		gv = ((gv + ((gv >> 8) & 0x0000ff00)) >> 8) & 0x0000ff00;
+		rowp[px] = 0xff000000 | rb | gv;
+	}
+}
+
+// [=]===^=[ blend_icon_row_sse2 ]===================================[=]
+static void blend_icon_row_sse2(uint32_t *rowp, uint32_t *src, int32_t col0, int32_t col1, int32_t x) {
+	int32_t col = col0;
+	__m128i round_rb = _mm_set1_epi32(0x00800080);
+	__m128i round_g = _mm_set1_epi32(0x00000080);
+	__m128i mask_rb = _mm_set1_epi32(0x00ff00ff);
+	__m128i mask_byte = _mm_set1_epi32(0x000000ff);
+	__m128i mask_a = _mm_set1_epi32((int32_t)0xff000000u);
+	__m128i val_255 = _mm_set1_epi32(255);
+	__m128i zero = _mm_setzero_si128();
+	for(; col + 4 <= col1; col += 4) {
+		__m128i spx = _mm_loadu_si128((__m128i *)&src[col]);
+		__m128i alphas = _mm_srli_epi32(spx, 24);
+		__m128i any_zero = _mm_cmpeq_epi32(alphas, zero);
+		if(_mm_movemask_epi8(any_zero) == 0xffff) {
+			continue;
+		}
+		int32_t px = x + col;
+		__m128i dst = _mm_loadu_si128((__m128i *)&rowp[px]);
+		__m128i ia = _mm_sub_epi32(val_255, alphas);
+		__m128i ia16 = _mm_or_si128(ia, _mm_slli_epi32(ia, 16));
+		__m128i src_rb = _mm_and_si128(spx, mask_rb);
+		__m128i src_g8 = _mm_and_si128(_mm_srli_epi32(spx, 8), mask_byte);
+		__m128i dst_rb = _mm_and_si128(dst, mask_rb);
+		__m128i dst_g8 = _mm_and_si128(_mm_srli_epi32(dst, 8), mask_byte);
+		__m128i d_rb = _mm_add_epi32(_mm_mullo_epi16(dst_rb, ia16), round_rb);
+		d_rb = _mm_and_si128(_mm_srli_epi32(_mm_add_epi32(d_rb, _mm_and_si128(_mm_srli_epi32(d_rb, 8), mask_rb)), 8), mask_rb);
+		__m128i d_gv = _mm_add_epi32(_mm_mullo_epi16(dst_g8, ia), round_g);
+		d_gv = _mm_slli_epi32(_mm_and_si128(_mm_srli_epi32(_mm_add_epi32(d_gv, _mm_and_si128(_mm_srli_epi32(d_gv, 8), mask_byte)), 8), mask_byte), 8);
+		__m128i rb = _mm_add_epi32(src_rb, d_rb);
+		__m128i gv = _mm_add_epi32(_mm_slli_epi32(src_g8, 8), d_gv);
+		__m128i result = _mm_or_si128(_mm_and_si128(_mm_or_si128(rb, gv), _mm_set1_epi32(0x00ffffff)), mask_a);
+		__m128i full = _mm_cmpeq_epi32(alphas, val_255);
+		result = _mm_or_si128(_mm_and_si128(full, spx), _mm_andnot_si128(full, result));
+		__m128i skip = _mm_cmpeq_epi32(alphas, zero);
+		result = _mm_or_si128(_mm_andnot_si128(skip, result), _mm_and_si128(skip, dst));
+		_mm_storeu_si128((__m128i *)&rowp[px], result);
+	}
+	for(; col < col1; ++col) {
+		uint32_t spx = src[col];
+		uint32_t a = spx >> 24;
+		int32_t px = x + col;
+		if(a == 255) {
+			rowp[px] = spx;
+		} else if(a > 0) {
+			uint32_t ia = 255 - a;
+			uint32_t d = rowp[px];
+			uint32_t d_rb = (d & 0x00ff00ff) * ia + 0x00800080;
+			d_rb = ((d_rb + ((d_rb >> 8) & 0x00ff00ff)) >> 8) & 0x00ff00ff;
+			uint32_t d_g = (d & 0x0000ff00) * ia + 0x00008000;
+			d_g = ((d_g + ((d_g >> 8) & 0x0000ff00)) >> 8) & 0x0000ff00;
+			uint32_t s_rb = spx & 0x00ff00ff;
+			uint32_t s_g = spx & 0x0000ff00;
+			rowp[px] = 0xff000000 | ((s_rb + d_rb) & 0x00ff00ff) | ((s_g + d_g) & 0x0000ff00);
+		}
+	}
+}
+
+// [=]===^=[ blend_icon_row_avx2 ]===================================[=]
+__attribute__((target("avx2")))
+static void blend_icon_row_avx2(uint32_t *rowp, uint32_t *src, int32_t col0, int32_t col1, int32_t x) {
+	int32_t col = col0;
+	__m256i round_rb = _mm256_set1_epi32(0x00800080);
+	__m256i round_g = _mm256_set1_epi32(0x00000080);
+	__m256i mask_rb = _mm256_set1_epi32(0x00ff00ff);
+	__m256i mask_byte = _mm256_set1_epi32(0x000000ff);
+	__m256i mask_a = _mm256_set1_epi32((int32_t)0xff000000u);
+	__m256i mask_rgb = _mm256_set1_epi32(0x00ffffff);
+	__m256i val_255 = _mm256_set1_epi32(255);
+	__m256i zero = _mm256_setzero_si256();
+	for(; col + 8 <= col1; col += 8) {
+		__m256i spx = _mm256_loadu_si256((__m256i *)&src[col]);
+		__m256i alphas = _mm256_srli_epi32(spx, 24);
+		__m256i any_zero = _mm256_cmpeq_epi32(alphas, zero);
+		if(_mm256_movemask_epi8(any_zero) == -1) {
+			continue;
+		}
+		int32_t px = x + col;
+		__m256i dst = _mm256_loadu_si256((__m256i *)&rowp[px]);
+		__m256i ia = _mm256_sub_epi32(val_255, alphas);
+		__m256i ia16 = _mm256_or_si256(ia, _mm256_slli_epi32(ia, 16));
+		__m256i src_rb = _mm256_and_si256(spx, mask_rb);
+		__m256i src_g8 = _mm256_and_si256(_mm256_srli_epi32(spx, 8), mask_byte);
+		__m256i dst_rb = _mm256_and_si256(dst, mask_rb);
+		__m256i dst_g8 = _mm256_and_si256(_mm256_srli_epi32(dst, 8), mask_byte);
+		__m256i d_rb = _mm256_add_epi32(_mm256_mullo_epi16(dst_rb, ia16), round_rb);
+		d_rb = _mm256_and_si256(_mm256_srli_epi32(_mm256_add_epi32(d_rb, _mm256_and_si256(_mm256_srli_epi32(d_rb, 8), mask_rb)), 8), mask_rb);
+		__m256i d_gv = _mm256_add_epi32(_mm256_mullo_epi16(dst_g8, ia), round_g);
+		d_gv = _mm256_slli_epi32(_mm256_and_si256(_mm256_srli_epi32(_mm256_add_epi32(d_gv, _mm256_and_si256(_mm256_srli_epi32(d_gv, 8), mask_byte)), 8), mask_byte), 8);
+		__m256i rb = _mm256_add_epi32(src_rb, d_rb);
+		__m256i gv = _mm256_add_epi32(_mm256_slli_epi32(src_g8, 8), d_gv);
+		__m256i result = _mm256_or_si256(_mm256_and_si256(_mm256_or_si256(rb, gv), mask_rgb), mask_a);
+		__m256i full = _mm256_cmpeq_epi32(alphas, val_255);
+		result = _mm256_or_si256(_mm256_and_si256(full, spx), _mm256_andnot_si256(full, result));
+		__m256i skip = _mm256_cmpeq_epi32(alphas, zero);
+		result = _mm256_or_si256(_mm256_andnot_si256(skip, result), _mm256_and_si256(skip, dst));
+		_mm256_storeu_si256((__m256i *)&rowp[px], result);
+	}
+	// SSE2 tail
+	__m128i round_rb4 = _mm_set1_epi32(0x00800080);
+	__m128i round_g4 = _mm_set1_epi32(0x00000080);
+	__m128i mask_rb4 = _mm_set1_epi32(0x00ff00ff);
+	__m128i mask_byte4 = _mm_set1_epi32(0x000000ff);
+	__m128i mask_a4 = _mm_set1_epi32((int32_t)0xff000000u);
+	__m128i val_2554 = _mm_set1_epi32(255);
+	__m128i zero4 = _mm_setzero_si128();
+	for(; col + 4 <= col1; col += 4) {
+		__m128i spx = _mm_loadu_si128((__m128i *)&src[col]);
+		__m128i alphas = _mm_srli_epi32(spx, 24);
+		__m128i any_zero = _mm_cmpeq_epi32(alphas, zero4);
+		if(_mm_movemask_epi8(any_zero) == 0xffff) {
+			continue;
+		}
+		int32_t px = x + col;
+		__m128i dst = _mm_loadu_si128((__m128i *)&rowp[px]);
+		__m128i ia = _mm_sub_epi32(val_2554, alphas);
+		__m128i ia16 = _mm_or_si128(ia, _mm_slli_epi32(ia, 16));
+		__m128i s_rb = _mm_and_si128(spx, mask_rb4);
+		__m128i s_g8 = _mm_and_si128(_mm_srli_epi32(spx, 8), mask_byte4);
+		__m128i dst_rb = _mm_and_si128(dst, mask_rb4);
+		__m128i dst_g8 = _mm_and_si128(_mm_srli_epi32(dst, 8), mask_byte4);
+		__m128i d_rb = _mm_add_epi32(_mm_mullo_epi16(dst_rb, ia16), round_rb4);
+		d_rb = _mm_and_si128(_mm_srli_epi32(_mm_add_epi32(d_rb, _mm_and_si128(_mm_srli_epi32(d_rb, 8), mask_rb4)), 8), mask_rb4);
+		__m128i d_gv = _mm_add_epi32(_mm_mullo_epi16(dst_g8, ia), round_g4);
+		d_gv = _mm_slli_epi32(_mm_and_si128(_mm_srli_epi32(_mm_add_epi32(d_gv, _mm_and_si128(_mm_srli_epi32(d_gv, 8), mask_byte4)), 8), mask_byte4), 8);
+		__m128i rb = _mm_add_epi32(s_rb, d_rb);
+		__m128i gv = _mm_add_epi32(_mm_slli_epi32(s_g8, 8), d_gv);
+		__m128i result = _mm_or_si128(_mm_and_si128(_mm_or_si128(rb, gv), _mm_set1_epi32(0x00ffffff)), mask_a4);
+		__m128i full = _mm_cmpeq_epi32(alphas, val_2554);
+		result = _mm_or_si128(_mm_and_si128(full, spx), _mm_andnot_si128(full, result));
+		__m128i skip = _mm_cmpeq_epi32(alphas, zero4);
+		result = _mm_or_si128(_mm_andnot_si128(skip, result), _mm_and_si128(skip, dst));
+		_mm_storeu_si128((__m128i *)&rowp[px], result);
+	}
+	for(; col < col1; ++col) {
+		uint32_t spx = src[col];
+		uint32_t a = spx >> 24;
+		int32_t px = x + col;
+		if(a == 255) {
+			rowp[px] = spx;
+		} else if(a > 0) {
+			uint32_t ia = 255 - a;
+			uint32_t d = rowp[px];
+			uint32_t d_rb = (d & 0x00ff00ff) * ia + 0x00800080;
+			d_rb = ((d_rb + ((d_rb >> 8) & 0x00ff00ff)) >> 8) & 0x00ff00ff;
+			uint32_t d_g = (d & 0x0000ff00) * ia + 0x00008000;
+			d_g = ((d_g + ((d_g >> 8) & 0x0000ff00)) >> 8) & 0x0000ff00;
+			uint32_t s_rb = spx & 0x00ff00ff;
+			uint32_t s_g = spx & 0x0000ff00;
+			rowp[px] = 0xff000000 | ((s_rb + d_rb) & 0x00ff00ff) | ((s_g + d_g) & 0x0000ff00);
+		}
+	}
+}
+
+// Function pointer types
+typedef void (*fn_fill_pixels)(uint32_t *, uint32_t, uint32_t);
+typedef void (*fn_blend_glyph_row)(uint32_t *, uint8_t *, int32_t, int32_t, int32_t, uint32_t, uint32_t);
+typedef void (*fn_blend_icon_row)(uint32_t *, uint32_t *, int32_t, int32_t, int32_t);
+
+// Forward declaration
+static void fill_pixels_resolve(uint32_t *dst, uint32_t count, uint32_t color);
+
+// Dispatch pointers
+static fn_fill_pixels fill_pixels = fill_pixels_resolve;
+static fn_blend_glyph_row blend_glyph_row = blend_glyph_row_sse2;
+static fn_blend_icon_row blend_icon_row = blend_icon_row_sse2;
+
+// [=]===^=[ fill_pixels_resolve ]===================================[=]
+static void fill_pixels_resolve(uint32_t *dst, uint32_t count, uint32_t color) {
+	detect_cpu();
+	if(cpu_has_avx2) {
+		fill_pixels = fill_pixels_avx2;
+		blend_glyph_row = blend_glyph_row_avx2;
+		blend_icon_row = blend_icon_row_avx2;
+	} else {
+		fill_pixels = fill_pixels_sse2;
+	}
+	fill_pixels(dst, count, color);
+}
+
+// ---------------------------------------------------------------------------
 // Drawing primitives
 // ---------------------------------------------------------------------------
 
@@ -56,17 +417,7 @@ static void draw_rect_fill(uint32_t *buf, int32_t bw, int32_t bh, int32_t x, int
 		return;
 	}
 	for(int32_t row = y0; row < y1; ++row) {
-		uint32_t *dst = &buf[row * bw + x0];
-		uint32_t i = 0;
-#if defined(__SSE2__)
-		__m128i cv = _mm_set1_epi32((int32_t)color);
-		for(; i + 4 <= (uint32_t)span; i += 4) {
-			_mm_storeu_si128((__m128i *)&dst[i], cv);
-		}
-#endif
-		for(; i < (uint32_t)span; ++i) {
-			dst[i] = color;
-		}
+		fill_pixels(&buf[row * bw + x0], (uint32_t)span, color);
 	}
 }
 
@@ -142,18 +493,7 @@ static void fill_span_clipped(uint32_t *buf, int32_t bw, int32_t py, int32_t lef
 		right = render_clip_x2;
 	}
 	if(left < right) {
-		uint32_t *dst = &buf[py * bw + left];
-		int32_t cnt = right - left;
-		uint32_t i = 0;
-#if defined(__SSE2__)
-		__m128i cv = _mm_set1_epi32((int32_t)color);
-		for(; i + 4 <= (uint32_t)cnt; i += 4) {
-			_mm_storeu_si128((__m128i *)&dst[i], cv);
-		}
-#endif
-		for(; i < (uint32_t)cnt; ++i) {
-			dst[i] = color;
-		}
+		fill_pixels(&buf[py * bw + left], (uint32_t)(right - left), color);
 	}
 }
 
@@ -266,17 +606,9 @@ static inline void draw_hline(uint32_t *buf, int32_t bw, int32_t bh, int32_t x, 
 	if(x1 > render_clip_x2) {
 		x1 = render_clip_x2;
 	}
-	uint32_t *dst = &buf[y * bw + x0];
 	int32_t cnt = x1 - x0;
-	int32_t i = 0;
-#if defined(__SSE2__)
-	__m128i cv = _mm_set1_epi32((int32_t)color);
-	for(; i + 4 <= cnt; i += 4) {
-		_mm_storeu_si128((__m128i *)&dst[i], cv);
-	}
-#endif
-	for(; i < cnt; ++i) {
-		dst[i] = color;
+	if(cnt > 0) {
+		fill_pixels(&buf[y * bw + x0], (uint32_t)cnt, color);
 	}
 }
 
@@ -518,58 +850,7 @@ static void draw_text_sw(struct mkgui_ctx *ctx, uint32_t *buf, int32_t bw, int32
 		uint32_t g_src = color & 0x0000ff00;
 		for(int32_t row = row0; row < row1; ++row) {
 			int32_t py = gy + row;
-			uint32_t *rowp = &buf[py * bw];
-			uint8_t *bmp = &g->bitmap[row * g->width];
-			int32_t col = col0;
-#if defined(__SSE2__)
-			__m128i src_rb = _mm_set1_epi32((int32_t)rb_src);
-			__m128i src_g8 = _mm_set1_epi32((int32_t)(g_src >> 8));
-			__m128i round_rb = _mm_set1_epi32(0x00800080);
-			__m128i round_g = _mm_set1_epi32(0x00000080);
-			__m128i mask_rb = _mm_set1_epi32(0x00ff00ff);
-			__m128i mask_byte = _mm_set1_epi32(0x000000ff);
-			__m128i mask_a = _mm_set1_epi32((int32_t)0xff000000u);
-			__m128i val_255 = _mm_set1_epi32(255);
-			__m128i zero = _mm_setzero_si128();
-			for(; col + 4 <= col1; col += 4) {
-				__m128i alphas = _mm_cvtsi32_si128(*(int32_t *)&bmp[col]);
-				alphas = _mm_unpacklo_epi8(alphas, zero);
-				alphas = _mm_unpacklo_epi16(alphas, zero);
-				__m128i any = _mm_cmpeq_epi32(alphas, zero);
-				if(_mm_movemask_epi8(any) == 0xffff) {
-					continue;
-				}
-				int32_t px = gx + col;
-				__m128i dst = _mm_loadu_si128((__m128i *)&rowp[px]);
-				__m128i ia = _mm_sub_epi32(val_255, alphas);
-				__m128i a16 = _mm_or_si128(alphas, _mm_slli_epi32(alphas, 16));
-				__m128i ia16 = _mm_or_si128(ia, _mm_slli_epi32(ia, 16));
-				__m128i dst_rb = _mm_and_si128(dst, mask_rb);
-				__m128i dst_g8 = _mm_and_si128(_mm_srli_epi32(dst, 8), mask_byte);
-				__m128i rb = _mm_add_epi32(_mm_add_epi32(_mm_mullo_epi16(src_rb, a16), _mm_mullo_epi16(dst_rb, ia16)), round_rb);
-				rb = _mm_and_si128(_mm_srli_epi32(_mm_add_epi32(rb, _mm_and_si128(_mm_srli_epi32(rb, 8), mask_rb)), 8), mask_rb);
-				__m128i gv = _mm_add_epi32(_mm_add_epi32(_mm_mullo_epi16(src_g8, alphas), _mm_mullo_epi16(dst_g8, ia)), round_g);
-				gv = _mm_slli_epi32(_mm_and_si128(_mm_srli_epi32(_mm_add_epi32(gv, _mm_and_si128(_mm_srli_epi32(gv, 8), mask_byte)), 8), mask_byte), 8);
-				__m128i result = _mm_or_si128(_mm_or_si128(rb, gv), mask_a);
-				__m128i skip = _mm_cmpeq_epi32(alphas, zero);
-				result = _mm_or_si128(_mm_andnot_si128(skip, result), _mm_and_si128(skip, dst));
-				_mm_storeu_si128((__m128i *)&rowp[px], result);
-			}
-#endif
-			for(; col < col1; ++col) {
-				uint32_t a = bmp[col];
-				if(a == 0) {
-					continue;
-				}
-				int32_t px = gx + col;
-				uint32_t ia = 255 - a;
-				uint32_t dst = rowp[px];
-				uint32_t rb = (rb_src * a + (dst & 0x00ff00ff) * ia + 0x00800080);
-				rb = ((rb + ((rb >> 8) & 0x00ff00ff)) >> 8) & 0x00ff00ff;
-				uint32_t gv = (g_src * a + (dst & 0x0000ff00) * ia + 0x00008000);
-				gv = ((gv + ((gv >> 8) & 0x0000ff00)) >> 8) & 0x0000ff00;
-				rowp[px] = 0xff000000 | rb | gv;
-			}
+			blend_glyph_row(&buf[py * bw], &glyph_atlas[(g->atlas_y + row) * glyph_atlas_w + g->atlas_x], col0, col1, gx, rb_src, g_src);
 		}
 
 		cx += g->advance;
@@ -703,6 +984,15 @@ static int32_t text_width(struct mkgui_ctx *ctx, char *text) {
 		}
 	}
 	return w;
+}
+
+// [=]===^=[ label_text_width ]=====================================[=]
+static int32_t label_text_width(struct mkgui_ctx *ctx, struct mkgui_widget *w) {
+	if(w->label_tw >= 0) {
+		return w->label_tw;
+	}
+	w->label_tw = text_width(ctx, w->label);
+	return w->label_tw;
 }
 
 // [=]===^=[ text_truncate ]=====================================[=]
