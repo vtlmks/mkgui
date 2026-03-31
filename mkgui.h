@@ -405,6 +405,7 @@ MKGUI_API void mkgui_destroy_child(struct mkgui_ctx *ctx);
 MKGUI_API void mkgui_set_app_class(struct mkgui_ctx *ctx, char *app_class);
 MKGUI_API void mkgui_set_window_instance(struct mkgui_ctx *ctx, char *instance);
 MKGUI_API void mkgui_set_window_icon(struct mkgui_ctx *ctx, struct mkgui_icon_size *sizes, uint32_t count);
+MKGUI_API void mkgui_set_title(struct mkgui_ctx *ctx, char *title);
 MKGUI_API void mkgui_run(struct mkgui_ctx *ctx, mkgui_event_cb cb, void *userdata);
 MKGUI_API void mkgui_quit(struct mkgui_ctx *ctx);
 MKGUI_API uint32_t mkgui_add_timer(struct mkgui_ctx *ctx, uint64_t interval_ns, mkgui_timer_cb cb, void *userdata);

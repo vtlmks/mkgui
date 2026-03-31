@@ -314,9 +314,12 @@ struct mkgui_ctx *mkgui_create(struct mkgui_widget *widgets, uint32_t count);
 void mkgui_destroy(struct mkgui_ctx *ctx);
 void mkgui_run(struct mkgui_ctx *ctx, mkgui_event_cb cb, void *userdata);
 void mkgui_quit(struct mkgui_ctx *ctx);
+void mkgui_set_title(struct mkgui_ctx *ctx, char *title);
 uint32_t mkgui_add_timer(struct mkgui_ctx *ctx, uint64_t interval_ns, mkgui_timer_cb cb, void *userdata);
 void mkgui_remove_timer(struct mkgui_ctx *ctx, uint32_t timer_id);
 ```
+
+`mkgui_set_title` changes the window title bar text at runtime. Does not trigger a widget redraw.
 
 `mkgui_create` takes a widget array and returns a context.
 

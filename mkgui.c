@@ -3882,6 +3882,19 @@ MKGUI_API void mkgui_set_app_class(struct mkgui_ctx *ctx, char *app_class) {
 	platform_set_class_hint(&ctx->plat, "main", ctx->app_class);
 }
 
+// [=]===^=[ mkgui_set_title ]======================================[=]
+MKGUI_API void mkgui_set_title(struct mkgui_ctx *ctx, char *title) {
+	MKGUI_CHECK(ctx);
+	if(!title) {
+		title = "";
+	}
+#ifdef _WIN32
+	SetWindowTextA(ctx->plat.hwnd, title);
+#else
+	XStoreName(ctx->plat.dpy, ctx->plat.win, title);
+#endif
+}
+
 // [=]===^=[ mkgui_set_window_instance ]============================[=]
 MKGUI_API void mkgui_set_window_instance(struct mkgui_ctx *ctx, char *instance) {
 	MKGUI_CHECK(ctx);
