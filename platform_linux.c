@@ -328,7 +328,7 @@ static void platform_resize_window(struct mkgui_ctx *ctx, int32_t w, int32_t h) 
 static void platform_blit(struct mkgui_ctx *ctx) {
 	struct mkgui_platform *plat = &ctx->plat;
 	XShmPutImage(plat->dpy, plat->win, plat->gc, plat->img, 0, 0, 0, 0, (uint32_t)ctx->win_w, (uint32_t)ctx->win_h, False);
-	XSync(plat->dpy, False);
+	XFlush(plat->dpy);
 }
 
 // [=]===^=[ platform_blit_region ]================================[=]
@@ -342,14 +342,14 @@ static void platform_blit_region(struct mkgui_ctx *ctx, int32_t x, int32_t y, in
 	}
 	struct mkgui_platform *plat = &ctx->plat;
 	XShmPutImage(plat->dpy, plat->win, plat->gc, plat->img, x, y, x, y, (uint32_t)w, (uint32_t)h, False);
-	XSync(plat->dpy, False);
+	XFlush(plat->dpy);
 }
 
 // [=]===^=[ platform_popup_blit ]=================================[=]
 static void platform_popup_blit(struct mkgui_ctx *ctx, struct mkgui_popup *p) {
 	struct mkgui_platform *plat = &ctx->plat;
 	XShmPutImage(plat->dpy, p->plat.xwin, plat->gc, p->plat.img, 0, 0, 0, 0, (uint32_t)p->w, (uint32_t)p->h, False);
-	XSync(plat->dpy, False);
+	XFlush(plat->dpy);
 }
 
 // [=]===^=[ platform_flush ]======================================[=]
