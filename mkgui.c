@@ -1089,6 +1089,7 @@ static uint32_t *layout_parent;
 static uint32_t *layout_first_child;
 static uint32_t *layout_next_sibling;
 static uint32_t layout_arr_cap;
+static uint32_t layout_min_full_content;
 
 static struct vm_arena layout_hash_arena;
 
@@ -1623,7 +1624,7 @@ static int32_t lc_measure_container(struct mkgui_ctx *ctx, struct layout_ctx *lc
 			child_main = lw_sw(ctx, jw->w);
 			child_cross = lw_sw(ctx, jw->h);
 		}
-		if(child_main == 0 && (jw->flags & MKGUI_FIXED) && (ct == MKGUI_VBOX || ct == MKGUI_HBOX || ct == MKGUI_FORM || ct == MKGUI_GROUP || ct == MKGUI_PANEL)) {
+		if(child_main == 0 && (ct == MKGUI_VBOX || ct == MKGUI_HBOX || ct == MKGUI_FORM || ct == MKGUI_GROUP || ct == MKGUI_PANEL)) {
 			child_main = lc_measure_container(ctx, lc, j, is_vbox ? 1 : 0);
 		}
 		if(child_main == 0) {
@@ -1807,7 +1808,7 @@ static void lc_layout_node(struct mkgui_ctx *ctx, struct layout_ctx *lc, uint32_
 		}
 
 		if(w->type == MKGUI_VBOX || is_panel_vbox) {
-			uint32_t scrollable = lc->has_scroll && (w->flags & MKGUI_SCROLL) ? 1 : 0;
+			uint32_t scrollable = lc->has_scroll && !(w->flags & MKGUI_NO_SCROLL) ? 1 : 0;
 			struct mkgui_box_scroll *bs = scrollable ? find_box_scroll(ctx, w->id) : NULL;
 			int32_t fixed_total = 0;
 			int32_t min_total = 0;
@@ -1838,7 +1839,13 @@ static void lc_layout_node(struct mkgui_ctx *ctx, struct layout_ctx *lc, uint32_
 					uint32_t ew = jw->weight > 0 ? jw->weight : 1;
 					int32_t minh = lw_sw(ctx, jw->h);
 					if(minh == 0) {
-						minh = natural_height(ctx, jw->type);
+						uint32_t ct = jw->type;
+						if(scrollable && (ct == MKGUI_VBOX || ct == MKGUI_HBOX || ct == MKGUI_FORM || ct == MKGUI_GROUP || ct == MKGUI_PANEL)) {
+							minh = lc_measure_container(ctx, lc, j, 1);
+						}
+						if(minh == 0) {
+							minh = natural_height(ctx, jw->type);
+						}
 					}
 					min_total += minh;
 					weight_total += ew;
@@ -1876,7 +1883,13 @@ static void lc_layout_node(struct mkgui_ctx *ctx, struct layout_ctx *lc, uint32_
 					uint32_t wt = jw->weight > 0 ? jw->weight : 1;
 					int32_t base_h = lw_sw(ctx, jw->h);
 					if(base_h == 0) {
-						base_h = natural_height(ctx, jw->type);
+						uint32_t ct = jw->type;
+						if(scrollable && (ct == MKGUI_VBOX || ct == MKGUI_HBOX || ct == MKGUI_FORM || ct == MKGUI_GROUP || ct == MKGUI_PANEL)) {
+							base_h = lc_measure_container(ctx, lc, j, 1);
+						}
+						if(base_h == 0) {
+							base_h = natural_height(ctx, jw->type);
+						}
 					}
 					ch = base_h + (weight_total > 0 ? (int32_t)((int64_t)remaining * (int32_t)wt / (int32_t)weight_total) : 0);
 				}
@@ -1907,7 +1920,7 @@ static void lc_layout_node(struct mkgui_ctx *ctx, struct layout_ctx *lc, uint32_
 			}
 
 		} else if(w->type == MKGUI_HBOX) {
-			uint32_t scrollable = lc->has_scroll && (w->flags & MKGUI_SCROLL) ? 1 : 0;
+			uint32_t scrollable = lc->has_scroll && !(w->flags & MKGUI_NO_SCROLL) ? 1 : 0;
 			struct mkgui_box_scroll *bs = scrollable ? find_box_scroll(ctx, w->id) : NULL;
 			int32_t fixed_total = 0;
 			int32_t min_total = 0;
@@ -1931,7 +1944,13 @@ static void lc_layout_node(struct mkgui_ctx *ctx, struct layout_ctx *lc, uint32_
 					uint32_t ew = jw->weight > 0 ? jw->weight : 1;
 					int32_t minw = lw_sw(ctx, jw->w);
 					if(minw == 0) {
-						minw = natural_width(ctx, jw->type);
+						uint32_t ct = jw->type;
+						if(scrollable && (ct == MKGUI_VBOX || ct == MKGUI_HBOX || ct == MKGUI_FORM || ct == MKGUI_GROUP || ct == MKGUI_PANEL)) {
+							minw = lc_measure_container(ctx, lc, j, 0);
+						}
+						if(minw == 0) {
+							minw = natural_width(ctx, jw->type);
+						}
 					}
 					min_total += minw;
 					weight_total += ew;
@@ -1966,12 +1985,19 @@ static void lc_layout_node(struct mkgui_ctx *ctx, struct layout_ctx *lc, uint32_
 					uint32_t wt = jw->weight > 0 ? jw->weight : 1;
 					int32_t base_w = lw_sw(ctx, jw->w);
 					if(base_w == 0) {
-						base_w = natural_width(ctx, jw->type);
+						uint32_t ct = jw->type;
+						if(scrollable && (ct == MKGUI_VBOX || ct == MKGUI_HBOX || ct == MKGUI_FORM || ct == MKGUI_GROUP || ct == MKGUI_PANEL)) {
+							base_w = lc_measure_container(ctx, lc, j, 0);
+						}
+						if(base_w == 0) {
+							base_w = natural_width(ctx, jw->type);
+						}
 					}
 					cw = base_w + (weight_total > 0 ? (int32_t)((int64_t)remaining * (int32_t)wt / (int32_t)weight_total) : 0);
 				}
 				if(!(jw->flags & MKGUI_FIXED)) {
 					int32_t min_cw = natural_width(ctx, jw->type);
+					if(min_cw < 1) { min_cw = 1; }
 					if(cw < min_cw) { cw = min_cw; }
 				}
 				int32_t cy_child = py;
@@ -2130,7 +2156,7 @@ static void layout_min_size(struct mkgui_ctx *ctx, uint32_t idx, int32_t *out_w,
 	struct mkgui_widget *w = &ctx->widgets[idx];
 	uint32_t t = w->type;
 
-	if(w->flags & MKGUI_SCROLL) {
+	if(!layout_min_full_content && (t == MKGUI_VBOX || t == MKGUI_HBOX || t == MKGUI_PANEL) && !(w->flags & MKGUI_NO_SCROLL)) {
 		*out_w = 100;
 		*out_h = ctx->row_height * 3;
 		return;
@@ -2782,7 +2808,7 @@ static void render_widget(struct mkgui_ctx *ctx, uint32_t idx) {
 			if(ctx->widgets[idx].style & MKGUI_PANEL_BORDER) {
 				render_panel(ctx, idx);
 			}
-			if(ctx->widgets[idx].flags & MKGUI_SCROLL) {
+			if(!(ctx->widgets[idx].flags & MKGUI_NO_SCROLL)) {
 				struct mkgui_box_scroll *bs = find_box_scroll(ctx, ctx->widgets[idx].id);
 				int32_t rx = ctx->rects[idx].x;
 				int32_t ry = ctx->rects[idx].y;
@@ -3034,14 +3060,14 @@ static void init_widget_aux(struct mkgui_ctx *ctx, struct mkgui_widget *w) {
 
 		case MKGUI_VBOX:
 		case MKGUI_HBOX: {
-			if(w->flags & MKGUI_SCROLL) {
-				MKGUI_AUX_GROW(ctx->box_scrolls, ctx->box_scroll_count, ctx->box_scroll_cap, struct mkgui_box_scroll);
-				if(ctx->box_scroll_count < ctx->box_scroll_cap) {
-					struct mkgui_box_scroll *bs = &ctx->box_scrolls[ctx->box_scroll_count++];
-					bs->widget_id = w->id;
-					bs->scroll_y = 0;
-					bs->content_h = 0;
-				}
+			MKGUI_AUX_GROW(ctx->box_scrolls, ctx->box_scroll_count, ctx->box_scroll_cap, struct mkgui_box_scroll);
+			if(ctx->box_scroll_count < ctx->box_scroll_cap) {
+				struct mkgui_box_scroll *bs = &ctx->box_scrolls[ctx->box_scroll_count++];
+				bs->widget_id = w->id;
+				bs->scroll_y = 0;
+				bs->content_h = 0;
+				bs->scroll_x = 0;
+				bs->content_w = 0;
 			}
 		} break;
 
@@ -4066,6 +4092,47 @@ MKGUI_API void mkgui_get_geometry(struct mkgui_ctx *ctx, uint32_t id, int32_t *x
 	if(y) { *y = ctx->rects[idx].y; }
 	if(w) { *w = ctx->rects[idx].w; }
 	if(h) { *h = ctx->rects[idx].h; }
+}
+
+// [=]===^=[ mkgui_get_min_size ]====================================[=]
+MKGUI_API void mkgui_get_min_size(struct mkgui_ctx *ctx, int32_t *out_w, int32_t *out_h) {
+	MKGUI_CHECK(ctx);
+	if(out_w) { *out_w = 0; }
+	if(out_h) { *out_h = 0; }
+	layout_build_index(ctx);
+	int32_t min_w = 0;
+	int32_t min_h = 0;
+	for(uint32_t i = 0; i < ctx->widget_count; ++i) {
+		if(ctx->widgets[i].type != MKGUI_WINDOW) {
+			continue;
+		}
+		layout_min_full_content = 1;
+		for(uint32_t c = layout_first_child[i]; c < ctx->widget_count; c = layout_next_sibling[c]) {
+			uint32_t ct = ctx->widgets[c].type;
+			if(ct == MKGUI_MENU) {
+				min_h += ctx->menu_height;
+			} else if(ct == MKGUI_TOOLBAR) {
+				min_h += ctx->font_height + 10;
+			} else if(ct == MKGUI_STATUSBAR) {
+				min_h += ctx->statusbar_height;
+			} else if(ct == MKGUI_PATHBAR && ctx->widgets[c].h == 0) {
+				min_h += ctx->pathbar_height;
+			} else {
+				int32_t cw, ch;
+				layout_min_size(ctx, c, &cw, &ch);
+				min_h += ch;
+				if(cw > min_w) {
+					min_w = cw;
+				}
+			}
+		}
+		layout_min_full_content = 0;
+		break;
+	}
+	min_w += ctx->box_pad * 2;
+	min_h += ctx->box_pad * 2;
+	if(out_w) { *out_w = min_w; }
+	if(out_h) { *out_h = min_h; }
 }
 
 // [=]===^=[ mkgui_set_flags ]======================================[=]
@@ -5474,12 +5541,15 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 						uint32_t sid = hi >= 0 ? ctx->widgets[hi].parent_id : 0;
 						if(!sid) {
 							for(int32_t k = (int32_t)ctx->widget_count - 1; k >= 0; --k) {
-								if((ctx->widgets[k].type == MKGUI_VBOX || ctx->widgets[k].type == MKGUI_HBOX) && (ctx->widgets[k].flags & MKGUI_SCROLL)) {
-									int32_t rx = ctx->rects[k].x;
-									int32_t ry = ctx->rects[k].y;
-									if(ctx->mouse_x >= rx && ctx->mouse_x < rx + ctx->rects[k].w && ctx->mouse_y >= ry && ctx->mouse_y < ry + ctx->rects[k].h) {
-										sid = ctx->widgets[k].id;
-										break;
+								if((ctx->widgets[k].type == MKGUI_VBOX || ctx->widgets[k].type == MKGUI_HBOX) && !(ctx->widgets[k].flags & MKGUI_NO_SCROLL)) {
+									struct mkgui_box_scroll *bsk = find_box_scroll(ctx, ctx->widgets[k].id);
+									if(bsk && (bsk->content_h > ctx->rects[k].h || bsk->content_w > ctx->rects[k].w)) {
+										int32_t rx = ctx->rects[k].x;
+										int32_t ry = ctx->rects[k].y;
+										if(ctx->mouse_x >= rx && ctx->mouse_x < rx + ctx->rects[k].w && ctx->mouse_y >= ry && ctx->mouse_y < ry + ctx->rects[k].h) {
+											sid = ctx->widgets[k].id;
+											break;
+										}
 									}
 								}
 							}
@@ -5489,7 +5559,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 							if(si < 0) {
 								break;
 							}
-							if((ctx->widgets[si].type == MKGUI_VBOX || ctx->widgets[si].type == MKGUI_HBOX) && (ctx->widgets[si].flags & MKGUI_SCROLL)) {
+							if((ctx->widgets[si].type == MKGUI_VBOX || ctx->widgets[si].type == MKGUI_HBOX) && !(ctx->widgets[si].flags & MKGUI_NO_SCROLL)) {
 								struct mkgui_box_scroll *bs = find_box_scroll(ctx, sid);
 								if(bs) {
 									if(ctx->widgets[si].type == MKGUI_HBOX && bs->content_w > ctx->rects[si].w) {
@@ -5505,7 +5575,10 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 										if(bs->scroll_x > max_scroll) {
 											bs->scroll_x = max_scroll;
 										}
-									} else {
+										dirty_widget(ctx, (uint32_t)si);
+										break;
+									}
+									if(bs->content_h > ctx->rects[si].h) {
 										int32_t view_h = ctx->rects[si].h;
 										int32_t max_scroll = bs->content_h - view_h;
 										if(max_scroll < 0) {
@@ -5518,10 +5591,10 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 										if(bs->scroll_y > max_scroll) {
 											bs->scroll_y = max_scroll;
 										}
+										dirty_widget(ctx, (uint32_t)si);
+										break;
 									}
-									dirty_widget(ctx, (uint32_t)si);
 								}
-								break;
 							}
 							sid = ctx->widgets[si].parent_id;
 						}
@@ -5548,7 +5621,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 							if(si < 0) {
 								break;
 							}
-							if((ctx->widgets[si].type == MKGUI_VBOX || ctx->widgets[si].type == MKGUI_HBOX) && (ctx->widgets[si].flags & MKGUI_SCROLL)) {
+							if((ctx->widgets[si].type == MKGUI_VBOX || ctx->widgets[si].type == MKGUI_HBOX) && !(ctx->widgets[si].flags & MKGUI_NO_SCROLL)) {
 								struct mkgui_box_scroll *bs = find_box_scroll(ctx, sid);
 								if(bs && bs->content_w > ctx->rects[si].w) {
 									int32_t max_scroll = bs->content_w - ctx->rects[si].w;
@@ -5563,8 +5636,8 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 										bs->scroll_x = max_scroll;
 									}
 									dirty_widget(ctx, (uint32_t)si);
+									break;
 								}
-								break;
 							}
 							sid = ctx->widgets[si].parent_id;
 						}
@@ -5574,7 +5647,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 
 				for(int32_t bi = (int32_t)ctx->widget_count - 1; bi >= 0; --bi) {
 					struct mkgui_widget *bw = &ctx->widgets[bi];
-					if((bw->type == MKGUI_VBOX || bw->type == MKGUI_HBOX) && (bw->flags & MKGUI_SCROLL)) {
+					if((bw->type == MKGUI_VBOX || bw->type == MKGUI_HBOX) && !(bw->flags & MKGUI_NO_SCROLL)) {
 						struct mkgui_box_scroll *bs = find_box_scroll(ctx, bw->id);
 						if(!bs) {
 							continue;

@@ -106,7 +106,7 @@ The `MKGUI_W` macro provides a shorthand for widget initializers using the origi
 MKGUI_W(type, id, label, icon, parent_id, w, h, flags, style, weight)
 ```
 
-The `flags` field holds universal layout and state flags: `MKGUI_FIXED`, `MKGUI_HIDDEN`, `MKGUI_DISABLED`, `MKGUI_SCROLL`, `MKGUI_NO_PAD`, `MKGUI_VERTICAL`, `MKGUI_REGION_*`, `MKGUI_ALIGN_*`. The `style` field holds per-widget-type appearance flags: `MKGUI_CHECKED`, `MKGUI_PASSWORD`, `MKGUI_READONLY`, `MKGUI_SEPARATOR`, `MKGUI_MENU_CHECK`, `MKGUI_MENU_RADIO`, `MKGUI_PANEL_BORDER`, `MKGUI_PANEL_SUNKEN`, `MKGUI_SLIDER_MIXER`, `MKGUI_METER_TEXT`, `MKGUI_IMAGE_STRETCH`, `MKGUI_TAB_CLOSABLE`, `MKGUI_MULTI_SELECT`, `MKGUI_TRUNCATE`, `MKGUI_TOOLBAR_ICONS_ONLY`, `MKGUI_TOOLBAR_TEXT_ONLY`, `MKGUI_LINK`, `MKGUI_COLLAPSIBLE`, `MKGUI_COLLAPSED`, `MKGUI_WRAP`, `MKGUI_NUMERIC`.
+The `flags` field holds universal layout and state flags: `MKGUI_FIXED`, `MKGUI_HIDDEN`, `MKGUI_DISABLED`, `MKGUI_NO_SCROLL`, `MKGUI_NO_PAD`, `MKGUI_VERTICAL`, `MKGUI_REGION_*`, `MKGUI_ALIGN_*`. The `style` field holds per-widget-type appearance flags: `MKGUI_CHECKED`, `MKGUI_PASSWORD`, `MKGUI_READONLY`, `MKGUI_SEPARATOR`, `MKGUI_MENU_CHECK`, `MKGUI_MENU_RADIO`, `MKGUI_PANEL_BORDER`, `MKGUI_PANEL_SUNKEN`, `MKGUI_SLIDER_MIXER`, `MKGUI_METER_TEXT`, `MKGUI_IMAGE_STRETCH`, `MKGUI_TAB_CLOSABLE`, `MKGUI_MULTI_SELECT`, `MKGUI_TRUNCATE`, `MKGUI_TOOLBAR_ICONS_ONLY`, `MKGUI_TOOLBAR_TEXT_ONLY`, `MKGUI_LINK`, `MKGUI_COLLAPSIBLE`, `MKGUI_COLLAPSED`, `MKGUI_WRAP`, `MKGUI_NUMERIC`.
 
 There are no `x, y` fields. All positioning is handled by the container-based layout system. The `w` and `h` fields specify size; when `h` is 0, the widget uses its natural height (derived from the font height for most widget types).
 
@@ -205,7 +205,7 @@ MKGUI_W(MKGUI_INPUT, ID_I1,   "",       "", ID_FORM, 0, 0, 0, 0, 0),
 | `MKGUI_REGION_RIGHT` | `1 << 7` | Right region |
 | `MKGUI_HIDDEN` | `1 << 8` | Widget not visible |
 | `MKGUI_DISABLED` | `1 << 9` | Widget not interactive |
-| `MKGUI_SCROLL` | `1 << 10` | Enable scrolling on VBOX (adds scrollbar when content overflows) |
+| `MKGUI_NO_SCROLL` | `1 << 10` | Disable automatic scrolling on VBOX/HBOX (content clips instead) |
 | `MKGUI_NO_PAD` | `1 << 11` | Suppress automatic container padding |
 | `MKGUI_ALIGN_START` | `1 << 12` | Align to start (left in VBOX, top in HBOX) |
 | `MKGUI_ALIGN_CENTER` | `2 << 12` | Center in cross-axis |
@@ -496,6 +496,7 @@ uint32_t mkgui_get_visible(struct mkgui_ctx *ctx, uint32_t id);
 void mkgui_set_focus(struct mkgui_ctx *ctx, uint32_t id);
 uint32_t mkgui_has_focus(struct mkgui_ctx *ctx, uint32_t id);
 void mkgui_get_geometry(struct mkgui_ctx *ctx, uint32_t id, int32_t *x, int32_t *y, int32_t *w, int32_t *h);
+void mkgui_get_min_size(struct mkgui_ctx *ctx, int32_t *out_w, int32_t *out_h);
 void mkgui_set_flags(struct mkgui_ctx *ctx, uint32_t id, uint32_t flags);
 uint32_t mkgui_get_flags(struct mkgui_ctx *ctx, uint32_t id);
 void mkgui_set_tooltip(struct mkgui_ctx *ctx, uint32_t id, char *text);
@@ -508,6 +509,7 @@ void mkgui_set_icon(struct mkgui_ctx *ctx, uint32_t widget_id, char *icon_name);
 - `set_visible` / `get_visible` -- toggle `MKGUI_HIDDEN` flag. Hiding clears focus.
 - `set_focus` -- programmatic focus. Only works on focusable, enabled widgets.
 - `get_geometry` -- returns the widget's computed layout rect (after layout). Any pointer may be NULL.
+- `get_min_size` -- returns the minimum window size needed to display all content without scrolling. Useful after dynamically adding widgets.
 - `set_flags` / `get_flags` -- raw flag access. Use for toggling multiple flags at once.
 
 ### Button
@@ -1293,7 +1295,7 @@ Use `mkgui_set_weight(ctx, id, weight)` to change weight at runtime.
 
 ### VBox
 
-Stacks children vertically with 6px gap. By default children stretch to the full container width (override with `MKGUI_ALIGN_START/CENTER/END`). Use `MKGUI_SCROLL` to enable vertical scrolling when content overflows.
+Stacks children vertically with 6px gap. By default children stretch to the full container width (override with `MKGUI_ALIGN_START/CENTER/END`). Scrolls automatically when content overflows. Set `MKGUI_NO_SCROLL` to disable scrolling and clip instead.
 
 ```c
 MKGUI_W(MKGUI_VBOX,   ID_VBOX,  "", "", ID_TAB1, 0, 0, 0, 0, 0),
@@ -1304,7 +1306,7 @@ MKGUI_W(MKGUI_BUTTON, ID_BTN2,  "Flex (fills)", "", ID_VBOX, 0, 0, 0, 0, 0),
 
 ### HBox
 
-Stacks children horizontally with 6px gap. By default children stretch to the full container height (override with `MKGUI_ALIGN_START/CENTER/END`). Use `MKGUI_SCROLL` to enable horizontal scrolling when content overflows.
+Stacks children horizontally with 6px gap. By default children stretch to the full container height (override with `MKGUI_ALIGN_START/CENTER/END`). Scrolls automatically when content overflows. Set `MKGUI_NO_SCROLL` to disable scrolling and clip instead.
 
 ```c
 MKGUI_W(MKGUI_HBOX,   ID_HBOX, "", "", ID_TAB1, 0, 0, 0, 0, 0),

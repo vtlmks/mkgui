@@ -131,7 +131,7 @@ enum {
 #define MKGUI_REGION_RIGHT         (1u << 7)
 #define MKGUI_HIDDEN               (1u << 8)
 #define MKGUI_DISABLED             (1u << 9)
-#define MKGUI_SCROLL               (1u << 10)
+#define MKGUI_NO_SCROLL            (1u << 10)
 #define MKGUI_NO_PAD               (1u << 11)
 #define MKGUI_ALIGN_START          (1u << 12)
 #define MKGUI_ALIGN_CENTER         (2u << 12)
@@ -429,6 +429,7 @@ MKGUI_API uint32_t mkgui_get_visible(struct mkgui_ctx *ctx, uint32_t id);
 MKGUI_API void mkgui_set_focus(struct mkgui_ctx *ctx, uint32_t id);
 MKGUI_API uint32_t mkgui_has_focus(struct mkgui_ctx *ctx, uint32_t id);
 MKGUI_API void mkgui_get_geometry(struct mkgui_ctx *ctx, uint32_t id, int32_t *x, int32_t *y, int32_t *w, int32_t *h);
+MKGUI_API void mkgui_get_min_size(struct mkgui_ctx *ctx, int32_t *out_w, int32_t *out_h);
 MKGUI_API void mkgui_set_flags(struct mkgui_ctx *ctx, uint32_t id, uint32_t flags);
 MKGUI_API uint32_t mkgui_get_flags(struct mkgui_ctx *ctx, uint32_t id);
 
