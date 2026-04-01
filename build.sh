@@ -91,4 +91,9 @@ fi
 	$CC $CFLAGS tests/test_layout.c -o tests/test_layout $LINUX_LIBS
 ) &
 
+# Build widget behavior tests
+(
+	$CC $CFLAGS tests/test_widgets.c -o tests/test_widgets $LINUX_LIBS
+) &
+
 wait
