@@ -55,12 +55,30 @@ static uint32_t cp_hsv_to_rgb(float h, float s, float v) {
 	int32_t mi = vi - ci;
 	int32_t r, g, b;
 	switch(sector) {
-		case 0:  { r = ci + mi; g = xi + mi; b = mi; } break;
-		case 1:  { r = xi + mi; g = ci + mi; b = mi; } break;
-		case 2:  { r = mi; g = ci + mi; b = xi + mi; } break;
-		case 3:  { r = mi; g = xi + mi; b = ci + mi; } break;
-		case 4:  { r = xi + mi; g = mi; b = ci + mi; } break;
-		default: { r = ci + mi; g = mi; b = xi + mi; } break;
+		case 0: {
+			r = ci + mi; g = xi + mi; b = mi;
+		} break;
+
+		case 1: {
+			r = xi + mi; g = ci + mi; b = mi;
+		} break;
+
+		case 2: {
+			r = mi; g = ci + mi; b = xi + mi;
+		} break;
+
+		case 3: {
+			r = mi; g = xi + mi; b = ci + mi;
+		} break;
+
+		case 4: {
+			r = xi + mi; g = mi; b = ci + mi;
+		} break;
+
+		default: {
+			r = ci + mi; g = mi; b = xi + mi;
+		} break;
+
 	}
 	return 0xff000000 | ((uint32_t)r << 16) | ((uint32_t)g << 8) | (uint32_t)b;
 }
