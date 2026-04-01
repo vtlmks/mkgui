@@ -31,24 +31,38 @@
 static struct {
 	float h, s, v;
 	uint32_t drag_target;
+	uint32_t *sv_cache;
+	int32_t sv_w, sv_h;
+	float sv_hue;
+	uint32_t *hue_cache;
+	int32_t hue_w, hue_h;
+	uint32_t *wheel_cache;
+	int32_t wheel_w, wheel_h;
+	float wheel_hue;
 } cp_state;
 
 // [=]===^=[ cp_hsv_to_rgb ]========================================[=]
 static uint32_t cp_hsv_to_rgb(float h, float s, float v) {
-	float c = v * s;
-	float x = c * (1.0f - fabsf(fmodf(h / 60.0f, 2.0f) - 1.0f));
-	float m = v - c;
-	float r, g, b;
-	if(h < 60.0f)       { r = c; g = x; b = 0; }
-	else if(h < 120.0f) { r = x; g = c; b = 0; }
-	else if(h < 180.0f) { r = 0; g = c; b = x; }
-	else if(h < 240.0f) { r = 0; g = x; b = c; }
-	else if(h < 300.0f) { r = x; g = 0; b = c; }
-	else                { r = c; g = 0; b = x; }
-	uint32_t ri = (uint32_t)((r + m) * 255.0f + 0.5f);
-	uint32_t gi = (uint32_t)((g + m) * 255.0f + 0.5f);
-	uint32_t bi = (uint32_t)((b + m) * 255.0f + 0.5f);
-	return 0xff000000 | (ri << 16) | (gi << 8) | bi;
+	int32_t hi = (int32_t)(h * (256.0f / 60.0f));
+	if(hi < 0) { hi = 0; }
+	if(hi >= 1536) { hi -= 1536; }
+	int32_t sector = hi >> 8;
+	int32_t frac = hi & 0xff;
+	int32_t vi = (int32_t)(v * 255.0f + 0.5f);
+	int32_t ci = vi * (int32_t)(s * 255.0f + 0.5f) / 255;
+	int32_t xf = (sector & 1) ? (255 - frac) : frac;
+	int32_t xi = ci * xf >> 8;
+	int32_t mi = vi - ci;
+	int32_t r, g, b;
+	switch(sector) {
+		case 0:  { r = ci + mi; g = xi + mi; b = mi; } break;
+		case 1:  { r = xi + mi; g = ci + mi; b = mi; } break;
+		case 2:  { r = mi; g = ci + mi; b = xi + mi; } break;
+		case 3:  { r = mi; g = xi + mi; b = ci + mi; } break;
+		case 4:  { r = xi + mi; g = mi; b = ci + mi; } break;
+		default: { r = ci + mi; g = mi; b = xi + mi; } break;
+	}
+	return 0xff000000 | ((uint32_t)r << 16) | ((uint32_t)g << 8) | (uint32_t)b;
 }
 
 // [=]===^=[ cp_rgb_to_hsv ]========================================[=]
@@ -91,19 +105,64 @@ static void cp_sync_controls(struct mkgui_ctx *ctx) {
 	mkgui_input_set(ctx, CP_HEX_INPUT, hex);
 }
 
-// [=]===^=[ cp_render_sv_square ]==================================[=]
-static void cp_render_sv_square(uint32_t *pixels, int32_t bw, int32_t bh, int32_t rx, int32_t ry, int32_t rw, int32_t rh) {
-	for(int32_t y = 0; y < rh; ++y) {
+// [=]===^=[ cp_cache_realloc ]=====================================[=]
+static uint32_t *cp_cache_realloc(uint32_t *buf, int32_t *old_w, int32_t *old_h, int32_t new_w, int32_t new_h) {
+	if(buf && *old_w == new_w && *old_h == new_h) {
+		return buf;
+	}
+	free(buf);
+	*old_w = new_w;
+	*old_h = new_h;
+	return (uint32_t *)malloc((size_t)new_w * (size_t)new_h * sizeof(uint32_t));
+}
+
+// [=]===^=[ cp_cache_blit ]========================================[=]
+static void cp_cache_blit(uint32_t *dst, int32_t dw, int32_t dh, int32_t rx, int32_t ry, uint32_t *src, int32_t sw, int32_t sh) {
+	for(int32_t y = 0; y < sh; ++y) {
 		int32_t py = ry + y;
-		if(py < 0 || py >= bh) { continue; }
-		float v = 1.0f - (float)y / (float)(rh - 1);
-		for(int32_t x = 0; x < rw; ++x) {
-			int32_t px = rx + x;
-			if(px < 0 || px >= bw) { continue; }
-			float s = (float)x / (float)(rw - 1);
-			pixels[py * bw + px] = cp_hsv_to_rgb(cp_state.h, s, v);
+		if(py < 0 || py >= dh) { continue; }
+		int32_t x0 = rx < 0 ? -rx : 0;
+		int32_t x1 = rx + sw > dw ? dw - rx : sw;
+		if(x1 > x0) {
+			memcpy(dst + py * dw + rx + x0, src + y * sw + x0, (size_t)(x1 - x0) * sizeof(uint32_t));
 		}
 	}
+}
+
+// [=]===^=[ cp_render_sv_base ]====================================[=]
+static void cp_render_sv_base(uint32_t *buf, int32_t rw, int32_t rh) {
+	int32_t hi = (int32_t)(cp_state.h * (256.0f / 60.0f));
+	if(hi < 0) { hi = 0; }
+	if(hi >= 1536) { hi -= 1536; }
+	int32_t sector = hi >> 8;
+	int32_t frac = hi & 0xff;
+	int32_t x_scale = (sector & 1) ? (255 - frac) : frac;
+	uint32_t shift_a, shift_b, shift_z;
+	switch(sector) {
+		case 0:  { shift_a = 16; shift_b = 8;  shift_z = 0;  } break;
+		case 1:  { shift_a = 8;  shift_b = 16; shift_z = 0;  } break;
+		case 2:  { shift_a = 8;  shift_b = 0;  shift_z = 16; } break;
+		case 3:  { shift_a = 0;  shift_b = 8;  shift_z = 16; } break;
+		case 4:  { shift_a = 0;  shift_b = 16; shift_z = 8;  } break;
+		default: { shift_a = 16; shift_b = 0;  shift_z = 8;  } break;
+	}
+	uint32_t rw1 = (uint32_t)(rw - 1);
+	uint32_t rh1 = (uint32_t)(rh - 1);
+	for(int32_t y = 0; y < rh; ++y) {
+		int32_t vi = 255 - (int32_t)((uint32_t)y * 255 / rh1);
+		uint32_t *row = buf + y * rw;
+		for(int32_t x = 0; x < rw; ++x) {
+			int32_t si = (int32_t)((uint32_t)x * 255 / rw1);
+			int32_t ci = vi * si / 255;
+			int32_t xi = ci * x_scale >> 8;
+			int32_t mi = vi - ci;
+			row[x] = 0xff000000 | ((uint32_t)(ci + mi) << shift_a) | ((uint32_t)(xi + mi) << shift_b) | ((uint32_t)mi << shift_z);
+		}
+	}
+}
+
+// [=]===^=[ cp_render_sv_cursor ]==================================[=]
+static void cp_render_sv_cursor(uint32_t *pixels, int32_t bw, int32_t bh, int32_t rx, int32_t ry, int32_t rw, int32_t rh) {
 	int32_t cx = rx + (int32_t)(cp_state.s * (float)(rw - 1));
 	int32_t cy = ry + (int32_t)((1.0f - cp_state.v) * (float)(rh - 1));
 	uint32_t mc = (cp_state.v > 0.5f) ? 0xff000000 : 0xffffffff;
@@ -113,18 +172,20 @@ static void cp_render_sv_square(uint32_t *pixels, int32_t bw, int32_t bh, int32_
 	}
 }
 
-// [=]===^=[ cp_render_hue_bar ]====================================[=]
-static void cp_render_hue_bar(uint32_t *pixels, int32_t bw, int32_t bh, int32_t rx, int32_t ry, int32_t rw, int32_t rh) {
+// [=]===^=[ cp_render_hue_base ]===================================[=]
+static void cp_render_hue_base(uint32_t *buf, int32_t rw, int32_t rh) {
 	for(int32_t y = 0; y < rh; ++y) {
-		int32_t py = ry + y;
-		if(py < 0 || py >= bh) { continue; }
 		float hue = (float)y / (float)(rh - 1) * 360.0f;
 		uint32_t c = cp_hsv_to_rgb(hue, 1.0f, 1.0f);
+		uint32_t *row = buf + y * rw;
 		for(int32_t x = 0; x < rw; ++x) {
-			int32_t px = rx + x;
-			if(px >= 0 && px < bw) { pixels[py * bw + px] = c; }
+			row[x] = c;
 		}
 	}
+}
+
+// [=]===^=[ cp_render_hue_cursor ]=================================[=]
+static void cp_render_hue_cursor(uint32_t *pixels, int32_t bw, int32_t bh, int32_t rx, int32_t ry, int32_t rw, int32_t rh) {
 	int32_t hy = ry + (int32_t)(cp_state.h / 360.0f * (float)(rh - 1));
 	for(int32_t dy = -1; dy <= 1; ++dy) {
 		int32_t py = hy + dy;
@@ -138,44 +199,57 @@ static void cp_render_hue_bar(uint32_t *pixels, int32_t bw, int32_t bh, int32_t 
 	}
 }
 
-// [=]===^=[ cp_render_wheel ]======================================[=]
-static void cp_render_wheel(uint32_t *pixels, int32_t bw, int32_t bh, int32_t rx, int32_t ry, int32_t rw, int32_t rh) {
+// [=]===^=[ cp_render_wheel_base ]=================================[=]
+static void cp_render_wheel_base(uint32_t *buf, int32_t rw, int32_t rh) {
+	uint32_t hue_lut[3600];
+	for(uint32_t i = 0; i < 3600; ++i) {
+		hue_lut[i] = cp_hsv_to_rgb((float)i * 0.1f, 1.0f, 1.0f);
+	}
 	int32_t sz = rw < rh ? rw : rh;
-	float cx = (float)rx + (float)rw * 0.5f;
-	float cy = (float)ry + (float)rh * 0.5f;
-	float outer = (float)sz * 0.5f;
-	float inner = outer * 0.75f;
-	float sq_half = inner * 0.60f;
+	int32_t hcx = rw / 2;
+	int32_t hcy = rh / 2;
+	int32_t iouter = sz / 2;
+	int32_t iinner = iouter * 3 / 4;
+	int32_t isq_half = iinner * 6 / 10;
+	int32_t outer_sq = iouter * iouter;
+	int32_t inner_sq = iinner * iinner;
+	memset(buf, 0, (size_t)rw * (size_t)rh * sizeof(uint32_t));
 	for(int32_t y = 0; y < rh; ++y) {
-		int32_t py = ry + y;
-		if(py < 0 || py >= bh) { continue; }
+		int32_t dy = y - hcy;
+		uint32_t *row = buf + y * rw;
 		for(int32_t x = 0; x < rw; ++x) {
-			int32_t px = rx + x;
-			if(px < 0 || px >= bw) { continue; }
-			float dx = (float)px - cx + 0.5f;
-			float dy = (float)py - cy + 0.5f;
-			float dist = sqrtf(dx * dx + dy * dy);
-			if(dist >= inner && dist <= outer) {
-				float angle = atan2f(dy, dx) * 180.0f / 3.14159265f;
-				if(angle < 0.0f) { angle += 360.0f; }
-				pixels[py * bw + px] = cp_hsv_to_rgb(angle, 1.0f, 1.0f);
-			} else if(fabsf(dx) <= sq_half && fabsf(dy) <= sq_half) {
-				float s = (dx + sq_half) / (2.0f * sq_half);
-				float v = 1.0f - (dy + sq_half) / (2.0f * sq_half);
-				pixels[py * bw + px] = cp_hsv_to_rgb(cp_state.h, s, v);
+			int32_t dx = x - hcx;
+			int32_t d2 = dx * dx + dy * dy;
+			if(d2 >= inner_sq && d2 <= outer_sq) {
+				int32_t ang = iatan2_deg10(-dy, dx);
+				row[x] = hue_lut[ang];
+			} else if(dx >= -isq_half && dx <= isq_half && dy >= -isq_half && dy <= isq_half) {
+				float s = (float)(dx + isq_half) / (float)(2 * isq_half);
+				float v = 1.0f - (float)(dy + isq_half) / (float)(2 * isq_half);
+				row[x] = cp_hsv_to_rgb(cp_state.h, s, v);
 			}
 		}
 	}
+}
+
+// [=]===^=[ cp_render_wheel_cursor ]===============================[=]
+static void cp_render_wheel_cursor(uint32_t *pixels, int32_t bw, int32_t bh, int32_t rx, int32_t ry, int32_t rw, int32_t rh) {
+	int32_t sz = rw < rh ? rw : rh;
+	int32_t icx = rx + rw / 2;
+	int32_t icy = ry + rh / 2;
+	int32_t iouter = sz / 2;
+	int32_t iinner = iouter * 3 / 4;
+	int32_t isq_half = iinner * 6 / 10;
 	float sel_angle = cp_state.h * 3.14159265f / 180.0f;
-	float ring_mid = (inner + outer) * 0.5f;
-	int32_t hx = (int32_t)(cx + cosf(sel_angle) * ring_mid);
-	int32_t hy = (int32_t)(cy + sinf(sel_angle) * ring_mid);
+	float ring_mid = ((float)iinner + (float)iouter) * 0.5f;
+	int32_t hx = (int32_t)((float)icx + cosf(sel_angle) * ring_mid);
+	int32_t hy = (int32_t)((float)icy + sinf(sel_angle) * ring_mid);
 	for(int32_t d = -3; d <= 3; ++d) {
 		if(hy >= 0 && hy < bh && hx + d >= 0 && hx + d < bw) { pixels[hy * bw + hx + d] = 0xffffffff; }
 		if(hx >= 0 && hx < bw && hy + d >= 0 && hy + d < bh) { pixels[(hy + d) * bw + hx] = 0xffffffff; }
 	}
-	int32_t sv_cx = (int32_t)(cx + (cp_state.s * 2.0f - 1.0f) * sq_half);
-	int32_t sv_cy = (int32_t)(cy + (1.0f - cp_state.v * 2.0f) * (sq_half - 1.0f));
+	int32_t sv_cx = icx + (int32_t)((cp_state.s * 2.0f - 1.0f) * (float)isq_half);
+	int32_t sv_cy = icy + (int32_t)((1.0f - cp_state.v * 2.0f) * (float)(isq_half - 1));
 	uint32_t mc = (cp_state.v > 0.5f) ? 0xff000000 : 0xffffffff;
 	for(int32_t d = -3; d <= 3; ++d) {
 		if(sv_cy >= 0 && sv_cy < bh && sv_cx + d >= 0 && sv_cx + d < bw) { pixels[sv_cy * bw + sv_cx + d] = mc; }
@@ -225,17 +299,45 @@ static void cp_render_cb(struct mkgui_ctx *ctx, void *userdata) {
 		int32_t hi = find_widget_idx(ctx, CP_HUE_CANVAS);
 		if(si >= 0) {
 			struct mkgui_rect *r = &ctx->rects[si];
-			cp_render_sv_square(ctx->pixels, ctx->win_w, ctx->win_h, r->x, r->y, r->w, r->h);
+			uint32_t *old_sv = cp_state.sv_cache;
+			cp_state.sv_cache = cp_cache_realloc(cp_state.sv_cache, &cp_state.sv_w, &cp_state.sv_h, r->w, r->h);
+			if(cp_state.sv_cache && (old_sv != cp_state.sv_cache || cp_state.sv_hue != cp_state.h)) {
+				cp_render_sv_base(cp_state.sv_cache, r->w, r->h);
+				cp_state.sv_hue = cp_state.h;
+			}
+			if(cp_state.sv_cache) {
+				cp_cache_blit(ctx->pixels, ctx->win_w, ctx->win_h, r->x, r->y, cp_state.sv_cache, r->w, r->h);
+			}
+			cp_render_sv_cursor(ctx->pixels, ctx->win_w, ctx->win_h, r->x, r->y, r->w, r->h);
 		}
 		if(hi >= 0) {
 			struct mkgui_rect *r = &ctx->rects[hi];
-			cp_render_hue_bar(ctx->pixels, ctx->win_w, ctx->win_h, r->x, r->y, r->w, r->h);
+			uint32_t *old_hue = cp_state.hue_cache;
+			cp_state.hue_cache = cp_cache_realloc(cp_state.hue_cache, &cp_state.hue_w, &cp_state.hue_h, r->w, r->h);
+			if(cp_state.hue_cache && old_hue != cp_state.hue_cache) {
+				cp_render_hue_base(cp_state.hue_cache, r->w, r->h);
+			}
+			if(cp_state.hue_cache) {
+				cp_cache_blit(ctx->pixels, ctx->win_w, ctx->win_h, r->x, r->y, cp_state.hue_cache, r->w, r->h);
+			}
+			cp_render_hue_cursor(ctx->pixels, ctx->win_w, ctx->win_h, r->x, r->y, r->w, r->h);
 		}
 	} else if(active == CP_TAB_WHEEL) {
 		int32_t wi = find_widget_idx(ctx, CP_WH_CANVAS);
 		if(wi >= 0) {
 			struct mkgui_rect *r = &ctx->rects[wi];
-			cp_render_wheel(ctx->pixels, ctx->win_w, ctx->win_h, r->x + 1, r->y + 1, r->w - 2, r->h - 2);
+			int32_t ww = r->w - 2;
+			int32_t wh = r->h - 2;
+			uint32_t *old_wh = cp_state.wheel_cache;
+			cp_state.wheel_cache = cp_cache_realloc(cp_state.wheel_cache, &cp_state.wheel_w, &cp_state.wheel_h, ww, wh);
+			if(cp_state.wheel_cache && (old_wh != cp_state.wheel_cache || cp_state.wheel_hue != cp_state.h)) {
+				cp_render_wheel_base(cp_state.wheel_cache, ww, wh);
+				cp_state.wheel_hue = cp_state.h;
+			}
+			if(cp_state.wheel_cache) {
+				cp_cache_blit(ctx->pixels, ctx->win_w, ctx->win_h, r->x + 1, r->y + 1, cp_state.wheel_cache, ww, wh);
+			}
+			cp_render_wheel_cursor(ctx->pixels, ctx->win_w, ctx->win_h, r->x + 1, r->y + 1, ww, wh);
 		}
 	} else if(active == CP_TAB_RGB) {
 		int32_t ri = find_widget_idx(ctx, CP_RGB_CANVAS);

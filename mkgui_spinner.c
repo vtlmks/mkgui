@@ -32,38 +32,6 @@ static int32_t iatan2_deg10(int32_t y, int32_t x) {
 	return a;
 }
 
-// [=]===^=[ arc_coverage ]=========================================[=]
-static uint32_t arc_coverage(int32_t dx, int32_t dy, int32_t outer_r, int32_t inner_r, int32_t ang_start, int32_t ang_end) {
-	int32_t or8 = 8 * outer_r;
-	int32_t ir8 = 8 * inner_r;
-	int32_t or8sq = or8 * or8;
-	int32_t ir8sq = ir8 * ir8;
-	int32_t base_dx8 = 8 * dx;
-	int32_t base_dy8 = 8 * dy;
-	uint32_t count = 0;
-	for(uint32_t sy = 0; sy < 4; ++sy) {
-		int32_t sdy = base_dy8 + 2 * (int32_t)sy + 1;
-		for(uint32_t sx = 0; sx < 4; ++sx) {
-			int32_t sdx = base_dx8 + 2 * (int32_t)sx + 1;
-			int32_t d2 = sdx * sdx + sdy * sdy;
-			if(d2 > or8sq || d2 < ir8sq) {
-				continue;
-			}
-			int32_t ang = iatan2_deg10(-sdy, sdx);
-			if(ang_start <= ang_end) {
-				if(ang >= ang_start && ang < ang_end) {
-					++count;
-				}
-			} else {
-				if(ang >= ang_start || ang < ang_end) {
-					++count;
-				}
-			}
-		}
-	}
-	return count;
-}
-
 // [=]===^=[ render_spinner ]=======================================[=]
 static void render_spinner(struct mkgui_ctx *ctx, uint32_t idx) {
 	int32_t rx = ctx->rects[idx].x;
@@ -85,10 +53,14 @@ static void render_spinner(struct mkgui_ctx *ctx, uint32_t idx) {
 	int32_t ang_start = (int32_t)(phase * 3600.0) % 3600;
 	int32_t ang_end = (ang_start + MKGUI_SPINNER_ARC * 10) % 3600;
 
-	int32_t or_inner = outer_r - 2;
-	int32_t ir_outer = inner_r + 2;
-	int32_t or_inner_sq = or_inner * or_inner;
-	int32_t ir_outer_sq = ir_outer * ir_outer;
+	int32_t outer_sq = outer_r * outer_r;
+	int32_t inner_sq = inner_r * inner_r;
+	int32_t or_inner_sq = (outer_r - 1) * (outer_r - 1);
+	int32_t ir_outer_sq = (inner_r + 1) * (inner_r + 1);
+	int32_t outer_aa = outer_sq - or_inner_sq;
+	int32_t inner_aa = ir_outer_sq - inner_sq;
+	if(outer_aa < 1) { outer_aa = 1; }
+	if(inner_aa < 1) { inner_aa = 1; }
 
 	int32_t dy0 = -outer_r;
 	int32_t dy1 = outer_r;
@@ -121,28 +93,31 @@ static void render_spinner(struct mkgui_ctx *ctx, uint32_t idx) {
 	for(int32_t dy = dy0; dy <= dy1; ++dy) {
 		int32_t py = cy + dy;
 		for(int32_t dx = dx0; dx <= dx1; ++dx) {
-			int32_t px = cx + dx;
 			int32_t d2 = dx * dx + dy * dy;
-			if(d2 > (outer_r + 1) * (outer_r + 1) || d2 < (inner_r - 1) * (inner_r - 1)) {
+			if(d2 > outer_sq || d2 < inner_sq) {
 				continue;
 			}
-			if(d2 <= or_inner_sq && d2 >= ir_outer_sq) {
-				int32_t ang = iatan2_deg10(-dy, dx);
-				uint32_t in_arc;
-				if(ang_start <= ang_end) {
-					in_arc = (ang >= ang_start && ang < ang_end);
-				} else {
-					in_arc = (ang >= ang_start || ang < ang_end);
-				}
-				if(in_arc) {
-					ctx->pixels[py * ctx->win_w + px] = ctx->theme.accent;
-				}
+			int32_t ang = iatan2_deg10(-dy, dx);
+			uint32_t in_arc;
+			if(ang_start <= ang_end) {
+				in_arc = (uint32_t)(ang >= ang_start && ang < ang_end);
+			} else {
+				in_arc = (uint32_t)(ang >= ang_start || ang < ang_end);
+			}
+			if(!in_arc) {
 				continue;
 			}
-			uint32_t cov = arc_coverage(dx, dy, outer_r, inner_r, ang_start, ang_end);
-			if(cov > 0) {
-				uint8_t alpha = (uint8_t)(cov * 255 / 16);
-				ctx->pixels[py * ctx->win_w + px] = blend_pixel(ctx->pixels[py * ctx->win_w + px], ctx->theme.accent, alpha);
+			int32_t px = cx + dx;
+			uint32_t alpha = 255;
+			if(d2 > or_inner_sq) {
+				alpha = (uint32_t)((outer_sq - d2) * 255 / outer_aa);
+			} else if(d2 < ir_outer_sq) {
+				alpha = (uint32_t)((d2 - inner_sq) * 255 / inner_aa);
+			}
+			if(alpha >= 255) {
+				ctx->pixels[py * ctx->win_w + px] = ctx->theme.accent;
+			} else if(alpha > 0) {
+				ctx->pixels[py * ctx->win_w + px] = blend_pixel(ctx->pixels[py * ctx->win_w + px], ctx->theme.accent, (uint8_t)alpha);
 			}
 		}
 	}
