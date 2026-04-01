@@ -129,8 +129,7 @@ static int32_t svg_rasterize_icon_ex(char *name, char *svg_data, uint32_t svg_le
 
 	int32_t idx = (int32_t)icon_count;
 	struct mkgui_icon *ic = &icons[icon_count++];
-	strncpy(ic->name, name, MKGUI_ICON_NAME_LEN - 1);
-	ic->name[MKGUI_ICON_NAME_LEN - 1] = '\0';
+	snprintf(ic->name, MKGUI_ICON_NAME_LEN, "%s", name);
 	ic->pixels = argb;
 	ic->w = render_size;
 	ic->h = render_size;
@@ -239,8 +238,7 @@ MKGUI_API int32_t mkgui_icon_add(char *name, uint32_t *pixels, int32_t w, int32_
 
 	int32_t idx = (int32_t)icon_count;
 	struct mkgui_icon *ic = &icons[icon_count++];
-	strncpy(ic->name, name, MKGUI_ICON_NAME_LEN - 1);
-	ic->name[MKGUI_ICON_NAME_LEN - 1] = '\0';
+	snprintf(ic->name, MKGUI_ICON_NAME_LEN, "%s", name);
 	ic->pixels = dst;
 	ic->w = w;
 	ic->h = h;
@@ -263,8 +261,7 @@ MKGUI_API void mkgui_set_icon(struct mkgui_ctx *ctx, uint32_t widget_id, char *i
 		dirty_all(ctx);
 		return;
 	}
-	strncpy(w->icon, icon_name, MKGUI_ICON_NAME_LEN - 1);
-	w->icon[MKGUI_ICON_NAME_LEN - 1] = '\0';
+	snprintf(w->icon, MKGUI_ICON_NAME_LEN, "%s", icon_name);
 	icon_resolve(icon_name);
 	dirty_all(ctx);
 }
@@ -309,8 +306,7 @@ MKGUI_API int32_t mkgui_icon_load_svg(struct mkgui_ctx *ctx, char *name, char *p
 
 	if(idx >= 0 && svg_source_count < MKGUI_SVG_ICON_MAX) {
 		struct mkgui_svg_source *src = &svg_sources[svg_source_count++];
-		strncpy(src->name, name, MKGUI_ICON_NAME_LEN - 1);
-		src->name[MKGUI_ICON_NAME_LEN - 1] = '\0';
+		snprintf(src->name, MKGUI_ICON_NAME_LEN, "%s", name);
 		src->svg_data = svg_data;
 		src->svg_len = svg_len;
 	} else {
@@ -375,8 +371,7 @@ MKGUI_API uint32_t mkgui_icon_load_svg_dir(struct mkgui_ctx *ctx, char *dir_path
 			++loaded;
 			if(svg_source_count < MKGUI_SVG_ICON_MAX) {
 				struct mkgui_svg_source *src = &svg_sources[svg_source_count++];
-				strncpy(src->name, name, MKGUI_ICON_NAME_LEN - 1);
-				src->name[MKGUI_ICON_NAME_LEN - 1] = '\0';
+				snprintf(src->name, MKGUI_ICON_NAME_LEN, "%s", name);
 				src->svg_data = svg_data;
 				src->svg_len = svg_len;
 			} else {
@@ -441,8 +436,7 @@ MKGUI_API uint32_t mkgui_icon_load_svg_dir(struct mkgui_ctx *ctx, char *dir_path
 				++tb_loaded;
 				if(svg_source_count < MKGUI_SVG_ICON_MAX) {
 					struct mkgui_svg_source *src = &svg_sources[svg_source_count++];
-					strncpy(src->name, name, MKGUI_ICON_NAME_LEN - 1);
-					src->name[MKGUI_ICON_NAME_LEN - 1] = '\0';
+					snprintf(src->name, MKGUI_ICON_NAME_LEN, "%s", name);
 					src->svg_data = svg_data;
 					src->svg_len = svg_len;
 				} else {

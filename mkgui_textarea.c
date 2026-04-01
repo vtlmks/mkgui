@@ -114,6 +114,7 @@ static uint32_t textarea_pos_to_line(struct mkgui_textarea_data *ta, uint32_t po
 
 // [=]===^=[ textarea_hit_pos ]====================================[=]
 static uint32_t textarea_hit_pos(struct mkgui_ctx *ctx, struct mkgui_textarea_data *ta, int32_t rx, int32_t ry, int32_t rh, int32_t mx, int32_t my) {
+	(void)rh;
 	int32_t local_y = my - (ry + 1) + ta->scroll_y;
 	int32_t hit_line = local_y / ctx->row_height;
 	if(hit_line < 0) {

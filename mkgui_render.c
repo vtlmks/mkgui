@@ -143,7 +143,8 @@ static void blend_glyph_row_avx2(uint32_t *rowp, uint8_t *bmp, int32_t col0, int
 	__m128i val_2554 = _mm_set1_epi32(255);
 	__m128i zero4 = _mm_setzero_si128();
 	for(; col + 4 <= col1; col += 4) {
-		__m128i alphas4 = _mm_cvtsi32_si128(*(int32_t *)&bmp[col]);
+		int32_t bmp4; memcpy(&bmp4, &bmp[col], 4);
+		__m128i alphas4 = _mm_cvtsi32_si128(bmp4);
 		alphas4 = _mm_unpacklo_epi8(alphas4, zero4);
 		alphas4 = _mm_unpacklo_epi16(alphas4, zero4);
 		__m128i any4 = _mm_cmpeq_epi32(alphas4, zero4);

@@ -4,7 +4,7 @@ CC=gcc
 WINCC=x86_64-w64-mingw32-gcc
 
 CFLAGS="-std=c99 "
-CFLAGS+="-Os "
+CFLAGS+="-O2 "
 CFLAGS+="-fwrapv "
 CFLAGS+="-Wall "
 CFLAGS+="-Wextra "
@@ -35,6 +35,10 @@ case "$BUILD_TYPE" in
 	"debug")
 		CFLAGS+="-g -O0 "
 		;;
+	"asan")
+		CFLAGS+="-g -O0 -fsanitize=address,undefined -fno-omit-frame-pointer "
+		SKIP_WINDOWS=1
+		;;
 	"clean")
 		rm -f demo editor demo.exe editor.exe mkgui.o libmkgui.a tools/extract_icons tests/test_layout
 		exit 0
@@ -58,7 +62,7 @@ set -e
 ) &
 
 # Build Windows demo
-if command -v $WINCC &>/dev/null; then
+if [ -z "$SKIP_WINDOWS" ] && command -v $WINCC &>/dev/null; then
 	(
 		$WINCC $CFLAGS demo.c -o demo.exe $WINDOWS_DEMO_LIBS
 	) &

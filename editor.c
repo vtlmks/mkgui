@@ -636,7 +636,7 @@ static void ed_sync_recent_menu(struct mkgui_ctx *ctx) {
 			} else {
 				fname = path;
 			}
-			snprintf(w->label, MKGUI_MAX_TEXT, "%s", fname);
+			snprintf(w->label, MKGUI_MAX_TEXT, "%.255s", fname);
 			w->label_tw = -1;
 		} else {
 			w->flags |= MKGUI_HIDDEN;
@@ -2386,6 +2386,7 @@ static void ed_render_canvas(struct mkgui_ctx *ctx, uint32_t id, uint32_t *pixel
 		} else {
 			ed_draw_widget_fallback(ctx, i);
 		}
+		flush_text(ctx);
 	}
 	ctx->widgets[0] = save_w0;
 	ctx->rects[0] = save_r0;
@@ -2536,7 +2537,7 @@ static void ed_sync_menu_tree(struct mkgui_ctx *ctx) {
 
 	mkgui_treeview_setup(ctx, ED_MENU_TREE);
 
-	char buf[128];
+	char buf[MKGUI_MAX_TEXT + 64];
 	int32_t menu_idx = ed_find_widget(menu_id);
 	if(menu_idx >= 0) {
 		struct ed_widget *mw = &ed.widgets[menu_idx];
@@ -2578,7 +2579,7 @@ static uint32_t ed_is_container_type(uint32_t type) {
 // [=]===^=[ ed_sync_parent_dropdown ]=============================[=]
 static void ed_sync_parent_dropdown(struct mkgui_ctx *ctx) {
 	char *items[ED_MAX_WIDGETS];
-	static char item_bufs[ED_MAX_WIDGETS][80];
+	static char item_bufs[ED_MAX_WIDGETS][MKGUI_MAX_TEXT + 80];
 	uint32_t count = 0;
 
 	for(uint32_t i = 0; i < ed.widget_count; ++i) {
@@ -3514,6 +3515,7 @@ static void ed_generate_code(struct mkgui_ctx *ctx) {
 
 	fprintf(f, "// Copyright (c) 2026\n");
 	fprintf(f, "// SPDX-License-Identifier: MIT\n\n");
+	fprintf(f, "#pragma GCC diagnostic ignored \"-Wunused-function\"\n");
 	fprintf(f, "#include \"mkgui.c\"\n\n");
 
 	fprintf(f, "enum {\n");
@@ -3642,21 +3644,20 @@ static void ed_generate_code(struct mkgui_ctx *ctx) {
 		char style_buf[512];
 		uint32_t out_flags = w->flags & ~0xfu;
 		uint32_t out_style = w->style;
-		uint32_t has_margins = (w->margin_l || w->margin_t || w->margin_r || w->margin_b);
-		if(has_margins) {
-			fprintf(f, "\t\t{ %s, %s, \"%s\", \"%s\", %s, %d, %d, %s, %s, %u, %d, %d, %d, %d },\n",
-				ed_type_name_upper(w->type), w->id_name, w->label, w->icon,
-				parent_name, lw, lh, ed_flags_to_str(out_flags, flag_buf, sizeof(flag_buf)),
-				ed_style_to_str(out_style, w->type, style_buf, sizeof(style_buf)), w->weight,
-				w->margin_l, w->margin_r, w->margin_t, w->margin_b);
-		} else {
-			fprintf(f, "\t\t{ %s, %s, \"%s\", \"%s\", %s, %d, %d, %s, %s, %u },\n",
-				ed_type_name_upper(w->type), w->id_name, w->label, w->icon,
-				parent_name, lw, lh, ed_flags_to_str(out_flags, flag_buf, sizeof(flag_buf)),
-				ed_style_to_str(out_style, w->type, style_buf, sizeof(style_buf)), w->weight);
-		}
+		fprintf(f, "\t\tMKGUI_W(%s, %s, \"%s\", \"%s\", %s, %d, %d, %s, %s, %u),\n",
+			ed_type_name_upper(w->type), w->id_name, w->label, w->icon,
+			parent_name, lw, lh, ed_flags_to_str(out_flags, flag_buf, sizeof(flag_buf)),
+			ed_style_to_str(out_style, w->type, style_buf, sizeof(style_buf)), w->weight);
 	}
 	fprintf(f, "\t};\n\n");
+
+	for(uint32_t i = 0; i < ed.widget_count; ++i) {
+		struct ed_widget *w = &ed.widgets[i];
+		if(w->margin_l || w->margin_t || w->margin_r || w->margin_b) {
+			fprintf(f, "\twidgets[%u].margin_l = %d; widgets[%u].margin_r = %d; widgets[%u].margin_t = %d; widgets[%u].margin_b = %d;\n",
+				i, w->margin_l, i, w->margin_r, i, w->margin_t, i, w->margin_b);
+		}
+	}
 
 	{
 		fprintf(f, "\tuint32_t widget_count = sizeof(widgets) / sizeof(widgets[0]);\n");
@@ -3897,21 +3898,24 @@ static void ed_generate_snippet(struct mkgui_ctx *ctx) {
 				parent_name = ed.widgets[pidx].id_name;
 			}
 		}
+		char flag_buf[512];
+		char style_buf[512];
 		uint32_t out_flags = w->flags & ~0xfu;
 		uint32_t out_style = w->style;
-		uint32_t has_margins = (w->margin_l || w->margin_t || w->margin_r || w->margin_b);
-		if(has_margins) {
-			fprintf(f, "\t{ %s, %s, \"%s\", \"%s\", %s, %d, %d, 0x%x, 0x%x, %u, %d, %d, %d, %d },\n",
-				ed_type_name_upper(w->type), w->id_name, w->label, w->icon,
-				parent_name, lw, lh, out_flags, out_style, w->weight,
-				w->margin_l, w->margin_r, w->margin_t, w->margin_b);
-		} else {
-			fprintf(f, "\t{ %s, %s, \"%s\", \"%s\", %s, %d, %d, 0x%x, 0x%x, %u },\n",
-				ed_type_name_upper(w->type), w->id_name, w->label, w->icon,
-				parent_name, lw, lh, out_flags, out_style, w->weight);
-		}
+		fprintf(f, "\tMKGUI_W(%s, %s, \"%s\", \"%s\", %s, %d, %d, %s, %s, %u),\n",
+			ed_type_name_upper(w->type), w->id_name, w->label, w->icon,
+			parent_name, lw, lh, ed_flags_to_str(out_flags, flag_buf, sizeof(flag_buf)),
+			ed_style_to_str(out_style, w->type, style_buf, sizeof(style_buf)), w->weight);
 	}
 	fprintf(f, "};\n");
+
+	for(uint32_t i = 0; i < ed.widget_count; ++i) {
+		struct ed_widget *w = &ed.widgets[i];
+		if(w->margin_l || w->margin_t || w->margin_r || w->margin_b) {
+			fprintf(f, "widgets[%u].margin_l = %d; widgets[%u].margin_r = %d; widgets[%u].margin_t = %d; widgets[%u].margin_b = %d;\n",
+				i, w->margin_l, i, w->margin_r, i, w->margin_t, i, w->margin_b);
+		}
+	}
 
 	fclose(f);
 
