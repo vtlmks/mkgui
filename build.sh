@@ -5,6 +5,7 @@ WINCC=x86_64-w64-mingw32-gcc
 
 CFLAGS="-std=c99 "
 CFLAGS+="-O2 "
+CFLAGS+="-march=x86-64-v2 "
 CFLAGS+="-fwrapv "
 CFLAGS+="-Wall "
 CFLAGS+="-Wextra "
