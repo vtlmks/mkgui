@@ -317,9 +317,10 @@ static void cp_render_cb(struct mkgui_ctx *ctx, void *userdata) {
 		int32_t hi = find_widget_idx(ctx, CP_HUE_CANVAS);
 		if(si >= 0) {
 			struct mkgui_rect *r = &ctx->rects[si];
-			uint32_t *old_sv = cp_state.sv_cache;
+			int32_t prev_sw = cp_state.sv_w;
+			int32_t prev_sh = cp_state.sv_h;
 			cp_state.sv_cache = cp_cache_realloc(cp_state.sv_cache, &cp_state.sv_w, &cp_state.sv_h, r->w, r->h);
-			if(cp_state.sv_cache && (old_sv != cp_state.sv_cache || cp_state.sv_hue != cp_state.h)) {
+			if(cp_state.sv_cache && (prev_sw != r->w || prev_sh != r->h || cp_state.sv_hue != cp_state.h)) {
 				cp_render_sv_base(cp_state.sv_cache, r->w, r->h);
 				cp_state.sv_hue = cp_state.h;
 			}
@@ -330,9 +331,10 @@ static void cp_render_cb(struct mkgui_ctx *ctx, void *userdata) {
 		}
 		if(hi >= 0) {
 			struct mkgui_rect *r = &ctx->rects[hi];
-			uint32_t *old_hue = cp_state.hue_cache;
+			int32_t prev_hw = cp_state.hue_w;
+			int32_t prev_hh = cp_state.hue_h;
 			cp_state.hue_cache = cp_cache_realloc(cp_state.hue_cache, &cp_state.hue_w, &cp_state.hue_h, r->w, r->h);
-			if(cp_state.hue_cache && old_hue != cp_state.hue_cache) {
+			if(cp_state.hue_cache && (prev_hw != r->w || prev_hh != r->h)) {
 				cp_render_hue_base(cp_state.hue_cache, r->w, r->h);
 			}
 			if(cp_state.hue_cache) {
@@ -346,9 +348,10 @@ static void cp_render_cb(struct mkgui_ctx *ctx, void *userdata) {
 			struct mkgui_rect *r = &ctx->rects[wi];
 			int32_t ww = r->w - 2;
 			int32_t wh = r->h - 2;
-			uint32_t *old_wh = cp_state.wheel_cache;
+			int32_t prev_ww = cp_state.wheel_w;
+			int32_t prev_wh = cp_state.wheel_h;
 			cp_state.wheel_cache = cp_cache_realloc(cp_state.wheel_cache, &cp_state.wheel_w, &cp_state.wheel_h, ww, wh);
-			if(cp_state.wheel_cache && (old_wh != cp_state.wheel_cache || cp_state.wheel_hue != cp_state.h)) {
+			if(cp_state.wheel_cache && (prev_ww != ww || prev_wh != wh || cp_state.wheel_hue != cp_state.h)) {
 				cp_render_wheel_base(cp_state.wheel_cache, ww, wh);
 				cp_state.wheel_hue = cp_state.h;
 			}
