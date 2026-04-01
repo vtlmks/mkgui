@@ -9,7 +9,7 @@ static void render_button(struct mkgui_ctx *ctx, uint32_t idx) {
 	int32_t rw = ctx->rects[idx].w;
 	int32_t rh = ctx->rects[idx].h;
 
-	uint32_t checked = (w->style & MKGUI_CHECKED);
+	uint32_t checked = (w->style & MKGUI_BUTTON_CHECKED);
 	uint32_t bg = checked ? ctx->theme.widget_press : ctx->theme.widget_bg;
 	uint32_t style = checked ? MKGUI_STYLE_SUNKEN : MKGUI_STYLE_RAISED;
 	if(ctx->press_id == w->id) {

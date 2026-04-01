@@ -5,7 +5,7 @@
 static uint32_t ctxmenu_item_count_nonsep(struct mkgui_ctx *ctx) {
 	uint32_t count = 0;
 	for(uint32_t i = 0; i < ctx->ctxmenu_count; ++i) {
-		if(!(ctx->ctxmenu_items[i].flags & MKGUI_SEPARATOR)) {
+		if(!(ctx->ctxmenu_items[i].flags & MKGUI_MENUITEM_SEPARATOR)) {
 			++count;
 		}
 	}
@@ -25,7 +25,7 @@ static void ctxmenu_metrics(struct mkgui_ctx *ctx, int32_t *out_w, int32_t *out_
 
 	for(uint32_t i = 0; i < ctx->ctxmenu_count; ++i) {
 		struct mkgui_ctxmenu_item *it = &ctx->ctxmenu_items[i];
-		if(it->flags & MKGUI_SEPARATOR) {
+		if(it->flags & MKGUI_MENUITEM_SEPARATOR) {
 			total_h += sep_h;
 		} else {
 			total_h += ctx->row_height;
@@ -50,9 +50,9 @@ static int32_t ctxmenu_hit_item(struct mkgui_ctx *ctx, int32_t local_y) {
 	int32_t idx = 0;
 	for(uint32_t i = 0; i < ctx->ctxmenu_count; ++i) {
 		struct mkgui_ctxmenu_item *it = &ctx->ctxmenu_items[i];
-		int32_t rh = (it->flags & MKGUI_SEPARATOR) ? sep_h : ctx->row_height;
+		int32_t rh = (it->flags & MKGUI_MENUITEM_SEPARATOR) ? sep_h : ctx->row_height;
 		if(local_y >= iy && local_y < iy + rh) {
-			if(it->flags & MKGUI_SEPARATOR) {
+			if(it->flags & MKGUI_MENUITEM_SEPARATOR) {
 				return -1;
 			}
 			return idx;
@@ -80,7 +80,7 @@ static int32_t ctxmenu_next_item(struct mkgui_ctx *ctx, int32_t current, int32_t
 	int32_t start = current + dir;
 	for(int32_t i = 0; i < n; ++i) {
 		int32_t idx = ((start + i * dir) % n + n) % n;
-		if(!(ctx->ctxmenu_items[idx].flags & MKGUI_SEPARATOR) && !(ctx->ctxmenu_items[idx].flags & MKGUI_DISABLED)) {
+		if(!(ctx->ctxmenu_items[idx].flags & MKGUI_MENUITEM_SEPARATOR) && !(ctx->ctxmenu_items[idx].flags & MKGUI_DISABLED)) {
 			return idx;
 		}
 	}
@@ -115,7 +115,7 @@ static void render_ctxmenu_popup(struct mkgui_ctx *ctx, struct mkgui_popup *p, i
 	for(uint32_t i = 0; i < ctx->ctxmenu_count; ++i) {
 		struct mkgui_ctxmenu_item *it = &ctx->ctxmenu_items[i];
 
-		if(it->flags & MKGUI_SEPARATOR) {
+		if(it->flags & MKGUI_MENUITEM_SEPARATOR) {
 			draw_hline(p->pixels, p->w, p->h, pad + 1, iy + sep_h / 2, p->w - pad * 2 - 2, ctx->theme.widget_border);
 			iy += sep_h;
 
@@ -132,7 +132,7 @@ static void render_ctxmenu_popup(struct mkgui_ctx *ctx, struct mkgui_popup *p, i
 			push_text_clip(p->x + tx, ty + p->y, it->label, tc, p->x + 1, p->y + 1, p->x + p->w - 1, p->y + p->h - 1);
 
 			int32_t icon_idx = -1;
-			if(it->icon[0] && !(it->flags & (MKGUI_MENU_CHECK | MKGUI_MENU_RADIO))) {
+			if(it->icon[0] && !(it->flags & (MKGUI_MENUITEM_CHECK | MKGUI_MENUITEM_RADIO))) {
 				icon_idx = icon_resolve(it->icon);
 			}
 
@@ -140,11 +140,11 @@ static void render_ctxmenu_popup(struct mkgui_ctx *ctx, struct mkgui_popup *p, i
 				int32_t iy2 = iy + (ctx->row_height - icons[icon_idx].h) / 2;
 				draw_icon_popup(p, &icons[icon_idx], pad, iy2);
 
-			} else if(it->flags & MKGUI_MENU_CHECK) {
+			} else if(it->flags & MKGUI_MENUITEM_CHECK) {
 				int32_t bx = pad + check_off;
 				int32_t by = iy + ctx->row_height / 2 - check_half;
 				draw_rect_border(p->pixels, p->w, p->h, bx, by, check_sz, check_sz, tc);
-				if(it->flags & MKGUI_CHECKED) {
+				if(it->flags & MKGUI_MENUITEM_CHECKED) {
 					draw_pixel(p->pixels, p->w, p->h, bx + 2, by + 4, tc);
 					draw_pixel(p->pixels, p->w, p->h, bx + 3, by + 5, tc);
 					draw_pixel(p->pixels, p->w, p->h, bx + 4, by + 6, tc);
@@ -158,12 +158,12 @@ static void render_ctxmenu_popup(struct mkgui_ctx *ctx, struct mkgui_popup *p, i
 					draw_pixel(p->pixels, p->w, p->h, bx + 7, by + 2, tc);
 				}
 
-			} else if(it->flags & MKGUI_MENU_RADIO) {
+			} else if(it->flags & MKGUI_MENUITEM_RADIO) {
 				int32_t cx = pad + radio_off;
 				int32_t cy = iy + ctx->row_height / 2;
 				uint32_t rbg = ((int32_t)i == hover_item && !(it->flags & MKGUI_DISABLED)) ? bg : ctx->theme.menu_bg;
 				draw_aa_circle_ring(p->pixels, p->w, p->h, cx, cy, radio_r_out, radio_r_mid, rbg, tc);
-				if(it->flags & MKGUI_CHECKED) {
+				if(it->flags & MKGUI_MENUITEM_CHECKED) {
 					draw_aa_circle_fill(p->pixels, p->w, p->h, cx, cy, radio_r_in, tc);
 				}
 			}
@@ -187,7 +187,7 @@ MKGUI_API void mkgui_context_menu_clear(struct mkgui_ctx *ctx) {
 // [=]===^=[ mkgui_context_menu_add ]===============================[=]
 MKGUI_API void mkgui_context_menu_add(struct mkgui_ctx *ctx, uint32_t id, char *label, char *icon, uint32_t flags) {
 	MKGUI_CHECK(ctx);
-	if(!label && !(flags & MKGUI_SEPARATOR)) {
+	if(!label && !(flags & MKGUI_MENUITEM_SEPARATOR)) {
 		return;
 	}
 	if(ctx->ctxmenu_count >= MKGUI_MAX_CTXMENU) {
@@ -209,7 +209,7 @@ MKGUI_API void mkgui_context_menu_add(struct mkgui_ctx *ctx, uint32_t id, char *
 // [=]===^=[ mkgui_context_menu_add_separator ]=====================[=]
 MKGUI_API void mkgui_context_menu_add_separator(struct mkgui_ctx *ctx) {
 	MKGUI_CHECK(ctx);
-	mkgui_context_menu_add(ctx, 0, NULL, NULL, MKGUI_SEPARATOR);
+	mkgui_context_menu_add(ctx, 0, NULL, NULL, MKGUI_MENUITEM_SEPARATOR);
 }
 
 // [=]===^=[ mkgui_context_menu_show ]==============================[=]

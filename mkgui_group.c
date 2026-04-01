@@ -10,7 +10,7 @@ static void render_group(struct mkgui_ctx *ctx, uint32_t idx) {
 	int32_t rh = ctx->rects[idx].h;
 
 	int32_t group_pad = sc(ctx, 6);
-	uint32_t collapsed = (w->style & MKGUI_COLLAPSED);
+	uint32_t collapsed = (w->style & MKGUI_GROUP_COLLAPSED);
 	int32_t label_y = ry + sc(ctx, 2);
 	int32_t label_x = rx + group_pad + sc(ctx, 4);
 	int32_t tw = label_text_width(ctx, w);
@@ -45,7 +45,7 @@ static void render_group(struct mkgui_ctx *ctx, uint32_t idx) {
 
 	push_text_clip(label_x, label_y, w->label, ctx->theme.text, rx, ry, rx + rw, ry + rh);
 
-	if(!(w->style & MKGUI_COLLAPSIBLE)) {
+	if(!(w->style & MKGUI_GROUP_COLLAPSIBLE)) {
 		return;
 	}
 
@@ -70,9 +70,9 @@ MKGUI_API void mkgui_group_set_collapsed(struct mkgui_ctx *ctx, uint32_t id, uin
 		return;
 	}
 	if(collapsed) {
-		w->style |= MKGUI_COLLAPSED;
+		w->style |= MKGUI_GROUP_COLLAPSED;
 	} else {
-		w->style &= ~MKGUI_COLLAPSED;
+		w->style &= ~MKGUI_GROUP_COLLAPSED;
 	}
 	dirty_all(ctx);
 }
@@ -81,5 +81,5 @@ MKGUI_API void mkgui_group_set_collapsed(struct mkgui_ctx *ctx, uint32_t id, uin
 MKGUI_API uint32_t mkgui_group_get_collapsed(struct mkgui_ctx *ctx, uint32_t id) {
 	MKGUI_CHECK_VAL(ctx, 0);
 	struct mkgui_widget *w = find_widget(ctx, id);
-	return (w && (w->style & MKGUI_COLLAPSED)) ? 1 : 0;
+	return (w && (w->style & MKGUI_GROUP_COLLAPSED)) ? 1 : 0;
 }

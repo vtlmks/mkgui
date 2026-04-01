@@ -144,7 +144,7 @@ static void render_radio(struct mkgui_ctx *ctx, uint32_t idx) {
 	uint32_t fill = pressed ? ctx->theme.widget_press : ctx->theme.widget_bg;
 	draw_aa_circle_ring(ctx->pixels, ctx->win_w, ctx->win_h, cx, cy, outer_r, inner_r, fill, border);
 
-	if(w->style & MKGUI_CHECKED) {
+	if(w->style & MKGUI_RADIO_CHECKED) {
 		uint32_t dot_color = disabled ? ctx->theme.widget_border : ctx->theme.splitter;
 		draw_aa_circle_fill(ctx->pixels, ctx->win_w, ctx->win_h, cx, cy, sc(ctx, 4), dot_color);
 	}
@@ -160,10 +160,10 @@ static uint32_t handle_radio_click(struct mkgui_ctx *ctx, struct mkgui_event *ev
 	for(uint32_t i = 0; i < ctx->widget_count; ++i) {
 		struct mkgui_widget *rw = &ctx->widgets[i];
 		if(rw->type == MKGUI_RADIO && rw->parent_id == w->parent_id) {
-			rw->style &= ~MKGUI_CHECKED;
+			rw->style &= ~MKGUI_RADIO_CHECKED;
 		}
 	}
-	w->style |= MKGUI_CHECKED;
+	w->style |= MKGUI_RADIO_CHECKED;
 	dirty_all(ctx);
 	ev->type = MKGUI_EVENT_RADIO_CHANGED;
 	ev->id = w->id;
@@ -186,7 +186,7 @@ static uint32_t handle_radio_key(struct mkgui_ctx *ctx, struct mkgui_event *ev, 
 MKGUI_API uint32_t mkgui_radio_get(struct mkgui_ctx *ctx, uint32_t id) {
 	MKGUI_CHECK_VAL(ctx, 0);
 	struct mkgui_widget *w = find_widget(ctx, id);
-	return (w && (w->style & MKGUI_CHECKED)) ? 1 : 0;
+	return (w && (w->style & MKGUI_RADIO_CHECKED)) ? 1 : 0;
 }
 
 // [=]===^=[ mkgui_radio_set ]======================================[=]
@@ -200,13 +200,13 @@ MKGUI_API void mkgui_radio_set(struct mkgui_ctx *ctx, uint32_t id, uint32_t chec
 		for(uint32_t i = 0; i < ctx->widget_count; ++i) {
 			struct mkgui_widget *s = &ctx->widgets[i];
 			if(s->type == MKGUI_RADIO && s->parent_id == w->parent_id && s->id != id) {
-				s->style &= ~MKGUI_CHECKED;
+				s->style &= ~MKGUI_RADIO_CHECKED;
 			}
 		}
-		w->style |= MKGUI_CHECKED;
+		w->style |= MKGUI_RADIO_CHECKED;
 
 	} else {
-		w->style &= ~MKGUI_CHECKED;
+		w->style &= ~MKGUI_RADIO_CHECKED;
 	}
 	dirty_all(ctx);
 }
@@ -215,7 +215,7 @@ MKGUI_API void mkgui_radio_set(struct mkgui_ctx *ctx, uint32_t id, uint32_t chec
 static uint32_t mkgui_radio_get_selected(struct mkgui_ctx *ctx, uint32_t group_parent_id) {
 	for(uint32_t i = 0; i < ctx->widget_count; ++i) {
 		struct mkgui_widget *w = &ctx->widgets[i];
-		if(w->type == MKGUI_RADIO && w->parent_id == group_parent_id && (w->style & MKGUI_CHECKED)) {
+		if(w->type == MKGUI_RADIO && w->parent_id == group_parent_id && (w->style & MKGUI_RADIO_CHECKED)) {
 			return w->id;
 		}
 	}

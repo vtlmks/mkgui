@@ -821,6 +821,7 @@ static void vm_arena_destroy(struct vm_arena *a) {
 
 #define MKGUI_GROW_WIDGETS 256
 #define MKGUI_GROW_AUX     16
+#define STYLE_BORDER_BIT   (1u << 0)
 
 #define MKGUI_AUX_GROW(arr, count, cap, type) do { \
 	if((count) >= (cap)) { \
@@ -1122,7 +1123,7 @@ static uint32_t widget_visible(struct mkgui_ctx *ctx, uint32_t idx) {
 					}
 				}
 			}
-			if(parent->type == MKGUI_GROUP && (parent->style & MKGUI_COLLAPSED)) {
+			if(parent->type == MKGUI_GROUP && (parent->style & MKGUI_GROUP_COLLAPSED)) {
 				return 0;
 			}
 			if(parent->type == MKGUI_WINDOW) {
@@ -1149,7 +1150,7 @@ static uint32_t widget_visible(struct mkgui_ctx *ctx, uint32_t idx) {
 					}
 				}
 			}
-			if(parent->type == MKGUI_GROUP && (parent->style & MKGUI_COLLAPSED)) {
+			if(parent->type == MKGUI_GROUP && (parent->style & MKGUI_GROUP_COLLAPSED)) {
 				return 0;
 			}
 			pid = parent->parent_id;
@@ -1570,7 +1571,7 @@ static int32_t lc_measure_container(struct mkgui_ctx *ctx, struct layout_ctx *lc
 	struct mkgui_widget *w = lw_get(lc, idx);
 	if(w->type == MKGUI_GROUP) {
 		int32_t gtop = ctx->font_height + 4;
-		if(w->style & MKGUI_COLLAPSED) {
+		if(w->style & MKGUI_GROUP_COLLAPSED) {
 			return (axis == 1) ? gtop : 0;
 		}
 		int32_t gpad = 6;
@@ -1654,7 +1655,7 @@ static int32_t lc_measure_container(struct mkgui_ctx *ctx, struct layout_ctx *lc
 				nested = 1;
 			}
 		}
-		if(!nested || (w->style & MKGUI_PANEL_BORDER)) {
+		if(!nested || (w->style & STYLE_BORDER_BIT)) {
 			has_pad = 1;
 		}
 	}
@@ -1775,7 +1776,7 @@ static void lc_layout_node(struct mkgui_ctx *ctx, struct layout_ctx *lc, uint32_
 		ph -= ctx->tab_height + 4;
 	}
 	if(w->type == MKGUI_GROUP) {
-		if(w->style & MKGUI_COLLAPSED) {
+		if(w->style & MKGUI_GROUP_COLLAPSED) {
 			return;
 		}
 		int32_t gtop = ctx->font_height + 4;
@@ -1798,7 +1799,7 @@ static void lc_layout_node(struct mkgui_ctx *ctx, struct layout_ctx *lc, uint32_
 					nested = 1;
 				}
 			}
-			if(!nested || (w->style & MKGUI_PANEL_BORDER)) {
+			if(!nested || (w->style & STYLE_BORDER_BIT)) {
 				px += ctx->box_pad;
 				py += ctx->box_pad;
 				pw -= ctx->box_pad * 2;
@@ -1820,10 +1821,10 @@ static void lc_layout_node(struct mkgui_ctx *ctx, struct layout_ctx *lc, uint32_
 					continue;
 				}
 				++child_count;
-				uint32_t treat_fixed = (jw->flags & MKGUI_FIXED) || (jw->type == MKGUI_GROUP && (jw->style & MKGUI_COLLAPSIBLE));
+				uint32_t treat_fixed = (jw->flags & MKGUI_FIXED) || (jw->type == MKGUI_GROUP && (jw->style & MKGUI_GROUP_COLLAPSIBLE));
 				if(treat_fixed) {
 					int32_t fh = lw_sw(ctx, jw->h);
-					if(jw->type == MKGUI_GROUP && (jw->style & MKGUI_COLLAPSED)) {
+					if(jw->type == MKGUI_GROUP && (jw->style & MKGUI_GROUP_COLLAPSED)) {
 						fh = ctx->font_height + 4;
 					}
 					uint32_t ct = jw->type;
@@ -1877,7 +1878,7 @@ static void lc_layout_node(struct mkgui_ctx *ctx, struct layout_ctx *lc, uint32_
 					continue;
 				}
 				int32_t ch;
-				if((jw->flags & MKGUI_FIXED) || (jw->type == MKGUI_GROUP && (jw->style & MKGUI_COLLAPSIBLE))) {
+				if((jw->flags & MKGUI_FIXED) || (jw->type == MKGUI_GROUP && (jw->style & MKGUI_GROUP_COLLAPSIBLE))) {
 					ch = lc->rects[j].h;
 				} else {
 					uint32_t wt = jw->weight > 0 ? jw->weight : 1;
@@ -1893,7 +1894,7 @@ static void lc_layout_node(struct mkgui_ctx *ctx, struct layout_ctx *lc, uint32_
 					}
 					ch = base_h + (weight_total > 0 ? (int32_t)((int64_t)remaining * (int32_t)wt / (int32_t)weight_total) : 0);
 				}
-				if(!((jw->flags & MKGUI_FIXED) || (jw->type == MKGUI_GROUP && (jw->style & MKGUI_COLLAPSIBLE)))) {
+				if(!((jw->flags & MKGUI_FIXED) || (jw->type == MKGUI_GROUP && (jw->style & MKGUI_GROUP_COLLAPSIBLE)))) {
 					int32_t min_ch = natural_height(ctx, jw->type);
 					if(min_ch < 1) { min_ch = 1; }
 					if(ch < min_ch) { ch = min_ch; }
@@ -2294,7 +2295,7 @@ static void layout_min_size(struct mkgui_ctx *ctx, uint32_t idx, int32_t *out_w,
 
 	if(t == MKGUI_GROUP) {
 		int32_t gtop = ctx->font_height + 4;
-		if(w->style & MKGUI_COLLAPSED) {
+		if(w->style & MKGUI_GROUP_COLLAPSED) {
 			*out_w = 40;
 			*out_h = gtop;
 			return;
@@ -2394,7 +2395,7 @@ static int32_t hit_test(struct mkgui_ctx *ctx, int32_t mx, int32_t my) {
 			}
 			continue;
 		}
-		if(w->type == MKGUI_LABEL && !(w->style & MKGUI_LINK)) {
+		if(w->type == MKGUI_LABEL && !(w->style & MKGUI_LABEL_LINK)) {
 			continue;
 		}
 		if(w->type == MKGUI_HSPLIT || w->type == MKGUI_VSPLIT) {
@@ -2805,7 +2806,7 @@ static void render_widget(struct mkgui_ctx *ctx, uint32_t idx) {
 		case MKGUI_VBOX:
 		case MKGUI_HBOX:
 		case MKGUI_FORM: {
-			if(ctx->widgets[idx].style & MKGUI_PANEL_BORDER) {
+			if(ctx->widgets[idx].style & STYLE_BORDER_BIT) {
 				render_panel(ctx, idx);
 			}
 			if(!(ctx->widgets[idx].flags & MKGUI_NO_SCROLL)) {
@@ -4408,7 +4409,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 		if(w->type == MKGUI_SPINNER || w->type == MKGUI_GLVIEW) {
 			ctx->anim_active = 1;
 		}
-		if(w->type == MKGUI_PROGRESS && (w->style & MKGUI_SHIMMER)) {
+		if(w->type == MKGUI_PROGRESS && (w->style & MKGUI_PROGRESS_SHIMMER)) {
 			struct mkgui_progress_data *pd = find_progress_data(ctx, w->id);
 			if(pd && pd->value > 0 && pd->value < pd->max_val) {
 				ctx->anim_active = 1;
@@ -4468,7 +4469,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 							mp->dirty = 1;
 						}
 						mp->hover_item = hit_idx;
-						if(hovered && !(hovered->style & MKGUI_SEPARATOR) && menu_item_has_children(ctx, hovered->id)) {
+						if(hovered && !(hovered->style & MKGUI_MENUITEM_SEPARATOR) && menu_item_has_children(ctx, hovered->id)) {
 							uint32_t already_open = 0;
 							if((uint32_t)popup_idx + 1 < ctx->popup_count) {
 								if(ctx->popups[popup_idx + 1].widget_id == hovered->id) {
@@ -4539,7 +4540,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 						if(inp) {
 							char *display = inp->text;
 							char masked_buf[MKGUI_MAX_TEXT];
-							if(ctx->widgets[dsi].style & MKGUI_PASSWORD) {
+							if(ctx->widgets[dsi].style & MKGUI_INPUT_PASSWORD) {
 								uint32_t mlen = (uint32_t)strlen(inp->text);
 								for(uint32_t mi = 0; mi < mlen && mi < MKGUI_MAX_TEXT - 1; ++mi) {
 									masked_buf[mi] = '*';
@@ -5020,17 +5021,17 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 						if(hit >= 0) {
 							struct mkgui_ctxmenu_item *it = ctxmenu_item_at(ctx, hit);
 							if(it && !(it->flags & MKGUI_DISABLED)) {
-								if(it->flags & MKGUI_MENU_CHECK) {
-									it->flags ^= MKGUI_CHECKED;
-								} else if(it->flags & MKGUI_MENU_RADIO) {
+								if(it->flags & MKGUI_MENUITEM_CHECK) {
+									it->flags ^= MKGUI_MENUITEM_CHECKED;
+								} else if(it->flags & MKGUI_MENUITEM_RADIO) {
 									for(uint32_t ri = 0; ri < ctx->ctxmenu_count; ++ri) {
-										ctx->ctxmenu_items[ri].flags &= ~MKGUI_CHECKED;
+										ctx->ctxmenu_items[ri].flags &= ~MKGUI_MENUITEM_CHECKED;
 									}
-									it->flags |= MKGUI_CHECKED;
+									it->flags |= MKGUI_MENUITEM_CHECKED;
 								}
 								ev->type = MKGUI_EVENT_CONTEXT_MENU;
 								ev->id = it->id;
-								ev->value = (it->flags & MKGUI_CHECKED) ? 1 : 0;
+								ev->value = (it->flags & MKGUI_MENUITEM_CHECKED) ? 1 : 0;
 								popup_destroy_all(ctx);
 								dirty_all(ctx);
 								return 1;
@@ -5179,26 +5180,26 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 					} else if(pw && pw->type == MKGUI_MENUITEM) {
 						int32_t hit_idx;
 						struct mkgui_widget *clicked = menu_popup_hit_item(ctx, pw->id, pev.y, &hit_idx);
-						if(clicked && !(clicked->style & MKGUI_SEPARATOR)) {
+						if(clicked && !(clicked->style & MKGUI_MENUITEM_SEPARATOR)) {
 							if(menu_item_has_children(ctx, clicked->id)) {
 								menu_open_submenu(ctx, (uint32_t)popup_idx, clicked->id);
 
 							} else {
-								if(clicked->style & MKGUI_MENU_CHECK) {
-									clicked->style ^= MKGUI_CHECKED;
+								if(clicked->style & MKGUI_MENUITEM_CHECK) {
+									clicked->style ^= MKGUI_MENUITEM_CHECKED;
 
-								} else if(clicked->style & MKGUI_MENU_RADIO) {
+								} else if(clicked->style & MKGUI_MENUITEM_RADIO) {
 									for(uint32_t ri = 0; ri < ctx->widget_count; ++ri) {
 										struct mkgui_widget *rw = &ctx->widgets[ri];
-										if(rw->type == MKGUI_MENUITEM && rw->parent_id == clicked->parent_id && (rw->style & MKGUI_MENU_RADIO)) {
-											rw->style &= ~MKGUI_CHECKED;
+										if(rw->type == MKGUI_MENUITEM && rw->parent_id == clicked->parent_id && (rw->style & MKGUI_MENUITEM_RADIO)) {
+											rw->style &= ~MKGUI_MENUITEM_CHECKED;
 										}
 									}
-									clicked->style |= MKGUI_CHECKED;
+									clicked->style |= MKGUI_MENUITEM_CHECKED;
 								}
 								ev->type = MKGUI_EVENT_MENU;
 								ev->id = clicked->id;
-								ev->value = (clicked->style & MKGUI_CHECKED) ? 1 : 0;
+								ev->value = (clicked->style & MKGUI_MENUITEM_CHECKED) ? 1 : 0;
 								popup_destroy_all(ctx);
 								dirty_all(ctx);
 								return 1;
@@ -5269,7 +5270,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 								if(row < 0 || row >= (int32_t)lv->row_count) {
 									row = -1;
 								} else {
-									if(hw->style & MKGUI_MULTI_SELECT) {
+									if(hw->style & MKGUI_LISTVIEW_MULTI_SELECT) {
 										if(lv_multi_sel_find(lv, row) < 0) {
 											lv->multi_sel_count = 0;
 											lv->multi_sel[0] = row;
@@ -5776,7 +5777,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 							} else {
 								char *display = inp->text;
 								char masked_buf[MKGUI_MAX_TEXT];
-								if(hw->style & MKGUI_PASSWORD) {
+								if(hw->style & MKGUI_INPUT_PASSWORD) {
 									uint32_t mlen = (uint32_t)strlen(inp->text);
 									for(uint32_t mi = 0; mi < mlen && mi < MKGUI_MAX_TEXT - 1; ++mi) {
 										masked_buf[mi] = '*';
@@ -5829,7 +5830,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 						}
 						if(ta) {
 							uint32_t hit = textarea_hit_pos(ctx, ta, ctx->rects[hi].x, ctx->rects[hi].y, ctx->rects[hi].h, ctx->mouse_x, ctx->mouse_y);
-							if(textarea_has_selection(ta) && !(hw->style & MKGUI_READONLY)) {
+							if(textarea_has_selection(ta) && !(hw->style & MKGUI_TEXTAREA_READONLY)) {
 								uint32_t lo, hi2;
 								textarea_sel_range(ta, &lo, &hi2);
 								if(hit >= lo && hit < hi2) {
@@ -5932,7 +5933,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 											ctx->dblclick_id = hw->id;
 											ctx->dblclick_row = row;
 											ctx->dblclick_time = now;
-											if(hw->style & MKGUI_MULTI_SELECT) {
+											if(hw->style & MKGUI_LISTVIEW_MULTI_SELECT) {
 												lv_multi_sel_toggle(lv, row);
 												lv->selected_row = row;
 											} else {
@@ -6498,26 +6499,26 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 							return 1;
 						}
 
-						if(hw->type == MKGUI_LABEL && (hw->style & MKGUI_LINK)) {
+						if(hw->type == MKGUI_LABEL && (hw->style & MKGUI_LABEL_LINK)) {
 							ev->type = MKGUI_EVENT_CLICK;
 							ev->id = hw->id;
 							return 1;
 						}
 
-						if(hw->type == MKGUI_GROUP && (hw->style & MKGUI_COLLAPSIBLE)) {
-							hw->style ^= MKGUI_COLLAPSED;
+						if(hw->type == MKGUI_GROUP && (hw->style & MKGUI_GROUP_COLLAPSIBLE)) {
+							hw->style ^= MKGUI_GROUP_COLLAPSED;
 							dirty_all(ctx);
 							ev->type = MKGUI_EVENT_CLICK;
 							ev->id = hw->id;
-							ev->value = (hw->style & MKGUI_COLLAPSED) ? 1 : 0;
+							ev->value = (hw->style & MKGUI_GROUP_COLLAPSED) ? 1 : 0;
 							return 1;
 						}
 
 						if(hw->type == MKGUI_CHECKBOX) {
-							hw->style ^= MKGUI_CHECKED;
+							hw->style ^= MKGUI_CHECKBOX_CHECKED;
 							ev->type = MKGUI_EVENT_CHECKBOX_CHANGED;
 							ev->id = hw->id;
-							ev->value = (hw->style & MKGUI_CHECKED) ? 1 : 0;
+							ev->value = (hw->style & MKGUI_CHECKBOX_CHECKED) ? 1 : 0;
 							return 1;
 						}
 
@@ -6561,17 +6562,17 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 						if(cp->hover_item >= 0) {
 							struct mkgui_ctxmenu_item *it = ctxmenu_item_at(ctx, cp->hover_item);
 							if(it && !(it->flags & MKGUI_DISABLED)) {
-								if(it->flags & MKGUI_MENU_CHECK) {
-									it->flags ^= MKGUI_CHECKED;
-								} else if(it->flags & MKGUI_MENU_RADIO) {
+								if(it->flags & MKGUI_MENUITEM_CHECK) {
+									it->flags ^= MKGUI_MENUITEM_CHECKED;
+								} else if(it->flags & MKGUI_MENUITEM_RADIO) {
 									for(uint32_t ri = 0; ri < ctx->ctxmenu_count; ++ri) {
-										ctx->ctxmenu_items[ri].flags &= ~MKGUI_CHECKED;
+										ctx->ctxmenu_items[ri].flags &= ~MKGUI_MENUITEM_CHECKED;
 									}
-									it->flags |= MKGUI_CHECKED;
+									it->flags |= MKGUI_MENUITEM_CHECKED;
 								}
 								ev->type = MKGUI_EVENT_CONTEXT_MENU;
 								ev->id = it->id;
-								ev->value = (it->flags & MKGUI_CHECKED) ? 1 : 0;
+								ev->value = (it->flags & MKGUI_MENUITEM_CHECKED) ? 1 : 0;
 								popup_destroy_all(ctx);
 								dirty_all(ctx);
 								return 1;
@@ -6650,7 +6651,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 					}
 
 					if(fw && (ks == 'c' || ks == 'C')) {
-						if(fw->type == MKGUI_INPUT && !(fw->style & MKGUI_PASSWORD)) {
+						if(fw->type == MKGUI_INPUT && !(fw->style & MKGUI_INPUT_PASSWORD)) {
 							struct mkgui_input_data *inp = find_input_data(ctx, ctx->focus_id);
 							if(inp) {
 								if(input_has_selection(inp)) {
@@ -6677,8 +6678,8 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 						break;
 					}
 
-					if(fw && (ks == 'x' || ks == 'X') && !(fw->style & MKGUI_READONLY)) {
-						if(fw->type == MKGUI_INPUT && !(fw->style & MKGUI_PASSWORD)) {
+					if(fw && (ks == 'x' || ks == 'X')) {
+						if(fw->type == MKGUI_INPUT && !(fw->style & MKGUI_INPUT_READONLY) && !(fw->style & MKGUI_INPUT_PASSWORD)) {
 							struct mkgui_input_data *inp = find_input_data(ctx, ctx->focus_id);
 							if(inp && input_has_selection(inp)) {
 								uint32_t lo, hi;
@@ -6692,7 +6693,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 								return 1;
 							}
 
-						} else if(fw->type == MKGUI_TEXTAREA) {
+						} else if(fw->type == MKGUI_TEXTAREA && !(fw->style & MKGUI_TEXTAREA_READONLY)) {
 							struct mkgui_textarea_data *ta = find_textarea_data(ctx, ctx->focus_id);
 							if(ta && textarea_has_selection(ta)) {
 								uint32_t lo, hi;
@@ -6709,8 +6710,8 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 						break;
 					}
 
-					if(fw && (ks == 'v' || ks == 'V') && !(fw->style & MKGUI_READONLY)) {
-						if(fw->type == MKGUI_INPUT) {
+					if(fw && (ks == 'v' || ks == 'V')) {
+						if(fw->type == MKGUI_INPUT && !(fw->style & MKGUI_INPUT_READONLY)) {
 							char clip_buf[MKGUI_CLIP_MAX];
 							uint32_t clip_len = platform_clipboard_get(ctx, clip_buf, sizeof(clip_buf));
 							if(clip_len > 0) {
@@ -6739,7 +6740,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 								}
 							}
 
-						} else if(fw->type == MKGUI_TEXTAREA) {
+						} else if(fw->type == MKGUI_TEXTAREA && !(fw->style & MKGUI_TEXTAREA_READONLY)) {
 							uint32_t clip_len = 0;
 							char *clip_buf = platform_clipboard_get_alloc(ctx, &clip_len);
 							if(clip_buf && clip_len > 0) {
@@ -6956,7 +6957,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 			if(w->type == MKGUI_SPINNER || w->type == MKGUI_GLVIEW) {
 				dirty_widget(ctx, i);
 			}
-			if(w->type == MKGUI_PROGRESS && (w->style & MKGUI_SHIMMER)) {
+			if(w->type == MKGUI_PROGRESS && (w->style & MKGUI_PROGRESS_SHIMMER)) {
 				struct mkgui_progress_data *pd = find_progress_data(ctx, w->id);
 				if(pd && pd->value > 0 && pd->value < pd->max_val) {
 					dirty_widget(ctx, i);
@@ -7085,7 +7086,7 @@ static void mkgui_flush(struct mkgui_ctx *ctx) {
 				p->anim_active = 1;
 				dirty_widget(p, i);
 			}
-			if(w->type == MKGUI_PROGRESS && (w->style & MKGUI_SHIMMER)) {
+			if(w->type == MKGUI_PROGRESS && (w->style & MKGUI_PROGRESS_SHIMMER)) {
 				struct mkgui_progress_data *pd = find_progress_data(p, w->id);
 				if(pd && pd->value > 0 && pd->value < pd->max_val) {
 					p->anim_active = 1;

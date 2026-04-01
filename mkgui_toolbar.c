@@ -21,7 +21,7 @@ static void render_toolbar(struct mkgui_ctx *ctx, uint32_t idx) {
 			continue;
 		}
 
-		if(btn->style & MKGUI_SEPARATOR) {
+		if(btn->style & MKGUI_BUTTON_SEPARATOR) {
 			int32_t sx = bx + ctx->toolbar_sep_w / 2;
 			int32_t sep_margin = rh / 5;
 			if(sep_margin < 4) {

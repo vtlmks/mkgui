@@ -92,7 +92,7 @@ struct mkgui_widget {
     uint32_t parent_id;   // parent widget id
     int32_t  w, h;        // size (0 = natural size derived from font height)
     uint32_t flags;       // universal layout flags (MKGUI_FIXED, MKGUI_HIDDEN, etc.)
-    uint32_t style;       // per-widget-type flags (MKGUI_TRUNCATE, MKGUI_CHECKED, etc.)
+    uint32_t style;       // per-widget-type flags (MKGUI_LABEL_TRUNCATE, MKGUI_CHECKBOX_CHECKED, etc.)
     uint32_t weight;      // layout weight (0=default flex, >0=explicit proportional)
     int32_t  margin_l, margin_r, margin_t, margin_b; // layout margins
     char     label[256];  // display text
@@ -106,7 +106,7 @@ The `MKGUI_W` macro provides a shorthand for widget initializers using the origi
 MKGUI_W(type, id, label, icon, parent_id, w, h, flags, style, weight)
 ```
 
-The `flags` field holds universal layout and state flags: `MKGUI_FIXED`, `MKGUI_HIDDEN`, `MKGUI_DISABLED`, `MKGUI_NO_SCROLL`, `MKGUI_NO_PAD`, `MKGUI_VERTICAL`, `MKGUI_REGION_*`, `MKGUI_ALIGN_*`. The `style` field holds per-widget-type appearance flags: `MKGUI_CHECKED`, `MKGUI_PASSWORD`, `MKGUI_READONLY`, `MKGUI_SEPARATOR`, `MKGUI_MENU_CHECK`, `MKGUI_MENU_RADIO`, `MKGUI_PANEL_BORDER`, `MKGUI_PANEL_SUNKEN`, `MKGUI_SLIDER_MIXER`, `MKGUI_METER_TEXT`, `MKGUI_IMAGE_STRETCH`, `MKGUI_TAB_CLOSABLE`, `MKGUI_MULTI_SELECT`, `MKGUI_TRUNCATE`, `MKGUI_TOOLBAR_ICONS_ONLY`, `MKGUI_TOOLBAR_TEXT_ONLY`, `MKGUI_LINK`, `MKGUI_COLLAPSIBLE`, `MKGUI_COLLAPSED`, `MKGUI_WRAP`, `MKGUI_NUMERIC`.
+The `flags` field holds universal layout and state flags: `MKGUI_FIXED`, `MKGUI_HIDDEN`, `MKGUI_DISABLED`, `MKGUI_NO_SCROLL`, `MKGUI_NO_PAD`, `MKGUI_VERTICAL`, `MKGUI_REGION_*`, `MKGUI_ALIGN_*`. The `style` field holds per-widget-type appearance flags, named with the widget type prefix: `MKGUI_CHECKBOX_CHECKED`, `MKGUI_INPUT_PASSWORD`, `MKGUI_INPUT_READONLY`, `MKGUI_MENUITEM_SEPARATOR`, `MKGUI_MENUITEM_CHECK`, `MKGUI_MENUITEM_RADIO`, `MKGUI_PANEL_BORDER`, `MKGUI_PANEL_SUNKEN`, `MKGUI_SLIDER_MIXER`, `MKGUI_METER_TEXT`, `MKGUI_IMAGE_STRETCH`, `MKGUI_TAB_CLOSABLE`, `MKGUI_LISTVIEW_MULTI_SELECT`, `MKGUI_LABEL_TRUNCATE`, `MKGUI_TOOLBAR_ICONS_ONLY`, `MKGUI_TOOLBAR_TEXT_ONLY`, `MKGUI_LABEL_LINK`, `MKGUI_GROUP_COLLAPSIBLE`, `MKGUI_GROUP_COLLAPSED`, `MKGUI_LABEL_WRAP`, `MKGUI_INPUT_NUMERIC`.
 
 There are no `x, y` fields. All positioning is handled by the container-based layout system. The `w` and `h` fields specify size; when `h` is 0, the widget uses its natural height (derived from the font height for most widget types).
 
@@ -115,7 +115,7 @@ There are no `x, y` fields. All positioning is handled by the container-based la
 | Type | Description |
 |------|-------------|
 | `MKGUI_WINDOW` | Root window. Must be first widget. |
-| `MKGUI_BUTTON` | Push button. Emits `MKGUI_EVENT_CLICK`. Set `MKGUI_CHECKED` for toggle button (renders sunken when checked). |
+| `MKGUI_BUTTON` | Push button. Emits `MKGUI_EVENT_CLICK`. Set `MKGUI_BUTTON_CHECKED` for toggle button (renders sunken when checked). |
 | `MKGUI_LABEL` | Static text. |
 | `MKGUI_INPUT` | Single-line text input. Emits `MKGUI_EVENT_INPUT_CHANGED`, `MKGUI_EVENT_INPUT_SUBMIT` on Enter. |
 | `MKGUI_TEXTAREA` | Multi-line text editor. Emits `MKGUI_EVENT_TEXTAREA_CHANGED`, `MKGUI_EVENT_TEXTAREA_CURSOR` on cursor movement. |
@@ -143,9 +143,9 @@ There are no `x, y` fields. All positioning is handled by the container-based la
 | `MKGUI_GROUP` | Group box container. Draws a thin rounded border with a label in the top edge. Children are inset inside the frame. |
 | `MKGUI_PANEL` | Plain container that behaves as a VBOX. No border by default. Use `MKGUI_PANEL_BORDER` for a border, `MKGUI_PANEL_SUNKEN` for a recessed look. Children are stacked vertically like VBOX. |
 | `MKGUI_SCROLLBAR` | Standalone scrollbar. Horizontal by default, `MKGUI_VERTICAL` for vertical. Emits `MKGUI_EVENT_SCROLL`. |
-| `MKGUI_IMAGE` | Displays ARGB pixel data. Centered by default, `MKGUI_IMAGE_STRETCH` to fill. `MKGUI_PANEL_BORDER` for a border. |
+| `MKGUI_IMAGE` | Displays ARGB pixel data. Centered by default, `MKGUI_IMAGE_STRETCH` to fill. `MKGUI_IMAGE_BORDER` for a border. |
 | `MKGUI_GLVIEW` | OpenGL viewport. Creates a native child window for GL rendering. The user creates their own GL context. Automatically triggers 60fps redraws when visible. |
-| `MKGUI_CANVAS` | Custom drawing area. Calls a user callback with clipping set to the widget rect. Supports `MKGUI_PANEL_BORDER`. |
+| `MKGUI_CANVAS` | Custom drawing area. Calls a user callback with clipping set to the widget rect. Supports `MKGUI_CANVAS_BORDER`. |
 | `MKGUI_VBOX` | Vertical box layout. Stacks children top-to-bottom. Uses weight-based distribution. |
 | `MKGUI_HBOX` | Horizontal box layout. Stacks children left-to-right. Uses weight-based distribution. |
 | `MKGUI_FORM` | Two-column form layout. Children are paired: odd=label, even=control. Label column auto-sizes to widest label. |
@@ -219,29 +219,75 @@ Change toolbar display mode at runtime with `mkgui_toolbar_set_mode()`. The tool
 
 ### Style flags (`style` field)
 
+Style flags use per-widget-type naming. Each flag is prefixed with the widget type it applies to. Flags at the same bit position are reused across unrelated widget types (e.g. `MKGUI_CHECKBOX_CHECKED` and `MKGUI_BUTTON_CHECKED` share bit 0).
+
+**Checked state** (bit 0):
+
+| Flag | Widget | Description |
+|------|--------|-------------|
+| `MKGUI_CHECKBOX_CHECKED` | Checkbox | Checked state |
+| `MKGUI_RADIO_CHECKED` | Radio | Selected state |
+| `MKGUI_TOGGLE_CHECKED` | Toggle | On state |
+| `MKGUI_BUTTON_CHECKED` | Button | Toggle button pressed state |
+| `MKGUI_MENUITEM_CHECKED` | Menu item | Check/radio item is active |
+
+**Input flags:**
+
+| Flag | Value | Widget | Description |
+|------|-------|--------|-------------|
+| `MKGUI_INPUT_PASSWORD` | `1 << 1` | Input | Show dots instead of text |
+| `MKGUI_INPUT_READONLY` | `1 << 2` | Input | Not editable |
+| `MKGUI_INPUT_NUMERIC` | `1 << 18` | Input | Filter to numeric characters |
+| `MKGUI_TEXTAREA_READONLY` | `1 << 2` | Textarea | Not editable |
+| `MKGUI_DATEPICKER_READONLY` | `1 << 2` | DatePicker | Not editable |
+
+**Menu item flags:**
+
 | Flag | Value | Description |
 |------|-------|-------------|
-| `MKGUI_CHECKED` | `1 << 0` | Checked state (checkbox, radio, menu check/radio, toggle button) |
-| `MKGUI_PASSWORD` | `1 << 1` | Input shows dots |
-| `MKGUI_READONLY` | `1 << 2` | Input not editable |
-| `MKGUI_SEPARATOR` | `1 << 3` | Menu item is a separator line |
-| `MKGUI_MENU_CHECK` | `1 << 4` | Menu item with checkbox indicator |
-| `MKGUI_MENU_RADIO` | `1 << 5` | Menu item with radio indicator |
-| `MKGUI_PANEL_BORDER` | `1 << 6` | Draw border on panel, image, canvas, or glview |
-| `MKGUI_PANEL_SUNKEN` | `1 << 7` | Recessed background on panel |
+| `MKGUI_MENUITEM_SEPARATOR` | `1 << 3` | Separator line |
+| `MKGUI_MENUITEM_CHECK` | `1 << 4` | Checkbox indicator |
+| `MKGUI_MENUITEM_RADIO` | `1 << 5` | Radio indicator |
+
+**Border and sunken flags:**
+
+| Flag | Value | Widget | Description |
+|------|-------|--------|-------------|
+| `MKGUI_PANEL_BORDER` | `1 << 6` | Panel | Draw border |
+| `MKGUI_PANEL_SUNKEN` | `1 << 7` | Panel | Recessed background |
+| `MKGUI_VBOX_BORDER` | `1 << 6` | VBox | Draw border |
+| `MKGUI_HBOX_BORDER` | `1 << 6` | HBox | Draw border |
+| `MKGUI_FORM_BORDER` | `1 << 6` | Form | Draw border |
+| `MKGUI_IMAGE_BORDER` | `1 << 6` | Image | Draw border |
+| `MKGUI_CANVAS_BORDER` | `1 << 6` | Canvas | Draw border |
+| `MKGUI_CANVAS_SUNKEN` | `1 << 7` | Canvas | Recessed background |
+| `MKGUI_GLVIEW_BORDER` | `1 << 6` | GL View | Draw border |
+
+**Slider and meter flags:**
+
+| Flag | Value | Description |
+|------|-------|-------------|
 | `MKGUI_SLIDER_MIXER` | `1 << 8` | Tapered volume style with meter support for slider |
 | `MKGUI_METER_TEXT` | `1 << 8` | Display centered percentage on meter |
-| `MKGUI_IMAGE_STRETCH` | `1 << 9` | Stretch image to fill widget area |
-| `MKGUI_TAB_CLOSABLE` | `1 << 10` | Show close button on tab (emits `MKGUI_EVENT_TAB_CLOSE`) |
-| `MKGUI_MULTI_SELECT` | `1 << 11` | Enable multi-selection on listview |
-| `MKGUI_TRUNCATE` | `1 << 12` | Truncate label text with "..." when it exceeds widget width |
-| `MKGUI_TOOLBAR_ICONS_ONLY` | `1 << 13` | Show only icons on toolbar |
-| `MKGUI_TOOLBAR_TEXT_ONLY` | `2 << 13` | Show only text on toolbar |
-| `MKGUI_LINK` | `1 << 15` | Make label clickable (renders as hyperlink) |
-| `MKGUI_COLLAPSED` | `1 << 16` | Group starts collapsed |
-| `MKGUI_WRAP` | `1 << 17` | Word-wrap label text |
-| `MKGUI_NUMERIC` | `1 << 18` | Filter input to numeric characters |
-| `MKGUI_COLLAPSIBLE` | `1 << 19` | Allow group to be collapsed/expanded by clicking header |
+
+**Other per-widget flags:**
+
+| Flag | Value | Widget | Description |
+|------|-------|--------|-------------|
+| `MKGUI_IMAGE_STRETCH` | `1 << 9` | Image | Stretch image to fill widget area |
+| `MKGUI_TAB_CLOSABLE` | `1 << 10` | Tab | Show close button (emits `MKGUI_EVENT_TAB_CLOSE`) |
+| `MKGUI_LISTVIEW_MULTI_SELECT` | `1 << 11` | Listview | Enable multi-selection |
+| `MKGUI_TREEVIEW_MULTI_SELECT` | `1 << 11` | Treeview | Enable multi-selection |
+| `MKGUI_GRIDVIEW_MULTI_SELECT` | `1 << 11` | Gridview | Enable multi-selection |
+| `MKGUI_LABEL_TRUNCATE` | `1 << 12` | Label | Truncate text with "..." when it exceeds widget width |
+| `MKGUI_TOOLBAR_ICONS_ONLY` | `1 << 13` | Toolbar | Show only icons |
+| `MKGUI_TOOLBAR_TEXT_ONLY` | `2 << 13` | Toolbar | Show only text |
+| `MKGUI_LABEL_LINK` | `1 << 15` | Label | Make clickable (renders as hyperlink) |
+| `MKGUI_GROUP_COLLAPSED` | `1 << 16` | Group | Start collapsed |
+| `MKGUI_LABEL_WRAP` | `1 << 17` | Label | Word-wrap text |
+| `MKGUI_GROUP_COLLAPSIBLE` | `1 << 19` | Group | Allow collapse/expand by clicking header |
+| `MKGUI_PROGRESS_SHIMMER` | `1 << 20` | Progress | Animated shimmer effect |
+| `MKGUI_BUTTON_SEPARATOR` | `1 << 3` | Button | Toolbar button separator |
 
 ## Events
 
@@ -519,7 +565,7 @@ void mkgui_button_set_text(struct mkgui_ctx *ctx, uint32_t id, char *text);
 char *mkgui_button_get_text(struct mkgui_ctx *ctx, uint32_t id);
 ```
 
-**Toggle button**: Set `MKGUI_CHECKED` on a button to render it sunken (pressed state). Toggle the flag in your click handler to create an on/off button:
+**Toggle button**: Set `MKGUI_BUTTON_CHECKED` on a button to render it sunken (pressed state). Toggle the flag in your click handler to create an on/off button:
 
 ```c
 // Icon-only buttons center the icon automatically when label is empty
@@ -529,9 +575,9 @@ MKGUI_W(MKGUI_BUTTON, ID_MUTE, "", "volume-high", ID_VBOX, 28, 28, MKGUI_FIXED |
 case MKGUI_EVENT_CLICK: {
     if(ev->id == ID_MUTE) {
         uint32_t f = mkgui_get_flags(ctx, ID_MUTE);
-        f ^= MKGUI_CHECKED;
+        f ^= MKGUI_BUTTON_CHECKED;
         mkgui_set_flags(ctx, ID_MUTE, f);
-        mkgui_set_icon(ctx, ID_MUTE, (f & MKGUI_CHECKED) ? "volume-off" : "volume-high");
+        mkgui_set_icon(ctx, ID_MUTE, (f & MKGUI_BUTTON_CHECKED) ? "volume-off" : "volume-high");
     }
 } break;
 ```
@@ -543,27 +589,27 @@ void mkgui_label_set(struct mkgui_ctx *ctx, uint32_t id, char *text);
 char *mkgui_label_get(struct mkgui_ctx *ctx, uint32_t id);
 ```
 
-Set `MKGUI_TRUNCATE` to clip text that overflows the widget width, replacing the tail with "...". Without this flag, text is hard-clipped at the widget boundary. The full text is preserved in the widget -- only the rendered output is affected.
+Set `MKGUI_LABEL_TRUNCATE` to clip text that overflows the widget width, replacing the tail with "...". Without this flag, text is hard-clipped at the widget boundary. The full text is preserved in the widget -- only the rendered output is affected.
 
 ```c
 MKGUI_W(MKGUI_LABEL, ID_NAME, "Very Long Channel Name", "", ID_PARENT, 80, 0,
-  MKGUI_FIXED, MKGUI_TRUNCATE, 0)
+  MKGUI_FIXED, MKGUI_LABEL_TRUNCATE, 0)
 ```
 
 #### Link label
 
-Set `MKGUI_LINK` to make a label clickable. The text renders in the selection color with an underline. Hover changes color. Generates `MKGUI_EVENT_CLICK` when clicked.
+Set `MKGUI_LABEL_LINK` to make a label clickable. The text renders in the selection color with an underline. Hover changes color. Generates `MKGUI_EVENT_CLICK` when clicked.
 
 ```c
-MKGUI_W(MKGUI_LABEL, ID_LINK, "Visit website", "", ID_PARENT, 0, 0, MKGUI_FIXED, MKGUI_LINK, 0)
+MKGUI_W(MKGUI_LABEL, ID_LINK, "Visit website", "", ID_PARENT, 0, 0, MKGUI_FIXED, MKGUI_LABEL_LINK, 0)
 ```
 
 #### Wrapping label
 
-Set `MKGUI_WRAP` to word-wrap text across multiple lines. The label renders from the top and wraps at word boundaries to fit the widget width. Set an explicit height or use flex fill.
+Set `MKGUI_LABEL_WRAP` to word-wrap text across multiple lines. The label renders from the top and wraps at word boundaries to fit the widget width. Set an explicit height or use flex fill.
 
 ```c
-MKGUI_W(MKGUI_LABEL, ID_DESC, "Long description text here...", "", ID_PARENT, 0, 80, MKGUI_FIXED, MKGUI_WRAP, 0)
+MKGUI_W(MKGUI_LABEL, ID_DESC, "Long description text here...", "", ID_PARENT, 0, 80, MKGUI_FIXED, MKGUI_LABEL_WRAP, 0)
 ```
 
 ### Input
@@ -583,16 +629,16 @@ void mkgui_input_set_selection(struct mkgui_ctx *ctx, uint32_t id, uint32_t star
 
 Double-click on an input widget selects all text. Single click positions the cursor. Click-drag selects a range.
 
-Supports Ctrl+C (copy) and Ctrl+V (paste). Newlines in pasted text are replaced with spaces. Copy is disabled when `MKGUI_PASSWORD` is set. Paste is disabled when `MKGUI_READONLY` is set.
+Supports Ctrl+C (copy) and Ctrl+V (paste). Newlines in pasted text are replaced with spaces. Copy is disabled when `MKGUI_INPUT_PASSWORD` is set. Paste is disabled when `MKGUI_INPUT_READONLY` is set.
 
-`input_clear` resets text, cursor, and selection. `input_set_readonly` / `input_get_readonly` toggle the `MKGUI_READONLY` flag at runtime. Cursor and selection positions are byte offsets into the text. Text is stored as UTF-8. Cursor navigation (left/right, backspace, delete) is UTF-8 aware -- multi-byte characters are treated as single units. The glyph range covers Latin-1 (codepoints 32-255), supporting Western European languages.
+`input_clear` resets text, cursor, and selection. `input_set_readonly` / `input_get_readonly` toggle the `MKGUI_INPUT_READONLY` flag at runtime. Cursor and selection positions are byte offsets into the text. Text is stored as UTF-8. Cursor navigation (left/right, backspace, delete) is UTF-8 aware -- multi-byte characters are treated as single units. The glyph range covers Latin-1 (codepoints 32-255), supporting Western European languages.
 
 #### Numeric input
 
-Set `MKGUI_NUMERIC` to filter keyboard input to digits, decimal point, sign, and scientific notation (e/E). Non-numeric characters are rejected.
+Set `MKGUI_INPUT_NUMERIC` to filter keyboard input to digits, decimal point, sign, and scientific notation (e/E). Non-numeric characters are rejected.
 
 ```c
-MKGUI_W(MKGUI_INPUT, ID_AMOUNT, "", "", ID_FORM, 0, 0, 0, MKGUI_NUMERIC, 0)
+MKGUI_W(MKGUI_INPUT, ID_AMOUNT, "", "", ID_FORM, 0, 0, 0, MKGUI_INPUT_NUMERIC, 0)
 ```
 
 ### Checkbox
@@ -966,7 +1012,7 @@ void mkgui_textarea_scroll_to_end(struct mkgui_ctx *ctx, uint32_t id);
 
 Supports Ctrl+C (copy) and Ctrl+V (paste). Uses the system clipboard (X11 CLIPBOARD selection / Win32 clipboard).
 
-`textarea_set_readonly` / `textarea_get_readonly` toggle the `MKGUI_READONLY` flag at runtime. Cursor position is returned as line/col (0-based). Selection start/end are byte offsets. `textarea_insert` inserts text at the cursor (replacing any selection). `textarea_append` appends to the end without moving the cursor. `textarea_scroll_to_end` scrolls to the bottom -- useful for log views. Text is stored as UTF-8. Cursor navigation (left/right, backspace, delete) is UTF-8 aware -- multi-byte characters are treated as single units.
+`textarea_set_readonly` / `textarea_get_readonly` toggle the `MKGUI_TEXTAREA_READONLY` flag at runtime. Cursor position is returned as line/col (0-based). Selection start/end are byte offsets. `textarea_insert` inserts text at the cursor (replacing any selection). `textarea_append` appends to the end without moving the cursor. `textarea_scroll_to_end` scrolls to the bottom -- useful for log views. Text is stored as UTF-8. Cursor navigation (left/right, backspace, delete) is UTF-8 aware -- multi-byte characters are treated as single units.
 
 ### Statusbar
 
@@ -996,10 +1042,10 @@ void mkgui_canvas_set_callback(struct mkgui_ctx *ctx, uint32_t id, mkgui_canvas_
 ```
 
 ```c
-MKGUI_W(MKGUI_CANVAS, ID_CANVAS, "", "", ID_PARENT, 0, 0, 0, MKGUI_PANEL_BORDER, 0)
+MKGUI_W(MKGUI_CANVAS, ID_CANVAS, "", "", ID_PARENT, 0, 0, 0, MKGUI_CANVAS_BORDER, 0)
 ```
 
-The callback receives the pixel buffer and the widget's rect. All `draw_*` functions respect the clip rect, which is automatically set to the widget bounds before the callback and restored after. Use `MKGUI_PANEL_BORDER` to draw a border before the callback runs.
+The callback receives the pixel buffer and the widget's rect. All `draw_*` functions respect the clip rect, which is automatically set to the widget bounds before the callback and restored after. Use `MKGUI_CANVAS_BORDER` to draw a border before the callback runs.
 
 ```c
 void my_draw(struct mkgui_ctx *ctx, uint32_t id, uint32_t *pixels,
@@ -1020,18 +1066,18 @@ MKGUI_W(MKGUI_MENU,     ID_MENU,  "",     "",             ID_WINDOW, 0, 0, 0, 0,
 MKGUI_W(MKGUI_MENUITEM, ID_FILE,  "File", "",             ID_MENU,   0, 0, 0, 0, 0),
 MKGUI_W(MKGUI_MENUITEM, ID_OPEN,  "Open", "folder-open",  ID_FILE,   0, 0, 0, 0, 0),
 MKGUI_W(MKGUI_MENUITEM, ID_SAVE,  "Save", "content-save", ID_FILE,   0, 0, 0, 0, 0),
-MKGUI_W(MKGUI_MENUITEM, ID_SEP1,  "",     "",             ID_FILE,   0, 0, 0, MKGUI_SEPARATOR, 0),
+MKGUI_W(MKGUI_MENUITEM, ID_SEP1,  "",     "",             ID_FILE,   0, 0, 0, MKGUI_MENUITEM_SEPARATOR, 0),
 MKGUI_W(MKGUI_MENUITEM, ID_EXIT,  "Exit", "",             ID_FILE,   0, 0, 0, 0, 0),
 ```
 
-`MKGUI_SEPARATOR` makes the item render as a horizontal separator line. Use a dedicated menu item with an empty label and the `MKGUI_SEPARATOR` flag to create visual grouping between menu entries.
+`MKGUI_MENUITEM_SEPARATOR` makes the item render as a horizontal separator line. Use a dedicated menu item with an empty label and the `MKGUI_MENUITEM_SEPARATOR` flag to create visual grouping between menu entries.
 
 Check/radio menu items:
 
 ```c
-MKGUI_W(MKGUI_MENUITEM, ID_SHOW_TB, "Show Toolbar", "", ID_VIEW, 0, 0, 0, MKGUI_MENU_CHECK | MKGUI_CHECKED, 0),
-MKGUI_W(MKGUI_MENUITEM, ID_SORT_NAME, "By Name",    "", ID_SORT, 0, 0, 0, MKGUI_MENU_RADIO | MKGUI_CHECKED, 0),
-MKGUI_W(MKGUI_MENUITEM, ID_SORT_SIZE, "By Size",    "", ID_SORT, 0, 0, 0, MKGUI_MENU_RADIO, 0),
+MKGUI_W(MKGUI_MENUITEM, ID_SHOW_TB, "Show Toolbar", "", ID_VIEW, 0, 0, 0, MKGUI_MENUITEM_CHECK | MKGUI_MENUITEM_CHECKED, 0),
+MKGUI_W(MKGUI_MENUITEM, ID_SORT_NAME, "By Name",    "", ID_SORT, 0, 0, 0, MKGUI_MENUITEM_RADIO | MKGUI_MENUITEM_CHECKED, 0),
+MKGUI_W(MKGUI_MENUITEM, ID_SORT_SIZE, "By Size",    "", ID_SORT, 0, 0, 0, MKGUI_MENUITEM_RADIO, 0),
 ```
 
 Check items toggle on click. Radio items auto-uncheck siblings. Only leaf items (no children) emit `MKGUI_EVENT_MENU`.
@@ -1142,11 +1188,11 @@ Children are laid out inside the group's content area (inside the border), stack
 
 ### Collapsible group
 
-Set `MKGUI_COLLAPSIBLE` to allow a group to be collapsed/expanded by clicking the header. A collapsible group is always content-sized (it does not stretch to fill available space). Add `MKGUI_COLLAPSED` to start collapsed. When collapsed, children are hidden and the group shrinks to header height. Generates `MKGUI_EVENT_CLICK` with `value=1` when collapsed, `value=0` when expanded. Groups without `MKGUI_COLLAPSIBLE` ignore header clicks and have no arrow indicator.
+Set `MKGUI_GROUP_COLLAPSIBLE` to allow a group to be collapsed/expanded by clicking the header. A collapsible group is always content-sized (it does not stretch to fill available space). Add `MKGUI_GROUP_COLLAPSED` to start collapsed. When collapsed, children are hidden and the group shrinks to header height. Generates `MKGUI_EVENT_CLICK` with `value=1` when collapsed, `value=0` when expanded. Groups without `MKGUI_GROUP_COLLAPSIBLE` ignore header clicks and have no arrow indicator.
 
 ```c
-MKGUI_W(MKGUI_GROUP, ID_GRP, "Advanced", "", ID_PARENT, 0, 0, 0, MKGUI_COLLAPSIBLE, 1)
-MKGUI_W(MKGUI_GROUP, ID_GRP, "Advanced", "", ID_PARENT, 0, 0, 0, MKGUI_COLLAPSIBLE | MKGUI_COLLAPSED, 1)
+MKGUI_W(MKGUI_GROUP, ID_GRP, "Advanced", "", ID_PARENT, 0, 0, 0, MKGUI_GROUP_COLLAPSIBLE, 1)
+MKGUI_W(MKGUI_GROUP, ID_GRP, "Advanced", "", ID_PARENT, 0, 0, 0, MKGUI_GROUP_COLLAPSIBLE | MKGUI_GROUP_COLLAPSED, 1)
 ```
 
 ```c
@@ -1198,7 +1244,7 @@ MKGUI_W(MKGUI_DIVIDER, ID_DIV, "", "", ID_VBOX, 0, 0, MKGUI_FIXED, 0, 0)
 Displays ARGB pixel data. The image is centered in the widget and scaled down to fit (never scaled up) by default.
 
 ```c
-MKGUI_W(MKGUI_IMAGE, ID_IMG, "", "", ID_TAB1, 200, 200, MKGUI_FIXED, MKGUI_PANEL_BORDER, 0),
+MKGUI_W(MKGUI_IMAGE, ID_IMG, "", "", ID_TAB1, 200, 200, MKGUI_FIXED, MKGUI_IMAGE_BORDER, 0),
 ```
 
 ```c
@@ -1206,14 +1252,14 @@ void mkgui_image_set(struct mkgui_ctx *ctx, uint32_t id, uint32_t *pixels, int32
 void mkgui_image_clear(struct mkgui_ctx *ctx, uint32_t id);
 ```
 
-Pixels are ARGB format (alpha in bits 31-24). The widget copies the pixel data internally. Use `MKGUI_IMAGE_STRETCH` to stretch the image to fill the widget area. Use `MKGUI_PANEL_BORDER` for a border frame.
+Pixels are ARGB format (alpha in bits 31-24). The widget copies the pixel data internally. Use `MKGUI_IMAGE_STRETCH` to stretch the image to fill the widget area. Use `MKGUI_IMAGE_BORDER` for a border frame.
 
 ## GL View
 
 Embeds an OpenGL viewport. mkgui creates a native child window; the user creates their own GL context and renders to it. The widget automatically triggers 60fps redraws when visible on the active tab.
 
 ```c
-MKGUI_W(MKGUI_GLVIEW, ID_GL, "", "", ID_TAB1, 0, 0, 0, MKGUI_PANEL_BORDER, 0),
+MKGUI_W(MKGUI_GLVIEW, ID_GL, "", "", ID_TAB1, 0, 0, 0, MKGUI_GLVIEW_BORDER, 0),
 ```
 
 ```c
@@ -1276,7 +1322,7 @@ Three container types provide automatic child positioning. The container control
 Layout containers (VBOX, HBOX, FORM) automatically apply 6px internal padding following these rules:
 - **Top-level containers** (parent is a window, tab, panel, etc.): 6px padding on all sides
 - **Nested containers** (parent is another VBOX/HBOX/FORM/GROUP/TABS): no padding (parent's gap provides spacing)
-- **Containers with `MKGUI_PANEL_BORDER`**: always have padding regardless of nesting (the border creates a visual boundary)
+- **Containers with a border flag** (`MKGUI_PANEL_BORDER`, `MKGUI_VBOX_BORDER`, `MKGUI_HBOX_BORDER`, `MKGUI_FORM_BORDER`): always have padding regardless of nesting (the border creates a visual boundary)
 - Use `MKGUI_NO_PAD` to explicitly suppress padding on any container
 
 ### Weight-based layout
@@ -1461,7 +1507,7 @@ void mkgui_context_menu_show_at(struct mkgui_ctx *ctx, int32_t x, int32_t y);
 ```
 
 - `mkgui_context_menu_clear()` -- Clear all items from the context menu
-- `mkgui_context_menu_add()` -- Add an item. `id` is returned in `MKGUI_EVENT_CONTEXT_MENU`. `icon` is a Freedesktop icon name (or NULL). `flags` can include `MKGUI_DISABLED`, `MKGUI_SEPARATOR`, `MKGUI_MENU_CHECK`, `MKGUI_MENU_RADIO`, `MKGUI_CHECKED`
+- `mkgui_context_menu_add()` -- Add an item. `id` is returned in `MKGUI_EVENT_CONTEXT_MENU`. `icon` is a Freedesktop icon name (or NULL). `flags` can include `MKGUI_DISABLED`, `MKGUI_MENUITEM_SEPARATOR`, `MKGUI_MENUITEM_CHECK`, `MKGUI_MENUITEM_RADIO`, `MKGUI_MENUITEM_CHECKED`
 - `mkgui_context_menu_add_separator()` -- Shorthand for adding a separator line
 - `mkgui_context_menu_show()` -- Show the menu at the last right-click position
 - `mkgui_context_menu_show_at()` -- Show the menu at a specific window position
@@ -1488,8 +1534,8 @@ case MKGUI_EVENT_CONTEXT: {
 case MKGUI_EVENT_CONTEXT_HEADER: {
     // Right-click on column header -- ev->col has the column index
     mkgui_context_menu_clear(ctx);
-    mkgui_context_menu_add(ctx, 200, "Name", NULL, MKGUI_MENU_CHECK | MKGUI_CHECKED);
-    mkgui_context_menu_add(ctx, 201, "Size", NULL, MKGUI_MENU_CHECK | MKGUI_CHECKED);
+    mkgui_context_menu_add(ctx, 200, "Name", NULL, MKGUI_MENUITEM_CHECK | MKGUI_MENUITEM_CHECKED);
+    mkgui_context_menu_add(ctx, 201, "Size", NULL, MKGUI_MENUITEM_CHECK | MKGUI_MENUITEM_CHECKED);
     mkgui_context_menu_show(ctx);
 } break;
 

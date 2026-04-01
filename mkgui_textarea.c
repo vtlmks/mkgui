@@ -398,7 +398,7 @@ static uint32_t handle_textarea_key(struct mkgui_ctx *ctx, struct mkgui_event *e
 	}
 
 	struct mkgui_widget *w = find_widget(ctx, ctx->focus_id);
-	uint32_t readonly = (w && (w->style & MKGUI_READONLY));
+	uint32_t readonly = (w && (w->style & MKGUI_TEXTAREA_READONLY));
 	uint32_t shift = (keymod & MKGUI_MOD_SHIFT);
 
 	if(ks == MKGUI_KEY_RETURN) {
@@ -635,10 +635,10 @@ MKGUI_API void mkgui_textarea_set_readonly(struct mkgui_ctx *ctx, uint32_t id, u
 		return;
 	}
 	if(readonly) {
-		w->style |= MKGUI_READONLY;
+		w->style |= MKGUI_TEXTAREA_READONLY;
 
 	} else {
-		w->style &= ~MKGUI_READONLY;
+		w->style &= ~MKGUI_TEXTAREA_READONLY;
 	}
 	dirty_widget_id(ctx, id);
 }
@@ -647,7 +647,7 @@ MKGUI_API void mkgui_textarea_set_readonly(struct mkgui_ctx *ctx, uint32_t id, u
 MKGUI_API uint32_t mkgui_textarea_get_readonly(struct mkgui_ctx *ctx, uint32_t id) {
 	MKGUI_CHECK_VAL(ctx, 0);
 	struct mkgui_widget *w = find_widget(ctx, id);
-	return (w && (w->style & MKGUI_READONLY)) ? 1 : 0;
+	return (w && (w->style & MKGUI_TEXTAREA_READONLY)) ? 1 : 0;
 }
 
 // [=]===^=[ mkgui_textarea_get_cursor ]==============================[=]

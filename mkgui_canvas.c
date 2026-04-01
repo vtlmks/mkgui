@@ -9,8 +9,8 @@ static void render_canvas(struct mkgui_ctx *ctx, uint32_t idx) {
 	int32_t rw = ctx->rects[idx].w;
 	int32_t rh = ctx->rects[idx].h;
 
-	if(w->style & MKGUI_PANEL_BORDER) {
-		uint32_t bg = (w->style & MKGUI_PANEL_SUNKEN) ? shade_color(ctx->theme.bg, -15) : ctx->theme.bg;
+	if(w->style & MKGUI_CANVAS_BORDER) {
+		uint32_t bg = (w->style & MKGUI_CANVAS_SUNKEN) ? shade_color(ctx->theme.bg, -15) : ctx->theme.bg;
 		draw_rounded_rect(ctx->pixels, ctx->win_w, ctx->win_h, rx, ry, rw, rh, bg, ctx->theme.widget_border, ctx->theme.corner_radius);
 	}
 

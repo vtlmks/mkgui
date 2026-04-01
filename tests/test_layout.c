@@ -446,7 +446,7 @@ static void test_group_collapsed(void) {
 	struct mkgui_widget widgets[] = {
 		MKGUI_W(MKGUI_WINDOW, WIN,   "Test", "", 0,     600, 400, 0, 0, 0),
 		MKGUI_W(MKGUI_VBOX,   VBOX1, "",     "", WIN,   0,   0,   0, 0, 0),
-		MKGUI_W(MKGUI_GROUP,  GRP,   "Grp",  "", VBOX1, 0,   0,   MKGUI_FIXED, MKGUI_COLLAPSIBLE | MKGUI_COLLAPSED, 0),
+		MKGUI_W(MKGUI_GROUP,  GRP,   "Grp",  "", VBOX1, 0,   0,   MKGUI_FIXED, MKGUI_GROUP_COLLAPSIBLE | MKGUI_GROUP_COLLAPSED, 0),
 		MKGUI_W(MKGUI_BUTTON, BTN1,  "A",    "", GRP,   0,   0,   0, 0, 0),
 		MKGUI_W(MKGUI_BUTTON, BTN2,  "B",    "", VBOX1, 0,   0,   0, 0, 0),
 	};

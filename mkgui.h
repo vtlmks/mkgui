@@ -142,32 +142,90 @@ enum {
 
 // ---------------------------------------------------------------------------
 // Widget style flags (stored in 'style' field, per-widget-type)
+// Each widget type has its own flag namespace starting at bit 0.
 // ---------------------------------------------------------------------------
 
-#define MKGUI_CHECKED              (1u << 0)
-#define MKGUI_PASSWORD             (1u << 1)
-#define MKGUI_READONLY             (1u << 2)
-#define MKGUI_SEPARATOR            (1u << 3)
-#define MKGUI_MENU_CHECK           (1u << 4)
-#define MKGUI_MENU_RADIO           (1u << 5)
-#define MKGUI_PANEL_BORDER         (1u << 6)
-#define MKGUI_PANEL_SUNKEN         (1u << 7)
-#define MKGUI_SLIDER_MIXER         (1u << 8)
-#define MKGUI_METER_TEXT           (1u << 8)
-#define MKGUI_IMAGE_STRETCH        (1u << 9)
-#define MKGUI_TAB_CLOSABLE         (1u << 10)
-#define MKGUI_MULTI_SELECT         (1u << 11)
-#define MKGUI_TRUNCATE             (1u << 12)
-#define MKGUI_TOOLBAR_ICONS_TEXT   0
-#define MKGUI_TOOLBAR_ICONS_ONLY   (1u << 13)
-#define MKGUI_TOOLBAR_TEXT_ONLY    (2u << 13)
-#define MKGUI_TOOLBAR_MODE_MASK    (3u << 13)
-#define MKGUI_LINK                 (1u << 15)
-#define MKGUI_COLLAPSED            (1u << 16)
-#define MKGUI_WRAP                 (1u << 17)
-#define MKGUI_NUMERIC              (1u << 18)
-#define MKGUI_COLLAPSIBLE          (1u << 19)
-#define MKGUI_SHIMMER              (1u << 20)
+// -- Checkbox --
+#define MKGUI_CHECKBOX_CHECKED         (1u << 0)
+
+// -- Radio --
+#define MKGUI_RADIO_CHECKED            (1u << 0)
+
+// -- Toggle --
+#define MKGUI_TOGGLE_CHECKED           (1u << 0)
+
+// -- Button --
+#define MKGUI_BUTTON_CHECKED           (1u << 0)
+#define MKGUI_BUTTON_SEPARATOR         (1u << 1)
+
+// -- Input --
+#define MKGUI_INPUT_PASSWORD           (1u << 0)
+#define MKGUI_INPUT_READONLY           (1u << 1)
+#define MKGUI_INPUT_NUMERIC            (1u << 2)
+
+// -- Textarea --
+#define MKGUI_TEXTAREA_READONLY        (1u << 0)
+
+// -- Datepicker --
+#define MKGUI_DATEPICKER_READONLY      (1u << 0)
+
+// -- Menu item / context menu --
+#define MKGUI_MENUITEM_SEPARATOR       (1u << 0)
+#define MKGUI_MENUITEM_CHECK           (1u << 1)
+#define MKGUI_MENUITEM_RADIO           (1u << 2)
+#define MKGUI_MENUITEM_CHECKED         (1u << 3)
+
+// -- Panel --
+#define MKGUI_PANEL_BORDER             (1u << 0)
+#define MKGUI_PANEL_SUNKEN             (1u << 1)
+
+// -- VBox / HBox / Form --
+#define MKGUI_VBOX_BORDER              (1u << 0)
+#define MKGUI_HBOX_BORDER              (1u << 0)
+#define MKGUI_FORM_BORDER              (1u << 0)
+
+// -- Canvas --
+#define MKGUI_CANVAS_BORDER            (1u << 0)
+#define MKGUI_CANVAS_SUNKEN            (1u << 1)
+
+// -- GLView --
+#define MKGUI_GLVIEW_BORDER            (1u << 0)
+
+// -- Image --
+#define MKGUI_IMAGE_BORDER             (1u << 0)
+#define MKGUI_IMAGE_STRETCH            (1u << 1)
+
+// -- Slider --
+#define MKGUI_SLIDER_MIXER             (1u << 0)
+
+// -- Meter --
+#define MKGUI_METER_TEXT               (1u << 0)
+
+// -- Tab --
+#define MKGUI_TAB_CLOSABLE             (1u << 0)
+
+// -- Listview / Gridview / Treeview --
+#define MKGUI_LISTVIEW_MULTI_SELECT    (1u << 0)
+#define MKGUI_GRIDVIEW_MULTI_SELECT    (1u << 0)
+#define MKGUI_TREEVIEW_MULTI_SELECT    (1u << 0)
+
+// -- Label --
+#define MKGUI_LABEL_TRUNCATE           (1u << 0)
+#define MKGUI_LABEL_LINK               (1u << 1)
+#define MKGUI_LABEL_WRAP               (1u << 2)
+
+// -- Toolbar --
+#define MKGUI_TOOLBAR_ICONS_TEXT       0
+#define MKGUI_TOOLBAR_ICONS_ONLY       (1u << 0)
+#define MKGUI_TOOLBAR_TEXT_ONLY        (2u << 0)
+#define MKGUI_TOOLBAR_MODE_MASK        (3u << 0)
+
+// -- Group --
+#define MKGUI_GROUP_COLLAPSIBLE        (1u << 0)
+#define MKGUI_GROUP_COLLAPSED          (1u << 1)
+
+// -- Progress --
+#define MKGUI_PROGRESS_SHIMMER         (1u << 0)
 
 // ---------------------------------------------------------------------------
 // Event types

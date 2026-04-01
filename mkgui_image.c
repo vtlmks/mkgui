@@ -68,7 +68,7 @@ static void render_image(struct mkgui_ctx *ctx, uint32_t idx) {
 	int32_t rw = ctx->rects[idx].w;
 	int32_t rh = ctx->rects[idx].h;
 
-	if(w->style & MKGUI_PANEL_BORDER) {
+	if(w->style & MKGUI_IMAGE_BORDER) {
 		draw_rounded_rect(ctx->pixels, ctx->win_w, ctx->win_h, rx, ry, rw, rh, ctx->theme.bg, ctx->theme.widget_border, ctx->theme.corner_radius);
 		rx += 1;
 		ry += 1;

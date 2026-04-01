@@ -73,7 +73,7 @@ enum {
 	ED_PROP_FLAGS_LBL,
 	ED_PROP_FL_LEFT, ED_PROP_FL_TOP, ED_PROP_FL_RIGHT, ED_PROP_FL_BOTTOM,
 	ED_PROP_FL_HIDDEN, ED_PROP_FL_DISABLED,
-	ED_PROP_FL_CHECKED, ED_PROP_FL_SEPARATOR,
+	ED_PROP_FL_CHECKED, ED_PROP_FL_MI_CHECKED, ED_PROP_FL_SEPARATOR,
 	ED_PROP_FL_MENUCHECK, ED_PROP_FL_MENURADIO,
 	ED_PROP_FL_REGTOP, ED_PROP_FL_REGBOT, ED_PROP_FL_REGLEFT, ED_PROP_FL_REGRIGHT,
 	ED_PROP_FL_SCROLL,
@@ -900,10 +900,11 @@ static struct ed_prop_desc ed_props[] = {
 	{ ED_PK_SECTION,       "Flags:",           0,                                        0,                  0,      0,    ED_VIS_ALWAYS,    ED_ACT_NONE,         ED_PROP_FLAGS_LBL,    0,                   0,                 0 },
 	{ ED_PK_FLAG,          "Hidden",          offsetof(struct ed_widget, flags),         MKGUI_HIDDEN,       0,      0,    ED_VIS_ALWAYS,    ED_ACT_NONE,         ED_PROP_FL_HIDDEN,    0,                   0,                 0 },
 	{ ED_PK_FLAG,          "Disabled",        offsetof(struct ed_widget, flags),         MKGUI_DISABLED,     0,      0,    ED_VIS_ALWAYS,    ED_ACT_NONE,         ED_PROP_FL_DISABLED,  0,                   0,                 0 },
-	{ ED_PK_FLAG,          "Checked",         offsetof(struct ed_widget, style),         MKGUI_CHECKED,      0,      0,    ED_VIS_HAS_CHECK, ED_ACT_NONE,         ED_PROP_FL_CHECKED,   0,                   0,                 0 },
-	{ ED_PK_FLAG,          "Sep",             offsetof(struct ed_widget, style),         MKGUI_SEPARATOR,    0,      0,    ED_VIS_MENUITEM,  ED_ACT_NONE,         ED_PROP_FL_SEPARATOR, 0,                   0,                 0 },
-	{ ED_PK_FLAG,          "MChk",            offsetof(struct ed_widget, style),         MKGUI_MENU_CHECK,   0,      0,    ED_VIS_MENUITEM,  ED_ACT_NONE,         ED_PROP_FL_MENUCHECK, 0,                   0,                 0 },
-	{ ED_PK_FLAG,          "MRad",            offsetof(struct ed_widget, style),         MKGUI_MENU_RADIO,   0,      0,    ED_VIS_MENUITEM,  ED_ACT_NONE,         ED_PROP_FL_MENURADIO, 0,                   0,                 0 },
+	{ ED_PK_FLAG,          "Checked",         offsetof(struct ed_widget, style),         MKGUI_CHECKBOX_CHECKED,  0,   0,    ED_VIS_HAS_CHECK, ED_ACT_NONE,         ED_PROP_FL_CHECKED,   0,                   0,                 0 },
+	{ ED_PK_FLAG,          "Checked",         offsetof(struct ed_widget, style),         MKGUI_MENUITEM_CHECKED,  0,   0,    ED_VIS_MENUITEM,  ED_ACT_NONE,         ED_PROP_FL_MI_CHECKED, 0,                  0,                 0 },
+	{ ED_PK_FLAG,          "Sep",             offsetof(struct ed_widget, style),         MKGUI_MENUITEM_SEPARATOR, 0,  0,    ED_VIS_MENUITEM,  ED_ACT_NONE,         ED_PROP_FL_SEPARATOR, 0,                   0,                 0 },
+	{ ED_PK_FLAG,          "MChk",            offsetof(struct ed_widget, style),         MKGUI_MENUITEM_CHECK, 0,      0,    ED_VIS_MENUITEM,  ED_ACT_NONE,         ED_PROP_FL_MENUCHECK, 0,                   0,                 0 },
+	{ ED_PK_FLAG,          "MRad",            offsetof(struct ed_widget, style),         MKGUI_MENUITEM_RADIO, 0,      0,    ED_VIS_MENUITEM,  ED_ACT_NONE,         ED_PROP_FL_MENURADIO, 0,                   0,                 0 },
 	{ ED_PK_FLAG,          "RgnTop",          offsetof(struct ed_widget, flags),         MKGUI_REGION_TOP,   0,      0,    ED_VIS_IN_SPLIT,  ED_ACT_NONE,         ED_PROP_FL_REGTOP,    0,                   0,                 0 },
 	{ ED_PK_FLAG,          "RgnBot",          offsetof(struct ed_widget, flags),         MKGUI_REGION_BOTTOM,0,      0,    ED_VIS_IN_SPLIT,  ED_ACT_NONE,         ED_PROP_FL_REGBOT,    0,                   0,                 0 },
 	{ ED_PK_FLAG,          "RgnLeft",         offsetof(struct ed_widget, flags),         MKGUI_REGION_LEFT,  0,      0,    ED_VIS_IN_SPLIT,  ED_ACT_NONE,         ED_PROP_FL_REGLEFT,   0,                   0,                 0 },
@@ -912,8 +913,8 @@ static struct ed_prop_desc ed_props[] = {
 	{ ED_PK_FLAG,          "Border",          offsetof(struct ed_widget, style),         MKGUI_PANEL_BORDER, 0,      0,    ED_VIS_BORDERABLE,ED_ACT_NONE,         ED_PROP_FL_BORDER,    0,                   0,                 0 },
 	{ ED_PK_FLAG,          "Sunken",          offsetof(struct ed_widget, style),         MKGUI_PANEL_SUNKEN, 0,      0,    ED_VIS_BORDERABLE,ED_ACT_NONE,         ED_PROP_FL_SUNKEN,    0,                   0,                 0 },
 	{ ED_PK_FLAG,          "No Pad",          offsetof(struct ed_widget, flags),         MKGUI_NO_PAD,       0,      0,    ED_VIS_BOX,       ED_ACT_NONE,         ED_PROP_FL_NOPAD,     0,                   0,                 0 },
-	{ ED_PK_FLAG,          "Password",        offsetof(struct ed_widget, style),         MKGUI_PASSWORD,     0,      0,    ED_VIS_INPUT,     ED_ACT_NONE,         ED_PROP_FL_PASSWORD,  0,                   0,                 0 },
-	{ ED_PK_FLAG,          "Readonly",        offsetof(struct ed_widget, style),         MKGUI_READONLY,     0,      0,    ED_VIS_INPUT,     ED_ACT_NONE,         ED_PROP_FL_READONLY,  0,                   0,                 0 },
+	{ ED_PK_FLAG,          "Password",        offsetof(struct ed_widget, style),         MKGUI_INPUT_PASSWORD, 0,     0,    ED_VIS_INPUT,     ED_ACT_NONE,         ED_PROP_FL_PASSWORD,  0,                   0,                 0 },
+	{ ED_PK_FLAG,          "Readonly",        offsetof(struct ed_widget, style),         MKGUI_INPUT_READONLY, 0,     0,    ED_VIS_INPUT,     ED_ACT_NONE,         ED_PROP_FL_READONLY,  0,                   0,                 0 },
 	{ ED_PK_FLAG,          "Fixed",          offsetof(struct ed_widget, flags),         MKGUI_FIXED,        0,      0,    ED_VIS_IN_BOX,    ED_ACT_NONE,         ED_PROP_FL_FIXED,     0,                   0,                 0 },
 	{ ED_PK_INT32,         "Weight:",        offsetof(struct ed_widget, weight),        0,                  0,    999,    ED_VIS_IN_BOX,    ED_ACT_NONE,         ED_PROP_WEIGHT_SPN,   ED_PROP_WEIGHT_LBL,  0,                 ED_PROP_WEIGHT_HBOX },
 	{ ED_PK_ALIGN,         "Align:",         0,                                        0,                  0,      0,    ED_VIS_IN_BOX,    ED_ACT_NONE,         ED_PROP_ALIGN_DRP,    ED_PROP_ALIGN_LBL,   0,                 0 },
@@ -923,16 +924,16 @@ static struct ed_prop_desc ed_props[] = {
 	{ ED_PK_ACTION,        "Remove Item",     0,                                        0,                  0,      0,    ED_VIS_MENU,      ED_ACT_REM_ITEM,     ED_PROP_REM_ITEM,     0,                   0,                 0 },
 	{ ED_PK_ACTION,        "Add Button",      0,                                        0,                  0,      0,    ED_VIS_TOOLBAR,   ED_ACT_ADD_TB_BTN,   ED_PROP_ADD_TB_BTN,   0,                   0,                 0 },
 	{ ED_PK_ACTION,        "Remove Button",   0,                                        0,                  0,      0,    ED_VIS_TOOLBAR,   ED_ACT_REM_TB_BTN,   ED_PROP_REM_TB_BTN,   0,                   0,                 0 },
-	{ ED_PK_FLAG,          "Sep",             offsetof(struct ed_widget, style),         MKGUI_SEPARATOR,    0,      0,    ED_VIS_IN_TOOLBAR,ED_ACT_NONE,         ED_PROP_FL_TBSEP,     0,                   0,                 0 },
+	{ ED_PK_FLAG,          "Sep",             offsetof(struct ed_widget, style),         MKGUI_BUTTON_SEPARATOR, 0,   0,    ED_VIS_IN_TOOLBAR,ED_ACT_NONE,         ED_PROP_FL_TBSEP,     0,                   0,                 0 },
 	{ ED_PK_FLAG,          "Vertical",       offsetof(struct ed_widget, flags),         MKGUI_VERTICAL,     0,      0,    ED_VIS_SLIDER,    ED_ACT_NONE,         ED_PROP_FL_VERTICAL,  0,                   0,                 0 },
 	{ ED_PK_FLAG,          "Mixer",          offsetof(struct ed_widget, style),         MKGUI_SLIDER_MIXER, 0,      0,    ED_VIS_SLIDER_ONLY,ED_ACT_NONE,        ED_PROP_FL_MIXER,     0,                   0,                 0 },
-	{ ED_PK_FLAG,          "Truncate",       offsetof(struct ed_widget, style),         MKGUI_TRUNCATE,     0,      0,    ED_VIS_LABEL,      ED_ACT_NONE,        ED_PROP_FL_TRUNCATE,  0,                   0,                 0 },
+	{ ED_PK_FLAG,          "Truncate",       offsetof(struct ed_widget, style),         MKGUI_LABEL_TRUNCATE, 0,     0,    ED_VIS_LABEL,      ED_ACT_NONE,        ED_PROP_FL_TRUNCATE,  0,                   0,                 0 },
 	{ ED_PK_FLAG,          "Show %",         offsetof(struct ed_widget, style),         MKGUI_METER_TEXT,   0,      0,    ED_VIS_METER,      ED_ACT_NONE,        ED_PROP_FL_METER_TEXT, 0,                   0,                 0 },
-	{ ED_PK_FLAG,          "Link",           offsetof(struct ed_widget, style),         MKGUI_LINK,         0,      0,    ED_VIS_LABEL,      ED_ACT_NONE,        ED_PROP_FL_LINK,      0,                   0,                 0 },
-	{ ED_PK_FLAG,          "Wrap",           offsetof(struct ed_widget, style),         MKGUI_WRAP,         0,      0,    ED_VIS_LABEL,      ED_ACT_NONE,        ED_PROP_FL_WRAP,      0,                   0,                 0 },
-	{ ED_PK_FLAG,          "Collapsible",    offsetof(struct ed_widget, style),         MKGUI_COLLAPSIBLE,  0,      0,    ED_VIS_GROUP,      ED_ACT_NONE,        ED_PROP_FL_COLLAPSIBLE, 0,                 0,                 0 },
-	{ ED_PK_FLAG,          "Collapsed",      offsetof(struct ed_widget, style),         MKGUI_COLLAPSED,    0,      0,    ED_VIS_GROUP,      ED_ACT_NONE,        ED_PROP_FL_COLLAPSED, 0,                   0,                 0 },
-	{ ED_PK_FLAG,          "Numeric",        offsetof(struct ed_widget, style),         MKGUI_NUMERIC,      0,      0,    ED_VIS_INPUT,      ED_ACT_NONE,        ED_PROP_FL_NUMERIC,   0,                   0,                 0 },
+	{ ED_PK_FLAG,          "Link",           offsetof(struct ed_widget, style),         MKGUI_LABEL_LINK,   0,      0,    ED_VIS_LABEL,      ED_ACT_NONE,        ED_PROP_FL_LINK,      0,                   0,                 0 },
+	{ ED_PK_FLAG,          "Wrap",           offsetof(struct ed_widget, style),         MKGUI_LABEL_WRAP,   0,      0,    ED_VIS_LABEL,      ED_ACT_NONE,        ED_PROP_FL_WRAP,      0,                   0,                 0 },
+	{ ED_PK_FLAG,          "Collapsible",    offsetof(struct ed_widget, style),         MKGUI_GROUP_COLLAPSIBLE, 0,  0,    ED_VIS_GROUP,      ED_ACT_NONE,        ED_PROP_FL_COLLAPSIBLE, 0,                 0,                 0 },
+	{ ED_PK_FLAG,          "Collapsed",      offsetof(struct ed_widget, style),         MKGUI_GROUP_COLLAPSED, 0,    0,    ED_VIS_GROUP,      ED_ACT_NONE,        ED_PROP_FL_COLLAPSED, 0,                   0,                 0 },
+	{ ED_PK_FLAG,          "Numeric",        offsetof(struct ed_widget, style),         MKGUI_INPUT_NUMERIC, 0,      0,    ED_VIS_INPUT,      ED_ACT_NONE,        ED_PROP_FL_NUMERIC,   0,                   0,                 0 },
 	{ ED_PK_MENU_TREE,     "",                0,                                        0,                  0,      0,    ED_VIS_MENU,      ED_ACT_NONE,         ED_MENU_TREE,         0,                   0,                 0 },
 };
 #define ED_PROP_COUNT (sizeof(ed_props) / sizeof(ed_props[0]))
@@ -940,7 +941,7 @@ static struct ed_prop_desc ed_props[] = {
 // [=]===^=[ ed_compute_vis_mask ]=================================[=]
 static uint32_t ed_compute_vis_mask(struct ed_widget *w) {
 	uint32_t mask = 0;
-	if(w->type == MKGUI_CHECKBOX || w->type == MKGUI_RADIO || w->type == MKGUI_MENUITEM) {
+	if(w->type == MKGUI_CHECKBOX || w->type == MKGUI_RADIO) {
 		mask |= ED_VIS_HAS_CHECK;
 	}
 	if(w->type == MKGUI_MENUITEM) {
@@ -1046,9 +1047,9 @@ static void ed_sync_prop_value(struct mkgui_ctx *ctx, struct ed_prop_desc *p, st
 			if(fl) {
 				uint32_t *fld = (uint32_t *)((char *)w + p->offset);
 				if(*fld & p->flag_bit) {
-					fl->flags |= MKGUI_CHECKED;
+					fl->flags |= MKGUI_CHECKBOX_CHECKED;
 				} else {
-					fl->flags &= ~MKGUI_CHECKED;
+					fl->flags &= ~MKGUI_CHECKBOX_CHECKED;
 				}
 			}
 		} break;
@@ -2130,7 +2131,7 @@ static void ed_draw_widget_fallback(struct mkgui_ctx *ctx, uint32_t idx) {
 				if(btn->type != MKGUI_BUTTON || btn->parent_id != ew->id) {
 					continue;
 				}
-				if(btn->style & MKGUI_SEPARATOR) {
+				if(btn->style & MKGUI_BUTTON_SEPARATOR) {
 					int32_t sx = bx + ctx->toolbar_sep_w / 2;
 					draw_vline(buf, bw, bh, sx, ry + 4, rh - 8, ctx->theme.widget_border);
 					bx += ctx->toolbar_sep_w;
@@ -3426,37 +3427,130 @@ static char *ed_style_to_str(uint32_t style, uint32_t widget_type, char *buf, ui
 		return "0";
 	}
 
-	static struct { uint32_t bit; char *name; } single_bits[] = {
-		{ MKGUI_CHECKED,         "MKGUI_CHECKED" },
-		{ MKGUI_PASSWORD,        "MKGUI_PASSWORD" },
-		{ MKGUI_READONLY,        "MKGUI_READONLY" },
-		{ MKGUI_SEPARATOR,       "MKGUI_SEPARATOR" },
-		{ MKGUI_MENU_CHECK,      "MKGUI_MENU_CHECK" },
-		{ MKGUI_MENU_RADIO,      "MKGUI_MENU_RADIO" },
-		{ MKGUI_PANEL_BORDER,    "MKGUI_PANEL_BORDER" },
-		{ MKGUI_PANEL_SUNKEN,    "MKGUI_PANEL_SUNKEN" },
-		{ MKGUI_IMAGE_STRETCH,   "MKGUI_IMAGE_STRETCH" },
-		{ MKGUI_TAB_CLOSABLE,    "MKGUI_TAB_CLOSABLE" },
-		{ MKGUI_MULTI_SELECT,    "MKGUI_MULTI_SELECT" },
-		{ MKGUI_TRUNCATE,        "MKGUI_TRUNCATE" },
-		{ MKGUI_LINK,            "MKGUI_LINK" },
-		{ MKGUI_COLLAPSIBLE,     "MKGUI_COLLAPSIBLE" },
-		{ MKGUI_COLLAPSED,       "MKGUI_COLLAPSED" },
-		{ MKGUI_WRAP,            "MKGUI_WRAP" },
-		{ MKGUI_NUMERIC,         "MKGUI_NUMERIC" },
+	struct ed_bit_name { uint32_t bit; char *name; };
+
+	static struct ed_bit_name bits_checkbox[] = {
+		{ MKGUI_CHECKBOX_CHECKED,    "MKGUI_CHECKBOX_CHECKED" },
 	};
+	static struct ed_bit_name bits_button[] = {
+		{ MKGUI_BUTTON_SEPARATOR,    "MKGUI_BUTTON_SEPARATOR" },
+	};
+	static struct ed_bit_name bits_input[] = {
+		{ MKGUI_INPUT_PASSWORD,      "MKGUI_INPUT_PASSWORD" },
+		{ MKGUI_INPUT_READONLY,      "MKGUI_INPUT_READONLY" },
+		{ MKGUI_INPUT_NUMERIC,       "MKGUI_INPUT_NUMERIC" },
+	};
+	static struct ed_bit_name bits_menuitem[] = {
+		{ MKGUI_MENUITEM_SEPARATOR,  "MKGUI_MENUITEM_SEPARATOR" },
+		{ MKGUI_MENUITEM_CHECK,      "MKGUI_MENUITEM_CHECK" },
+		{ MKGUI_MENUITEM_RADIO,      "MKGUI_MENUITEM_RADIO" },
+		{ MKGUI_MENUITEM_CHECKED,    "MKGUI_MENUITEM_CHECKED" },
+	};
+	static struct ed_bit_name bits_panel[] = {
+		{ MKGUI_PANEL_BORDER,        "MKGUI_PANEL_BORDER" },
+		{ MKGUI_PANEL_SUNKEN,        "MKGUI_PANEL_SUNKEN" },
+	};
+	static struct ed_bit_name bits_image[] = {
+		{ MKGUI_PANEL_BORDER,        "MKGUI_PANEL_BORDER" },
+		{ MKGUI_IMAGE_STRETCH,       "MKGUI_IMAGE_STRETCH" },
+	};
+	static struct ed_bit_name bits_tabs[] = {
+		{ MKGUI_TAB_CLOSABLE,        "MKGUI_TAB_CLOSABLE" },
+	};
+	static struct ed_bit_name bits_listview[] = {
+		{ MKGUI_LISTVIEW_MULTI_SELECT, "MKGUI_LISTVIEW_MULTI_SELECT" },
+	};
+	static struct ed_bit_name bits_label[] = {
+		{ MKGUI_LABEL_TRUNCATE,      "MKGUI_LABEL_TRUNCATE" },
+		{ MKGUI_LABEL_LINK,          "MKGUI_LABEL_LINK" },
+		{ MKGUI_LABEL_WRAP,          "MKGUI_LABEL_WRAP" },
+	};
+	static struct ed_bit_name bits_group[] = {
+		{ MKGUI_GROUP_COLLAPSIBLE,   "MKGUI_GROUP_COLLAPSIBLE" },
+		{ MKGUI_GROUP_COLLAPSED,     "MKGUI_GROUP_COLLAPSED" },
+	};
+	static struct ed_bit_name bits_progress[] = {
+		{ MKGUI_PROGRESS_SHIMMER,    "MKGUI_PROGRESS_SHIMMER" },
+	};
+
+	struct ed_bit_name *bits = NULL;
+	uint32_t bits_count = 0;
+
+	switch(widget_type) {
+		case MKGUI_CHECKBOX:
+		case MKGUI_RADIO: {
+			bits = bits_checkbox;
+			bits_count = sizeof(bits_checkbox) / sizeof(bits_checkbox[0]);
+		} break;
+
+		case MKGUI_BUTTON: {
+			bits = bits_button;
+			bits_count = sizeof(bits_button) / sizeof(bits_button[0]);
+		} break;
+
+		case MKGUI_INPUT:
+		case MKGUI_TEXTAREA: {
+			bits = bits_input;
+			bits_count = sizeof(bits_input) / sizeof(bits_input[0]);
+		} break;
+
+		case MKGUI_MENUITEM: {
+			bits = bits_menuitem;
+			bits_count = sizeof(bits_menuitem) / sizeof(bits_menuitem[0]);
+		} break;
+
+		case MKGUI_PANEL:
+		case MKGUI_VBOX:
+		case MKGUI_HBOX:
+		case MKGUI_FORM:
+		case MKGUI_CANVAS:
+		case MKGUI_GLVIEW: {
+			bits = bits_panel;
+			bits_count = sizeof(bits_panel) / sizeof(bits_panel[0]);
+		} break;
+
+		case MKGUI_IMAGE: {
+			bits = bits_image;
+			bits_count = sizeof(bits_image) / sizeof(bits_image[0]);
+		} break;
+
+		case MKGUI_TABS: {
+			bits = bits_tabs;
+			bits_count = sizeof(bits_tabs) / sizeof(bits_tabs[0]);
+		} break;
+
+		case MKGUI_LISTVIEW: {
+			bits = bits_listview;
+			bits_count = sizeof(bits_listview) / sizeof(bits_listview[0]);
+		} break;
+
+		case MKGUI_LABEL: {
+			bits = bits_label;
+			bits_count = sizeof(bits_label) / sizeof(bits_label[0]);
+		} break;
+
+		case MKGUI_GROUP: {
+			bits = bits_group;
+			bits_count = sizeof(bits_group) / sizeof(bits_group[0]);
+		} break;
+
+		case MKGUI_PROGRESS: {
+			bits = bits_progress;
+			bits_count = sizeof(bits_progress) / sizeof(bits_progress[0]);
+		} break;
+	}
 
 	buf[0] = '\0';
 	uint32_t pos = 0;
 	uint32_t remaining = style;
 
-	for(uint32_t i = 0; i < sizeof(single_bits) / sizeof(single_bits[0]); ++i) {
-		if(style & single_bits[i].bit) {
+	for(uint32_t i = 0; i < bits_count; ++i) {
+		if(style & bits[i].bit) {
 			if(pos > 0) {
 				pos += (uint32_t)snprintf(buf + pos, buf_size - pos, " | ");
 			}
-			pos += (uint32_t)snprintf(buf + pos, buf_size - pos, "%s", single_bits[i].name);
-			remaining &= ~single_bits[i].bit;
+			pos += (uint32_t)snprintf(buf + pos, buf_size - pos, "%s", bits[i].name);
+			remaining &= ~bits[i].bit;
 		}
 	}
 
@@ -4166,7 +4260,7 @@ int main(void) {
 		MKGUI_W(MKGUI_MENUITEM, ED_MI_OPEN,     "Open",             "document-open", ED_FILE_MENU, 0, 0, 0, 0, 0 ),
 		MKGUI_W(MKGUI_MENUITEM, ED_MI_SAVE,     "Save",             "document-save", ED_FILE_MENU, 0, 0, 0, 0, 0 ),
 		MKGUI_W(MKGUI_MENUITEM, ED_MI_SAVEAS,   "Save As...",       "", ED_FILE_MENU, 0, 0, 0, 0, 0 ),
-		MKGUI_W(MKGUI_MENUITEM, ED_MI_SEP1,     "",                 "", ED_FILE_MENU, 0, 0, 0, MKGUI_SEPARATOR, 0 ),
+		MKGUI_W(MKGUI_MENUITEM, ED_MI_SEP1,     "",                 "", ED_FILE_MENU, 0, 0, 0, MKGUI_MENUITEM_SEPARATOR, 0 ),
 		MKGUI_W(MKGUI_MENUITEM, ED_MI_RECENT,   "Recent Files",     "", ED_FILE_MENU, 0, 0, 0, 0, 0 ),
 		MKGUI_W(MKGUI_MENUITEM, ED_RECENT_FIRST + 0, "", "", ED_MI_RECENT, 0, 0, MKGUI_HIDDEN, 0, 0 ),
 		MKGUI_W(MKGUI_MENUITEM, ED_RECENT_FIRST + 1, "", "", ED_MI_RECENT, 0, 0, MKGUI_HIDDEN, 0, 0 ),
@@ -4178,24 +4272,24 @@ int main(void) {
 		MKGUI_W(MKGUI_MENUITEM, ED_RECENT_FIRST + 7, "", "", ED_MI_RECENT, 0, 0, MKGUI_HIDDEN, 0, 0 ),
 		MKGUI_W(MKGUI_MENUITEM, ED_RECENT_FIRST + 8, "", "", ED_MI_RECENT, 0, 0, MKGUI_HIDDEN, 0, 0 ),
 		MKGUI_W(MKGUI_MENUITEM, ED_RECENT_FIRST + 9, "", "", ED_MI_RECENT, 0, 0, MKGUI_HIDDEN, 0, 0 ),
-		MKGUI_W(MKGUI_MENUITEM, ED_MI_SEP2,     "",                 "", ED_FILE_MENU, 0, 0, 0, MKGUI_SEPARATOR, 0 ),
+		MKGUI_W(MKGUI_MENUITEM, ED_MI_SEP2,     "",                 "", ED_FILE_MENU, 0, 0, 0, MKGUI_MENUITEM_SEPARATOR, 0 ),
 		MKGUI_W(MKGUI_MENUITEM, ED_MI_GENERATE, "Generate Code",    "", ED_FILE_MENU, 0, 0, 0, 0, 0 ),
 		MKGUI_W(MKGUI_MENUITEM, ED_MI_SNIPPET,  "Generate Snippet", "", ED_FILE_MENU, 0, 0, 0, 0, 0 ),
-		MKGUI_W(MKGUI_MENUITEM, ED_MI_SEP3,     "",                 "", ED_FILE_MENU, 0, 0, 0, MKGUI_SEPARATOR, 0 ),
+		MKGUI_W(MKGUI_MENUITEM, ED_MI_SEP3,     "",                 "", ED_FILE_MENU, 0, 0, 0, MKGUI_MENUITEM_SEPARATOR, 0 ),
 		MKGUI_W(MKGUI_MENUITEM, ED_MI_EXIT,     "Exit",             "application-exit", ED_FILE_MENU, 0, 0, 0, 0, 0 ),
 		MKGUI_W(MKGUI_MENUITEM, ED_MI_UNDO,     "Undo",             "edit-undo", ED_EDIT_MENU, 0, 0, 0, 0, 0 ),
 		MKGUI_W(MKGUI_MENUITEM, ED_MI_REDO,     "Redo",             "edit-redo", ED_EDIT_MENU, 0, 0, 0, 0, 0 ),
-		MKGUI_W(MKGUI_MENUITEM, ED_MI_SEP4,     "",                 "", ED_EDIT_MENU, 0, 0, 0, MKGUI_SEPARATOR, 0 ),
+		MKGUI_W(MKGUI_MENUITEM, ED_MI_SEP4,     "",                 "", ED_EDIT_MENU, 0, 0, 0, MKGUI_MENUITEM_SEPARATOR, 0 ),
 		MKGUI_W(MKGUI_MENUITEM, ED_MI_DELETE,   "Delete",           "edit-delete", ED_EDIT_MENU, 0, 0, 0, 0, 0 ),
 
 		MKGUI_W(MKGUI_TOOLBAR,  ED_TOOLBAR,     "",                 "", ED_WINDOW,  0, 0, 0, 0, 0 ),
 		MKGUI_W(MKGUI_BUTTON,   ED_TB_NEW,      "New",              "document-new",  ED_TOOLBAR, 0, 0, 0, 0, 0 ),
 		MKGUI_W(MKGUI_BUTTON,   ED_TB_OPEN,     "Open",             "document-open", ED_TOOLBAR, 0, 0, 0, 0, 0 ),
 		MKGUI_W(MKGUI_BUTTON,   ED_TB_SAVE,     "Save",             "document-save", ED_TOOLBAR, 0, 0, 0, 0, 0 ),
-		MKGUI_W(MKGUI_BUTTON,   ED_TB_SEP1,     "",                 "", ED_TOOLBAR, 0, 0, 0, MKGUI_SEPARATOR, 0 ),
+		MKGUI_W(MKGUI_BUTTON,   ED_TB_SEP1,     "",                 "", ED_TOOLBAR, 0, 0, 0, MKGUI_BUTTON_SEPARATOR, 0 ),
 		MKGUI_W(MKGUI_BUTTON,   ED_TB_GEN,      "Gen",              "system-run", ED_TOOLBAR, 0, 0, 0, 0, 0 ),
 		MKGUI_W(MKGUI_BUTTON,   ED_TB_TEST,     "Test",             "media-playback-start", ED_TOOLBAR, 0, 0, 0, 0, 0 ),
-		MKGUI_W(MKGUI_BUTTON,   ED_TB_SEP2,     "",                 "", ED_TOOLBAR, 0, 0, 0, MKGUI_SEPARATOR, 0 ),
+		MKGUI_W(MKGUI_BUTTON,   ED_TB_SEP2,     "",                 "", ED_TOOLBAR, 0, 0, 0, MKGUI_BUTTON_SEPARATOR, 0 ),
 		MKGUI_W(MKGUI_BUTTON,   ED_TB_UNDO,     "Undo",             "edit-undo", ED_TOOLBAR, 0, 0, 0, 0, 0 ),
 		MKGUI_W(MKGUI_BUTTON,   ED_TB_REDO,     "Redo",             "edit-redo", ED_TOOLBAR, 0, 0, 0, 0, 0 ),
 
@@ -4273,6 +4367,7 @@ int main(void) {
 		MKGUI_W(MKGUI_VBOX,     ED_PROP_FL_COL3,   "",                "", ED_PROP_FL_HBOX, 0, 0, 0, 0, 1 ),
 		MKGUI_W(MKGUI_CHECKBOX, ED_PROP_FL_REGTOP,  "RgnTop",         "", ED_PROP_FL_COL0, 0, 20, MKGUI_FIXED, 0, 0 ),
 		MKGUI_W(MKGUI_CHECKBOX, ED_PROP_FL_CHECKED, "Checked",        "", ED_PROP_FL_COL0, 0, 20, MKGUI_FIXED, 0, 0 ),
+		MKGUI_W(MKGUI_CHECKBOX, ED_PROP_FL_MI_CHECKED, "Checked",    "", ED_PROP_FL_COL0, 0, 20, MKGUI_FIXED, 0, 0 ),
 		MKGUI_W(MKGUI_CHECKBOX, ED_PROP_FL_REGBOT,  "RgnBot",         "", ED_PROP_FL_COL1, 0, 20, MKGUI_FIXED, 0, 0 ),
 		MKGUI_W(MKGUI_CHECKBOX, ED_PROP_FL_HIDDEN,  "Hidden",         "", ED_PROP_FL_COL1, 0, 20, MKGUI_FIXED, 0, 0 ),
 		MKGUI_W(MKGUI_CHECKBOX, ED_PROP_FL_SEPARATOR,"Sep",            "", ED_PROP_FL_COL1, 0, 20, MKGUI_FIXED, 0, 0 ),
@@ -4318,7 +4413,7 @@ int main(void) {
 		/* Events section */
 		MKGUI_W(MKGUI_GROUP,    ED_EVT_GROUP,      "Events",          "", ED_RIGHT_PANEL, 0, 200, MKGUI_HIDDEN | MKGUI_FIXED, 0, 0 ),
 		MKGUI_W(MKGUI_VBOX,     ED_EVT_VBOX,       "",                "", ED_EVT_GROUP,   0, 0, 0, 0, 0 ),
-		MKGUI_W(MKGUI_LISTVIEW, ED_EVT_LIST,       "",                "", ED_EVT_VBOX,    0, 0, 0, MKGUI_MULTI_SELECT, 1 ),
+		MKGUI_W(MKGUI_LISTVIEW, ED_EVT_LIST,       "",                "", ED_EVT_VBOX,    0, 0, 0, MKGUI_LISTVIEW_MULTI_SELECT, 1 ),
 
 		/* Data section */
 		MKGUI_W(MKGUI_GROUP,    ED_DATA_GROUP,     "Data",            "", ED_RIGHT_PANEL, 0, 250, MKGUI_HIDDEN | MKGUI_FIXED, 0, 0 ),

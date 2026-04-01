@@ -549,7 +549,7 @@ static void demo_event(struct mkgui_ctx *ctx, struct mkgui_event *ev, void *user
 				if(lv) {
 					mkgui_context_menu_clear(ctx);
 					for(uint32_t c = 0; c < lv->col_count; ++c) {
-						mkgui_context_menu_add(ctx, ID_CTX_COL_NAME + c, lv->columns[c].label, NULL, MKGUI_MENU_CHECK | MKGUI_CHECKED);
+						mkgui_context_menu_add(ctx, ID_CTX_COL_NAME + c, lv->columns[c].label, NULL, MKGUI_MENUITEM_CHECK | MKGUI_MENUITEM_CHECKED);
 					}
 					mkgui_context_menu_add_separator(ctx);
 					mkgui_context_menu_add(ctx, ID_CTX_COL_AUTOSIZE, "Auto-size Column", "arrow-expand-horizontal", 0);
@@ -561,7 +561,7 @@ static void demo_event(struct mkgui_ctx *ctx, struct mkgui_event *ev, void *user
 				if(gv) {
 					mkgui_context_menu_clear(ctx);
 					for(uint32_t c = 0; c < gv->col_count; ++c) {
-						mkgui_context_menu_add(ctx, ID_CTX_COL_NAME + c, gv->columns[c].label, NULL, MKGUI_MENU_CHECK | MKGUI_CHECKED);
+						mkgui_context_menu_add(ctx, ID_CTX_COL_NAME + c, gv->columns[c].label, NULL, MKGUI_MENUITEM_CHECK | MKGUI_MENUITEM_CHECKED);
 					}
 					mkgui_context_menu_add_separator(ctx);
 					mkgui_context_menu_add(ctx, ID_CTX_COL_AUTOSIZE, "Auto-size Column", "arrow-expand-horizontal", 0);
@@ -614,23 +614,23 @@ int main(void) {
 		MKGUI_W(MKGUI_MENUITEM, ID_FILE_NEW,  "New",               "document-new",       ID_FILE_MENU, 0, 0, 0, 0, 0),
 		MKGUI_W(MKGUI_MENUITEM, ID_OPEN,      "Open",              "document-open",      ID_FILE_MENU, 0, 0, 0, 0, 0),
 		MKGUI_W(MKGUI_MENUITEM, ID_SAVE,      "Save",              "document-save",      ID_FILE_MENU, 0, 0, 0, 0, 0),
-		MKGUI_W(MKGUI_MENUITEM, ID_FILE_SEP1, "",                  "",                   ID_FILE_MENU, 0, 0, 0, MKGUI_SEPARATOR, 0),
+		MKGUI_W(MKGUI_MENUITEM, ID_FILE_SEP1, "",                  "",                   ID_FILE_MENU, 0, 0, 0, MKGUI_MENUITEM_SEPARATOR, 0),
 		MKGUI_W(MKGUI_MENUITEM, ID_EXIT,      "Exit",              "application-exit",   ID_FILE_MENU, 0, 0, 0, 0, 0),
 		MKGUI_W(MKGUI_MENUITEM, ID_EDIT_CUT,  "Cut",               "edit-cut",           ID_EDIT_MENU, 0, 0, 0, 0, 0),
 		MKGUI_W(MKGUI_MENUITEM, ID_COPY,      "Copy",              "edit-copy",          ID_EDIT_MENU, 0, 0, 0, 0, 0),
 		MKGUI_W(MKGUI_MENUITEM, ID_PASTE,     "Paste",             "edit-paste",         ID_EDIT_MENU, 0, 0, 0, 0, 0),
-		MKGUI_W(MKGUI_MENUITEM, ID_VIEW_GRID, "Show Grid",         "view-grid",          ID_VIEW_MENU, 0, 0, 0, MKGUI_MENU_CHECK | MKGUI_CHECKED, 0),
-		MKGUI_W(MKGUI_MENUITEM, ID_VIEW_STATUS,"Show Statusbar",   "view-fullscreen",    ID_VIEW_MENU, 0, 0, 0, MKGUI_MENU_CHECK | MKGUI_CHECKED, 0),
-		MKGUI_W(MKGUI_MENUITEM, ID_VIEW_SEP1, "",                  "",                   ID_VIEW_MENU, 0, 0, 0, MKGUI_SEPARATOR, 0),
-		MKGUI_W(MKGUI_MENUITEM, ID_VIEW_SMALL,"Small",             "",                   ID_VIEW_MENU, 0, 0, 0, MKGUI_MENU_RADIO, 0),
-		MKGUI_W(MKGUI_MENUITEM, ID_VIEW_MEDIUM,"Medium",           "",                   ID_VIEW_MENU, 0, 0, 0, MKGUI_MENU_RADIO | MKGUI_CHECKED, 0),
-		MKGUI_W(MKGUI_MENUITEM, ID_VIEW_LARGE,"Large",             "",                   ID_VIEW_MENU, 0, 0, 0, MKGUI_MENU_RADIO, 0),
+		MKGUI_W(MKGUI_MENUITEM, ID_VIEW_GRID, "Show Grid",         "view-grid",          ID_VIEW_MENU, 0, 0, 0, MKGUI_MENUITEM_CHECK | MKGUI_MENUITEM_CHECKED, 0),
+		MKGUI_W(MKGUI_MENUITEM, ID_VIEW_STATUS,"Show Statusbar",   "view-fullscreen",    ID_VIEW_MENU, 0, 0, 0, MKGUI_MENUITEM_CHECK | MKGUI_MENUITEM_CHECKED, 0),
+		MKGUI_W(MKGUI_MENUITEM, ID_VIEW_SEP1, "",                  "",                   ID_VIEW_MENU, 0, 0, 0, MKGUI_MENUITEM_SEPARATOR, 0),
+		MKGUI_W(MKGUI_MENUITEM, ID_VIEW_SMALL,"Small",             "",                   ID_VIEW_MENU, 0, 0, 0, MKGUI_MENUITEM_RADIO, 0),
+		MKGUI_W(MKGUI_MENUITEM, ID_VIEW_MEDIUM,"Medium",           "",                   ID_VIEW_MENU, 0, 0, 0, MKGUI_MENUITEM_RADIO | MKGUI_MENUITEM_CHECKED, 0),
+		MKGUI_W(MKGUI_MENUITEM, ID_VIEW_LARGE,"Large",             "",                   ID_VIEW_MENU, 0, 0, 0, MKGUI_MENUITEM_RADIO, 0),
 		MKGUI_W(MKGUI_MENUITEM, ID_HELP_ABOUT,"About",             "help-about",         ID_HELP_MENU, 0, 0, 0, 0, 0),
 
 		/* Toolbar */
 		MKGUI_W(MKGUI_TOOLBAR,  ID_TOOLBAR,   "",                  "", ID_WINDOW,   0, 0, 0, 0, 0),
 		MKGUI_W(MKGUI_BUTTON,   ID_TB_NEW,    "New",               "edit-copy",     ID_TOOLBAR, 0, 0, 0, 0, 0),
-		MKGUI_W(MKGUI_BUTTON,   ID_TB_SEP1,   "",                  "",              ID_TOOLBAR, 0, 0, 0, MKGUI_SEPARATOR, 0),
+		MKGUI_W(MKGUI_BUTTON,   ID_TB_SEP1,   "",                  "",              ID_TOOLBAR, 0, 0, 0, MKGUI_BUTTON_SEPARATOR, 0),
 		MKGUI_W(MKGUI_BUTTON,   ID_TB_OPEN,   "Open",              "folder-open",   ID_TOOLBAR, 0, 0, 0, 0, 0),
 		MKGUI_W(MKGUI_BUTTON,   ID_TB_SAVE,   "Save",              "document-save", ID_TOOLBAR, 0, 0, 0, 0, 0),
 
@@ -662,13 +662,13 @@ int main(void) {
 
 		MKGUI_W(MKGUI_GROUP,    ID_GRP_RADIO, "Priority",          "", ID_CTL_LVBOX, 0, 0, MKGUI_FIXED, 0, 0),
 		MKGUI_W(MKGUI_HBOX,     ID_RADIO_HBOX,"",                  "", ID_GRP_RADIO, 0, 0, 0, 0, 0),
-		MKGUI_W(MKGUI_RADIO,    ID_RADIO1,    "Low",               "", ID_RADIO_HBOX, 0, 0, 0, MKGUI_CHECKED, 1),
+		MKGUI_W(MKGUI_RADIO,    ID_RADIO1,    "Low",               "", ID_RADIO_HBOX, 0, 0, 0, MKGUI_RADIO_CHECKED, 1),
 		MKGUI_W(MKGUI_RADIO,    ID_RADIO2,    "Medium",            "", ID_RADIO_HBOX, 0, 0, 0, 0, 1),
 		MKGUI_W(MKGUI_RADIO,    ID_RADIO3,    "High",              "", ID_RADIO_HBOX, 0, 0, 0, 0, 1),
 
 		MKGUI_W(MKGUI_HBOX,     ID_PROG_HBOX, "",                  "", ID_CTL_LVBOX, 0, 28, MKGUI_FIXED, 0, 0),
 		MKGUI_W(MKGUI_LABEL,    ID_PROG_LBL,  "Progress:",         "", ID_PROG_HBOX, 80, 0, MKGUI_FIXED, 0, 0),
-		MKGUI_W(MKGUI_PROGRESS, ID_PROGRESS1, "",                  "", ID_PROG_HBOX, 0, 0, 0, MKGUI_SHIMMER, 1),
+		MKGUI_W(MKGUI_PROGRESS, ID_PROGRESS1, "",                  "", ID_PROG_HBOX, 0, 0, 0, MKGUI_PROGRESS_SHIMMER, 1),
 		MKGUI_W(MKGUI_SPINNER,  ID_SPINNER1,  "",                  "", ID_PROG_HBOX, 28, 0, MKGUI_FIXED, 0, 0),
 
 		MKGUI_W(MKGUI_HBOX,     ID_METER_HBOX,"",                  "", ID_CTL_LVBOX, 0, 28, MKGUI_FIXED, 0, 0),
@@ -687,7 +687,7 @@ int main(void) {
 
 		/* Controls: right column */
 		MKGUI_W(MKGUI_VBOX,     ID_CTL_RVBOX, "",                  "", ID_CTL_HBOX, 280, 0, MKGUI_FIXED, 0, 0),
-		MKGUI_W(MKGUI_GROUP,    ID_GRP_EXTRA, "Extra Controls",    "", ID_CTL_RVBOX, 0, 0, 0, MKGUI_COLLAPSIBLE, 1),
+		MKGUI_W(MKGUI_GROUP,    ID_GRP_EXTRA, "Extra Controls",    "", ID_CTL_RVBOX, 0, 0, 0, MKGUI_GROUP_COLLAPSIBLE, 1),
 		MKGUI_W(MKGUI_FORM,     ID_EXTRA_FORM,"",                  "", ID_GRP_EXTRA, 0, 0, 0, 0, 0),
 		MKGUI_W(MKGUI_LABEL,    ID_LBL_POWER, "Power:",            "", ID_EXTRA_FORM, 0, 0, 0, 0, 0),
 		MKGUI_W(MKGUI_TOGGLE,   ID_TOGGLE1,   "",                  "", ID_EXTRA_FORM, 0, 0, 0, 0, 0),
@@ -698,16 +698,16 @@ int main(void) {
 		MKGUI_W(MKGUI_LABEL,    ID_LBL_TBMODE,"Toolbar:",          "", ID_EXTRA_FORM, 0, 0, 0, 0, 0),
 		MKGUI_W(MKGUI_DROPDOWN, ID_TBMODE_DROP,"",                 "", ID_EXTRA_FORM, 0, 0, 0, 0, 0),
 		MKGUI_W(MKGUI_LABEL,    ID_LBL_AMOUNT,"Amount:",           "", ID_EXTRA_FORM, 0, 0, 0, 0, 0),
-		MKGUI_W(MKGUI_INPUT,    ID_AMOUNT_INPUT,"",                "", ID_EXTRA_FORM, 0, 0, 0, MKGUI_NUMERIC, 0),
+		MKGUI_W(MKGUI_INPUT,    ID_AMOUNT_INPUT,"",                "", ID_EXTRA_FORM, 0, 0, 0, MKGUI_INPUT_NUMERIC, 0),
 		MKGUI_W(MKGUI_LABEL,    ID_LBL_COLOR, "Color:",            "", ID_EXTRA_FORM, 0, 0, 0, 0, 0),
 		MKGUI_W(MKGUI_BUTTON,   ID_BTN_COLOR, "Pick Color",  "palette", ID_EXTRA_FORM, 0, 0, 0, 0, 0),
 
 		MKGUI_W(MKGUI_DIVIDER,  ID_DIVIDER1,  "",                  "", ID_CTL_RVBOX, 0, 0, MKGUI_FIXED, 0, 0),
 
-		MKGUI_W(MKGUI_GROUP,    ID_GRP_COLLAPSIBLE, "Collapsible", "", ID_CTL_RVBOX, 0, 0, 0, MKGUI_COLLAPSIBLE, 1),
+		MKGUI_W(MKGUI_GROUP,    ID_GRP_COLLAPSIBLE, "Collapsible", "", ID_CTL_RVBOX, 0, 0, 0, MKGUI_GROUP_COLLAPSIBLE, 1),
 		MKGUI_W(MKGUI_VBOX,     ID_COLL_LBL,  "",                  "", ID_GRP_COLLAPSIBLE, 0, 0, 0, 0, 0),
-		MKGUI_W(MKGUI_LABEL,    ID_LINK1,     "mkgui on GitHub",   "", ID_COLL_LBL, 0, 0, MKGUI_FIXED, MKGUI_LINK, 0),
-		MKGUI_W(MKGUI_LABEL,    ID_LBL_WRAP,  "This label demonstrates word wrapping. Text flows to the next line when it reaches the edge of the widget.", "", ID_COLL_LBL, 0, 80, MKGUI_FIXED, MKGUI_WRAP, 0),
+		MKGUI_W(MKGUI_LABEL,    ID_LINK1,     "mkgui on GitHub",   "", ID_COLL_LBL, 0, 0, MKGUI_FIXED, MKGUI_LABEL_LINK, 0),
+		MKGUI_W(MKGUI_LABEL,    ID_LBL_WRAP,  "This label demonstrates word wrapping. Text flows to the next line when it reaches the edge of the widget.", "", ID_COLL_LBL, 0, 80, MKGUI_FIXED, MKGUI_LABEL_WRAP, 0),
 
 		/* ---- Tree / Text tab ---- */
 		MKGUI_W(MKGUI_VSPLIT,   ID_TREE_SPLIT,"",                  "", ID_TAB_TREE, 0, 0, 0, 0, 0),
@@ -737,13 +737,13 @@ int main(void) {
 
 		/* ---- Layout tab ---- */
 		MKGUI_W(MKGUI_HBOX,     ID_LAY_HBOX,  "",                  "", ID_TAB_LAYOUT, 0, 0, 0, 0, 0),
-		MKGUI_W(MKGUI_VBOX,     ID_LAY_VBOX,  "",                  "", ID_LAY_HBOX, 200, 0, MKGUI_FIXED, MKGUI_PANEL_BORDER, 0),
+		MKGUI_W(MKGUI_VBOX,     ID_LAY_VBOX,  "",                  "", ID_LAY_HBOX, 200, 0, MKGUI_FIXED, MKGUI_VBOX_BORDER, 0),
 		MKGUI_W(MKGUI_BUTTON,   ID_VBOX_BTN1, "First",             "file-plus",    ID_LAY_VBOX, 0, 28, MKGUI_FIXED, 0, 0),
 		MKGUI_W(MKGUI_BUTTON,   ID_VBOX_BTN2, "Second",            "content-save", ID_LAY_VBOX, 0, 28, MKGUI_FIXED, 0, 0),
 		MKGUI_W(MKGUI_INPUT,    ID_VBOX_INPUT,"",                  "", ID_LAY_VBOX, 0, 24, MKGUI_FIXED, 0, 0),
 		MKGUI_W(MKGUI_SPACER,   ID_VBOX_SPACER,"",                 "", ID_LAY_VBOX, 0, 0, 0, 0, 1),
 		MKGUI_W(MKGUI_BUTTON,   ID_VBOX_BTN3, "Bottom (after spacer)", "", ID_LAY_VBOX, 0, 28, MKGUI_FIXED, 0, 0),
-		MKGUI_W(MKGUI_FORM,     ID_LAY_FORM,  "",                  "", ID_LAY_HBOX, 0, 0, 0, MKGUI_PANEL_BORDER, 1),
+		MKGUI_W(MKGUI_FORM,     ID_LAY_FORM,  "",                  "", ID_LAY_HBOX, 0, 0, 0, MKGUI_FORM_BORDER, 1),
 		MKGUI_W(MKGUI_LABEL,    ID_FORM_LBL1, "Name:",             "", ID_LAY_FORM, 0, 0, 0, 0, 0),
 		MKGUI_W(MKGUI_INPUT,    ID_FORM_INP1, "",                  "", ID_LAY_FORM, 0, 0, 0, 0, 0),
 		MKGUI_W(MKGUI_LABEL,    ID_FORM_LBL2, "Email address:",    "", ID_LAY_FORM, 0, 0, 0, 0, 0),
@@ -765,11 +765,11 @@ int main(void) {
 		MKGUI_W(MKGUI_SCROLLBAR,ID_SCROLLBAR1,"",                  "", ID_MEDIA_LVBOX, MKGUI_SCROLLBAR_W, 0, MKGUI_VERTICAL, 0, 1),
 		MKGUI_W(MKGUI_VBOX,     ID_MEDIA_RVBOX,"",                 "", ID_MEDIA_HBOX, 0, 0, 0, 0, 1),
 		MKGUI_W(MKGUI_LABEL,    ID_CANVAS_LBL,"Canvas:",           "", ID_MEDIA_RVBOX, 0, 20, MKGUI_FIXED, 0, 0),
-		MKGUI_W(MKGUI_CANVAS,   ID_CANVAS1,   "",                  "", ID_MEDIA_RVBOX, 0, 120, MKGUI_FIXED, MKGUI_PANEL_BORDER, 0),
+		MKGUI_W(MKGUI_CANVAS,   ID_CANVAS1,   "",                  "", ID_MEDIA_RVBOX, 0, 120, MKGUI_FIXED, MKGUI_CANVAS_BORDER, 0),
 		MKGUI_W(MKGUI_LABEL,    ID_IMG_LBL,   "Image:",            "", ID_MEDIA_RVBOX, 0, 20, MKGUI_FIXED, 0, 0),
-		MKGUI_W(MKGUI_IMAGE,    ID_IMAGE1,    "",                  "", ID_MEDIA_RVBOX, 0, 120, MKGUI_FIXED, MKGUI_PANEL_BORDER, 0),
+		MKGUI_W(MKGUI_IMAGE,    ID_IMAGE1,    "",                  "", ID_MEDIA_RVBOX, 0, 120, MKGUI_FIXED, MKGUI_IMAGE_BORDER, 0),
 		MKGUI_W(MKGUI_LABEL,    ID_GL_LBL,    "OpenGL:",           "", ID_MEDIA_RVBOX, 0, 20, MKGUI_FIXED, 0, 0),
-		MKGUI_W(MKGUI_GLVIEW,   ID_GLVIEW1,   "",                  "", ID_MEDIA_RVBOX, 0, 0, 0, MKGUI_PANEL_BORDER, 1),
+		MKGUI_W(MKGUI_GLVIEW,   ID_GLVIEW1,   "",                  "", ID_MEDIA_RVBOX, 0, 0, 0, MKGUI_GLVIEW_BORDER, 1),
 
 		MKGUI_W(MKGUI_STATUSBAR, ID_STATUSBAR, "Ready",            "", ID_WINDOW, 0, 0, 0, 0, 0),
 	};

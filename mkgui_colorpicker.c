@@ -486,16 +486,16 @@ MKGUI_API uint32_t mkgui_color_dialog(struct mkgui_ctx *ctx, uint32_t initial_co
 		MKGUI_W(MKGUI_TAB,     CP_TAB_RGB,    "Sliders",       "", CP_TABS,      0, 0, 0, 0, 0),
 
 		MKGUI_W(MKGUI_HBOX,    CP_SV_HBOX,    "",              "", CP_TAB_SV,    0, 0, 0, 0, 0),
-		MKGUI_W(MKGUI_CANVAS,  CP_SV_CANVAS,  "",              "", CP_SV_HBOX,   0, 0, 0, MKGUI_PANEL_BORDER, 1),
-		MKGUI_W(MKGUI_CANVAS,  CP_HUE_CANVAS, "",              "", CP_SV_HBOX,   28, 0, MKGUI_FIXED, MKGUI_PANEL_BORDER, 0),
+		MKGUI_W(MKGUI_CANVAS,  CP_SV_CANVAS,  "",              "", CP_SV_HBOX,   0, 0, 0, MKGUI_CANVAS_BORDER, 1),
+		MKGUI_W(MKGUI_CANVAS,  CP_HUE_CANVAS, "",              "", CP_SV_HBOX,   28, 0, MKGUI_FIXED, MKGUI_CANVAS_BORDER, 0),
 
-		MKGUI_W(MKGUI_CANVAS,  CP_WH_CANVAS,  "",              "", CP_TAB_WHEEL,  0, 0, 0, MKGUI_PANEL_BORDER, 0),
-		MKGUI_W(MKGUI_CANVAS,  CP_RGB_CANVAS, "",              "", CP_TAB_RGB,    0, 0, 0, MKGUI_PANEL_BORDER, 0),
+		MKGUI_W(MKGUI_CANVAS,  CP_WH_CANVAS,  "",              "", CP_TAB_WHEEL,  0, 0, 0, MKGUI_CANVAS_BORDER, 0),
+		MKGUI_W(MKGUI_CANVAS,  CP_RGB_CANVAS, "",              "", CP_TAB_RGB,    0, 0, 0, MKGUI_CANVAS_BORDER, 0),
 
 		MKGUI_W(MKGUI_DIVIDER, CP_DIVIDER,    "",              "", CP_VBOX,      0, 0, MKGUI_FIXED, 0, 0),
 
 		MKGUI_W(MKGUI_HBOX,    CP_CTL_HBOX,   "",              "", CP_VBOX,      0, 0, MKGUI_FIXED, 0, 0),
-		MKGUI_W(MKGUI_CANVAS,  CP_PREVIEW,    "",              "", CP_CTL_HBOX,  28, 0, MKGUI_FIXED, MKGUI_PANEL_BORDER, 0),
+		MKGUI_W(MKGUI_CANVAS,  CP_PREVIEW,    "",              "", CP_CTL_HBOX,  28, 0, MKGUI_FIXED, MKGUI_CANVAS_BORDER, 0),
 		MKGUI_W(MKGUI_LABEL,   CP_HEX_LBL,    "#",             "", CP_CTL_HBOX,  16, 0, MKGUI_FIXED, 0, 0),
 		MKGUI_W(MKGUI_INPUT,   CP_HEX_INPUT,  "",              "", CP_CTL_HBOX,  68, 0, MKGUI_FIXED, 0, 0),
 		MKGUI_W(MKGUI_LABEL,   CP_R_LBL,      "R:",            "", CP_CTL_HBOX,  20, 0, MKGUI_FIXED, 0, 0),

@@ -1082,7 +1082,7 @@ static uint32_t fd_run_dialog(struct mkgui_ctx *ctx, uint32_t mode, struct mkgui
 
 	popup_destroy_all(ctx);
 
-	uint32_t multi = (mode == 0 && opts && opts->multi_select) ? MKGUI_MULTI_SELECT : 0;
+	uint32_t multi = (mode == 0 && opts && opts->multi_select) ? MKGUI_LISTVIEW_MULTI_SELECT : 0;
 	char *confirm_label = (mode == 0) ? "Open" : "Save";
 	char *title = (mode == 0) ? "Open File" : "Save File";
 
@@ -1095,7 +1095,7 @@ static uint32_t fd_run_dialog(struct mkgui_ctx *ctx, uint32_t mode, struct mkgui
 		MKGUI_W(MKGUI_BUTTON,   FD_ID_BTN_BACK,       "",              "go-previous",  FD_ID_TOOLBAR,      0, 0, 0, 0, 0),
 		MKGUI_W(MKGUI_BUTTON,   FD_ID_BTN_FWD,        "",              "go-next",      FD_ID_TOOLBAR,      0, 0, 0, 0, 0),
 		MKGUI_W(MKGUI_BUTTON,   FD_ID_BTN_UP,         "",              "go-up",        FD_ID_TOOLBAR,      0, 0, 0, 0, 0),
-		MKGUI_W(MKGUI_BUTTON,   FD_ID_TB_SEP1,        "",              "",             FD_ID_TOOLBAR,      0, 0, 0, MKGUI_SEPARATOR, 0),
+		MKGUI_W(MKGUI_BUTTON,   FD_ID_TB_SEP1,        "",              "",             FD_ID_TOOLBAR,      0, 0, 0, MKGUI_BUTTON_SEPARATOR, 0),
 		MKGUI_W(MKGUI_BUTTON,   FD_ID_BTN_NEWFOLDER,  "",              "folder-new",   FD_ID_TOOLBAR,      0, 0, 0, 0, 0),
 
 		MKGUI_W(MKGUI_PATHBAR,  FD_ID_PATHBAR,        "",              "",             FD_ID_WINDOW,       0, 0, 0, 0, 0),

@@ -61,7 +61,7 @@ static void render_label(struct mkgui_ctx *ctx, uint32_t idx) {
 	int32_t rw = ctx->rects[idx].w;
 	int32_t rh = ctx->rects[idx].h;
 
-	uint32_t is_link = (w->style & MKGUI_LINK);
+	uint32_t is_link = (w->style & MKGUI_LABEL_LINK);
 	uint32_t tc;
 	if(w->flags & MKGUI_DISABLED) {
 		tc = ctx->theme.text_disabled;
@@ -70,14 +70,14 @@ static void render_label(struct mkgui_ctx *ctx, uint32_t idx) {
 	} else {
 		tc = ctx->theme.text;
 	}
-	if(w->style & MKGUI_WRAP) {
+	if(w->style & MKGUI_LABEL_WRAP) {
 		render_label_wrap(ctx, idx, tc);
 		return;
 	}
 	int32_t ty = ry + (rh - ctx->font_height) / 2;
 	int32_t tx = rx;
 	char *text = w->label;
-	if(w->style & MKGUI_TRUNCATE) {
+	if(w->style & MKGUI_LABEL_TRUNCATE) {
 		text = text_truncate(ctx, text, rw);
 	}
 	uint32_t align = w->flags & MKGUI_ALIGN_MASK;
