@@ -8,13 +8,16 @@ This is a personal project by a single developer. It works well for what it does
 
 ## Features
 
-- 25+ widget types: buttons, inputs, checkboxes, dropdowns, sliders, spinboxes, treeviews, listviews, tabs, menus, toolbars, statusbars, and more
+- 45+ widget types: buttons, inputs, checkboxes, dropdowns, sliders, spinboxes, treeviews, listviews, gridviews, tabs, menus, toolbars, statusbars, toggles, comboboxes, datepickers, and more
 - Auto-layout containers: VBox, HBox, Form, Group, Tabs, Splitters
 - Software rendering via XShm (Linux) and GDI (Windows) -- no GPU required
-- Built-in file dialogs, message boxes, input dialogs
-- Material Design Icons (7400+ icons, monochrome, theme-tinted)
-- Dual icon pack support for toolbar-specific icon sizes
+- Built-in file dialogs, message boxes, input dialogs, color picker
+- SVG icon system via PlutoSVG (Freedesktop icon naming, theme-aware monochrome)
 - Toolbar display modes: icons only, text only, icons + text
+- DPI scaling with auto-detection and `MKGUI_SCALE` environment variable override
+- Keyboard accelerators with automatic menu shortcut display
+- Undo/redo in text input and textarea widgets
+- External file drag-and-drop (XDnd on Linux, WM_DROPFILES on Windows)
 - Visual editor with drag-and-drop, property editing, and C code generation
 - Unity build: `#include "mkgui.c"` and compile
 - ~260KB stripped binary, ~5MB BSS, instant startup
@@ -40,7 +43,7 @@ See [documentation/editor.md](documentation/editor.md) for the full editor guide
    # Windows (MinGW)
    x86_64-w64-mingw32-gcc -std=c99 -O2 myapp.c -o myapp.exe -lgdi32 -mwindows
    ```
-4. Place `mdi_icons.dat` next to your executable for icon support
+4. Place an `icons/` directory next to your executable with SVG icons (see Icon section below)
 
 ## Quick example
 
@@ -49,48 +52,55 @@ See [documentation/editor.md](documentation/editor.md) for the full editor guide
 
 enum { ID_WIN = 0, ID_BTN = 1, ID_LBL = 2 };
 
+static void on_event(struct mkgui_ctx *ctx, struct mkgui_event *ev, void *userdata) {
+    (void)userdata;
+    switch(ev->type) {
+        case MKGUI_EVENT_CLOSE: {
+            mkgui_quit(ctx);
+        } break;
+
+        case MKGUI_EVENT_CLICK: {
+            if(ev->id == ID_BTN) {
+                mkgui_label_set(ctx, ID_LBL, "Clicked!");
+            }
+        } break;
+    }
+}
+
 int main(void) {
     struct mkgui_widget widgets[] = {
-        { MKGUI_WINDOW, ID_WIN, "Hello",  "",  0,      0, 0, 400, 300, 0, 0 },
-        { MKGUI_BUTTON, ID_BTN, "Click",  "",  ID_WIN, 10, 10, 100, 28, 0, 0 },
-        { MKGUI_LABEL,  ID_LBL, "Ready",  "",  ID_WIN, 10, 50, 200, 24, 0, 0 },
+        MKGUI_W(MKGUI_WINDOW, ID_WIN, "Hello", "", 0,      400, 300, 0, 0, 0),
+        MKGUI_W(MKGUI_BUTTON, ID_BTN, "Click", "", ID_WIN, 100, 0, MKGUI_FIXED, 0, 0),
+        MKGUI_W(MKGUI_LABEL,  ID_LBL, "Ready", "", ID_WIN, 0, 0, 0, 0, 0),
     };
 
     struct mkgui_ctx *ctx = mkgui_create(widgets, 3);
     if(!ctx) return 1;
 
-    struct mkgui_event ev;
-    uint32_t running = 1;
-    while(running) {
-        while(mkgui_poll(ctx, &ev)) {
-            if(ev.type == MKGUI_EVENT_CLOSE) running = 0;
-            if(ev.type == MKGUI_EVENT_CLICK && ev.id == ID_BTN) {
-                mkgui_label_set(ctx, ID_LBL, "Clicked!");
-            }
-        }
-        mkgui_wait(ctx);
-    }
-
+    mkgui_run(ctx, on_event, NULL);
     mkgui_destroy(ctx);
     return 0;
 }
 ```
 
-## Icon pack
+## Icons
 
-mkgui uses an external `mdi_icons.dat` file containing pre-rasterized Material Design Icons. To generate or regenerate the icon pack from the MDI font:
+mkgui uses SVG icons via PlutoSVG, following the Freedesktop icon naming standard. Icons are loaded at runtime from a flat directory:
 
-```bash
-./tools/gen_icons ext/materialdesignicons-webfont.ttf 18 mdi_icons.dat
+```c
+mkgui_icon_load_svg_dir(ctx, "icons");           // load all SVGs from icons/
+mkgui_icon_load_svg(ctx, "my-icon", "path.svg"); // load a single icon
 ```
 
-The second argument is the icon size in pixels. For toolbar-specific larger icons:
+Monochrome icons using `currentColor` automatically follow the theme text color and update on theme switch.
+
+To extract icons from an installed Freedesktop icon theme (e.g. Papirus, Breeze):
 
 ```bash
-./tools/gen_icons ext/materialdesignicons-webfont.ttf 32 mdi_icons_toolbar.dat icons.txt
+./tools/extract_icons /usr/share/icons/Papirus icons/ tools/subset.txt
 ```
 
-Where `icons.txt` lists only the icon names used in your toolbar (one per line). If `mdi_icons_toolbar.dat` exists, the toolbar uses it automatically; otherwise it falls back to the regular icon pack.
+This extracts small (16/18px) and toolbar (22px) icons listed in `subset.txt` into the `icons/` directory. Toolbar-size icons go into `icons/toolbar/`.
 
 ## Building the demo and editor
 
@@ -130,10 +140,9 @@ Cross-compiling from Linux also works. The included `build.sh` automatically bui
 
 ## Limitations
 
-- ASCII/Latin text only. No IME, CJK, or complex text shaping
+- Latin-1 (ISO 8859-1) text only -- covers Western European languages. No CJK, Arabic, or complex text shaping
 - No right-to-left (RTL) layout support
-- No DPI scaling / HiDPI awareness
-- No accessibility API integration
+- No accessibility API integration (tab navigation and keyboard accelerators are supported)
 
 ## License
 

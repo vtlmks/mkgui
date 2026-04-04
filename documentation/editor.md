@@ -119,6 +119,22 @@ A grid of checkboxes for widget flags:
 | RgnTop, RgnBot, RgnLeft, RgnRight | Split region assignment |
 | TbSep   | Toolbar separator (visible for toolbar button children) |
 | Separator, MChk, MRad | Menu item options |
+| Vertical | Vertical orientation (slider, scrollbar, meter) |
+| Mixer    | Tapered volume style (slider) |
+| Truncate | Truncate with ellipsis (label) |
+| Link     | Clickable blue underlined text (label) |
+| Wrap     | Word-wrapping text (label) |
+| Show %   | Show percentage text (meter) |
+| Numeric  | Filter to digits/decimal/sign (input) |
+| Closable | Show close button on tab |
+| Shimmer  | Animated shimmer effect (progress) |
+| MultiSel | Enable multi-selection (listview, gridview, treeview) |
+| Stretch  | Stretch image to fill widget (image) |
+| Collapsible, Collapsed | Collapsible group with expand/collapse |
+
+### Accelerators
+
+For Button and MenuItem widgets, the **Accel** field lets you bind a keyboard shortcut. Click the button (shows "None" by default), then press the desired key combination (e.g. Ctrl+S). The shortcut is stored and emitted as `mkgui_accel_add()` in generated code. Menu items with accelerators automatically display the shortcut text in the popup. Press Escape to cancel capture, click the X button to clear.
 
 ### Tab management
 
@@ -143,9 +159,10 @@ Visible when a TOOLBAR widget is selected:
 - **Add Button** -- create a new toolbar button
 - **Remove Button** -- delete the last toolbar button
 
-Select a toolbar button child to set its icon (the icon browser shows the
-toolbar icon pack if `mdi_icons_toolbar.dat` exists), label, and the **TbSep**
-flag (draws a vertical separator before this button).
+Select a toolbar button child to set its icon (the icon browser shows toolbar-size
+icons from the `icons/toolbar/` directory), label, and the **TbSep** flag (draws
+a vertical separator before this button). The toolbar **Mode** dropdown sets the
+display mode: Icons + Text, Icons Only, or Text Only.
 
 ### Data items / Sections
 

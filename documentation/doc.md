@@ -146,6 +146,13 @@ There are no `x, y` fields. All positioning is handled by the container-based la
 | `MKGUI_IMAGE` | Displays ARGB pixel data. Centered by default, `MKGUI_IMAGE_STRETCH` to fill. `MKGUI_IMAGE_BORDER` for a border. |
 | `MKGUI_GLVIEW` | OpenGL viewport. Creates a native child window for GL rendering. The user creates their own GL context. Automatically triggers 60fps redraws when visible. |
 | `MKGUI_CANVAS` | Custom drawing area. Calls a user callback with clipping set to the widget rect. Supports `MKGUI_CANVAS_BORDER`. |
+| `MKGUI_TOGGLE` | On/off toggle switch. Emits `MKGUI_EVENT_TOGGLE_CHANGED`. |
+| `MKGUI_COMBOBOX` | Editable dropdown with filtering. Emits `MKGUI_EVENT_COMBOBOX_CHANGED`, `MKGUI_EVENT_COMBOBOX_SUBMIT`. |
+| `MKGUI_DATEPICKER` | Date picker with calendar popup. Emits `MKGUI_EVENT_DATEPICKER_CHANGED`. |
+| `MKGUI_IPINPUT` | IP address input (four octets). Emits `MKGUI_EVENT_IPINPUT_CHANGED`. |
+| `MKGUI_PATHBAR` | Breadcrumb path bar. Emits `MKGUI_EVENT_PATHBAR_NAV`, `MKGUI_EVENT_PATHBAR_SUBMIT`. |
+| `MKGUI_DIVIDER` | Horizontal or vertical etched separator line. No events. |
+| `MKGUI_SPACER` | Invisible spacer for layout padding. No events. |
 | `MKGUI_VBOX` | Vertical box layout. Stacks children top-to-bottom. Uses weight-based distribution. |
 | `MKGUI_HBOX` | Horizontal box layout. Stacks children left-to-right. Uses weight-based distribution. |
 | `MKGUI_FORM` | Two-column form layout. Children are paired: odd=label, even=control. Label column auto-sizes to widest label. |
@@ -1821,6 +1828,87 @@ Key theme colors (dark defaults shown):
 | `listview_alt` | `#2a2e32` | Alternating row background |
 | `accent` | `#2a7ab5` | Accent color (spinner arc, progress bar fill, cell progress) |
 | `corner_radius` | `3` | Rounded corner radius in pixels |
+
+## Keyboard accelerators
+
+Bind keyboard shortcuts to widgets. When a shortcut matches, the bound widget receives an event -- `MKGUI_EVENT_MENU` for menu items, `MKGUI_EVENT_ACCEL` for everything else.
+
+```c
+void mkgui_accel_add(struct mkgui_ctx *ctx, uint32_t id, uint32_t keymod, uint32_t keysym);
+void mkgui_accel_remove(struct mkgui_ctx *ctx, uint32_t id);
+void mkgui_accel_clear(struct mkgui_ctx *ctx);
+```
+
+Modifier flags: `MKGUI_MOD_CONTROL`, `MKGUI_MOD_SHIFT`, `MKGUI_MOD_ALT`. Combine with bitwise OR.
+
+```c
+mkgui_accel_add(ctx, ID_SAVE, MKGUI_MOD_CONTROL, 's');
+mkgui_accel_add(ctx, ID_REDO, MKGUI_MOD_CONTROL | MKGUI_MOD_SHIFT, 'z');
+mkgui_accel_add(ctx, ID_HELP, MKGUI_MOD_CONTROL, MKGUI_KEY_F1);
+```
+
+Menu items with accelerators automatically show the shortcut text right-aligned in the popup (e.g. "Ctrl+S"). No manual text formatting needed.
+
+Accelerators dispatch after context menu keys but before Tab and Ctrl+A/C/V/X. This means app shortcuts take priority over default clipboard bindings when a text widget is focused. Key matching is case-insensitive.
+
+Maximum 64 accelerators per context.
+
+## Undo/redo
+
+Input and textarea widgets support undo/redo via Ctrl+Z and Ctrl+Y (or Ctrl+Shift+Z). This is built-in and requires no setup.
+
+Each widget maintains its own undo ring buffer (32 snapshots). All text mutations are covered: typing, backspace, delete, cut, paste, Enter (textarea), and text drag-and-drop. Consecutive single-character inserts within 500ms are coalesced into one undo step to avoid excessive snapshots during normal typing.
+
+## File drag-and-drop
+
+Accept file drops from the OS file manager. Opt-in per context.
+
+```c
+void mkgui_drop_enable(struct mkgui_ctx *ctx);
+uint32_t mkgui_drop_count(struct mkgui_ctx *ctx);
+char *mkgui_drop_file(struct mkgui_ctx *ctx, uint32_t index);
+```
+
+Call `mkgui_drop_enable(ctx)` after creation. When files are dropped, `MKGUI_EVENT_FILE_DROP` fires with `ev->value` set to the file count. Retrieve paths with `mkgui_drop_file()`:
+
+```c
+mkgui_drop_enable(ctx);
+
+// in event handler:
+case MKGUI_EVENT_FILE_DROP: {
+    for(uint32_t i = 0; i < mkgui_drop_count(ctx); ++i) {
+        printf("Dropped: %s\n", mkgui_drop_file(ctx, i));
+    }
+} break;
+```
+
+Paths are valid until the next drop event or context destruction. Uses XDnd v5 protocol on Linux and WM_DROPFILES on Windows. Maximum 256 files per drop.
+
+## DPI scaling
+
+mkgui auto-detects the display scale factor on startup:
+
+- **Linux**: reads `Xft.dpi` from X resources, falls back to physical display DPI
+- **Windows**: uses `GetDpiForWindow()` or `GetDeviceCaps(LOGPIXELSX)`
+
+Override auto-detection with `mkgui_set_scale()` or the `MKGUI_SCALE` environment variable:
+
+```c
+void mkgui_set_scale(struct mkgui_ctx *ctx, float scale);
+float mkgui_get_scale(struct mkgui_ctx *ctx);
+```
+
+The `MKGUI_SCALE` environment variable accepts three formats:
+
+| Format | Example | Result |
+|--------|---------|--------|
+| Float | `MKGUI_SCALE=1.5` | 1.5x scale |
+| Percentage | `MKGUI_SCALE=150%` | 1.5x scale |
+| DPI | `MKGUI_SCALE=144dpi` | 1.5x scale (144/96) |
+
+The environment variable takes precedence over auto-detection. Scale range is 0.5 to 4.0.
+
+All widgets, fonts, spacing, icons, and dialog windows scale automatically. User-provided pixel values in widget definitions are scaled by the layout engine.
 
 ## Complete example
 

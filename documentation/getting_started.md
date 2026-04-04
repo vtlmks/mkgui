@@ -59,10 +59,10 @@ static void on_event(struct mkgui_ctx *ctx, struct mkgui_event *ev, void *userda
 
 int main(void) {
 	struct mkgui_widget widgets[] = {
-		{ MKGUI_WINDOW, ID_WINDOW, "My App", "", 0, 400, 300, 0, 0, 0 },
-		{ MKGUI_VBOX, ID_VBOX, "", "", ID_WINDOW, 0, 0, 0, 0, 0 },
-		{ MKGUI_LABEL, ID_LABEL, "Hello", "", ID_VBOX, 0, 0, 0, 0, 0 },
-		{ MKGUI_BUTTON, ID_BUTTON, "Click me", "edit-find", ID_VBOX, 120, 0, MKGUI_FIXED, 0, 0 },
+		MKGUI_W(MKGUI_WINDOW, ID_WINDOW, "My App",    "", 0,         400, 300, 0, 0, 0),
+		MKGUI_W(MKGUI_VBOX,   ID_VBOX,   "",          "", ID_WINDOW, 0, 0, 0, 0, 0),
+		MKGUI_W(MKGUI_LABEL,  ID_LABEL,  "Hello",     "", ID_VBOX,   0, 0, 0, 0, 0),
+		MKGUI_W(MKGUI_BUTTON, ID_BUTTON, "Click me",  "edit-find", ID_VBOX, 120, 0, MKGUI_FIXED, 0, 0),
 	};
 	struct mkgui_ctx *ctx = mkgui_create(widgets, 4);
 	mkgui_icon_load_svg_dir(ctx, "icons");
@@ -150,11 +150,15 @@ Icons adapt to the active theme. Monochrome icons using `currentColor` (like Pap
 
 ## DPI scaling
 
+mkgui auto-detects display DPI on startup (via Xft.dpi on Linux, GetDpiForWindow on Windows). Override with:
+
 ```c
 mkgui_set_scale(ctx, 2.0f);  // 2x scale for HiDPI displays
 ```
 
-All widgets, fonts, spacing, and icons scale automatically. The scale factor can be changed at runtime. Range: 0.5 to 4.0.
+Or set the `MKGUI_SCALE` environment variable before launching: `MKGUI_SCALE=1.5`, `MKGUI_SCALE=150%`, or `MKGUI_SCALE=144dpi`. The env var takes precedence over auto-detection.
+
+All widgets, fonts, spacing, icons, and dialog windows scale automatically. The scale factor can be changed at runtime. Range: 0.5 to 4.0.
 
 ## Widget layout
 
@@ -162,11 +166,11 @@ Widgets are defined as a flat array of `struct mkgui_widget`. Each widget has a 
 
 ```c
 struct mkgui_widget widgets[] = {
-//   type          id          label          icon       parent  w    h    flags          style  weight
-    { MKGUI_WINDOW, ID_WINDOW, "Title",       "",        0,      800, 600, 0,             0,     0 },
-    { MKGUI_VBOX,   ID_VBOX,   "",            "",        ID_WIN, 0,   0,   0,             0,     0 },
-    { MKGUI_LABEL,  ID_LABEL,  "Hello",       "",        ID_VBOX,0,   0,   0,             0,     0 },
-    { MKGUI_BUTTON, ID_BTN,    "OK",          "",        ID_VBOX,100, 0,   MKGUI_FIXED,   0,     0 },
+//   MKGUI_W(type, id, label, icon, parent, w, h, flags, style, weight)
+    MKGUI_W(MKGUI_WINDOW, ID_WINDOW, "Title",  "", 0,      800, 600, 0, 0, 0),
+    MKGUI_W(MKGUI_VBOX,   ID_VBOX,   "",       "", ID_WIN, 0,   0,   0, 0, 0),
+    MKGUI_W(MKGUI_LABEL,  ID_LABEL,  "Hello",  "", ID_VBOX,0,   0,   0, 0, 0),
+    MKGUI_W(MKGUI_BUTTON, ID_BTN,    "OK",     "", ID_VBOX,100, 0, MKGUI_FIXED, 0, 0),
 };
 ```
 
