@@ -114,6 +114,16 @@ static uint32_t platform_init(struct mkgui_ctx *ctx, const char *title, int32_t 
 	plat->targets = XInternAtom(plat->dpy, "TARGETS", False);
 	plat->mkgui_clip_prop = XInternAtom(plat->dpy, "MKGUI_CLIP", False);
 	plat->net_wm_pid = XInternAtom(plat->dpy, "_NET_WM_PID", False);
+	plat->xdnd_aware = XInternAtom(plat->dpy, "XdndAware", False);
+	plat->xdnd_enter = XInternAtom(plat->dpy, "XdndEnter", False);
+	plat->xdnd_position = XInternAtom(plat->dpy, "XdndPosition", False);
+	plat->xdnd_status = XInternAtom(plat->dpy, "XdndStatus", False);
+	plat->xdnd_drop = XInternAtom(plat->dpy, "XdndDrop", False);
+	plat->xdnd_finished = XInternAtom(plat->dpy, "XdndFinished", False);
+	plat->xdnd_leave = XInternAtom(plat->dpy, "XdndLeave", False);
+	plat->xdnd_action_copy = XInternAtom(plat->dpy, "XdndActionCopy", False);
+	plat->xdnd_selection = XInternAtom(plat->dpy, "XdndSelection", False);
+	plat->text_uri_list = XInternAtom(plat->dpy, "text/uri-list", False);
 	XSetWMProtocols(plat->dpy, plat->win, &plat->wm_delete, 1);
 
 	pid_t pid = getpid();
@@ -275,6 +285,22 @@ static void platform_fb_resize(struct mkgui_ctx *ctx) {
 
 // [=]===^=[ platform_detect_scale ]================================[=]
 static float platform_detect_scale(struct mkgui_ctx *ctx) {
+	char *env = getenv("MKGUI_SCALE");
+	if(env) {
+		char *end = NULL;
+		double val = strtod(env, &end);
+		if(end && end != env && val > 0.0) {
+			if(end[0] == '%') {
+				val /= 100.0;
+			} else if((end[0] == 'd' || end[0] == 'D') && (end[1] == 'p' || end[1] == 'P') && (end[2] == 'i' || end[2] == 'I')) {
+				val /= 96.0;
+			}
+			if(val >= 0.5 && val <= 4.0) {
+				return (float)val;
+			}
+		}
+	}
+
 	Display *dpy = ctx->plat.dpy;
 
 	XrmInitialize();
@@ -509,6 +535,153 @@ static uint32_t platform_translate_keysym(KeySym ks) {
 	return (uint32_t)ks;
 }
 
+// ---------------------------------------------------------------------------
+// File drag-and-drop (XDnd v5)
+// ---------------------------------------------------------------------------
+
+// [=]===^=[ platform_drop_enable ]================================[=]
+static void platform_drop_enable(struct mkgui_ctx *ctx) {
+	struct mkgui_platform *plat = &ctx->plat;
+	Atom version = 5;
+	XChangeProperty(plat->dpy, plat->win, plat->xdnd_aware, XA_ATOM, 32,
+		PropModeReplace, (unsigned char *)&version, 1);
+}
+
+// [=]===^=[ platform_xdnd_handle ]================================[=]
+static uint32_t platform_xdnd_handle(struct mkgui_ctx *ctx, XClientMessageEvent *cm, struct mkgui_plat_event *pev) {
+	struct mkgui_platform *plat = &ctx->plat;
+
+	if(cm->message_type == plat->xdnd_enter) {
+		plat->xdnd_source = (Window)cm->data.l[0];
+		plat->xdnd_uri_ok = 0;
+		uint32_t has_type_list = (uint32_t)cm->data.l[1] & 1;
+		if(has_type_list) {
+			Atom type_ret;
+			int32_t format;
+			unsigned long count, remaining;
+			unsigned char *data = NULL;
+			XGetWindowProperty(plat->dpy, plat->xdnd_source, plat->text_uri_list,
+				0, 256, False, XA_ATOM, &type_ret, &format, &count, &remaining, &data);
+			if(!data) {
+				Atom type_list_atom = XInternAtom(plat->dpy, "XdndTypeList", False);
+				XGetWindowProperty(plat->dpy, plat->xdnd_source, type_list_atom,
+					0, 256, False, XA_ATOM, &type_ret, &format, &count, &remaining, &data);
+			}
+			if(data) {
+				Atom *types = (Atom *)data;
+				for(unsigned long i = 0; i < count; ++i) {
+					if(types[i] == plat->text_uri_list) {
+						plat->xdnd_uri_ok = 1;
+						break;
+					}
+				}
+				XFree(data);
+			}
+		} else {
+			for(uint32_t i = 0; i < 3; ++i) {
+				if((Atom)cm->data.l[2 + i] == plat->text_uri_list) {
+					plat->xdnd_uri_ok = 1;
+					break;
+				}
+			}
+		}
+		return 0;
+	}
+
+	if(cm->message_type == plat->xdnd_position) {
+		XClientMessageEvent reply;
+		memset(&reply, 0, sizeof(reply));
+		reply.type = ClientMessage;
+		reply.window = plat->xdnd_source;
+		reply.message_type = plat->xdnd_status;
+		reply.format = 32;
+		reply.data.l[0] = (long)plat->win;
+		if(plat->xdnd_uri_ok && ctx->drop_enabled) {
+			reply.data.l[1] = 1;
+			reply.data.l[4] = (long)plat->xdnd_action_copy;
+		}
+		XSendEvent(plat->dpy, plat->xdnd_source, False, NoEventMask, (XEvent *)&reply);
+		XFlush(plat->dpy);
+		return 0;
+	}
+
+	if(cm->message_type == plat->xdnd_drop) {
+		if(plat->xdnd_uri_ok && ctx->drop_enabled) {
+			XConvertSelection(plat->dpy, plat->xdnd_selection, plat->text_uri_list,
+				plat->mkgui_clip_prop, plat->win, (Time)cm->data.l[2]);
+		} else {
+			XClientMessageEvent fin;
+			memset(&fin, 0, sizeof(fin));
+			fin.type = ClientMessage;
+			fin.window = plat->xdnd_source;
+			fin.message_type = plat->xdnd_finished;
+			fin.format = 32;
+			fin.data.l[0] = (long)plat->win;
+			XSendEvent(plat->dpy, plat->xdnd_source, False, NoEventMask, (XEvent *)&fin);
+			XFlush(plat->dpy);
+		}
+		return 0;
+	}
+
+	if(cm->message_type == plat->xdnd_leave) {
+		plat->xdnd_source = 0;
+		plat->xdnd_uri_ok = 0;
+		return 0;
+	}
+
+	(void)pev;
+	return 0;
+}
+
+// [=]===^=[ platform_xdnd_selection ]=============================[=]
+static uint32_t platform_xdnd_selection(struct mkgui_ctx *ctx, XSelectionEvent *se, struct mkgui_plat_event *pev) {
+	struct mkgui_platform *plat = &ctx->plat;
+
+	if(se->selection != plat->xdnd_selection) {
+		return 0;
+	}
+
+	uint32_t got_data = 0;
+	if(se->property != None) {
+		Atom type_ret;
+		int32_t format;
+		unsigned long count, remaining;
+		unsigned char *data = NULL;
+		XGetWindowProperty(plat->dpy, plat->win, se->property,
+			0, 65536, True, AnyPropertyType, &type_ret, &format, &count, &remaining, &data);
+		if(data && count > 0) {
+			drop_parse_uri_list(ctx, (char *)data, (uint32_t)count);
+			got_data = (ctx->drop_count > 0);
+		}
+		if(data) {
+			XFree(data);
+		}
+	}
+
+	XClientMessageEvent fin;
+	memset(&fin, 0, sizeof(fin));
+	fin.type = ClientMessage;
+	fin.window = plat->xdnd_source;
+	fin.message_type = plat->xdnd_finished;
+	fin.format = 32;
+	fin.data.l[0] = (long)plat->win;
+	if(got_data) {
+		fin.data.l[1] = 1;
+		fin.data.l[2] = (long)plat->xdnd_action_copy;
+	}
+	XSendEvent(plat->dpy, plat->xdnd_source, False, NoEventMask, (XEvent *)&fin);
+	XFlush(plat->dpy);
+
+	plat->xdnd_source = 0;
+	plat->xdnd_uri_ok = 0;
+
+	if(got_data) {
+		pev->type = MKGUI_PLAT_DROP;
+		return 1;
+	}
+	return 0;
+}
+
 // [=]===^=[ platform_translate_xevent ]===========================[=]
 static void platform_translate_xevent(struct mkgui_ctx *owner, XEvent *xev, struct mkgui_plat_event *pev) {
 	switch(xev->type) {
@@ -583,6 +756,8 @@ static void platform_translate_xevent(struct mkgui_ctx *owner, XEvent *xev, stru
 		case ClientMessage: {
 			if((Atom)xev->xclient.data.l[0] == owner->plat.wm_delete) {
 				pev->type = MKGUI_PLAT_CLOSE;
+			} else {
+				platform_xdnd_handle(owner, &xev->xclient, pev);
 			}
 		} break;
 
@@ -623,6 +798,7 @@ static void platform_translate_xevent(struct mkgui_ctx *owner, XEvent *xev, stru
 
 		case SelectionNotify: {
 			pev->type = MKGUI_PLAT_NONE;
+			platform_xdnd_selection(owner, &xev->xselection, pev);
 		} break;
 
 		default: {

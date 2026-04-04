@@ -32,6 +32,18 @@ struct mkgui_platform {
 	Atom targets;
 	Atom mkgui_clip_prop;
 	Atom net_wm_pid;
+	Atom xdnd_aware;
+	Atom xdnd_enter;
+	Atom xdnd_position;
+	Atom xdnd_status;
+	Atom xdnd_drop;
+	Atom xdnd_finished;
+	Atom xdnd_leave;
+	Atom xdnd_action_copy;
+	Atom xdnd_selection;
+	Atom text_uri_list;
+	Window xdnd_source;
+	uint32_t xdnd_uri_ok;
 	XShmSegmentInfo shm;
 	XImage *img;
 	Cursor cursor_default;

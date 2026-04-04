@@ -783,6 +783,14 @@ int main(void) {
 	mkgui_set_app_class(ctx, "mkgui_demo");
 	mkgui_icon_load_svg_dir(ctx, "icons");
 
+	mkgui_accel_add(ctx, ID_FILE_NEW, MKGUI_MOD_CONTROL, 'n');
+	mkgui_accel_add(ctx, ID_OPEN, MKGUI_MOD_CONTROL, 'o');
+	mkgui_accel_add(ctx, ID_SAVE, MKGUI_MOD_CONTROL, 's');
+	mkgui_accel_add(ctx, ID_EXIT, MKGUI_MOD_CONTROL, 'q');
+	mkgui_accel_add(ctx, ID_EDIT_CUT, MKGUI_MOD_CONTROL, 'x');
+	mkgui_accel_add(ctx, ID_COPY, MKGUI_MOD_CONTROL, 'c');
+	mkgui_accel_add(ctx, ID_PASTE, MKGUI_MOD_CONTROL, 'v');
+
 	/* Controls tab setup */
 	char *modes[] = { "Auto", "Manual", "Custom", "Debug" };
 	mkgui_dropdown_setup(ctx, ID_DROPDOWN1, modes, 4);

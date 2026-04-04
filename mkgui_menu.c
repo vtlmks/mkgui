@@ -92,6 +92,12 @@ static int32_t menu_popup_child_metrics(struct mkgui_ctx *ctx, uint32_t parent_i
 			if(menu_item_has_children(ctx, sub->id)) {
 				tw += submenu_w;
 			}
+			struct mkgui_accel *acl = accel_find_for_widget(ctx, sub->id);
+			if(acl) {
+				char accel_buf[64];
+				accel_format_text(acl->keymod, acl->keysym, accel_buf, sizeof(accel_buf));
+				tw += text_width(ctx, accel_buf) + sc(ctx, 16);
+			}
 			if(tw > *max_w) {
 				*max_w = tw;
 			}
@@ -211,17 +217,16 @@ static void render_menu_popup(struct mkgui_ctx *ctx, struct mkgui_popup *p, uint
 				int32_t by = iy + ctx->row_height / 2 - check_half;
 				draw_rect_border(p->pixels, p->w, p->h, bx, by, check_sz, check_sz, ctx->theme.text);
 				if(mi->style & MKGUI_MENUITEM_CHECKED) {
-					draw_pixel(p->pixels, p->w, p->h, bx + 2, by + 4, ctx->theme.text);
-					draw_pixel(p->pixels, p->w, p->h, bx + 3, by + 5, ctx->theme.text);
-					draw_pixel(p->pixels, p->w, p->h, bx + 4, by + 6, ctx->theme.text);
-					draw_pixel(p->pixels, p->w, p->h, bx + 5, by + 5, ctx->theme.text);
-					draw_pixel(p->pixels, p->w, p->h, bx + 6, by + 4, ctx->theme.text);
-					draw_pixel(p->pixels, p->w, p->h, bx + 7, by + 3, ctx->theme.text);
-					draw_pixel(p->pixels, p->w, p->h, bx + 3, by + 4, ctx->theme.text);
-					draw_pixel(p->pixels, p->w, p->h, bx + 4, by + 5, ctx->theme.text);
-					draw_pixel(p->pixels, p->w, p->h, bx + 5, by + 4, ctx->theme.text);
-					draw_pixel(p->pixels, p->w, p->h, bx + 6, by + 3, ctx->theme.text);
-					draw_pixel(p->pixels, p->w, p->h, bx + 7, by + 2, ctx->theme.text);
+					int32_t m = check_sz / 5;
+					int32_t lw = m > 0 ? m : 1;
+					int32_t x0 = bx + m;
+					int32_t y0 = by + check_sz / 2;
+					int32_t x1 = bx + check_sz * 2 / 5;
+					int32_t y1 = by + check_sz - m - 1;
+					int32_t x2 = bx + check_sz - m;
+					int32_t y2 = by + m;
+					draw_aa_line(p->pixels, p->w, p->h, x0, y0, x1, y1, ctx->theme.text, lw);
+					draw_aa_line(p->pixels, p->w, p->h, x1, y1, x2, y2, ctx->theme.text, lw);
 				}
 
 			} else if(mi->style & MKGUI_MENUITEM_RADIO) {
@@ -231,6 +236,15 @@ static void render_menu_popup(struct mkgui_ctx *ctx, struct mkgui_popup *p, uint
 				if(mi->style & MKGUI_MENUITEM_CHECKED) {
 					draw_aa_circle_fill(p->pixels, p->w, p->h, cx, cy, radio_r_in, ctx->theme.text);
 				}
+			}
+
+			struct mkgui_accel *acl = accel_find_for_widget(ctx, mi->id);
+			if(acl) {
+				char accel_buf[64];
+				accel_format_text(acl->keymod, acl->keysym, accel_buf, sizeof(accel_buf));
+				int32_t atw = text_width(ctx, accel_buf);
+				int32_t ax = p->w - atw - sc(ctx, 8);
+				push_text_clip(p->x + ax, ty + p->y, accel_buf, ctx->theme.text_disabled, p->x + 1, p->y + 1, p->x + p->w - 1, p->y + p->h - 1);
 			}
 
 			if(menu_item_has_children(ctx, mi->id)) {

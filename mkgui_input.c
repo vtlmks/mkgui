@@ -284,6 +284,7 @@ static uint32_t handle_input_key(struct mkgui_ctx *ctx, struct mkgui_event *ev, 
 		if(readonly) {
 			return 0;
 		}
+		input_undo_push_force(inp);
 		if(input_has_selection(inp)) {
 			input_delete_selection(inp);
 			dirty_all(ctx);
@@ -311,6 +312,7 @@ static uint32_t handle_input_key(struct mkgui_ctx *ctx, struct mkgui_event *ev, 
 		if(readonly) {
 			return 0;
 		}
+		input_undo_push_force(inp);
 		if(input_has_selection(inp)) {
 			input_delete_selection(inp);
 			dirty_all(ctx);
@@ -344,6 +346,7 @@ static uint32_t handle_input_key(struct mkgui_ctx *ctx, struct mkgui_event *ev, 
 				}
 			}
 		}
+		input_undo_push(inp);
 		if(input_has_selection(inp)) {
 			input_delete_selection(inp);
 			text_len = (uint32_t)strlen(inp->text);

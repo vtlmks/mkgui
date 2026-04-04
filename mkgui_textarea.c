@@ -405,6 +405,7 @@ static uint32_t handle_textarea_key(struct mkgui_ctx *ctx, struct mkgui_event *e
 		if(readonly) {
 			return 0;
 		}
+		textarea_undo_push_force(ta);
 		if(textarea_has_selection(ta)) {
 			textarea_delete_selection(ta);
 		}
@@ -421,6 +422,7 @@ static uint32_t handle_textarea_key(struct mkgui_ctx *ctx, struct mkgui_event *e
 		if(readonly) {
 			return 0;
 		}
+		textarea_undo_push_force(ta);
 		if(textarea_has_selection(ta)) {
 			textarea_delete_selection(ta);
 			dirty_widget_id(ctx, ctx->focus_id);
@@ -448,6 +450,7 @@ static uint32_t handle_textarea_key(struct mkgui_ctx *ctx, struct mkgui_event *e
 		if(readonly) {
 			return 0;
 		}
+		textarea_undo_push_force(ta);
 		if(textarea_has_selection(ta)) {
 			textarea_delete_selection(ta);
 			dirty_widget_id(ctx, ctx->focus_id);
@@ -578,6 +581,7 @@ static uint32_t handle_textarea_key(struct mkgui_ctx *ctx, struct mkgui_event *e
 		if(readonly) {
 			return 0;
 		}
+		textarea_undo_push(ta);
 		if(textarea_has_selection(ta)) {
 			textarea_delete_selection(ta);
 		}

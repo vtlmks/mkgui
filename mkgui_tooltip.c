@@ -20,6 +20,7 @@ static void render_tooltip(struct mkgui_ctx *ctx) {
 
 	char *text = ctx->tooltip_texts[idx];
 	if(text[0] == '\0') {
+		ctx->tooltip_shown = 1;
 		return;
 	}
 

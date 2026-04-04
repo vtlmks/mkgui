@@ -47,6 +47,8 @@
 #define MKGUI_TOOLBAR_SEP_W        8
 #define MKGUI_STATUSBAR_HEIGHT     22
 #define MKGUI_MAX_TIMERS           8
+#define MKGUI_MAX_ACCELS           64
+#define MKGUI_DROP_MAX             256
 
 // ---------------------------------------------------------------------------
 // Key constants
@@ -71,6 +73,7 @@
 
 #define MKGUI_MOD_SHIFT            (1 << 0)
 #define MKGUI_MOD_CONTROL          (1 << 2)
+#define MKGUI_MOD_ALT              (1 << 3)
 
 // ---------------------------------------------------------------------------
 // Widget types
@@ -288,6 +291,8 @@ enum {
 	MKGUI_EVENT_CONTEXT_HEADER,
 	MKGUI_EVENT_CONTEXT_MENU,
 	MKGUI_EVENT_TIMER,
+	MKGUI_EVENT_ACCEL,
+	MKGUI_EVENT_FILE_DROP,
 };
 
 // ---------------------------------------------------------------------------
@@ -846,6 +851,22 @@ MKGUI_API uint32_t mkgui_input_dialog(struct mkgui_ctx *ctx, char *title, char *
 MKGUI_API uint32_t mkgui_open_dialog(struct mkgui_ctx *ctx, struct mkgui_file_dialog_opts *opts);
 MKGUI_API uint32_t mkgui_save_dialog(struct mkgui_ctx *ctx, struct mkgui_file_dialog_opts *opts);
 MKGUI_API char *mkgui_dialog_path(struct mkgui_ctx *ctx, uint32_t index);
+
+// ---------------------------------------------------------------------------
+// Accelerators
+// ---------------------------------------------------------------------------
+
+MKGUI_API void mkgui_accel_add(struct mkgui_ctx *ctx, uint32_t id, uint32_t keymod, uint32_t keysym);
+MKGUI_API void mkgui_accel_remove(struct mkgui_ctx *ctx, uint32_t id);
+MKGUI_API void mkgui_accel_clear(struct mkgui_ctx *ctx);
+
+// ---------------------------------------------------------------------------
+// File drag-and-drop
+// ---------------------------------------------------------------------------
+
+MKGUI_API void mkgui_drop_enable(struct mkgui_ctx *ctx);
+MKGUI_API uint32_t mkgui_drop_count(struct mkgui_ctx *ctx);
+MKGUI_API char *mkgui_drop_file(struct mkgui_ctx *ctx, uint32_t index);
 
 // ---------------------------------------------------------------------------
 // Utilities

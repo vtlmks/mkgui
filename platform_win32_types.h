@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 #include <wingdi.h>
+#include <shellapi.h>
 
 #define MKGUI_EVQ_SIZE 256
 

@@ -255,6 +255,25 @@ static LRESULT CALLBACK mkgui_wndproc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 			return 0;
 		} break;
 
+		case WM_DROPFILES: {
+			HDROP hDrop = (HDROP)wp;
+			UINT count = DragQueryFileA(hDrop, 0xFFFFFFFF, NULL, 0);
+			drop_free(owner);
+			for(UINT i = 0; i < count && i < MKGUI_DROP_MAX; ++i) {
+				char path[4096];
+				UINT len = DragQueryFileA(hDrop, i, path, sizeof(path));
+				if(len > 0) {
+					drop_add_path(owner, path);
+				}
+			}
+			DragFinish(hDrop);
+			if(owner->drop_count > 0) {
+				pev.type = MKGUI_PLAT_DROP;
+				evq_push_ctx(&owner->plat, &pev);
+			}
+			return 0;
+		} break;
+
 		case WM_ENTERSIZEMOVE: {
 			SetTimer(hwnd, 1, 16, NULL);
 			return 0;
@@ -572,8 +591,29 @@ static void platform_fb_resize(struct mkgui_ctx *ctx) {
 	ReleaseDC(plat->hwnd, hdc);
 }
 
+// [=]===^=[ platform_drop_enable ]================================[=]
+static void platform_drop_enable(struct mkgui_ctx *ctx) {
+	DragAcceptFiles(ctx->plat.hwnd, TRUE);
+}
+
 // [=]===^=[ platform_detect_scale ]================================[=]
 static float platform_detect_scale(struct mkgui_ctx *ctx) {
+	char *env = getenv("MKGUI_SCALE");
+	if(env) {
+		char *end = NULL;
+		double val = strtod(env, &end);
+		if(end && end != env && val > 0.0) {
+			if(end[0] == '%') {
+				val /= 100.0;
+			} else if((end[0] == 'd' || end[0] == 'D') && (end[1] == 'p' || end[1] == 'P') && (end[2] == 'i' || end[2] == 'I')) {
+				val /= 96.0;
+			}
+			if(val >= 0.5 && val <= 4.0) {
+				return (float)val;
+			}
+		}
+	}
+
 	typedef UINT (WINAPI *GetDpiForWindow_t)(HWND);
 	HMODULE user32 = GetModuleHandleA("user32.dll");
 	if(user32) {
