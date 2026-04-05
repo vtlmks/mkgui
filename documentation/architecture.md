@@ -301,7 +301,7 @@ Both platforms implement the same set of `platform_*()` functions. The correct i
 | `platform_next_event()` | Dequeue and translate one event |
 | `platform_translate_coords()` | Local to screen coordinate conversion |
 | `platform_screen_size()` | Get desktop dimensions |
-| `platform_set_cursor()` | Switch cursor (default, h-resize, etc.) |
+| `platform_set_cursor()` | Switch cursor (`MKGUI_CURSOR_DEFAULT` / `_H_RESIZE` / `_V_RESIZE`) |
 | `platform_font_init()` | Load TTF font, rasterize glyphs |
 | `platform_font_fini()` | Free font resources |
 | `platform_clipboard_set()` | Set clipboard content |

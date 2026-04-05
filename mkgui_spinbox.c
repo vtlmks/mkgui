@@ -72,7 +72,7 @@ static void render_spinbox(struct mkgui_ctx *ctx, uint32_t idx) {
 
 	uint32_t disabled = (w->flags & MKGUI_DISABLED);
 	uint32_t focused = (ctx->focus_id == w->id);
-	draw_patch(ctx, MKGUI_STYLE_SUNKEN, rx, ry, rw, rh, ctx->theme.input_bg, focused ? ctx->theme.splitter : ctx->theme.widget_border);
+	draw_patch(ctx, MKGUI_STYLE_SUNKEN, rx, ry, rw, rh, ctx->theme.input_bg, focused ? ctx->theme.highlight : ctx->theme.widget_border);
 
 	int32_t btn_w = sc(ctx, 20);
 	int32_t text_pad = sc(ctx, 4);

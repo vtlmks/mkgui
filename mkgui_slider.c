@@ -108,8 +108,8 @@ static void render_slider(struct mkgui_ctx *ctx, uint32_t idx) {
 		range = 1;
 	}
 
-	uint32_t thumb_color = disabled ? ctx->theme.widget_border : ((ctx->focus_id == w->id) ? ctx->theme.sel_text : ctx->theme.splitter);
-	uint32_t thumb_border = disabled ? ctx->theme.widget_border : ctx->theme.splitter;
+	uint32_t thumb_color = disabled ? ctx->theme.widget_border : ((ctx->focus_id == w->id) ? ctx->theme.sel_text : ctx->theme.highlight);
+	uint32_t thumb_border = disabled ? ctx->theme.widget_border : ctx->theme.highlight;
 	uint32_t wedge_color = blend_pixel(ctx->theme.bg, ctx->theme.widget_border, 128);
 
 	if(vertical) {

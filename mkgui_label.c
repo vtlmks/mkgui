@@ -66,7 +66,7 @@ static void render_label(struct mkgui_ctx *ctx, uint32_t idx) {
 	if(w->flags & MKGUI_DISABLED) {
 		tc = ctx->theme.text_disabled;
 	} else if(is_link) {
-		tc = (ctx->hover_id == w->id) ? ctx->theme.splitter : ctx->theme.selection;
+		tc = (ctx->hover_id == w->id) ? ctx->theme.highlight : ctx->theme.selection;
 	} else {
 		tc = ctx->theme.text;
 	}

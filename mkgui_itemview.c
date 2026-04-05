@@ -538,7 +538,7 @@ static void render_itemview(struct mkgui_ctx *ctx, uint32_t idx) {
 	}
 
 	uint32_t focused = (ctx->focus_id == w->id);
-	draw_patch(ctx, MKGUI_STYLE_SUNKEN, rx, ry, rw, rh, ctx->theme.input_bg, focused ? ctx->theme.splitter : ctx->theme.widget_border);
+	draw_patch(ctx, MKGUI_STYLE_SUNKEN, rx, ry, rw, rh, ctx->theme.input_bg, focused ? ctx->theme.highlight : ctx->theme.widget_border);
 
 	int32_t save_cx1 = render_clip_x1, save_cy1 = render_clip_y1;
 	int32_t save_cx2 = render_clip_x2, save_cy2 = render_clip_y2;

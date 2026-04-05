@@ -511,7 +511,8 @@ static uint32_t platform_init(struct mkgui_ctx *ctx, const char *title, int32_t 
 
 	plat->cursor_default = LoadCursorA(NULL, IDC_ARROW);
 	plat->cursor_h_resize = LoadCursorA(NULL, IDC_SIZEWE);
-	plat->cursor_active = 0;
+	plat->cursor_v_resize = LoadCursorA(NULL, IDC_SIZENS);
+	plat->cursor_active = MKGUI_CURSOR_DEFAULT;
 
 	ShowWindow(plat->hwnd, SW_SHOW);
 	UpdateWindow(plat->hwnd);
@@ -547,7 +548,8 @@ static uint32_t platform_init_child(struct mkgui_ctx *ctx, struct mkgui_ctx *par
 
 	plat->cursor_default = LoadCursorA(NULL, IDC_ARROW);
 	plat->cursor_h_resize = LoadCursorA(NULL, IDC_SIZEWE);
-	plat->cursor_active = 0;
+	plat->cursor_v_resize = LoadCursorA(NULL, IDC_SIZENS);
+	plat->cursor_active = MKGUI_CURSOR_DEFAULT;
 
 	ShowWindow(plat->hwnd, SW_SHOW);
 	UpdateWindow(plat->hwnd);
@@ -572,7 +574,21 @@ static void platform_set_cursor(struct mkgui_ctx *ctx, uint32_t cursor_type) {
 		return;
 	}
 	plat->cursor_active = cursor_type;
-	SetCursor(cursor_type ? plat->cursor_h_resize : plat->cursor_default);
+	HCURSOR c;
+	switch(cursor_type) {
+		case MKGUI_CURSOR_H_RESIZE: {
+			c = plat->cursor_h_resize;
+		} break;
+
+		case MKGUI_CURSOR_V_RESIZE: {
+			c = plat->cursor_v_resize;
+		} break;
+
+		default: {
+			c = plat->cursor_default;
+		} break;
+	}
+	SetCursor(c);
 }
 
 // ---------------------------------------------------------------------------

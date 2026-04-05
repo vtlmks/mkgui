@@ -34,7 +34,7 @@ static void render_toggle(struct mkgui_ctx *ctx, uint32_t idx) {
 		track_border = track_fill;
 	} else {
 		track_fill = ctx->theme.bg;
-		track_border = (focused || hovered) ? ctx->theme.splitter : ctx->theme.widget_border;
+		track_border = (focused || hovered) ? ctx->theme.highlight : ctx->theme.widget_border;
 	}
 	draw_rounded_rect(ctx->pixels, ctx->win_w, ctx->win_h, rx, ty, track_w, track_h, track_fill, track_border, track_r);
 

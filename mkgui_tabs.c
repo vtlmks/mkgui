@@ -101,10 +101,10 @@ static void render_tabs(struct mkgui_ctx *ctx, uint32_t idx) {
 		uint32_t focused_tab = (active && ctx->focus_id == w->id);
 		uint32_t hovered = (!active && hover_tab == child->id);
 		uint32_t bg = active ? ctx->theme.tab_active : (hovered ? ctx->theme.tab_hover : ctx->theme.tab_inactive);
-		uint32_t bd = active ? (focused_tab ? ctx->theme.splitter : ctx->theme.widget_border) : (hovered ? ctx->theme.tab_hover : ctx->theme.tab_inactive);
+		uint32_t bd = active ? (focused_tab ? ctx->theme.highlight : ctx->theme.widget_border) : (hovered ? ctx->theme.tab_hover : ctx->theme.tab_inactive);
 		draw_rounded_rect(ctx->pixels, ctx->win_w, ctx->win_h, tx, ry, tw, ctx->tab_height, bg, bd, ctx->theme.corner_radius);
 		if(active) {
-			draw_hline(ctx->pixels, ctx->win_w, ctx->win_h, tx, ry, tw, ctx->theme.splitter);
+			draw_hline(ctx->pixels, ctx->win_w, ctx->win_h, tx, ry, tw, ctx->theme.highlight);
 		}
 		int32_t cx = tx + tab_pad;
 		int32_t ii = widget_icon_idx(child);

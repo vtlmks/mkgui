@@ -120,7 +120,7 @@ static void render_ctxmenu_popup(struct mkgui_ctx *ctx, struct mkgui_popup *p, i
 			iy += sep_h;
 
 		} else {
-			uint32_t bg = ((int32_t)i == hover_item) ? ctx->theme.menu_hover : ctx->theme.menu_bg;
+			uint32_t bg = ((int32_t)i == hover_item) ? ctx->theme.highlight : ctx->theme.menu_bg;
 			uint32_t tc = (it->flags & MKGUI_DISABLED) ? ctx->theme.text_disabled : ctx->theme.text;
 
 			if((int32_t)i == hover_item && !(it->flags & MKGUI_DISABLED)) {

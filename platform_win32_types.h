@@ -13,6 +13,7 @@ struct mkgui_platform {
 	HBITMAP hbmp_old;
 	HCURSOR cursor_default;
 	HCURSOR cursor_h_resize;
+	HCURSOR cursor_v_resize;
 	uint32_t cursor_active;
 	uint32_t is_child;
 	HWND parent_hwnd;

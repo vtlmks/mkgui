@@ -18,7 +18,7 @@ static void render_button(struct mkgui_ctx *ctx, uint32_t idx) {
 	} else if(ctx->hover_id == w->id) {
 		bg = ctx->theme.widget_hover;
 	}
-	uint32_t border = (ctx->focus_id == w->id) ? ctx->theme.splitter : ctx->theme.widget_border;
+	uint32_t border = (ctx->focus_id == w->id) ? ctx->theme.highlight : ctx->theme.widget_border;
 	draw_patch(ctx, style, rx, ry, rw, rh, bg, border);
 
 	uint32_t tc = (w->flags & MKGUI_DISABLED) ? ctx->theme.text_disabled : ctx->theme.text;

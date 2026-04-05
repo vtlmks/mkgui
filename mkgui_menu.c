@@ -146,7 +146,7 @@ static void render_menu_bar(struct mkgui_ctx *ctx, uint32_t idx) {
 			continue;
 		}
 		int32_t iw = label_text_width(ctx, mi) + menu_pad * 2;
-		uint32_t bg = (ctx->hover_id == mi->id) ? ctx->theme.menu_hover : ctx->theme.menu_bg;
+		uint32_t bg = (ctx->hover_id == mi->id) ? ctx->theme.highlight : ctx->theme.menu_bg;
 		draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, mx, ry, iw, rh, bg);
 		int32_t ty = ry + (rh - ctx->font_height) / 2;
 		push_text_clip(mx + menu_pad, ty, mi->label, ctx->theme.text, mx, ry, mx + iw, ry + rh);
@@ -202,7 +202,7 @@ static void render_menu_popup(struct mkgui_ctx *ctx, struct mkgui_popup *p, uint
 			iy += sep_h;
 
 		} else {
-			uint32_t bg = (item_idx == hover_item) ? ctx->theme.menu_hover : ctx->theme.menu_bg;
+			uint32_t bg = (item_idx == hover_item) ? ctx->theme.highlight : ctx->theme.menu_bg;
 			draw_rect_fill(p->pixels, p->w, p->h, 1, iy, p->w - 2, ctx->row_height, bg);
 			int32_t ty = iy + (ctx->row_height - ctx->font_height) / 2;
 			push_text_clip(p->x + icon_col, ty + p->y, mi->label, ctx->theme.text, p->x + 1, p->y + 1, p->x + p->w - 1, p->y + p->h - 1);

@@ -1788,7 +1788,7 @@ Rounded rectangles and circles use 4x4 subpixel sampling for antialiased edges. 
 
 ### Theming
 
-The default theme uses Breeze dark colors. A built-in light theme is also available. Switch themes at runtime with `mkgui_set_theme`:
+`mkgui_init()` auto-detects light vs dark from the environment. Apps can override at runtime with `mkgui_set_theme`:
 
 ```c
 // Built-in themes
@@ -1798,6 +1798,13 @@ struct mkgui_theme light_theme(void);    // light
 // Apply a theme (re-renders icons automatically)
 void mkgui_set_theme(struct mkgui_ctx *ctx, struct mkgui_theme theme);
 ```
+
+`mkgui_init()` detects dark vs light in this order:
+
+1. `MKGUI_THEME=light` or `MKGUI_THEME=dark` environment variable (explicit override)
+2. `GTK_THEME` contains `:dark` or `-dark` (GNOME/XFCE convention)
+3. Windows registry `HKCU\...\Themes\Personalize\AppsUseLightTheme` (Win32 only)
+4. Falls back to dark
 
 Custom themes can be created by filling in a `struct mkgui_theme` manually.
 
@@ -1819,11 +1826,10 @@ Key theme colors (dark defaults shown):
 | `tab_inactive` | `#2a2e32` | Inactive tab background |
 | `tab_hover` | `#353a3f` | Tab hover highlight |
 | `menu_bg` | `#31363b` | Menu/popup background |
-| `menu_hover` | `#3daee9` | Menu hover highlight |
 | `scrollbar_bg` | `#1d2023` | Scrollbar track |
 | `scrollbar_thumb` | `#4d4d4d` | Scrollbar thumb |
 | `scrollbar_thumb_hover` | `#5a5a5a` | Scrollbar thumb on hover/drag |
-| `splitter` | `#3daee9` | Splitter handle, focus border, column drag indicator |
+| `highlight` | `#3daee9` | Focus border, menu hover, selection accents (KDE Highlight color) |
 | `header_bg` | `#2a2e32` | Listview column header background |
 | `listview_alt` | `#2a2e32` | Alternating row background |
 | `accent` | `#2a7ab5` | Accent color (spinner arc, progress bar fill, cell progress) |

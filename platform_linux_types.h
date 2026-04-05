@@ -48,6 +48,7 @@ struct mkgui_platform {
 	XImage *img;
 	Cursor cursor_default;
 	Cursor cursor_h_resize;
+	Cursor cursor_v_resize;
 	uint32_t cursor_active;
 	uint32_t is_child;
 	XIM xim;

@@ -16,7 +16,7 @@ static void render_dropdown(struct mkgui_ctx *ctx, uint32_t idx) {
 	if(!disabled && ctx->hover_id == w->id) {
 		bg = ctx->theme.widget_hover;
 	}
-	uint32_t border = (ctx->focus_id == w->id) ? ctx->theme.splitter : ctx->theme.widget_border;
+	uint32_t border = (ctx->focus_id == w->id) ? ctx->theme.highlight : ctx->theme.widget_border;
 	draw_patch(ctx, MKGUI_STYLE_RAISED, rx, ry, rw, rh, bg, border);
 
 	struct mkgui_dropdown_data *dd = find_dropdown_data(ctx, w->id);
@@ -79,7 +79,7 @@ static void render_dropdown_popup(struct mkgui_ctx *ctx, struct mkgui_popup *p, 
 		}
 		uint32_t bg;
 		if((int32_t)i == hover_item) {
-			bg = ctx->theme.menu_hover;
+			bg = ctx->theme.highlight;
 		} else if((int32_t)i == dd->selected) {
 			bg = ctx->theme.selection;
 		} else {

@@ -788,7 +788,7 @@ static void ed_render_help_popup(struct mkgui_ctx *ctx, void *userdata) {
 		by = 0;
 	}
 
-	draw_rounded_rect(ctx->pixels, ctx->win_w, ctx->win_h, bx, by, pw, ph, ctx->theme.menu_bg, ctx->theme.splitter, ctx->theme.corner_radius);
+	draw_rounded_rect(ctx->pixels, ctx->win_w, ctx->win_h, bx, by, pw, ph, ctx->theme.menu_bg, ctx->theme.highlight, ctx->theme.corner_radius);
 
 	src = ed_help_text;
 	int32_t ty = by + pad;
@@ -2010,7 +2010,7 @@ static void ed_draw_widget_fallback(struct mkgui_ctx *ctx, uint32_t idx) {
 					slider_draw_wedge_v(buf, bw, bh, track_x + 4, ry, rh, 0, rh, MKGUI_SLIDER_WEDGE_MAX_W, ctx->theme.widget_border);
 				}
 				int32_t thumb_y = ry + rh / 3;
-				draw_patch(ctx, MKGUI_STYLE_RAISED, rx + 2, thumb_y, rw - 4, 10, ctx->theme.splitter, ctx->theme.splitter);
+				draw_patch(ctx, MKGUI_STYLE_RAISED, rx + 2, thumb_y, rw - 4, 10, ctx->theme.highlight, ctx->theme.highlight);
 
 			} else {
 				int32_t track_y = ry + rh / 2 - 2;
@@ -2019,7 +2019,7 @@ static void ed_draw_widget_fallback(struct mkgui_ctx *ctx, uint32_t idx) {
 					slider_draw_wedge_h(buf, bw, bh, rx, track_y + 4, rw, 0, rw, MKGUI_SLIDER_WEDGE_MAX_W, ctx->theme.widget_border);
 				}
 				int32_t thumb_x = rx + rw / 3;
-				draw_patch(ctx, MKGUI_STYLE_RAISED, thumb_x, ry + 2, 10, rh - 4, ctx->theme.splitter, ctx->theme.splitter);
+				draw_patch(ctx, MKGUI_STYLE_RAISED, thumb_x, ry + 2, 10, rh - 4, ctx->theme.highlight, ctx->theme.highlight);
 			}
 		} break;
 
@@ -2094,7 +2094,7 @@ static void ed_draw_widget_fallback(struct mkgui_ctx *ctx, uint32_t idx) {
 				uint32_t bd = active ? ctx->theme.widget_border : ctx->theme.tab_inactive;
 				draw_rounded_rect(buf, bw, bh, tx, ry, tw, ctx->tab_height, tab_bg, bd, ctx->theme.corner_radius);
 				if(active) {
-					draw_hline(buf, bw, bh, tx, ry, tw, ctx->theme.splitter);
+					draw_hline(buf, bw, bh, tx, ry, tw, ctx->theme.highlight);
 				}
 				int32_t cx = tx + 10;
 				if(tab_ii >= 0) {
@@ -2262,12 +2262,12 @@ static void ed_draw_widget_fallback(struct mkgui_ctx *ctx, uint32_t idx) {
 
 		case MKGUI_HSPLIT: {
 			int32_t split_y = ry + rh / 2;
-			draw_rect_fill(buf, bw, bh, rx, split_y, rw, ctx->split_thick, ctx->theme.splitter);
+			draw_rect_fill(buf, bw, bh, rx, split_y, rw, ctx->split_thick, ctx->theme.highlight);
 		} break;
 
 		case MKGUI_VSPLIT: {
 			int32_t split_x = rx + rw / 2;
-			draw_rect_fill(buf, bw, bh, split_x, ry, ctx->split_thick, rh, ctx->theme.splitter);
+			draw_rect_fill(buf, bw, bh, split_x, ry, ctx->split_thick, rh, ctx->theme.highlight);
 		} break;
 
 		case MKGUI_SCROLLBAR: {
@@ -2360,7 +2360,9 @@ static void ed_render_canvas(struct mkgui_ctx *ctx, uint32_t id, uint32_t *pixel
 	(void)pixels;
 	(void)userdata;
 
-	draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, cx, cy, cw, ch, 0xFF3A3A3A);
+	uint32_t workspace_bg = blend_pixel(ctx->theme.bg, ctx->theme.text, 30);
+	uint32_t grid_color = blend_pixel(ctx->theme.bg, ctx->theme.text, 60);
+	draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, cx, cy, cw, ch, workspace_bg);
 
 	int32_t win_x = cx + (cw - ed.canvas_w) / 2;
 	int32_t win_y = cy + (ch - ed.canvas_h) / 2;
@@ -2368,7 +2370,7 @@ static void ed_render_canvas(struct mkgui_ctx *ctx, uint32_t id, uint32_t *pixel
 	ed_win_y = win_y;
 
 	draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, win_x, win_y, ed.canvas_w, ed.canvas_h, ctx->theme.bg);
-	draw_rect_border(ctx->pixels, ctx->win_w, ctx->win_h, win_x, win_y, ed.canvas_w, ed.canvas_h, 0xFF555555);
+	draw_rect_border(ctx->pixels, ctx->win_w, ctx->win_h, win_x, win_y, ed.canvas_w, ed.canvas_h, ctx->theme.widget_border);
 
 	if(ed.grid_size >= 4) {
 		for(uint32_t gy = 0; gy < (uint32_t)ed.canvas_h; gy += (uint32_t)ed.grid_size) {
@@ -2377,7 +2379,7 @@ static void ed_render_canvas(struct mkgui_ctx *ctx, uint32_t id, uint32_t *pixel
 				int32_t py = win_y + (int32_t)gy;
 				if(px >= cx && px < cx + cw && py >= cy && py < cy + ch) {
 					if(px >= 0 && px < ctx->win_w && py >= 0 && py < ctx->win_h) {
-						ctx->pixels[py * ctx->win_w + px] = 0xFF4A4A4A;
+						ctx->pixels[py * ctx->win_w + px] = grid_color;
 					}
 				}
 			}

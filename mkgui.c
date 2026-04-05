@@ -71,6 +71,12 @@ enum {
 	MKGUI_PLAT_DROP,
 };
 
+enum {
+	MKGUI_CURSOR_DEFAULT,
+	MKGUI_CURSOR_H_RESIZE,
+	MKGUI_CURSOR_V_RESIZE,
+};
+
 struct mkgui_plat_event {
 	uint32_t type;
 	int32_t x, y;
@@ -897,11 +903,10 @@ MKGUI_API struct mkgui_theme default_theme(void) {
 	t.tab_inactive        = 0xff2a2e32;
 	t.tab_hover           = 0xff353a3f;
 	t.menu_bg             = 0xff31363b;
-	t.menu_hover          = 0xff3daee9;
 	t.scrollbar_bg        = 0xff1d2023;
 	t.scrollbar_thumb     = 0xff4d4d4d;
 	t.scrollbar_thumb_hover = 0xff5a5a5a;
-	t.splitter            = 0xff3daee9;
+	t.highlight           = 0xff3daee9;
 	t.header_bg           = 0xff2a2e32;
 	t.listview_alt        = 0xff2a2e32;
 	t.accent              = 0xff2a7ab5;
@@ -926,16 +931,61 @@ MKGUI_API struct mkgui_theme light_theme(void) {
 	t.tab_inactive          = 0xffe0e0e0;
 	t.tab_hover             = 0xffebebeb;
 	t.menu_bg               = 0xfffafafa;
-	t.menu_hover            = 0xff3daee9;
 	t.scrollbar_bg          = 0xffe0e0e0;
 	t.scrollbar_thumb       = 0xffb0b0b0;
 	t.scrollbar_thumb_hover = 0xff909090;
-	t.splitter              = 0xff3daee9;
+	t.highlight             = 0xff3daee9;
 	t.header_bg             = 0xffe8e8e8;
 	t.listview_alt          = 0xfff5f5f5;
 	t.accent                = 0xff2a7ab5;
 	t.corner_radius         = 3;
 	return t;
+}
+
+// [=]===^=[ theme_prefers_dark ]=================================[=]
+static uint32_t theme_prefers_dark(void) {
+	char *override = getenv("MKGUI_THEME");
+	if(override) {
+		if(strcmp(override, "light") == 0) {
+			return 0;
+		}
+		if(strcmp(override, "dark") == 0) {
+			return 1;
+		}
+	}
+	char *gtk = getenv("GTK_THEME");
+	if(gtk && gtk[0]) {
+		char lower[128];
+		uint32_t i = 0;
+		while(gtk[i] && i < sizeof(lower) - 1) {
+			char c = gtk[i];
+			if(c >= 'A' && c <= 'Z') {
+				c = (char)(c + ('a' - 'A'));
+			}
+			lower[i] = c;
+			++i;
+		}
+		lower[i] = 0;
+		return strstr(lower, "dark") != NULL;
+	}
+#ifdef _WIN32
+	DWORD value = 1;
+	DWORD size = sizeof(value);
+	LONG res = RegGetValueA(HKEY_CURRENT_USER,
+		"Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize",
+		"AppsUseLightTheme",
+		RRF_RT_REG_DWORD,
+		NULL, &value, &size);
+	if(res == ERROR_SUCCESS) {
+		return value == 0;
+	}
+#endif
+	return 1;
+}
+
+// [=]===^=[ auto_theme ]=========================================[=]
+static struct mkgui_theme auto_theme(void) {
+	return theme_prefers_dark() ? default_theme() : light_theme();
 }
 
 // ---------------------------------------------------------------------------
@@ -3939,7 +3989,7 @@ MKGUI_API struct mkgui_ctx *mkgui_create(struct mkgui_widget *widgets, uint32_t 
 	}
 
 	platform_font_init(ctx);
-	ctx->theme = default_theme();
+	ctx->theme = auto_theme();
 	mkgui_icon_init();
 	icon_load_from_widgets(ctx);
 	dirty_all(ctx);
@@ -5046,18 +5096,34 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 					}
 				}
 
-				uint32_t want_resize_cursor = 0;
-				if(hi >= 0 && ctx->widgets[hi].type == MKGUI_LISTVIEW) {
-					if(listview_divider_hit(ctx, (uint32_t)hi, ctx->mouse_x, ctx->mouse_y) >= 0) {
-						want_resize_cursor = 1;
+				uint32_t cursor_type = MKGUI_CURSOR_DEFAULT;
+				if(ctx->press_id) {
+					struct mkgui_widget *pw = find_widget(ctx, ctx->press_id);
+					if(pw) {
+						if(pw->type == MKGUI_HSPLIT) {
+							cursor_type = MKGUI_CURSOR_V_RESIZE;
+						} else if(pw->type == MKGUI_VSPLIT) {
+							cursor_type = MKGUI_CURSOR_H_RESIZE;
+						}
 					}
 				}
-				if(hi >= 0 && ctx->widgets[hi].type == MKGUI_GRIDVIEW) {
-					if(gridview_divider_hit(ctx, (uint32_t)hi, ctx->mouse_x, ctx->mouse_y) >= 0) {
-						want_resize_cursor = 1;
+				if(cursor_type == MKGUI_CURSOR_DEFAULT && hi >= 0) {
+					uint32_t htype = ctx->widgets[hi].type;
+					if(htype == MKGUI_HSPLIT) {
+						cursor_type = MKGUI_CURSOR_V_RESIZE;
+					} else if(htype == MKGUI_VSPLIT) {
+						cursor_type = MKGUI_CURSOR_H_RESIZE;
+					} else if(htype == MKGUI_LISTVIEW) {
+						if(listview_divider_hit(ctx, (uint32_t)hi, ctx->mouse_x, ctx->mouse_y) >= 0) {
+							cursor_type = MKGUI_CURSOR_H_RESIZE;
+						}
+					} else if(htype == MKGUI_GRIDVIEW) {
+						if(gridview_divider_hit(ctx, (uint32_t)hi, ctx->mouse_x, ctx->mouse_y) >= 0) {
+							cursor_type = MKGUI_CURSOR_H_RESIZE;
+						}
 					}
 				}
-				platform_set_cursor(ctx, want_resize_cursor);
+				platform_set_cursor(ctx, cursor_type);
 
 				if(ctx->popup_count > 0 && hi >= 0 && ctx->widgets[hi].type == MKGUI_MENUITEM) {
 					struct mkgui_widget *mw = &ctx->widgets[hi];

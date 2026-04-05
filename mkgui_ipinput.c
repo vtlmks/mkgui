@@ -53,7 +53,7 @@ static void render_ipinput(struct mkgui_ctx *ctx, uint32_t idx) {
 	int32_t rh = ctx->rects[idx].h;
 
 	uint32_t focused = (ctx->focus_id == w->id);
-	draw_patch(ctx, MKGUI_STYLE_SUNKEN, rx, ry, rw, rh, ctx->theme.input_bg, focused ? ctx->theme.splitter : ctx->theme.widget_border);
+	draw_patch(ctx, MKGUI_STYLE_SUNKEN, rx, ry, rw, rh, ctx->theme.input_bg, focused ? ctx->theme.highlight : ctx->theme.widget_border);
 
 	struct mkgui_ipinput_data *ip = find_ipinput_data(ctx, w->id);
 	if(!ip) {

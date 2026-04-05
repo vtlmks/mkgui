@@ -12,10 +12,7 @@ static void render_split(struct mkgui_ctx *ctx, uint32_t idx) {
 	struct mkgui_split_data *sd = find_split_data(ctx, w->id);
 	float ratio = sd ? sd->ratio : 0.5f;
 
-	uint32_t color = ctx->theme.splitter;
-	if(ctx->hover_id == w->id || ctx->press_id == w->id) {
-		color = ctx->theme.sel_text;
-	}
+	uint32_t color = ctx->theme.widget_border;
 
 	if(w->type == MKGUI_HSPLIT) {
 		int32_t split_y = ry + (int32_t)(rh * ratio);

@@ -150,7 +150,7 @@ static void render_combobox(struct mkgui_ctx *ctx, uint32_t idx) {
 
 	uint32_t disabled = (w->flags & MKGUI_DISABLED);
 	uint32_t focused = (ctx->focus_id == w->id);
-	uint32_t border = focused ? ctx->theme.splitter : ctx->theme.widget_border;
+	uint32_t border = focused ? ctx->theme.highlight : ctx->theme.widget_border;
 
 	int32_t text_w = rw - btn_w;
 	draw_patch(ctx, MKGUI_STYLE_SUNKEN, rx, ry, text_w, rh, ctx->theme.input_bg, border);
@@ -241,7 +241,7 @@ static void render_combobox_popup(struct mkgui_ctx *ctx, struct mkgui_popup *p, 
 		}
 		uint32_t bg;
 		if((int32_t)i == hover_item) {
-			bg = ctx->theme.menu_hover;
+			bg = ctx->theme.highlight;
 		} else if((int32_t)i == cb->highlight) {
 			bg = ctx->theme.selection;
 		} else {

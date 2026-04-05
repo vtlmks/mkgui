@@ -230,7 +230,7 @@ static void render_cell(struct mkgui_ctx *ctx, struct mkgui_listview_data *lv, u
 			int32_t bx = cx + (col_w - box_size) / 2;
 			int32_t by = row_y + (ctx->row_height - box_size) / 2;
 			if(bx + box_size > clip_left && bx < clip_right && by + box_size > clip_top && by < clip_bottom) {
-				uint32_t bg = checked ? ctx->theme.splitter : ctx->theme.input_bg;
+				uint32_t bg = checked ? ctx->theme.highlight : ctx->theme.input_bg;
 				draw_patch(ctx, MKGUI_STYLE_SUNKEN, bx, by, box_size, box_size, bg, ctx->theme.widget_border);
 				if(checked) {
 					int32_t ccx = bx + box_size / 2;
@@ -356,7 +356,7 @@ static void render_listview(struct mkgui_ctx *ctx, uint32_t idx) {
 	}
 
 	uint32_t focused = (ctx->focus_id == w->id);
-	draw_patch(ctx, MKGUI_STYLE_SUNKEN, rx, ry, rw, rh, ctx->theme.input_bg, focused ? ctx->theme.splitter : ctx->theme.widget_border);
+	draw_patch(ctx, MKGUI_STYLE_SUNKEN, rx, ry, rw, rh, ctx->theme.input_bg, focused ? ctx->theme.highlight : ctx->theme.widget_border);
 
 	int32_t hh = lv->header_height > 0 ? lv->header_height : ctx->row_height;
 	int32_t content_w = rw - 2 - ctx->scrollbar_w;
@@ -429,7 +429,7 @@ static void render_listview(struct mkgui_ctx *ctx, uint32_t idx) {
 			}
 			if(ix >= clip_left && ix <= clip_right) {
 				int32_t ind_w = sc(ctx, 3);
-				draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, ix - 1, ry + 1, ind_w, hh, ctx->theme.splitter);
+				draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, ix - 1, ry + 1, ind_w, hh, ctx->theme.highlight);
 			}
 		}
 	}

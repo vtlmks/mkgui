@@ -154,7 +154,8 @@ static uint32_t platform_init(struct mkgui_ctx *ctx, const char *title, int32_t 
 
 	plat->cursor_default = XCreateFontCursor(plat->dpy, XC_left_ptr);
 	plat->cursor_h_resize = XCreateFontCursor(plat->dpy, XC_sb_h_double_arrow);
-	plat->cursor_active = 0;
+	plat->cursor_v_resize = XCreateFontCursor(plat->dpy, XC_sb_v_double_arrow);
+	plat->cursor_active = MKGUI_CURSOR_DEFAULT;
 
 	plat->xim = XOpenIM(plat->dpy, NULL, NULL, NULL);
 	if(plat->xim) {
@@ -220,7 +221,8 @@ static uint32_t platform_init_child(struct mkgui_ctx *ctx, struct mkgui_ctx *par
 
 	plat->cursor_default = XCreateFontCursor(plat->dpy, XC_left_ptr);
 	plat->cursor_h_resize = XCreateFontCursor(plat->dpy, XC_sb_h_double_arrow);
-	plat->cursor_active = 0;
+	plat->cursor_v_resize = XCreateFontCursor(plat->dpy, XC_sb_v_double_arrow);
+	plat->cursor_active = MKGUI_CURSOR_DEFAULT;
 
 	plat->xim = pplat->xim;
 	plat->xic = NULL;
@@ -242,6 +244,7 @@ static void platform_destroy(struct mkgui_ctx *ctx) {
 	plat->img = NULL;
 	XFreeCursor(plat->dpy, plat->cursor_default);
 	XFreeCursor(plat->dpy, plat->cursor_h_resize);
+	XFreeCursor(plat->dpy, plat->cursor_v_resize);
 	if(plat->xic) {
 		XDestroyIC(plat->xic);
 	}
@@ -262,7 +265,20 @@ static void platform_set_cursor(struct mkgui_ctx *ctx, uint32_t cursor_type) {
 		return;
 	}
 	plat->cursor_active = cursor_type;
-	Cursor c = cursor_type ? plat->cursor_h_resize : plat->cursor_default;
+	Cursor c;
+	switch(cursor_type) {
+		case MKGUI_CURSOR_H_RESIZE: {
+			c = plat->cursor_h_resize;
+		} break;
+
+		case MKGUI_CURSOR_V_RESIZE: {
+			c = plat->cursor_v_resize;
+		} break;
+
+		default: {
+			c = plat->cursor_default;
+		} break;
+	}
 	XDefineCursor(plat->dpy, plat->win, c);
 }
 

@@ -135,7 +135,7 @@ static void render_pathbar(struct mkgui_ctx *ctx, uint32_t idx) {
 	}
 
 	uint32_t focused = (ctx->focus_id == w->id);
-	draw_patch(ctx, MKGUI_STYLE_SUNKEN, rx, ry, rw, rh, ctx->theme.input_bg, focused ? ctx->theme.splitter : ctx->theme.widget_border);
+	draw_patch(ctx, MKGUI_STYLE_SUNKEN, rx, ry, rw, rh, ctx->theme.input_bg, focused ? ctx->theme.highlight : ctx->theme.widget_border);
 
 	if(pb->editing) {
 		char *display = pb->edit_buf;

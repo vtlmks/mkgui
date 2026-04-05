@@ -166,7 +166,7 @@ static void render_richlist(struct mkgui_ctx *ctx, uint32_t idx) {
 	}
 
 	uint32_t focused = (ctx->focus_id == w->id);
-	draw_patch(ctx, MKGUI_STYLE_SUNKEN, rx, ry, rw, rh, ctx->theme.input_bg, focused ? ctx->theme.splitter : ctx->theme.widget_border);
+	draw_patch(ctx, MKGUI_STYLE_SUNKEN, rx, ry, rw, rh, ctx->theme.input_bg, focused ? ctx->theme.highlight : ctx->theme.widget_border);
 
 	int32_t content_w = rw - 2 - ctx->scrollbar_w;
 	int32_t content_y = ry + 1;

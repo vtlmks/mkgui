@@ -402,11 +402,10 @@ struct mkgui_theme {
 	uint32_t tab_inactive;
 	uint32_t tab_hover;
 	uint32_t menu_bg;
-	uint32_t menu_hover;
 	uint32_t scrollbar_bg;
 	uint32_t scrollbar_thumb;
 	uint32_t scrollbar_thumb_hover;
-	uint32_t splitter;
+	uint32_t highlight;
 	uint32_t header_bg;
 	uint32_t listview_alt;
 	uint32_t accent;
