@@ -97,4 +97,14 @@ fi
 	$CC $CFLAGS tests/test_widgets.c -o tests/test_widgets $LINUX_LIBS
 ) &
 
+# Build event tests
+(
+	$CC $CFLAGS tests/test_events.c -o tests/test_events $LINUX_LIBS
+) &
+
+# Build extended event tests
+(
+	$CC $CFLAGS tests/test_events_ext.c -o tests/test_events_ext $LINUX_LIBS
+) &
+
 wait

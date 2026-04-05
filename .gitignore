@@ -11,6 +11,11 @@ mdi_icons_toolbar.dat
 benchmark
 mkcamview/mkcamview
 test_dynamic
+tests/test_widgets
+tests/test_events
+tests/test_events_ext
+tests/test_layout
+tools/extract_icons
 libmkgui.a
 icons
 
