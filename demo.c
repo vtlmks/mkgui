@@ -384,18 +384,6 @@ static void demo_gl_timer(struct mkgui_ctx *ctx, uint32_t timer_id, void *userda
 	demo_gl_render(ctx, (struct demo_state *)userdata);
 }
 
-// [=]===^=[ demo_perf_timer ]======================================[=]
-static void demo_perf_timer(struct mkgui_ctx *ctx, uint32_t timer_id, void *userdata) {
-	(void)timer_id;
-	(void)userdata;
-	char buf[256];
-	snprintf(buf, sizeof(buf), "mkgui demo  [layout: %llu us | render: %llu us | blit: %llu us]",
-		(unsigned long long)ctx->perf_layout_us,
-		(unsigned long long)ctx->perf_render_us,
-		(unsigned long long)ctx->perf_blit_us);
-	mkgui_set_title(ctx, buf);
-}
-
 // [=]===^=[ demo_event ]==========================================[=]
 static void demo_event(struct mkgui_ctx *ctx, struct mkgui_event *ev, void *userdata) {
 	(void)userdata;
@@ -819,8 +807,6 @@ int main(void) {
 	mkgui_statusbar_set(ctx, ID_STATUSBAR, 0, "Ready");
 	mkgui_statusbar_set(ctx, ID_STATUSBAR, 1, "Ln 1, Col 1");
 	mkgui_statusbar_set(ctx, ID_STATUSBAR, 2, "UTF-8");
-	mkgui_add_timer(ctx, 500000000, demo_perf_timer, NULL);
-
 	/* Data Views tab setup */
 	struct mkgui_column cols[] = {
 		{ "Name",     200, MKGUI_CELL_ICON_TEXT },
