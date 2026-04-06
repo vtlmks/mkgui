@@ -458,6 +458,15 @@ struct mkgui_pathbar_data {
 	uint32_t edit_sel_end;
 };
 
+struct mkgui_text_edit {
+	char *text;
+	uint32_t buf_size;
+	uint32_t cursor;
+	uint32_t sel_start;
+	uint32_t sel_end;
+	int32_t scroll_x;
+};
+
 #define MKGUI_CTXMENU_POPUP_ID   UINT32_MAX
 
 struct mkgui_ctxmenu_item {
@@ -2741,6 +2750,7 @@ plutovg_surface_t *plutovg_surface_load_from_image_data(const void *d, int l) { 
 #include "mkgui_icon.c"
 #include "mkgui_button.c"
 #include "mkgui_label.c"
+#include "mkgui_textedit.c"
 #include "mkgui_undo.c"
 #include "mkgui_input.c"
 #include "mkgui_checkbox.c"

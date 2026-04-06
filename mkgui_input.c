@@ -1,30 +1,6 @@
 // Copyright (c) 2026, Peter Fors
 // SPDX-License-Identifier: MIT
 
-// [=]===^=[ utf8_prev ]==============================================[=]
-static uint32_t utf8_prev(char *text, uint32_t pos) {
-	if(pos == 0) {
-		return 0;
-	}
-	--pos;
-	while(pos > 0 && ((uint8_t)text[pos] & 0xc0) == 0x80) {
-		--pos;
-	}
-	return pos;
-}
-
-// [=]===^=[ utf8_next ]==============================================[=]
-static uint32_t utf8_next(char *text, uint32_t pos) {
-	if(!text[pos]) {
-		return pos;
-	}
-	++pos;
-	while(text[pos] && ((uint8_t)text[pos] & 0xc0) == 0x80) {
-		++pos;
-	}
-	return pos;
-}
-
 // [=]===^=[ input_has_selection ]====================================[=]
 static uint32_t input_has_selection(struct mkgui_input_data *inp) {
 	return inp->sel_start != inp->sel_end;
