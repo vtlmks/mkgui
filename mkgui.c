@@ -508,13 +508,12 @@ struct mkgui_icon {
 	char name[MKGUI_ICON_NAME_LEN];
 	uint32_t *pixels;
 	int32_t w, h;
-	int32_t atlas_x, atlas_y;
+	uint32_t atlas_offset;
 	uint32_t custom;
 };
 
-// Icon atlas: packed uint32_t ARGB pixels for all loaded icons
+// Icon atlas: linear uint32_t ARGB pixels for all loaded icons (contiguous per icon)
 static uint32_t *icon_atlas;
-static int32_t icon_atlas_w, icon_atlas_h;
 
 static struct mkgui_icon icons[MKGUI_MAX_ICONS];
 static uint32_t icon_count;
@@ -1046,8 +1045,6 @@ static void mkgui_recompute_metrics(struct mkgui_ctx *ctx) {
 	}
 }
 
-#include "mkgui_atlas.c"
-
 // [=]===^=[ glyph_atlas_build ]====================================[=]
 // Linear layout: each glyph's bitmap is stored contiguously (row-major,
 // no stride padding). Better cache locality than 2D packing since the
@@ -1081,40 +1078,25 @@ static void icon_atlas_rebuild(void) {
 		return;
 	}
 
-	// Collect icon sizes for packing (idx tracks original icon index through sort)
-	struct atlas_rect rects[MKGUI_MAX_ICONS];
+	uint32_t total = 0;
 	for(uint32_t i = 0; i < icon_count; ++i) {
-		rects[i].w = icons[i].w > 0 ? icons[i].w : 1;
-		rects[i].h = icons[i].h > 0 ? icons[i].h : 1;
-		rects[i].idx = i;
+		total += (uint32_t)icons[i].w * (uint32_t)icons[i].h;
 	}
 
-	struct atlas_result res;
-	if(!atlas_pack(rects, icon_count, &res)) {
-		return;
-	}
-
-	// Allocate atlas
 	free(icon_atlas);
-	icon_atlas_w = res.w;
-	icon_atlas_h = res.h;
-	icon_atlas = (uint32_t *)calloc((size_t)icon_atlas_w * (size_t)icon_atlas_h, sizeof(uint32_t));
+	icon_atlas = (uint32_t *)calloc(total > 0 ? total : 1, sizeof(uint32_t));
 	if(!icon_atlas) {
 		return;
 	}
 
-	// Blit each icon from its staging pixels into atlas, then free staging
+	uint32_t offset = 0;
 	for(uint32_t i = 0; i < icon_count; ++i) {
-		uint32_t ii = rects[i].idx;
-		struct mkgui_icon *ic = &icons[ii];
-		ic->atlas_x = rects[i].x;
-		ic->atlas_y = rects[i].y;
+		struct mkgui_icon *ic = &icons[i];
+		ic->atlas_offset = offset;
 		if(ic->pixels) {
-			for(int32_t row = 0; row < ic->h; ++row) {
-				uint32_t *src = &ic->pixels[row * ic->w];
-				uint32_t *dst = &icon_atlas[(ic->atlas_y + row) * icon_atlas_w + ic->atlas_x];
-				memcpy(dst, src, (size_t)ic->w * sizeof(uint32_t));
-			}
+			uint32_t size = (uint32_t)ic->w * (uint32_t)ic->h;
+			memcpy(&icon_atlas[offset], ic->pixels, size * sizeof(uint32_t));
+			offset += size;
 			free(ic->pixels);
 			ic->pixels = NULL;
 		}
@@ -2695,7 +2677,7 @@ static void draw_icon(uint32_t *buf, int32_t bw, int32_t bh, struct mkgui_icon *
 		col1 = bw - x;
 	}
 	for(int32_t row = row0; row < row1; ++row) {
-		blend_icon_row(&buf[(y + row) * bw], &icon_atlas[(icon->atlas_y + row) * icon_atlas_w + icon->atlas_x], col0, col1, x);
+		blend_icon_row(&buf[(y + row) * bw], &icon_atlas[icon->atlas_offset + (uint32_t)row * (uint32_t)icon->w], col0, col1, x);
 	}
 }
 

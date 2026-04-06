@@ -1761,18 +1761,9 @@ All widget rendering is software-based (no GPU). The framebuffer is blitted to t
 
 mkgui uses partial rendering via dirty rectangles. Widgets mark themselves dirty on state changes, dirty rects are merged when spatially close, and only affected regions are cleared, re-rendered, and blitted. Each dirty rect is processed individually: clip bounds are set, the background is cleared, overlapping widgets are rendered, and `platform_blit_region` blits just that region. Hot-path operations (hover, scroll, slider drag, text input, click selection) dirty only the affected widget. Full redraws (`dirty_all`) are reserved for structural changes: window resize/expose, tab switch, focus change, widget add/remove, theme change, and scale change. All rendering goes to a client-side framebuffer, then `XShmPutImage` (Linux) or `BitBlt` (Windows) blits the result to the window.
 
-### Atlas packing
+### Glyph and icon storage
 
-Glyphs and icons are packed into texture atlases for cache-friendly rendering. The atlas packer (`mkgui_atlas.c`) uses a skyline bottom-left algorithm to fit all rects into the smallest power-of-2 atlas that works. Tunables in `mkgui_atlas.c`:
-
-| Define | Default | Purpose |
-|--------|---------|---------|
-| `ATLAS_MAX_SIZE` | 4096 | Maximum atlas width/height in pixels |
-| `ATLAS_MIN_SIZE` | 64 | Minimum atlas dimension |
-| `ATLAS_MAX_RECTS` | 16384 | Maximum number of rects per pack |
-| `ATLAS_PAD` | 1 | Padding between packed rects (pixels) |
-
-Since mkgui is built as a unity build, you can change these values directly in your copy of the source. If you have a very large icon set at high DPI, increase `ATLAS_MAX_SIZE` (e.g. 8192). The atlas is rebuilt automatically on scale or theme changes.
+Glyph and icon bitmaps are stored in linear memory for cache-friendly rendering. Each glyph or icon is a contiguous block of pixels (row-major, no stride padding), and each entry stores a byte offset into the flat buffer. This means the entire bitmap for a glyph or icon fits in a few cache lines with no gaps, which is optimal for the CPU-side alpha blending path. The buffers are rebuilt automatically on scale or theme changes.
 
 ### Antialiased drawing
 
