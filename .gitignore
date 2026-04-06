@@ -19,3 +19,4 @@ tools/extract_icons
 libmkgui.a
 icons
 
+tools/subset.txt
