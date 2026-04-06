@@ -109,6 +109,7 @@ static void pathbar_enter_edit(struct mkgui_pathbar_data *pb) {
 	pb->edit_cursor = plen;
 	pb->edit_sel_start = 0;
 	pb->edit_sel_end = plen;
+	pb->edit_scroll_x = 0;
 }
 
 // [=]===^=[ pathbar_exit_edit ]=====================================[=]
@@ -138,53 +139,11 @@ static void render_pathbar(struct mkgui_ctx *ctx, uint32_t idx) {
 	draw_patch(ctx, MKGUI_STYLE_SUNKEN, rx, ry, rw, rh, ctx->theme.input_bg, focused ? ctx->theme.highlight : ctx->theme.widget_border);
 
 	if(pb->editing) {
-		char *display = pb->edit_buf;
 		int32_t ty = ry + (rh - ctx->font_height) / 2;
-		uint32_t tc = ctx->theme.text;
+		int32_t tx = rx + text_pad - pb->edit_scroll_x;
 
-		uint32_t has_sel = (pb->edit_sel_start != pb->edit_sel_end);
-		if(focused && has_sel) {
-			uint32_t lo = pb->edit_sel_start < pb->edit_sel_end ? pb->edit_sel_start : pb->edit_sel_end;
-			uint32_t hi = pb->edit_sel_start < pb->edit_sel_end ? pb->edit_sel_end : pb->edit_sel_start;
-			char tmp[4096];
-
-			memcpy(tmp, display, lo);
-			tmp[lo] = '\0';
-			int32_t sel_x1 = rx + text_pad + text_width(ctx, tmp);
-
-			memcpy(tmp, display, hi);
-			tmp[hi] = '\0';
-			int32_t sel_x2 = rx + text_pad + text_width(ctx, tmp);
-
-			int32_t cx1 = sel_x1 < rx + 1 ? rx + 1 : sel_x1;
-			int32_t cx2 = sel_x2 > rx + rw - 1 ? rx + rw - 1 : sel_x2;
-			if(cx2 > cx1) {
-				draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, cx1, ry + inset2, cx2 - cx1, rh - inset2 * 2, ctx->theme.selection);
-			}
-
-			push_text_clip(rx + text_pad, ty, display, tc, rx + 1, ry + 1, rx + rw - 1, ry + rh - 1);
-
-			uint32_t sel_len = hi - lo;
-			memcpy(tmp, display + lo, sel_len);
-			tmp[sel_len] = '\0';
-			push_text_clip(sel_x1, ty, tmp, ctx->theme.sel_text, cx1, ry + 1, cx2, ry + rh - 1);
-
-		} else {
-			push_text_clip(rx + text_pad, ty, display, tc, rx + 1, ry + 1, rx + rw - 1, ry + rh - 1);
-		}
-
-		if(focused) {
-			uint32_t cpos = pb->edit_cursor;
-			uint32_t dlen = (uint32_t)strlen(display);
-			if(cpos > dlen) {
-				cpos = dlen;
-			}
-			char tmp[4096];
-			memcpy(tmp, display, cpos);
-			tmp[cpos] = '\0';
-			int32_t cx = rx + text_pad + text_width(ctx, tmp);
-			draw_vline(ctx->pixels, ctx->win_w, ctx->win_h, cx, ry + inset2, rh - inset2 * 2, ctx->theme.text);
-		}
+		struct mkgui_text_edit te = {pb->edit_buf, (uint32_t)sizeof(pb->edit_buf), pb->edit_cursor, pb->edit_sel_start, pb->edit_sel_end, pb->edit_scroll_x};
+		textedit_render(ctx, &te, pb->edit_buf, tx, ty, ry + inset2, rh - inset2 * 2, rx + 1, ry + 1, rx + rw - 1, ry + rh - 1, ctx->theme.text, focused);
 		return;
 	}
 
@@ -241,29 +200,8 @@ static uint32_t handle_pathbar_click(struct mkgui_ctx *ctx, struct mkgui_event *
 
 	if(pb->editing) {
 		int32_t rx = ctx->rects[idx].x;
-		int32_t base_x = rx + sc(ctx, 4);
-		uint32_t len = (uint32_t)strlen(pb->edit_buf);
-		char tmp[4096];
-		uint32_t hit_pos = len;
-		for(uint32_t i = 0; i <= len; ++i) {
-			memcpy(tmp, pb->edit_buf, i);
-			tmp[i] = '\0';
-			int32_t tw = text_width(ctx, tmp);
-			if(base_x + tw >= mx) {
-				if(i > 0) {
-					tmp[i - 1] = '\0';
-					int32_t prev_w = text_width(ctx, tmp);
-					if(mx - (base_x + prev_w) < (base_x + tw) - mx) {
-						hit_pos = i - 1;
-					} else {
-						hit_pos = i;
-					}
-				} else {
-					hit_pos = i;
-				}
-				break;
-			}
-		}
+		int32_t base_x = rx + sc(ctx, 4) - pb->edit_scroll_x;
+		uint32_t hit_pos = textedit_hit_cursor(ctx, pb->edit_buf, base_x, mx);
 		pb->edit_cursor = hit_pos;
 		pb->edit_sel_start = hit_pos;
 		pb->edit_sel_end = hit_pos;
@@ -286,6 +224,20 @@ static uint32_t handle_pathbar_click(struct mkgui_ctx *ctx, struct mkgui_event *
 	return 0;
 }
 
+// [=]===^=[ pathbar_scroll_to_cursor ]==============================[=]
+static void pathbar_scroll_to_cursor(struct mkgui_ctx *ctx, struct mkgui_pathbar_data *pb) {
+	int32_t widx = find_widget_idx(ctx, pb->widget_id);
+	if(widx < 0) {
+		return;
+	}
+	int32_t pad = sc(ctx, 4);
+	int32_t visible = ctx->rects[widx].w - pad * 2;
+
+	struct mkgui_text_edit te = {pb->edit_buf, (uint32_t)sizeof(pb->edit_buf), pb->edit_cursor, pb->edit_sel_start, pb->edit_sel_end, pb->edit_scroll_x};
+	textedit_scroll_to_cursor(ctx, &te, pb->edit_buf, visible);
+	pb->edit_scroll_x = te.scroll_x;
+}
+
 // [=]===^=[ handle_pathbar_key ]===================================[=]
 static uint32_t handle_pathbar_key(struct mkgui_ctx *ctx, struct mkgui_event *ev, uint32_t ks, uint32_t keymod, char *buf, int32_t len) {
 	struct mkgui_pathbar_data *pb = find_pathbar_data(ctx, ctx->focus_id);
@@ -303,8 +255,6 @@ static uint32_t handle_pathbar_key(struct mkgui_ctx *ctx, struct mkgui_event *ev
 	}
 
 	uint32_t shift = (keymod & MKGUI_MOD_SHIFT);
-	uint32_t text_len = (uint32_t)strlen(pb->edit_buf);
-	uint32_t has_sel = (pb->edit_sel_start != pb->edit_sel_end);
 
 	switch(ks) {
 	case MKGUI_KEY_ESCAPE: {
@@ -325,107 +275,80 @@ static uint32_t handle_pathbar_key(struct mkgui_ctx *ctx, struct mkgui_event *ev
 	}
 
 	case MKGUI_KEY_LEFT: {
-		if(pb->edit_cursor > 0) {
-			--pb->edit_cursor;
-		}
-		if(shift) {
-			pb->edit_sel_end = pb->edit_cursor;
-		} else {
-			pb->edit_sel_start = pb->edit_cursor;
-			pb->edit_sel_end = pb->edit_cursor;
-		}
+		struct mkgui_text_edit te = {pb->edit_buf, (uint32_t)sizeof(pb->edit_buf), pb->edit_cursor, pb->edit_sel_start, pb->edit_sel_end, pb->edit_scroll_x};
+		textedit_move_left(&te, shift);
+		pb->edit_cursor = te.cursor;
+		pb->edit_sel_start = te.sel_start;
+		pb->edit_sel_end = te.sel_end;
 		dirty_all(ctx);
+		pathbar_scroll_to_cursor(ctx, pb);
 		return 0;
 	}
 
 	case MKGUI_KEY_RIGHT: {
-		if(pb->edit_cursor < text_len) {
-			++pb->edit_cursor;
-		}
-		if(shift) {
-			pb->edit_sel_end = pb->edit_cursor;
-		} else {
-			pb->edit_sel_start = pb->edit_cursor;
-			pb->edit_sel_end = pb->edit_cursor;
-		}
+		struct mkgui_text_edit te = {pb->edit_buf, (uint32_t)sizeof(pb->edit_buf), pb->edit_cursor, pb->edit_sel_start, pb->edit_sel_end, pb->edit_scroll_x};
+		textedit_move_right(&te, shift);
+		pb->edit_cursor = te.cursor;
+		pb->edit_sel_start = te.sel_start;
+		pb->edit_sel_end = te.sel_end;
 		dirty_all(ctx);
+		pathbar_scroll_to_cursor(ctx, pb);
 		return 0;
 	}
 
 	case MKGUI_KEY_HOME: {
-		pb->edit_cursor = 0;
-		if(shift) {
-			pb->edit_sel_end = 0;
-		} else {
-			pb->edit_sel_start = 0;
-			pb->edit_sel_end = 0;
-		}
+		struct mkgui_text_edit te = {pb->edit_buf, (uint32_t)sizeof(pb->edit_buf), pb->edit_cursor, pb->edit_sel_start, pb->edit_sel_end, pb->edit_scroll_x};
+		textedit_move_home(&te, shift);
+		pb->edit_cursor = te.cursor;
+		pb->edit_sel_start = te.sel_start;
+		pb->edit_sel_end = te.sel_end;
 		dirty_all(ctx);
+		pathbar_scroll_to_cursor(ctx, pb);
 		return 0;
 	}
 
 	case MKGUI_KEY_END: {
-		pb->edit_cursor = text_len;
-		if(shift) {
-			pb->edit_sel_end = text_len;
-		} else {
-			pb->edit_sel_start = text_len;
-			pb->edit_sel_end = text_len;
-		}
+		struct mkgui_text_edit te = {pb->edit_buf, (uint32_t)sizeof(pb->edit_buf), pb->edit_cursor, pb->edit_sel_start, pb->edit_sel_end, pb->edit_scroll_x};
+		textedit_move_end(&te, shift);
+		pb->edit_cursor = te.cursor;
+		pb->edit_sel_start = te.sel_start;
+		pb->edit_sel_end = te.sel_end;
 		dirty_all(ctx);
+		pathbar_scroll_to_cursor(ctx, pb);
 		return 0;
 	}
 
 	case MKGUI_KEY_BACKSPACE: {
-		if(has_sel) {
-			uint32_t lo = pb->edit_sel_start < pb->edit_sel_end ? pb->edit_sel_start : pb->edit_sel_end;
-			uint32_t hi = pb->edit_sel_start < pb->edit_sel_end ? pb->edit_sel_end : pb->edit_sel_start;
-			memmove(&pb->edit_buf[lo], &pb->edit_buf[hi], text_len - hi + 1);
-			pb->edit_cursor = lo;
-			pb->edit_sel_start = lo;
-			pb->edit_sel_end = lo;
-		} else if(pb->edit_cursor > 0) {
-			memmove(&pb->edit_buf[pb->edit_cursor - 1], &pb->edit_buf[pb->edit_cursor], text_len - pb->edit_cursor + 1);
-			--pb->edit_cursor;
-			pb->edit_sel_start = pb->edit_cursor;
-			pb->edit_sel_end = pb->edit_cursor;
-		}
+		struct mkgui_text_edit te = {pb->edit_buf, (uint32_t)sizeof(pb->edit_buf), pb->edit_cursor, pb->edit_sel_start, pb->edit_sel_end, pb->edit_scroll_x};
+		textedit_backspace(&te);
+		pb->edit_cursor = te.cursor;
+		pb->edit_sel_start = te.sel_start;
+		pb->edit_sel_end = te.sel_end;
 		dirty_all(ctx);
+		pathbar_scroll_to_cursor(ctx, pb);
 		return 0;
 	}
 
 	case MKGUI_KEY_DELETE: {
-		if(has_sel) {
-			uint32_t lo = pb->edit_sel_start < pb->edit_sel_end ? pb->edit_sel_start : pb->edit_sel_end;
-			uint32_t hi = pb->edit_sel_start < pb->edit_sel_end ? pb->edit_sel_end : pb->edit_sel_start;
-			memmove(&pb->edit_buf[lo], &pb->edit_buf[hi], text_len - hi + 1);
-			pb->edit_cursor = lo;
-			pb->edit_sel_start = lo;
-			pb->edit_sel_end = lo;
-		} else if(pb->edit_cursor < text_len) {
-			memmove(&pb->edit_buf[pb->edit_cursor], &pb->edit_buf[pb->edit_cursor + 1], text_len - pb->edit_cursor);
-		}
+		struct mkgui_text_edit te = {pb->edit_buf, (uint32_t)sizeof(pb->edit_buf), pb->edit_cursor, pb->edit_sel_start, pb->edit_sel_end, pb->edit_scroll_x};
+		textedit_delete(&te);
+		pb->edit_cursor = te.cursor;
+		pb->edit_sel_start = te.sel_start;
+		pb->edit_sel_end = te.sel_end;
 		dirty_all(ctx);
+		pathbar_scroll_to_cursor(ctx, pb);
 		return 0;
 	}
 
 	default: {
 		if(len > 0 && (uint8_t)buf[0] >= 32) {
-			if(has_sel) {
-				uint32_t lo = pb->edit_sel_start < pb->edit_sel_end ? pb->edit_sel_start : pb->edit_sel_end;
-				uint32_t hi = pb->edit_sel_start < pb->edit_sel_end ? pb->edit_sel_end : pb->edit_sel_start;
-				memmove(&pb->edit_buf[lo], &pb->edit_buf[hi], text_len - hi + 1);
-				pb->edit_cursor = lo;
-				text_len = (uint32_t)strlen(pb->edit_buf);
-			}
-			if(text_len + (uint32_t)len < sizeof(pb->edit_buf) - 1) {
-				memmove(&pb->edit_buf[pb->edit_cursor + (uint32_t)len], &pb->edit_buf[pb->edit_cursor], text_len - pb->edit_cursor + 1);
-				memcpy(&pb->edit_buf[pb->edit_cursor], buf, (uint32_t)len);
-				pb->edit_cursor += (uint32_t)len;
-				pb->edit_sel_start = pb->edit_cursor;
-				pb->edit_sel_end = pb->edit_cursor;
-			}
+			struct mkgui_text_edit te = {pb->edit_buf, (uint32_t)sizeof(pb->edit_buf), pb->edit_cursor, pb->edit_sel_start, pb->edit_sel_end, pb->edit_scroll_x};
+			textedit_insert(&te, buf, (uint32_t)len);
+			pb->edit_cursor = te.cursor;
+			pb->edit_sel_start = te.sel_start;
+			pb->edit_sel_end = te.sel_end;
 			dirty_all(ctx);
+			pathbar_scroll_to_cursor(ctx, pb);
 		}
 		return 0;
 	}

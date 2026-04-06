@@ -52,13 +52,11 @@ static void combobox_clear_selection(struct mkgui_combobox_data *cb) {
 
 // [=]===^=[ combobox_delete_selection ]============================[=]
 static void combobox_delete_selection(struct mkgui_combobox_data *cb) {
-	uint32_t lo = cb->sel_start < cb->sel_end ? cb->sel_start : cb->sel_end;
-	uint32_t hi = cb->sel_start < cb->sel_end ? cb->sel_end : cb->sel_start;
-	uint32_t tlen = (uint32_t)strlen(cb->text);
-	memmove(&cb->text[lo], &cb->text[hi], tlen - hi + 1);
-	cb->cursor = lo;
-	cb->sel_start = lo;
-	cb->sel_end = lo;
+	struct mkgui_text_edit te = {cb->text, MKGUI_MAX_TEXT, cb->cursor, cb->sel_start, cb->sel_end, cb->scroll_x};
+	textedit_delete_selection(&te);
+	cb->cursor = te.cursor;
+	cb->sel_start = te.sel_start;
+	cb->sel_end = te.sel_end;
 }
 
 // [=]===^=[ combobox_select_all ]=================================[=]
@@ -72,25 +70,7 @@ static void combobox_select_all(struct mkgui_combobox_data *cb) {
 
 // [=]===^=[ combobox_hit_cursor ]=================================[=]
 static uint32_t combobox_hit_cursor(struct mkgui_ctx *ctx, struct mkgui_combobox_data *cb, int32_t rx, int32_t mx) {
-	int32_t base_x = rx + sc(ctx, 4) - cb->scroll_x;
-	uint32_t len = (uint32_t)strlen(cb->text);
-	char tmp[MKGUI_MAX_TEXT];
-	for(uint32_t i = 0; i <= len; ++i) {
-		memcpy(tmp, cb->text, i);
-		tmp[i] = '\0';
-		int32_t w = text_width(ctx, tmp);
-		if(base_x + w >= mx) {
-			if(i > 0) {
-				tmp[i - 1] = '\0';
-				int32_t prev_w = text_width(ctx, tmp);
-				if(mx - (base_x + prev_w) < (base_x + w) - mx) {
-					return i - 1;
-				}
-			}
-			return i;
-		}
-	}
-	return len;
+	return textedit_hit_cursor(ctx, cb->text, rx + sc(ctx, 4) - cb->scroll_x, mx);
 }
 
 // [=]===^=[ combobox_scroll_to_cursor ]============================[=]
@@ -103,37 +83,12 @@ static void combobox_scroll_to_cursor(struct mkgui_ctx *ctx, uint32_t widget_id)
 	if(widx < 0) {
 		return;
 	}
-	int32_t rw = ctx->rects[widx].w;
 	int32_t pad = sc(ctx, 4);
-	int32_t visible = rw - sc(ctx, 24) - pad * 2;
-	if(visible < 1) {
-		return;
-	}
+	int32_t visible = ctx->rects[widx].w - sc(ctx, 24) - pad * 2;
 
-	char tmp[MKGUI_MAX_TEXT];
-	uint32_t cpos = cb->cursor;
-	uint32_t dlen = (uint32_t)strlen(cb->text);
-	if(cpos > dlen) {
-		cpos = dlen;
-	}
-	memcpy(tmp, cb->text, cpos);
-	tmp[cpos] = '\0';
-	int32_t cx = text_width(ctx, tmp);
-
-	if(cx - cb->scroll_x > visible) {
-		cb->scroll_x = cx - visible;
-	}
-	if(cx - cb->scroll_x < 0) {
-		cb->scroll_x = cx;
-	}
-
-	int32_t total_w = text_width(ctx, cb->text);
-	if(total_w - cb->scroll_x < visible && cb->scroll_x > 0) {
-		cb->scroll_x = total_w - visible;
-		if(cb->scroll_x < 0) {
-			cb->scroll_x = 0;
-		}
-	}
+	struct mkgui_text_edit te = {cb->text, MKGUI_MAX_TEXT, cb->cursor, cb->sel_start, cb->sel_end, cb->scroll_x};
+	textedit_scroll_to_cursor(ctx, &te, cb->text, visible);
+	cb->scroll_x = te.scroll_x;
 }
 
 // [=]===^=[ render_combobox ]=====================================[=]
@@ -171,54 +126,11 @@ static void render_combobox(struct mkgui_ctx *ctx, uint32_t idx) {
 		return;
 	}
 
-	char *display = cb->text;
 	int32_t ty = ry + (rh - ctx->font_height) / 2;
 	int32_t tx = rx + text_pad - cb->scroll_x;
 
-	if(focused && cb->sel_start != cb->sel_end) {
-		uint32_t lo = cb->sel_start < cb->sel_end ? cb->sel_start : cb->sel_end;
-		uint32_t hi = cb->sel_start < cb->sel_end ? cb->sel_end : cb->sel_start;
-		char tmp[MKGUI_MAX_TEXT];
-
-		memcpy(tmp, display, lo);
-		tmp[lo] = '\0';
-		int32_t sel_x1 = tx + text_width(ctx, tmp);
-
-		memcpy(tmp, display, hi);
-		tmp[hi] = '\0';
-		int32_t sel_x2 = tx + text_width(ctx, tmp);
-
-		int32_t cx1 = sel_x1 < rx + 1 ? rx + 1 : sel_x1;
-		int32_t cx2 = sel_x2 > rx + text_w - 1 ? rx + text_w - 1 : sel_x2;
-		if(cx2 > cx1) {
-			draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, cx1, ry + inset2, cx2 - cx1, rh - inset2 * 2, ctx->theme.selection);
-		}
-
-		push_text_clip(tx, ty, display, tc, rx + 1, ry + 1, rx + text_w - 1, ry + rh - 1);
-
-		uint32_t sel_len = hi - lo;
-		memcpy(tmp, display + lo, sel_len);
-		tmp[sel_len] = '\0';
-		push_text_clip(sel_x1, ty, tmp, ctx->theme.sel_text, cx1, ry + 1, cx2, ry + rh - 1);
-
-	} else {
-		push_text_clip(tx, ty, display, tc, rx + 1, ry + 1, rx + text_w - 1, ry + rh - 1);
-	}
-
-	if(focused) {
-		char tmp[MKGUI_MAX_TEXT];
-		uint32_t cpos = cb->cursor;
-		uint32_t dlen = (uint32_t)strlen(display);
-		if(cpos > dlen) {
-			cpos = dlen;
-		}
-		memcpy(tmp, display, cpos);
-		tmp[cpos] = '\0';
-		int32_t cx = tx + text_width(ctx, tmp);
-		if(cx >= rx + 1 && cx <= rx + text_w - 1) {
-			draw_vline(ctx->pixels, ctx->win_w, ctx->win_h, cx, ry + inset2, rh - inset2 * 2, ctx->theme.text);
-		}
-	}
+	struct mkgui_text_edit te = {cb->text, MKGUI_MAX_TEXT, cb->cursor, cb->sel_start, cb->sel_end, cb->scroll_x};
+	textedit_render(ctx, &te, cb->text, tx, ty, ry + inset2, rh - inset2 * 2, rx + 1, ry + 1, rx + text_w - 1, ry + rh - 1, tc, focused);
 }
 
 // [=]===^=[ render_combobox_popup ]===============================[=]
@@ -342,6 +254,7 @@ static void handle_combobox_click(struct mkgui_ctx *ctx, struct mkgui_event *ev,
 		} else {
 			cb->cursor = combobox_hit_cursor(ctx, cb, rx, ctx->mouse_x);
 			combobox_clear_selection(cb);
+			ctx->drag_select_id = widget_id;
 		}
 	}
 	dirty_all(ctx);
@@ -356,7 +269,6 @@ static uint32_t handle_combobox_key(struct mkgui_ctx *ctx, struct mkgui_event *e
 		return 0;
 	}
 	uint32_t shift = (keymod & MKGUI_MOD_SHIFT);
-	uint32_t text_len = (uint32_t)strlen(cb->text);
 
 	switch(ks) {
 	case MKGUI_KEY_ESCAPE: {
@@ -441,86 +353,57 @@ static uint32_t handle_combobox_key(struct mkgui_ctx *ctx, struct mkgui_event *e
 	}
 
 	case MKGUI_KEY_LEFT: {
-		if(combobox_has_selection(cb) && !shift) {
-			uint32_t lo = cb->sel_start < cb->sel_end ? cb->sel_start : cb->sel_end;
-			cb->cursor = lo;
-			combobox_clear_selection(cb);
-		} else {
-			if(cb->cursor > 0) {
-				--cb->cursor;
-			}
-			if(shift) {
-				cb->sel_end = cb->cursor;
-			} else {
-				combobox_clear_selection(cb);
-			}
-		}
+		struct mkgui_text_edit te = {cb->text, MKGUI_MAX_TEXT, cb->cursor, cb->sel_start, cb->sel_end, cb->scroll_x};
+		textedit_move_left(&te, shift);
+		cb->cursor = te.cursor;
+		cb->sel_start = te.sel_start;
+		cb->sel_end = te.sel_end;
 		dirty_all(ctx);
 		combobox_scroll_to_cursor(ctx, ctx->focus_id);
 		return 1;
 	}
 
 	case MKGUI_KEY_RIGHT: {
-		if(combobox_has_selection(cb) && !shift) {
-			uint32_t hi = cb->sel_start > cb->sel_end ? cb->sel_start : cb->sel_end;
-			cb->cursor = hi;
-			combobox_clear_selection(cb);
-		} else {
-			if(cb->cursor < text_len) {
-				++cb->cursor;
-			}
-			if(shift) {
-				cb->sel_end = cb->cursor;
-			} else {
-				combobox_clear_selection(cb);
-			}
-		}
+		struct mkgui_text_edit te = {cb->text, MKGUI_MAX_TEXT, cb->cursor, cb->sel_start, cb->sel_end, cb->scroll_x};
+		textedit_move_right(&te, shift);
+		cb->cursor = te.cursor;
+		cb->sel_start = te.sel_start;
+		cb->sel_end = te.sel_end;
 		dirty_all(ctx);
 		combobox_scroll_to_cursor(ctx, ctx->focus_id);
 		return 1;
 	}
 
 	case MKGUI_KEY_HOME: {
-		cb->cursor = 0;
-		if(shift) {
-			cb->sel_end = cb->cursor;
-		} else {
-			combobox_clear_selection(cb);
-		}
+		struct mkgui_text_edit te = {cb->text, MKGUI_MAX_TEXT, cb->cursor, cb->sel_start, cb->sel_end, cb->scroll_x};
+		textedit_move_home(&te, shift);
+		cb->cursor = te.cursor;
+		cb->sel_start = te.sel_start;
+		cb->sel_end = te.sel_end;
 		dirty_all(ctx);
 		combobox_scroll_to_cursor(ctx, ctx->focus_id);
 		return 1;
 	}
 
 	case MKGUI_KEY_END: {
-		cb->cursor = text_len;
-		if(shift) {
-			cb->sel_end = cb->cursor;
-		} else {
-			combobox_clear_selection(cb);
-		}
+		struct mkgui_text_edit te = {cb->text, MKGUI_MAX_TEXT, cb->cursor, cb->sel_start, cb->sel_end, cb->scroll_x};
+		textedit_move_end(&te, shift);
+		cb->cursor = te.cursor;
+		cb->sel_start = te.sel_start;
+		cb->sel_end = te.sel_end;
 		dirty_all(ctx);
 		combobox_scroll_to_cursor(ctx, ctx->focus_id);
 		return 1;
 	}
 
 	case MKGUI_KEY_BACKSPACE: {
-		if(combobox_has_selection(cb)) {
-			combobox_delete_selection(cb);
+		struct mkgui_text_edit te = {cb->text, MKGUI_MAX_TEXT, cb->cursor, cb->sel_start, cb->sel_end, cb->scroll_x};
+		if(textedit_backspace(&te)) {
+			cb->cursor = te.cursor;
+			cb->sel_start = te.sel_start;
+			cb->sel_end = te.sel_end;
 			cb->selected = -1;
 			{ size_t _l = strlen(cb->text); if(_l >= MKGUI_MAX_TEXT) { _l = MKGUI_MAX_TEXT - 1; } memcpy(cb->prev_text, cb->text, _l); cb->prev_text[_l] = '\0'; }
-			combobox_open_popup(ctx, ctx->focus_id, 1);
-			ev->type = MKGUI_EVENT_COMBOBOX_CHANGED;
-			ev->id = ctx->focus_id;
-			dirty_all(ctx);
-			combobox_scroll_to_cursor(ctx, ctx->focus_id);
-			return 1;
-		}
-		if(cb->cursor > 0) {
-			uint32_t tlen = (uint32_t)strlen(cb->text);
-			memmove(&cb->text[cb->cursor - 1], &cb->text[cb->cursor], tlen - cb->cursor + 1);
-			--cb->cursor;
-			cb->selected = -1;
 			combobox_open_popup(ctx, ctx->focus_id, 1);
 			ev->type = MKGUI_EVENT_COMBOBOX_CHANGED;
 			ev->id = ctx->focus_id;
@@ -532,20 +415,13 @@ static uint32_t handle_combobox_key(struct mkgui_ctx *ctx, struct mkgui_event *e
 	}
 
 	case MKGUI_KEY_DELETE: {
-		if(combobox_has_selection(cb)) {
-			combobox_delete_selection(cb);
+		struct mkgui_text_edit te = {cb->text, MKGUI_MAX_TEXT, cb->cursor, cb->sel_start, cb->sel_end, cb->scroll_x};
+		if(textedit_delete(&te)) {
+			cb->cursor = te.cursor;
+			cb->sel_start = te.sel_start;
+			cb->sel_end = te.sel_end;
 			cb->selected = -1;
 			{ size_t _l = strlen(cb->text); if(_l >= MKGUI_MAX_TEXT) { _l = MKGUI_MAX_TEXT - 1; } memcpy(cb->prev_text, cb->text, _l); cb->prev_text[_l] = '\0'; }
-			combobox_open_popup(ctx, ctx->focus_id, 1);
-			ev->type = MKGUI_EVENT_COMBOBOX_CHANGED;
-			ev->id = ctx->focus_id;
-			dirty_all(ctx);
-			combobox_scroll_to_cursor(ctx, ctx->focus_id);
-			return 1;
-		}
-		if(cb->cursor < text_len) {
-			memmove(&cb->text[cb->cursor], &cb->text[cb->cursor + 1], text_len - cb->cursor);
-			cb->selected = -1;
 			combobox_open_popup(ctx, ctx->focus_id, 1);
 			ev->type = MKGUI_EVENT_COMBOBOX_CHANGED;
 			ev->id = ctx->focus_id;
@@ -557,16 +433,12 @@ static uint32_t handle_combobox_key(struct mkgui_ctx *ctx, struct mkgui_event *e
 	}
 
 	default: {
-		if(len == 1 && (uint8_t)buf[0] >= 0x20) {
-			if(combobox_has_selection(cb)) {
-				combobox_delete_selection(cb);
-			}
-			uint32_t tlen = (uint32_t)strlen(cb->text);
-			if(tlen < MKGUI_MAX_TEXT - 2) {
-				memmove(&cb->text[cb->cursor + 1], &cb->text[cb->cursor], tlen - cb->cursor + 1);
-				cb->text[cb->cursor] = buf[0];
-				++cb->cursor;
-				combobox_clear_selection(cb);
+		if(len > 0 && (uint8_t)buf[0] >= 0x20) {
+			struct mkgui_text_edit te = {cb->text, MKGUI_MAX_TEXT, cb->cursor, cb->sel_start, cb->sel_end, cb->scroll_x};
+			if(textedit_insert(&te, buf, (uint32_t)len)) {
+				cb->cursor = te.cursor;
+				cb->sel_start = te.sel_start;
+				cb->sel_end = te.sel_end;
 				cb->selected = -1;
 				{ size_t _l = strlen(cb->text); if(_l >= MKGUI_MAX_TEXT) { _l = MKGUI_MAX_TEXT - 1; } memcpy(cb->prev_text, cb->text, _l); cb->prev_text[_l] = '\0'; }
 				combobox_open_popup(ctx, ctx->focus_id, 1);
@@ -576,7 +448,6 @@ static uint32_t handle_combobox_key(struct mkgui_ctx *ctx, struct mkgui_event *e
 				combobox_scroll_to_cursor(ctx, ctx->focus_id);
 				return 1;
 			}
-			return 1;
 		}
 	} break;
 	}

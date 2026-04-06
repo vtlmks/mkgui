@@ -240,8 +240,10 @@ static void render_treeview(struct mkgui_ctx *ctx, uint32_t idx) {
 		}
 		int32_t ty = row_y + (ctx->row_height - ctx->font_height) / 2;
 		if(ty >= clip_top && ty + ctx->font_height <= clip_bottom) {
-			uint32_t tc = ((int32_t)tv->nodes[i].id == tv->selected_node) ? ctx->theme.sel_text : ((w->flags & MKGUI_DISABLED) ? ctx->theme.text_disabled : ctx->theme.text);
-			push_text_clip(text_x, ty, tv->nodes[i].label, tc, rx + 1, clip_top, rx + rw - 1, clip_bottom);
+			if(!(ctx->cell_edit.active && ctx->cell_edit.widget_id == w->id && ctx->cell_edit.row == (int32_t)tv->nodes[i].id)) {
+				uint32_t tc = ((int32_t)tv->nodes[i].id == tv->selected_node) ? ctx->theme.sel_text : ((w->flags & MKGUI_DISABLED) ? ctx->theme.text_disabled : ctx->theme.text);
+				push_text_clip(text_x, ty, tv->nodes[i].label, tc, rx + 1, clip_top, rx + rw - 1, clip_bottom);
+			}
 		}
 	}
 

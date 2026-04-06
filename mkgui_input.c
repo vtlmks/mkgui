@@ -25,13 +25,11 @@ static void input_clear_selection(struct mkgui_input_data *inp) {
 
 // [=]===^=[ input_delete_selection ]=================================[=]
 static void input_delete_selection(struct mkgui_input_data *inp) {
-	uint32_t lo, hi;
-	input_sel_range(inp, &lo, &hi);
-	uint32_t text_len = (uint32_t)strlen(inp->text);
-	memmove(&inp->text[lo], &inp->text[hi], text_len - hi + 1);
-	inp->cursor = lo;
-	inp->sel_start = lo;
-	inp->sel_end = lo;
+	struct mkgui_text_edit te = {inp->text, MKGUI_MAX_TEXT, inp->cursor, inp->sel_start, inp->sel_end, inp->scroll_x};
+	textedit_delete_selection(&te);
+	inp->cursor = te.cursor;
+	inp->sel_start = te.sel_start;
+	inp->sel_end = te.sel_end;
 }
 
 // [=]===^=[ input_scroll_to_cursor ]=================================[=]
@@ -44,12 +42,8 @@ static void input_scroll_to_cursor(struct mkgui_ctx *ctx, uint32_t widget_id) {
 	if(widx < 0) {
 		return;
 	}
-	int32_t rw = ctx->rects[widx].w;
 	int32_t pad = sc(ctx, 4);
-	int32_t visible = rw - pad * 2;
-	if(visible < 1) {
-		return;
-	}
+	int32_t visible = ctx->rects[widx].w - pad * 2;
 
 	char *display = inp->text;
 	char masked[MKGUI_MAX_TEXT];
@@ -63,53 +57,14 @@ static void input_scroll_to_cursor(struct mkgui_ctx *ctx, uint32_t widget_id) {
 		display = masked;
 	}
 
-	char tmp[MKGUI_MAX_TEXT];
-	uint32_t cpos = inp->cursor;
-	uint32_t dlen = (uint32_t)strlen(display);
-	if(cpos > dlen) {
-		cpos = dlen;
-	}
-	memcpy(tmp, display, cpos);
-	tmp[cpos] = '\0';
-	int32_t cx = text_width(ctx, tmp);
-
-	if(cx - inp->scroll_x > visible) {
-		inp->scroll_x = cx - visible;
-	}
-	if(cx - inp->scroll_x < 0) {
-		inp->scroll_x = cx;
-	}
-
-	int32_t total_w = text_width(ctx, display);
-	if(total_w - inp->scroll_x < visible && inp->scroll_x > 0) {
-		inp->scroll_x = total_w - visible;
-		if(inp->scroll_x < 0) {
-			inp->scroll_x = 0;
-		}
-	}
+	struct mkgui_text_edit te = {inp->text, MKGUI_MAX_TEXT, inp->cursor, inp->sel_start, inp->sel_end, inp->scroll_x};
+	textedit_scroll_to_cursor(ctx, &te, display, visible);
+	inp->scroll_x = te.scroll_x;
 }
 
 // [=]===^=[ input_hit_cursor ]=======================================[=]
 static uint32_t input_hit_cursor(struct mkgui_ctx *ctx, struct mkgui_input_data *inp, char *display, int32_t rx, int32_t mx) {
-	int32_t base_x = rx + sc(ctx, 4) - inp->scroll_x;
-	uint32_t len = (uint32_t)strlen(display);
-	char tmp[MKGUI_MAX_TEXT];
-	for(uint32_t i = 0; i <= len; ++i) {
-		memcpy(tmp, display, i);
-		tmp[i] = '\0';
-		int32_t w = text_width(ctx, tmp);
-		if(base_x + w >= mx) {
-			if(i > 0) {
-				tmp[i - 1] = '\0';
-				int32_t prev_w = text_width(ctx, tmp);
-				if(mx - (base_x + prev_w) < (base_x + w) - mx) {
-					return i - 1;
-				}
-			}
-			return i;
-		}
-	}
-	return len;
+	return textedit_hit_cursor(ctx, display, rx + sc(ctx, 4) - inp->scroll_x, mx);
 }
 
 // [=]===^=[ render_input ]==========================================[=]
@@ -138,58 +93,14 @@ static void render_input(struct mkgui_ctx *ctx, uint32_t idx) {
 		masked[len < MKGUI_MAX_TEXT - 1 ? len : MKGUI_MAX_TEXT - 1] = '\0';
 		display = masked;
 	}
+
 	int32_t ty = ry + (rh - ctx->font_height) / 2;
 	uint32_t tc = (w->flags & MKGUI_DISABLED) ? ctx->theme.text_disabled : ctx->theme.text;
 	int32_t tx = rx + sc(ctx, 4) - inp->scroll_x;
+	int32_t pad2 = sc(ctx, 2);
 
-	if(focused && input_has_selection(inp)) {
-		uint32_t lo, hi;
-		input_sel_range(inp, &lo, &hi);
-		char tmp[MKGUI_MAX_TEXT];
-
-		memcpy(tmp, display, lo);
-		tmp[lo] = '\0';
-		int32_t sel_x1 = tx + text_width(ctx, tmp);
-
-		memcpy(tmp, display, hi);
-		tmp[hi] = '\0';
-		int32_t sel_x2 = tx + text_width(ctx, tmp);
-
-		int32_t cx1 = sel_x1 < rx + 1 ? rx + 1 : sel_x1;
-		int32_t cx2 = sel_x2 > rx + rw - 1 ? rx + rw - 1 : sel_x2;
-		if(cx2 > cx1) {
-			draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, cx1, ry + sc(ctx, 2), cx2 - cx1, rh - sc(ctx, 4), ctx->theme.selection);
-		}
-
-		push_text_clip(tx, ty, display, tc, rx + 1, ry + 1, rx + rw - 1, ry + rh - 1);
-
-		if(lo > 0) {
-			memcpy(tmp, display, lo);
-			tmp[lo] = '\0';
-		}
-		uint32_t sel_len = hi - lo;
-		memcpy(tmp, display + lo, sel_len);
-		tmp[sel_len] = '\0';
-		push_text_clip(sel_x1, ty, tmp, ctx->theme.sel_text, cx1, ry + 1, cx2, ry + rh - 1);
-
-	} else {
-		push_text_clip(tx, ty, display, tc, rx + 1, ry + 1, rx + rw - 1, ry + rh - 1);
-	}
-
-	if(focused) {
-		char tmp[MKGUI_MAX_TEXT];
-		uint32_t cpos = inp->cursor;
-		uint32_t dlen = (uint32_t)strlen(display);
-		if(cpos > dlen) {
-			cpos = dlen;
-		}
-		memcpy(tmp, display, cpos);
-		tmp[cpos] = '\0';
-		int32_t cx = tx + text_width(ctx, tmp);
-		if(cx >= rx + 1 && cx <= rx + rw - 1) {
-			draw_vline(ctx->pixels, ctx->win_w, ctx->win_h, cx, ry + sc(ctx, 2), rh - sc(ctx, 4), ctx->theme.text);
-		}
-	}
+	struct mkgui_text_edit te = {inp->text, MKGUI_MAX_TEXT, inp->cursor, inp->sel_start, inp->sel_end, inp->scroll_x};
+	textedit_render(ctx, &te, display, tx, ty, ry + pad2, rh - pad2 * 2, rx + 1, ry + 1, rx + rw - 1, ry + rh - 1, tc, focused);
 }
 
 // [=]===^=[ handle_input_key ]======================================[=]
@@ -202,7 +113,6 @@ static uint32_t handle_input_key(struct mkgui_ctx *ctx, struct mkgui_event *ev, 
 	struct mkgui_widget *w = find_widget(ctx, ctx->focus_id);
 	uint32_t readonly = (w && (w->style & MKGUI_INPUT_READONLY));
 	uint32_t shift = (keymod & MKGUI_MOD_SHIFT);
-	uint32_t text_len = (uint32_t)strlen(inp->text);
 
 	switch(ks) {
 	case MKGUI_KEY_RETURN: {
@@ -214,48 +124,44 @@ static uint32_t handle_input_key(struct mkgui_ctx *ctx, struct mkgui_event *ev, 
 	}
 
 	case MKGUI_KEY_LEFT: {
-		inp->cursor = utf8_prev(inp->text, inp->cursor);
-		if(shift) {
-			inp->sel_end = inp->cursor;
-		} else {
-			input_clear_selection(inp);
-		}
+		struct mkgui_text_edit te = {inp->text, MKGUI_MAX_TEXT, inp->cursor, inp->sel_start, inp->sel_end, inp->scroll_x};
+		textedit_move_left(&te, shift);
+		inp->cursor = te.cursor;
+		inp->sel_start = te.sel_start;
+		inp->sel_end = te.sel_end;
 		dirty_all(ctx);
 		input_scroll_to_cursor(ctx, ctx->focus_id);
 		return 0;
 	}
 
 	case MKGUI_KEY_RIGHT: {
-		inp->cursor = utf8_next(inp->text, inp->cursor);
-		if(shift) {
-			inp->sel_end = inp->cursor;
-		} else {
-			input_clear_selection(inp);
-		}
+		struct mkgui_text_edit te = {inp->text, MKGUI_MAX_TEXT, inp->cursor, inp->sel_start, inp->sel_end, inp->scroll_x};
+		textedit_move_right(&te, shift);
+		inp->cursor = te.cursor;
+		inp->sel_start = te.sel_start;
+		inp->sel_end = te.sel_end;
 		dirty_all(ctx);
 		input_scroll_to_cursor(ctx, ctx->focus_id);
 		return 0;
 	}
 
 	case MKGUI_KEY_HOME: {
-		inp->cursor = 0;
-		if(shift) {
-			inp->sel_end = inp->cursor;
-		} else {
-			input_clear_selection(inp);
-		}
+		struct mkgui_text_edit te = {inp->text, MKGUI_MAX_TEXT, inp->cursor, inp->sel_start, inp->sel_end, inp->scroll_x};
+		textedit_move_home(&te, shift);
+		inp->cursor = te.cursor;
+		inp->sel_start = te.sel_start;
+		inp->sel_end = te.sel_end;
 		dirty_all(ctx);
 		input_scroll_to_cursor(ctx, ctx->focus_id);
 		return 0;
 	}
 
 	case MKGUI_KEY_END: {
-		inp->cursor = text_len;
-		if(shift) {
-			inp->sel_end = inp->cursor;
-		} else {
-			input_clear_selection(inp);
-		}
+		struct mkgui_text_edit te = {inp->text, MKGUI_MAX_TEXT, inp->cursor, inp->sel_start, inp->sel_end, inp->scroll_x};
+		textedit_move_end(&te, shift);
+		inp->cursor = te.cursor;
+		inp->sel_start = te.sel_start;
+		inp->sel_end = te.sel_end;
 		dirty_all(ctx);
 		input_scroll_to_cursor(ctx, ctx->focus_id);
 		return 0;
@@ -266,21 +172,11 @@ static uint32_t handle_input_key(struct mkgui_ctx *ctx, struct mkgui_event *ev, 
 			return 0;
 		}
 		input_undo_push_force(inp);
-		if(input_has_selection(inp)) {
-			input_delete_selection(inp);
-			dirty_all(ctx);
-			input_scroll_to_cursor(ctx, ctx->focus_id);
-			ev->type = MKGUI_EVENT_INPUT_CHANGED;
-			ev->id = ctx->focus_id;
-			return 1;
-		}
-		if(inp->cursor > 0 && text_len > 0) {
-			uint32_t prev = utf8_prev(inp->text, inp->cursor);
-			uint32_t del = inp->cursor - prev;
-			memmove(&inp->text[prev], &inp->text[inp->cursor], text_len - inp->cursor + 1);
-			inp->cursor = prev;
-			(void)del;
-			input_clear_selection(inp);
+		struct mkgui_text_edit te = {inp->text, MKGUI_MAX_TEXT, inp->cursor, inp->sel_start, inp->sel_end, inp->scroll_x};
+		if(textedit_backspace(&te)) {
+			inp->cursor = te.cursor;
+			inp->sel_start = te.sel_start;
+			inp->sel_end = te.sel_end;
 			dirty_all(ctx);
 			input_scroll_to_cursor(ctx, ctx->focus_id);
 			ev->type = MKGUI_EVENT_INPUT_CHANGED;
@@ -295,19 +191,11 @@ static uint32_t handle_input_key(struct mkgui_ctx *ctx, struct mkgui_event *ev, 
 			return 0;
 		}
 		input_undo_push_force(inp);
-		if(input_has_selection(inp)) {
-			input_delete_selection(inp);
-			dirty_all(ctx);
-			input_scroll_to_cursor(ctx, ctx->focus_id);
-			ev->type = MKGUI_EVENT_INPUT_CHANGED;
-			ev->id = ctx->focus_id;
-			return 1;
-		}
-		if(inp->cursor < text_len) {
-			uint32_t next = utf8_next(inp->text, inp->cursor);
-			uint32_t del = next - inp->cursor;
-			memmove(&inp->text[inp->cursor], &inp->text[next], text_len - next + 1);
-			(void)del;
+		struct mkgui_text_edit te = {inp->text, MKGUI_MAX_TEXT, inp->cursor, inp->sel_start, inp->sel_end, inp->scroll_x};
+		if(textedit_delete(&te)) {
+			inp->cursor = te.cursor;
+			inp->sel_start = te.sel_start;
+			inp->sel_end = te.sel_end;
 			dirty_all(ctx);
 			input_scroll_to_cursor(ctx, ctx->focus_id);
 			ev->type = MKGUI_EVENT_INPUT_CHANGED;
@@ -331,15 +219,11 @@ static uint32_t handle_input_key(struct mkgui_ctx *ctx, struct mkgui_event *ev, 
 				}
 			}
 			input_undo_push(inp);
-			if(input_has_selection(inp)) {
-				input_delete_selection(inp);
-				text_len = (uint32_t)strlen(inp->text);
-			}
-			if(text_len + (uint32_t)len < MKGUI_MAX_TEXT - 1) {
-				memmove(&inp->text[inp->cursor + (uint32_t)len], &inp->text[inp->cursor], text_len - inp->cursor + 1);
-				memcpy(&inp->text[inp->cursor], buf, (uint32_t)len);
-				inp->cursor += (uint32_t)len;
-				input_clear_selection(inp);
+			struct mkgui_text_edit te = {inp->text, MKGUI_MAX_TEXT, inp->cursor, inp->sel_start, inp->sel_end, inp->scroll_x};
+			if(textedit_insert(&te, buf, (uint32_t)len)) {
+				inp->cursor = te.cursor;
+				inp->sel_start = te.sel_start;
+				inp->sel_end = te.sel_end;
 				dirty_all(ctx);
 				input_scroll_to_cursor(ctx, ctx->focus_id);
 				ev->type = MKGUI_EVENT_INPUT_CHANGED;

@@ -1292,6 +1292,15 @@ static uint32_t fd_run_dialog(struct mkgui_ctx *ctx, uint32_t mode, struct mkgui
 							fd_navigate_up(dlg);
 						}
 
+					} else if(ev.keysym == MKGUI_KEY_F2 && dlg->focus_id == FD_ID_FILES) {
+						struct mkgui_listview_data *lv = find_listv_data(dlg, FD_ID_FILES);
+						if(lv && lv->selected_row >= 0) {
+							struct fd_entry *e = fd_filtered_entry((uint32_t)lv->selected_row);
+							if(e && strcmp(e->name, "..") != 0) {
+								celledit_begin(dlg, FD_ID_FILES, lv->selected_row, 0, e->name);
+							}
+						}
+
 					} else if(ev.keysym == 'l' && (ev.keymod & MKGUI_MOD_CONTROL)) {
 						struct mkgui_pathbar_data *pb = find_pathbar_data(dlg, FD_ID_PATHBAR);
 						if(pb && !pb->editing) {
@@ -1343,6 +1352,24 @@ static uint32_t fd_run_dialog(struct mkgui_ctx *ctx, uint32_t mode, struct mkgui
 								if(fd_confirm(dlg)) {
 									running = 0;
 								}
+							}
+						}
+					}
+				} break;
+
+				case MKGUI_EVENT_CELL_EDIT_COMMIT: {
+					if(ev.id == FD_ID_FILES && ev.value >= 0) {
+						struct fd_entry *e = fd_filtered_entry((uint32_t)ev.value);
+						char *new_name = mkgui_cell_edit_get_text(dlg);
+						if(e && new_name && new_name[0] && strcmp(e->name, new_name) != 0) {
+							char old_path[FD_PATH_SIZE + 260];
+							char new_path[FD_PATH_SIZE + 260];
+							snprintf(old_path, sizeof(old_path), "%s/%s", fd.path, e->name);
+							snprintf(new_path, sizeof(new_path), "%s/%s", fd.path, new_name);
+							if(rename(old_path, new_path) == 0) {
+								snprintf(e->name, sizeof(e->name), "%s", new_name);
+								fd_apply_filter(dlg);
+								dirty_all(dlg);
 							}
 						}
 					}

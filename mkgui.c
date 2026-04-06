@@ -456,6 +456,7 @@ struct mkgui_pathbar_data {
 	uint32_t edit_cursor;
 	uint32_t edit_sel_start;
 	uint32_t edit_sel_end;
+	int32_t edit_scroll_x;
 };
 
 struct mkgui_text_edit {
@@ -690,6 +691,17 @@ struct mkgui_ctx {
 	uint32_t divider_dblclick_id;
 	int32_t divider_dblclick_col;
 	uint32_t divider_dblclick_time;
+
+	struct mkgui_cell_edit {
+		uint32_t active;
+		uint32_t widget_id;
+		int32_t row;
+		int32_t col;
+		char text[MKGUI_MAX_TEXT];
+		struct mkgui_text_edit te;
+		int32_t cell_x, cell_y, cell_w, cell_h;
+		uint32_t dragging;
+	} cell_edit;
 
 	struct mkgui_rect dirty_rects[32];
 	uint32_t dirty_count;
@@ -2787,6 +2799,7 @@ plutovg_surface_t *plutovg_surface_load_from_image_data(const void *d, int l) { 
 #include "mkgui_image.c"
 #include "mkgui_glview.c"
 #include "mkgui_canvas.c"
+#include "mkgui_celledit.c"
 #include "mkgui_tooltip.c"
 
 // ---------------------------------------------------------------------------
@@ -2830,6 +2843,7 @@ static void render_widget(struct mkgui_ctx *ctx, uint32_t idx) {
 
 		case MKGUI_LISTVIEW: {
 			render_listview(ctx, idx);
+			celledit_render(ctx, idx);
 		} break;
 
 		case MKGUI_HSPLIT:
@@ -2843,6 +2857,7 @@ static void render_widget(struct mkgui_ctx *ctx, uint32_t idx) {
 
 		case MKGUI_TREEVIEW: {
 			render_treeview(ctx, idx);
+			celledit_render(ctx, idx);
 		} break;
 
 		case MKGUI_STATUSBAR: {
@@ -2883,6 +2898,7 @@ static void render_widget(struct mkgui_ctx *ctx, uint32_t idx) {
 
 		case MKGUI_ITEMVIEW: {
 			render_itemview(ctx, idx);
+			celledit_render(ctx, idx);
 		} break;
 
 		case MKGUI_PANEL: {
@@ -2927,6 +2943,7 @@ static void render_widget(struct mkgui_ctx *ctx, uint32_t idx) {
 
 		case MKGUI_GRIDVIEW: {
 			render_gridview(ctx, idx);
+			celledit_render(ctx, idx);
 		} break;
 
 		case MKGUI_RICHLIST: {
@@ -4675,6 +4692,18 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 					break;
 				}
 
+				if(ctx->cell_edit.active && ctx->cell_edit.dragging) {
+					struct mkgui_cell_edit *ce = &ctx->cell_edit;
+					if(celledit_compute_rect(ctx)) {
+						int32_t base_x = ce->cell_x + sc(ctx, 4) - ce->te.scroll_x;
+						uint32_t hit_pos = textedit_hit_cursor(ctx, ce->text, base_x, ctx->mouse_x);
+						ce->te.cursor = hit_pos;
+						ce->te.sel_end = hit_pos;
+						dirty_widget_id(ctx, ce->widget_id);
+					}
+					break;
+				}
+
 				if(ctx->drag_select_id) {
 					int32_t dsi = find_widget_idx(ctx, ctx->drag_select_id);
 					if(dsi >= 0 && ctx->widgets[dsi].type == MKGUI_INPUT) {
@@ -4726,33 +4755,21 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 					} else if(dsi >= 0 && ctx->widgets[dsi].type == MKGUI_PATHBAR) {
 						struct mkgui_pathbar_data *pb = find_pathbar_data(ctx, ctx->drag_select_id);
 						if(pb && pb->editing) {
-							int32_t rx = ctx->rects[dsi].x;
-							int32_t base_x = rx + sc(ctx, 4);
-							uint32_t len = (uint32_t)strlen(pb->edit_buf);
-							char tmp[4096];
-							uint32_t hit_pos = len;
-							for(uint32_t i = 0; i <= len; ++i) {
-								memcpy(tmp, pb->edit_buf, i);
-								tmp[i] = '\0';
-								int32_t tw = text_width(ctx, tmp);
-								if(base_x + tw >= ctx->mouse_x) {
-									if(i > 0) {
-										tmp[i - 1] = '\0';
-										int32_t prev_w = text_width(ctx, tmp);
-										if(ctx->mouse_x - (base_x + prev_w) < (base_x + tw) - ctx->mouse_x) {
-											hit_pos = i - 1;
-										} else {
-											hit_pos = i;
-										}
-									} else {
-										hit_pos = i;
-									}
-									break;
-								}
-							}
+							int32_t base_x = ctx->rects[dsi].x + sc(ctx, 4) - pb->edit_scroll_x;
+							uint32_t hit_pos = textedit_hit_cursor(ctx, pb->edit_buf, base_x, ctx->mouse_x);
 							pb->edit_cursor = hit_pos;
 							pb->edit_sel_end = hit_pos;
 							dirty_widget(ctx, (uint32_t)dsi);
+							pathbar_scroll_to_cursor(ctx, pb);
+						}
+
+					} else if(dsi >= 0 && ctx->widgets[dsi].type == MKGUI_COMBOBOX) {
+						struct mkgui_combobox_data *cb = find_combobox_data(ctx, ctx->drag_select_id);
+						if(cb) {
+							cb->cursor = combobox_hit_cursor(ctx, cb, ctx->rects[dsi].x, ctx->mouse_x);
+							cb->sel_end = cb->cursor;
+							dirty_widget(ctx, (uint32_t)dsi);
+							combobox_scroll_to_cursor(ctx, ctx->drag_select_id);
 						}
 					}
 					break;
@@ -5170,6 +5187,25 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 
 			// -=[ BUTTON PRESS ]=-
 			case MKGUI_PLAT_BUTTON_PRESS: {
+				if(ctx->cell_edit.active && pev.button == 1) {
+					struct mkgui_cell_edit *ce = &ctx->cell_edit;
+					if(!celledit_compute_rect(ctx) || ctx->mouse_x < ce->cell_x || ctx->mouse_x >= ce->cell_x + ce->cell_w || ctx->mouse_y < ce->cell_y || ctx->mouse_y >= ce->cell_y + ce->cell_h) {
+						ce->dragging = 0;
+						celledit_commit(ctx, ev);
+						if(ev->type != MKGUI_EVENT_NONE) {
+							return 1;
+						}
+					} else {
+						int32_t base_x = ce->cell_x + sc(ctx, 4) - ce->te.scroll_x;
+						uint32_t hit_pos = textedit_hit_cursor(ctx, ce->text, base_x, ctx->mouse_x);
+						ce->te.cursor = hit_pos;
+						ce->te.sel_start = hit_pos;
+						ce->te.sel_end = hit_pos;
+						ce->dragging = 1;
+						dirty_widget_id(ctx, ce->widget_id);
+						break;
+					}
+				}
 				if(popup_idx >= 0) {
 					struct mkgui_popup *p = &ctx->popups[popup_idx];
 					struct mkgui_widget *pw = find_widget(ctx, p->widget_id);
@@ -5550,6 +5586,9 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 				}
 
 				if(pev.button == 4 || pev.button == 5) {
+					if(ctx->cell_edit.active) {
+						celledit_cancel(ctx);
+					}
 					int32_t hi = hit_test(ctx, ctx->mouse_x, ctx->mouse_y);
 					int32_t delta = (pev.button == 4) ? -ctx->row_height * 3 : ctx->row_height * 3;
 					if(hi >= 0 && ctx->widgets[hi].type == MKGUI_LISTVIEW) {
@@ -6089,7 +6128,10 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 										struct mkgui_listview_data *lv = find_listv_data(ctx, hw->id);
 										if(lv) {
 											uint32_t now = mkgui_time_ms();
-											uint32_t is_dblclick = (ctx->dblclick_id == hw->id && ctx->dblclick_row == row && (now - ctx->dblclick_time) < 400);
+											uint32_t elapsed = now - ctx->dblclick_time;
+											uint32_t is_dblclick = (ctx->dblclick_id == hw->id && ctx->dblclick_row == row && elapsed < 400);
+											uint32_t slow_click = (ctx->dblclick_id == hw->id && ctx->dblclick_row == row && elapsed >= 400 && elapsed < 1500);
+											uint32_t was_selected = (lv->selected_row == row);
 											ctx->dblclick_id = hw->id;
 											ctx->dblclick_row = row;
 											ctx->dblclick_time = now;
@@ -6108,6 +6150,15 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 												ctx->dblclick_id = 0;
 												dirty_widget(ctx, (uint32_t)hi);
 												return 1;
+											}
+											if(was_selected && slow_click) {
+												char cell_buf[MKGUI_MAX_TEXT] = {0};
+												if(lv->row_cb) {
+													lv->row_cb((uint32_t)row, 0, cell_buf, MKGUI_MAX_TEXT, lv->userdata);
+												}
+												celledit_begin(ctx, hw->id, row, 0, cell_buf);
+												dirty_widget(ctx, (uint32_t)hi);
+												return 0;
 											}
 											lv->drag_source = row;
 											lv->drag_target = -1;
@@ -6261,7 +6312,10 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 								int32_t item = itemview_hit_item(ctx, (uint32_t)hi, iv, ctx->mouse_x, ctx->mouse_y);
 								if(item >= 0) {
 									uint32_t now = mkgui_time_ms();
-									uint32_t is_dblclick = (ctx->dblclick_id == hw->id && ctx->dblclick_row == item && (now - ctx->dblclick_time) < 400);
+									uint32_t elapsed = now - ctx->dblclick_time;
+									uint32_t is_dblclick = (ctx->dblclick_id == hw->id && ctx->dblclick_row == item && elapsed < 400);
+									uint32_t slow_click = (ctx->dblclick_id == hw->id && ctx->dblclick_row == item && elapsed >= 400 && elapsed < 1500);
+									uint32_t was_selected = (iv->selected == item);
 									ctx->dblclick_id = hw->id;
 									ctx->dblclick_row = item;
 									ctx->dblclick_time = now;
@@ -6269,6 +6323,14 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 									if(is_dblclick) {
 										ev->type = MKGUI_EVENT_ITEMVIEW_DBLCLICK;
 										ctx->dblclick_id = 0;
+									} else if(was_selected && slow_click) {
+										char label[MKGUI_MAX_TEXT] = {0};
+										if(iv->label_cb) {
+											iv->label_cb((uint32_t)item, label, MKGUI_MAX_TEXT, iv->userdata);
+										}
+										celledit_begin(ctx, hw->id, item, 0, label);
+										dirty_widget(ctx, (uint32_t)hi);
+										return 0;
 									} else {
 										ev->type = MKGUI_EVENT_ITEMVIEW_SELECT;
 									}
@@ -6376,11 +6438,15 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 
 								} else {
 									uint32_t now_ms = mkgui_time_ms();
-									uint32_t is_dblclick = (ctx->dblclick_id == hw->id && ctx->dblclick_row == (int32_t)tv->nodes[node_idx].id && (now_ms - ctx->dblclick_time) < 400);
+									int32_t node_id = (int32_t)tv->nodes[node_idx].id;
+									uint32_t elapsed = now_ms - ctx->dblclick_time;
+									uint32_t is_dblclick = (ctx->dblclick_id == hw->id && ctx->dblclick_row == node_id && elapsed < 400);
+									uint32_t slow_click = (ctx->dblclick_id == hw->id && ctx->dblclick_row == node_id && elapsed >= 400 && elapsed < 1500);
+									uint32_t was_selected = (tv->selected_node == node_id);
 									ctx->dblclick_id = hw->id;
-									ctx->dblclick_row = (int32_t)tv->nodes[node_idx].id;
+									ctx->dblclick_row = node_id;
 									ctx->dblclick_time = now_ms;
-									tv->selected_node = (int32_t)tv->nodes[node_idx].id;
+									tv->selected_node = node_id;
 									tv->drag_source = node_idx;
 									tv->drag_target = -1;
 									tv->drag_pos = 0;
@@ -6390,6 +6456,9 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 									if(is_dblclick) {
 										ev->type = MKGUI_EVENT_TREEVIEW_DBLCLICK;
 										ctx->dblclick_id = 0;
+									} else if(was_selected && slow_click) {
+										celledit_begin(ctx, hw->id, node_id, 0, tv->nodes[node_idx].label);
+										return 0;
 									} else {
 										ev->type = MKGUI_EVENT_TREEVIEW_SELECT;
 									}
@@ -6436,6 +6505,8 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 				if(pev.button >= 4) {
 					break;
 				}
+
+				ctx->cell_edit.dragging = 0;
 
 				for(uint32_t si = 0; si < ctx->spinbox_count; ++si) {
 					ctx->spinboxes[si].repeat_dir = 0;
@@ -6791,6 +6862,12 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 					break;
 				}
 
+				if(ctx->cell_edit.active) {
+					if(celledit_key(ctx, ev, ks, pev.keymod, pev.text, pev.text_len)) {
+						return ev->type != MKGUI_EVENT_NONE;
+					}
+				}
+
 				if((pev.keymod & 4) && ctx->focus_id) {
 					struct mkgui_widget *fw = find_widget(ctx, ctx->focus_id);
 					if(fw && (ks == 'z' || ks == 'Z') && !(pev.keymod & MKGUI_MOD_SHIFT)) {
@@ -6859,6 +6936,17 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 								dirty_widget_id(ctx, ctx->focus_id);
 							}
 
+						} else if(fw->type == MKGUI_PATHBAR) {
+							struct mkgui_pathbar_data *pb = find_pathbar_data(ctx, ctx->focus_id);
+							if(pb && pb->editing) {
+								struct mkgui_text_edit te = {pb->edit_buf, (uint32_t)sizeof(pb->edit_buf), pb->edit_cursor, pb->edit_sel_start, pb->edit_sel_end, pb->edit_scroll_x};
+								textedit_select_all(&te);
+								pb->edit_cursor = te.cursor;
+								pb->edit_sel_start = te.sel_start;
+								pb->edit_sel_end = te.sel_end;
+								dirty_widget_id(ctx, ctx->focus_id);
+							}
+
 						} else if(fw->type == MKGUI_TEXTAREA) {
 							struct mkgui_textarea_data *ta = find_textarea_data(ctx, ctx->focus_id);
 							if(ta) {
@@ -6895,6 +6983,30 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 									platform_clipboard_set(ctx, ta->text, ta->text_len);
 								}
 							}
+
+						} else if(fw->type == MKGUI_PATHBAR) {
+							struct mkgui_pathbar_data *pb = find_pathbar_data(ctx, ctx->focus_id);
+							if(pb && pb->editing) {
+								if(pb->edit_sel_start != pb->edit_sel_end) {
+									uint32_t lo = pb->edit_sel_start < pb->edit_sel_end ? pb->edit_sel_start : pb->edit_sel_end;
+									uint32_t hi = pb->edit_sel_start < pb->edit_sel_end ? pb->edit_sel_end : pb->edit_sel_start;
+									platform_clipboard_set(ctx, pb->edit_buf + lo, hi - lo);
+								} else {
+									platform_clipboard_set(ctx, pb->edit_buf, (uint32_t)strlen(pb->edit_buf));
+								}
+							}
+
+						} else if(fw->type == MKGUI_COMBOBOX) {
+							struct mkgui_combobox_data *cb = find_combobox_data(ctx, ctx->focus_id);
+							if(cb) {
+								if(combobox_has_selection(cb)) {
+									uint32_t lo = cb->sel_start < cb->sel_end ? cb->sel_start : cb->sel_end;
+									uint32_t hi = cb->sel_start < cb->sel_end ? cb->sel_end : cb->sel_start;
+									platform_clipboard_set(ctx, cb->text + lo, hi - lo);
+								} else {
+									platform_clipboard_set(ctx, cb->text, (uint32_t)strlen(cb->text));
+								}
+							}
 						}
 						break;
 					}
@@ -6927,6 +7039,38 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 								textarea_scroll_to_cursor(ctx, ctx->focus_id);
 								ev->type = MKGUI_EVENT_TEXTAREA_CHANGED;
 								ev->id = ctx->focus_id;
+								return 1;
+							}
+
+						} else if(fw->type == MKGUI_PATHBAR) {
+							struct mkgui_pathbar_data *pb = find_pathbar_data(ctx, ctx->focus_id);
+							if(pb && pb->editing && pb->edit_sel_start != pb->edit_sel_end) {
+								uint32_t lo = pb->edit_sel_start < pb->edit_sel_end ? pb->edit_sel_start : pb->edit_sel_end;
+								uint32_t hi = pb->edit_sel_start < pb->edit_sel_end ? pb->edit_sel_end : pb->edit_sel_start;
+								platform_clipboard_set(ctx, pb->edit_buf + lo, hi - lo);
+								struct mkgui_text_edit te = {pb->edit_buf, (uint32_t)sizeof(pb->edit_buf), pb->edit_cursor, pb->edit_sel_start, pb->edit_sel_end, pb->edit_scroll_x};
+								textedit_delete_selection(&te);
+								pb->edit_cursor = te.cursor;
+								pb->edit_sel_start = te.sel_start;
+								pb->edit_sel_end = te.sel_end;
+								dirty_widget_id(ctx, ctx->focus_id);
+								pathbar_scroll_to_cursor(ctx, pb);
+							}
+
+						} else if(fw->type == MKGUI_COMBOBOX) {
+							struct mkgui_combobox_data *cb = find_combobox_data(ctx, ctx->focus_id);
+							if(cb && combobox_has_selection(cb)) {
+								uint32_t lo = cb->sel_start < cb->sel_end ? cb->sel_start : cb->sel_end;
+								uint32_t hi = cb->sel_start < cb->sel_end ? cb->sel_end : cb->sel_start;
+								platform_clipboard_set(ctx, cb->text + lo, hi - lo);
+								combobox_delete_selection(cb);
+								cb->selected = -1;
+								{ size_t _l = strlen(cb->text); if(_l >= MKGUI_MAX_TEXT) { _l = MKGUI_MAX_TEXT - 1; } memcpy(cb->prev_text, cb->text, _l); cb->prev_text[_l] = '\0'; }
+								combobox_open_popup(ctx, ctx->focus_id, 1);
+								ev->type = MKGUI_EVENT_COMBOBOX_CHANGED;
+								ev->id = ctx->focus_id;
+								dirty_widget_id(ctx, ctx->focus_id);
+								combobox_scroll_to_cursor(ctx, ctx->focus_id);
 								return 1;
 							}
 						}
@@ -6997,6 +7141,56 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 								}
 							}
 							free(clip_buf);
+
+						} else if(fw->type == MKGUI_PATHBAR) {
+							struct mkgui_pathbar_data *pb = find_pathbar_data(ctx, ctx->focus_id);
+							if(pb && pb->editing) {
+								char clip_buf[MKGUI_CLIP_MAX];
+								uint32_t clip_len = platform_clipboard_get(ctx, clip_buf, sizeof(clip_buf));
+								if(clip_len > 0) {
+									for(uint32_t ci = 0; ci < clip_len; ++ci) {
+										if(clip_buf[ci] == '\n' || clip_buf[ci] == '\r') {
+											clip_buf[ci] = ' ';
+										}
+									}
+									struct mkgui_text_edit te = {pb->edit_buf, (uint32_t)sizeof(pb->edit_buf), pb->edit_cursor, pb->edit_sel_start, pb->edit_sel_end, pb->edit_scroll_x};
+									if(textedit_insert(&te, clip_buf, clip_len)) {
+										pb->edit_cursor = te.cursor;
+										pb->edit_sel_start = te.sel_start;
+										pb->edit_sel_end = te.sel_end;
+										dirty_widget_id(ctx, ctx->focus_id);
+										pathbar_scroll_to_cursor(ctx, pb);
+									}
+								}
+							}
+
+						} else if(fw->type == MKGUI_COMBOBOX) {
+							char clip_buf[MKGUI_CLIP_MAX];
+							uint32_t clip_len = platform_clipboard_get(ctx, clip_buf, sizeof(clip_buf));
+							if(clip_len > 0) {
+								struct mkgui_combobox_data *cb = find_combobox_data(ctx, ctx->focus_id);
+								if(cb) {
+									for(uint32_t ci = 0; ci < clip_len; ++ci) {
+										if(clip_buf[ci] == '\n' || clip_buf[ci] == '\r') {
+											clip_buf[ci] = ' ';
+										}
+									}
+									struct mkgui_text_edit te = {cb->text, MKGUI_MAX_TEXT, cb->cursor, cb->sel_start, cb->sel_end, cb->scroll_x};
+									if(textedit_insert(&te, clip_buf, clip_len)) {
+										cb->cursor = te.cursor;
+										cb->sel_start = te.sel_start;
+										cb->sel_end = te.sel_end;
+										cb->selected = -1;
+										{ size_t _l = strlen(cb->text); if(_l >= MKGUI_MAX_TEXT) { _l = MKGUI_MAX_TEXT - 1; } memcpy(cb->prev_text, cb->text, _l); cb->prev_text[_l] = '\0'; }
+										combobox_open_popup(ctx, ctx->focus_id, 1);
+										ev->type = MKGUI_EVENT_COMBOBOX_CHANGED;
+										ev->id = ctx->focus_id;
+										dirty_widget_id(ctx, ctx->focus_id);
+										combobox_scroll_to_cursor(ctx, ctx->focus_id);
+										return 1;
+									}
+								}
+							}
 						}
 						break;
 					}
@@ -7005,6 +7199,50 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 				if(ctx->focus_id) {
 					struct mkgui_widget *fw = find_widget(ctx, ctx->focus_id);
 					if(fw) {
+						if(ks == MKGUI_KEY_F2 && (fw->type == MKGUI_TREEVIEW || fw->type == MKGUI_LISTVIEW || fw->type == MKGUI_GRIDVIEW || fw->type == MKGUI_ITEMVIEW)) {
+							if(fw->type == MKGUI_TREEVIEW) {
+								struct mkgui_treeview_data *tv = find_treeview_data(ctx, ctx->focus_id);
+								if(tv && tv->selected_node >= 0) {
+									for(uint32_t ni = 0; ni < tv->node_count; ++ni) {
+										if((int32_t)tv->nodes[ni].id == tv->selected_node) {
+											celledit_begin(ctx, ctx->focus_id, tv->selected_node, 0, tv->nodes[ni].label);
+											break;
+										}
+									}
+									return 0;
+								}
+							} else if(fw->type == MKGUI_LISTVIEW) {
+								struct mkgui_listview_data *lv = find_listv_data(ctx, ctx->focus_id);
+								if(lv && lv->selected_row >= 0) {
+									char cell_buf[MKGUI_MAX_TEXT] = {0};
+									if(lv->row_cb) {
+										lv->row_cb((uint32_t)lv->selected_row, 0, cell_buf, MKGUI_MAX_TEXT, lv->userdata);
+									}
+									celledit_begin(ctx, ctx->focus_id, lv->selected_row, 0, cell_buf);
+									return 0;
+								}
+							} else if(fw->type == MKGUI_GRIDVIEW) {
+								struct mkgui_gridview_data *gv = find_gridv_data(ctx, ctx->focus_id);
+								if(gv && gv->selected_row >= 0 && gv->selected_col >= 0) {
+									char cell_buf[MKGUI_MAX_TEXT] = {0};
+									if(gv->cell_cb) {
+										gv->cell_cb((uint32_t)gv->selected_row, (uint32_t)gv->selected_col, cell_buf, MKGUI_MAX_TEXT, gv->userdata);
+									}
+									celledit_begin(ctx, ctx->focus_id, gv->selected_row, gv->selected_col, cell_buf);
+									return 0;
+								}
+							} else if(fw->type == MKGUI_ITEMVIEW) {
+								struct mkgui_itemview_data *iv = find_itemview_data(ctx, ctx->focus_id);
+								if(iv && iv->selected >= 0) {
+									char label[MKGUI_MAX_TEXT] = {0};
+									if(iv->label_cb) {
+										iv->label_cb((uint32_t)iv->selected, label, MKGUI_MAX_TEXT, iv->userdata);
+									}
+									celledit_begin(ctx, ctx->focus_id, iv->selected, 0, label);
+									return 0;
+								}
+							}
+						}
 						switch(fw->type) {
 							case MKGUI_INPUT: {
 								if(handle_input_key(ctx, ev, ks, pev.keymod, pev.text, pev.text_len)) {

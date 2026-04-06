@@ -493,7 +493,9 @@ static void render_listview(struct mkgui_ctx *ctx, uint32_t idx) {
 			if(cell_cr > clip_right) {
 				cell_cr = clip_right;
 			}
-			render_cell(ctx, lv, c, cell_buf, cx, ty, col_w, cell_cl, cell_cr, clip_top, clip_bottom, tc, row_y);
+			if(!(ctx->cell_edit.active && ctx->cell_edit.widget_id == w->id && ctx->cell_edit.row == row_idx && ctx->cell_edit.col == (int32_t)c)) {
+				render_cell(ctx, lv, c, cell_buf, cx, ty, col_w, cell_cl, cell_cr, clip_top, clip_bottom, tc, row_y);
+			}
 			cx += col_w;
 		}
 	}

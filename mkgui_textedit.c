@@ -75,7 +75,15 @@ static uint32_t textedit_delete_selection(struct mkgui_text_edit *te) {
 }
 
 // [=]===^=[ textedit_move_left ]=====================================[=]
+// collapses selection to left edge on unshifted press (standard behavior)
 static void textedit_move_left(struct mkgui_text_edit *te, uint32_t shift) {
+	if(!shift && textedit_has_selection(te)) {
+		uint32_t lo, hi;
+		textedit_sel_range(te, &lo, &hi);
+		te->cursor = lo;
+		textedit_clear_selection(te);
+		return;
+	}
 	if(te->cursor > 0) {
 		te->cursor = utf8_prev(te->text, te->cursor);
 	}
@@ -87,7 +95,15 @@ static void textedit_move_left(struct mkgui_text_edit *te, uint32_t shift) {
 }
 
 // [=]===^=[ textedit_move_right ]====================================[=]
+// collapses selection to right edge on unshifted press (standard behavior)
 static void textedit_move_right(struct mkgui_text_edit *te, uint32_t shift) {
+	if(!shift && textedit_has_selection(te)) {
+		uint32_t lo, hi;
+		textedit_sel_range(te, &lo, &hi);
+		te->cursor = hi;
+		textedit_clear_selection(te);
+		return;
+	}
 	uint32_t len = (uint32_t)strlen(te->text);
 	if(te->cursor < len) {
 		te->cursor = utf8_next(te->text, te->cursor);

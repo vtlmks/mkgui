@@ -193,7 +193,7 @@ static void render_itemview_icon(struct mkgui_ctx *ctx, uint32_t idx, struct mkg
 			}
 
 			itemview_get_label(iv, (uint32_t)item, label, sizeof(label));
-			if(label[0]) {
+			if(label[0] && !(ctx->cell_edit.active && ctx->cell_edit.widget_id == ctx->widgets[idx].id && ctx->cell_edit.row == item)) {
 				int32_t max_tw = cw - cell_pad * 2;
 				int32_t cell_cx1 = cx + cell_pad > ca_x ? cx + cell_pad : ca_x;
 				int32_t cell_cx2 = cx + cw - cell_pad < clip_x2 ? cx + cw - cell_pad : clip_x2;
@@ -330,7 +330,7 @@ static void render_itemview_thumbnail(struct mkgui_ctx *ctx, uint32_t idx, struc
 			draw_rect_border(ctx->pixels, ctx->win_w, ctx->win_h, thumb_x, thumb_y, ts, ts, ctx->theme.widget_border);
 
 			itemview_get_label(iv, (uint32_t)item, label, sizeof(label));
-			if(label[0]) {
+			if(label[0] && !(ctx->cell_edit.active && ctx->cell_edit.widget_id == ctx->widgets[idx].id && ctx->cell_edit.row == item)) {
 				int32_t tw = text_width(ctx, label);
 				int32_t max_tw = cw - thumb_pad;
 				int32_t label_x = cx + (cw - (tw < max_tw ? tw : max_tw)) / 2;
@@ -400,7 +400,7 @@ static void render_itemview_compact(struct mkgui_ctx *ctx, uint32_t idx, struct 
 			}
 
 			itemview_get_label(iv, (uint32_t)item, label, sizeof(label));
-			if(label[0]) {
+			if(label[0] && !(ctx->cell_edit.active && ctx->cell_edit.widget_id == ctx->widgets[idx].id && ctx->cell_edit.row == item)) {
 				int32_t ty = cy + (row_h - ctx->font_height) / 2;
 				uint32_t tc = (item == iv->selected) ? ctx->theme.sel_text : ((ctx->widgets[idx].flags & MKGUI_DISABLED) ? ctx->theme.text_disabled : ctx->theme.text);
 				int32_t col_clip_r = col_x + col_w;
@@ -457,7 +457,7 @@ static void render_itemview_detail(struct mkgui_ctx *ctx, uint32_t idx, struct m
 		}
 
 		itemview_get_label(iv, (uint32_t)item, label, sizeof(label));
-		if(label[0]) {
+		if(label[0] && !(ctx->cell_edit.active && ctx->cell_edit.widget_id == ctx->widgets[idx].id && ctx->cell_edit.row == item)) {
 			int32_t ty = cy + (row_h - ctx->font_height) / 2;
 			uint32_t tc = (item == iv->selected) ? ctx->theme.sel_text : ((ctx->widgets[idx].flags & MKGUI_DISABLED) ? ctx->theme.text_disabled : ctx->theme.text);
 			push_text_clip(tx, ty, label, tc, ca_x, ca_y, ca_x + ca_w, clip_y2);

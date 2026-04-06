@@ -70,6 +70,7 @@
 #define MKGUI_KEY_PAGE_DOWN        0xff56
 #define MKGUI_KEY_END              0xff57
 #define MKGUI_KEY_F1               0xffbe
+#define MKGUI_KEY_F2               0xffbf
 
 #define MKGUI_MOD_SHIFT            (1 << 0)
 #define MKGUI_MOD_CONTROL          (1 << 2)
@@ -293,6 +294,7 @@ enum {
 	MKGUI_EVENT_TIMER,
 	MKGUI_EVENT_ACCEL,
 	MKGUI_EVENT_FILE_DROP,
+	MKGUI_EVENT_CELL_EDIT_COMMIT,
 };
 
 // ---------------------------------------------------------------------------
@@ -866,6 +868,15 @@ MKGUI_API void mkgui_accel_clear(struct mkgui_ctx *ctx);
 MKGUI_API void mkgui_drop_enable(struct mkgui_ctx *ctx);
 MKGUI_API uint32_t mkgui_drop_count(struct mkgui_ctx *ctx);
 MKGUI_API char *mkgui_drop_file(struct mkgui_ctx *ctx, uint32_t index);
+
+// ---------------------------------------------------------------------------
+// Cell editing (inline rename in treeview/listview/gridview)
+// ---------------------------------------------------------------------------
+
+MKGUI_API void mkgui_cell_edit_begin(struct mkgui_ctx *ctx, uint32_t widget_id, int32_t row, int32_t col, char *text);
+MKGUI_API void mkgui_cell_edit_cancel(struct mkgui_ctx *ctx);
+MKGUI_API char *mkgui_cell_edit_get_text(struct mkgui_ctx *ctx);
+MKGUI_API uint32_t mkgui_cell_edit_active(struct mkgui_ctx *ctx);
 
 // ---------------------------------------------------------------------------
 // Utilities

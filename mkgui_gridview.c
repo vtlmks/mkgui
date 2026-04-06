@@ -199,6 +199,14 @@ static void render_gridview(struct mkgui_ctx *ctx, uint32_t idx) {
 				cell_cr = clip_right;
 			}
 
+			if(ctx->cell_edit.active && ctx->cell_edit.widget_id == w->id && ctx->cell_edit.row == row_idx && ctx->cell_edit.col == (int32_t)c) {
+				cx += col_w;
+				if(cx > clip_left && cx < clip_right) {
+					draw_vline(ctx->pixels, ctx->win_w, ctx->win_h, cx, draw_y, draw_h, grid_line_color);
+				}
+				continue;
+			}
+
 			uint32_t tc = is_selected ? ctx->theme.sel_text : ((w->flags & MKGUI_DISABLED) ? ctx->theme.text_disabled : ctx->theme.text);
 
 			int32_t box_size = sc(ctx, 14);
