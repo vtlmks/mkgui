@@ -483,13 +483,11 @@ struct mkgui_glyph {
 	int32_t bearing_x;
 	int32_t bearing_y;
 	int32_t advance;
-	int32_t atlas_x;
-	int32_t atlas_y;
+	uint32_t atlas_offset;
 };
 
-// Glyph atlas: packed uint8_t alpha bitmaps for all 224 glyphs
+// Glyph atlas: linear uint8_t alpha bitmaps for all 224 glyphs (contiguous per glyph)
 static uint8_t *glyph_atlas;
-static int32_t glyph_atlas_w, glyph_atlas_h;
 static uint8_t glyph_staging[MKGUI_GLYPH_COUNT][MKGUI_GLYPH_MAX_BMP];
 
 struct mkgui_popup {
@@ -1051,39 +1049,29 @@ static void mkgui_recompute_metrics(struct mkgui_ctx *ctx) {
 #include "mkgui_atlas.c"
 
 // [=]===^=[ glyph_atlas_build ]====================================[=]
+// Linear layout: each glyph's bitmap is stored contiguously (row-major,
+// no stride padding). Better cache locality than 2D packing since the
+// entire glyph fits in a few cache lines with no gaps.
 static void glyph_atlas_build(struct mkgui_ctx *ctx) {
-	// Collect glyph sizes for packing (idx tracks original glyph index through sort)
-	struct atlas_rect rects[MKGUI_GLYPH_COUNT];
+	uint32_t total = 0;
 	for(uint32_t i = 0; i < MKGUI_GLYPH_COUNT; ++i) {
 		struct mkgui_glyph *g = &ctx->glyphs[i];
-		rects[i].w = g->width > 0 ? g->width : 1;
-		rects[i].h = g->height > 0 ? g->height : 1;
-		rects[i].idx = i;
+		total += (uint32_t)g->width * (uint32_t)g->height;
 	}
 
-	struct atlas_result res;
-	atlas_pack(rects, MKGUI_GLYPH_COUNT, &res);
-
-	// Allocate or reallocate atlas buffer
 	free(glyph_atlas);
-	glyph_atlas_w = res.w;
-	glyph_atlas_h = res.h;
-	glyph_atlas = (uint8_t *)calloc((size_t)glyph_atlas_w * (size_t)glyph_atlas_h, 1);
+	glyph_atlas = (uint8_t *)calloc(total > 0 ? total : 1, 1);
 	if(!glyph_atlas) {
 		return;
 	}
 
-	// Blit each glyph from staging into atlas (use idx to map back to original glyph)
+	uint32_t offset = 0;
 	for(uint32_t i = 0; i < MKGUI_GLYPH_COUNT; ++i) {
-		uint32_t gi = rects[i].idx;
-		struct mkgui_glyph *g = &ctx->glyphs[gi];
-		g->atlas_x = rects[i].x;
-		g->atlas_y = rects[i].y;
-		for(int32_t row = 0; row < g->height; ++row) {
-			uint8_t *src = &glyph_staging[gi][row * g->width];
-			uint8_t *dst = &glyph_atlas[(g->atlas_y + row) * glyph_atlas_w + g->atlas_x];
-			memcpy(dst, src, (size_t)g->width);
-		}
+		struct mkgui_glyph *g = &ctx->glyphs[i];
+		g->atlas_offset = offset;
+		uint32_t size = (uint32_t)g->width * (uint32_t)g->height;
+		memcpy(&glyph_atlas[offset], glyph_staging[i], size);
+		offset += size;
 	}
 }
 

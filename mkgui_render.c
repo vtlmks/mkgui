@@ -868,7 +868,7 @@ static void draw_text_sw(struct mkgui_ctx *ctx, uint32_t *buf, int32_t bw, int32
 		uint32_t g_src = color & 0x0000ff00;
 		for(int32_t row = row0; row < row1; ++row) {
 			int32_t py = gy + row;
-			blend_glyph_row(&buf[py * bw], &glyph_atlas[(g->atlas_y + row) * glyph_atlas_w + g->atlas_x], col0, col1, gx, rb_src, g_src);
+			blend_glyph_row(&buf[py * bw], &glyph_atlas[g->atlas_offset + (uint32_t)row * (uint32_t)g->width], col0, col1, gx, rb_src, g_src);
 		}
 
 		cx += g->advance;
