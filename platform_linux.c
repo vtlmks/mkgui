@@ -44,10 +44,10 @@ static void platform_fb_destroy(struct mkgui_platform *plat, XShmSegmentInfo *sh
 // ---------------------------------------------------------------------------
 
 // [=]===^=[ platform_set_class_hint ]==============================[=]
-static void platform_set_class_hint(struct mkgui_platform *plat, char *instance, char *cls) {
+static void platform_set_class_hint(struct mkgui_platform *plat, const char *instance, const char *cls) {
 	XClassHint hint;
-	hint.res_name = instance;
-	hint.res_class = cls;
+	hint.res_name = (char *)instance;
+	hint.res_class = (char *)cls;
 	XSetClassHint(plat->dpy, plat->win, &hint);
 }
 

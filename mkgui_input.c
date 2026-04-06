@@ -369,7 +369,7 @@ static uint32_t handle_input_key(struct mkgui_ctx *ctx, struct mkgui_event *ev, 
 }
 
 // [=]===^=[ mkgui_input_set ]=======================================[=]
-MKGUI_API void mkgui_input_set(struct mkgui_ctx *ctx, uint32_t id, char *text) {
+MKGUI_API void mkgui_input_set(struct mkgui_ctx *ctx, uint32_t id, const char *text) {
 	MKGUI_CHECK(ctx);
 	if(!text) {
 		text = "";

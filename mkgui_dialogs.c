@@ -112,18 +112,18 @@ static int32_t dlg_icon_resolve(struct mkgui_ctx *ctx, uint32_t icon_type) {
 }
 
 // [=]===^=[ dlg_wrap_text ]==========================================[=]
-static uint32_t dlg_wrap_text(struct mkgui_ctx *ctx, char *text, int32_t max_w, char lines[][DLG_LINE_LEN], uint32_t max_lines) {
+static uint32_t dlg_wrap_text(struct mkgui_ctx *ctx, const char *text, int32_t max_w, char lines[][DLG_LINE_LEN], uint32_t max_lines) {
 	uint32_t lc = 0;
-	char *p = text;
+	const char *p = text;
 
 	while(lc < max_lines && *p) {
 		uint32_t li = 0;
 		int32_t w = 0;
 		uint32_t last_break = 0;
-		char *last_break_src = NULL;
+		const char *last_break_src = NULL;
 		uint32_t broke_at_width = 0;
 
-		char *s = p;
+		const char *s = p;
 		while(*s && *s != '\n' && li < DLG_LINE_LEN - 1) {
 			uint32_t ch = (uint8_t)*s;
 			int32_t cw = 0;
@@ -206,7 +206,7 @@ static uint32_t dlg_setup_buttons(uint32_t buttons) {
 }
 
 // [=]===^=[ dlg_run ]================================================[=]
-static uint32_t dlg_run(struct mkgui_ctx *parent, struct mkgui_widget *widgets, uint32_t count, char *title, int32_t w, int32_t h) {
+static uint32_t dlg_run(struct mkgui_ctx *parent, struct mkgui_widget *widgets, uint32_t count, const char *title, int32_t w, int32_t h) {
 	struct mkgui_ctx *dlg = mkgui_create_child(parent, widgets, count, title, w, h);
 	if(!dlg) {
 		return MKGUI_DLG_RESULT_NONE;
@@ -263,7 +263,7 @@ static uint32_t dlg_run(struct mkgui_ctx *parent, struct mkgui_widget *widgets, 
 }
 
 // [=]===^=[ mkgui_message_box ]======================================[=]
-MKGUI_API uint32_t mkgui_message_box(struct mkgui_ctx *ctx, char *title, char *message, uint32_t icon_type, uint32_t buttons) {
+MKGUI_API uint32_t mkgui_message_box(struct mkgui_ctx *ctx, const char *title, const char *message, uint32_t icon_type, uint32_t buttons) {
 	MKGUI_CHECK_VAL(ctx, 0);
 	if(!title) {
 		title = "";
@@ -363,7 +363,7 @@ MKGUI_API uint32_t mkgui_message_box(struct mkgui_ctx *ctx, char *title, char *m
 }
 
 // [=]===^=[ mkgui_confirm_dialog ]==================================[=]
-MKGUI_API uint32_t mkgui_confirm_dialog(struct mkgui_ctx *ctx, char *title, char *message) {
+MKGUI_API uint32_t mkgui_confirm_dialog(struct mkgui_ctx *ctx, const char *title, const char *message) {
 	MKGUI_CHECK_VAL(ctx, 0);
 	if(!title) {
 		title = "";
@@ -376,7 +376,7 @@ MKGUI_API uint32_t mkgui_confirm_dialog(struct mkgui_ctx *ctx, char *title, char
 }
 
 // [=]===^=[ mkgui_input_dialog ]====================================[=]
-MKGUI_API uint32_t mkgui_input_dialog(struct mkgui_ctx *ctx, char *title, char *prompt, char *default_text, char *out, uint32_t out_size) {
+MKGUI_API uint32_t mkgui_input_dialog(struct mkgui_ctx *ctx, const char *title, const char *prompt, const char *default_text, char *out, uint32_t out_size) {
 	MKGUI_CHECK_VAL(ctx, 0);
 	if(!title) {
 		title = "";

@@ -256,7 +256,7 @@ MKGUI_API char *mkgui_dropdown_get_item_text(struct mkgui_ctx *ctx, uint32_t id,
 }
 
 // [=]===^=[ mkgui_dropdown_add ]=================================[=]
-MKGUI_API void mkgui_dropdown_add(struct mkgui_ctx *ctx, uint32_t id, char *text) {
+MKGUI_API void mkgui_dropdown_add(struct mkgui_ctx *ctx, uint32_t id, const char *text) {
 	MKGUI_CHECK(ctx);
 	if(!text) {
 		return;

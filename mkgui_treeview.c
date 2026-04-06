@@ -515,7 +515,7 @@ MKGUI_API void mkgui_treeview_setup(struct mkgui_ctx *ctx, uint32_t id) {
 }
 
 // [=]===^=[ mkgui_treeview_add ]=================================[=]
-MKGUI_API uint32_t mkgui_treeview_add(struct mkgui_ctx *ctx, uint32_t widget_id, uint32_t node_id, uint32_t parent_node, char *label) {
+MKGUI_API uint32_t mkgui_treeview_add(struct mkgui_ctx *ctx, uint32_t widget_id, uint32_t node_id, uint32_t parent_node, const char *label) {
 	MKGUI_CHECK_VAL(ctx, 0);
 	if(!label) {
 		label = "";
@@ -640,7 +640,7 @@ MKGUI_API void mkgui_treeview_clear(struct mkgui_ctx *ctx, uint32_t widget_id) {
 }
 
 // [=]===^=[ mkgui_treeview_set_label ]=============================[=]
-MKGUI_API void mkgui_treeview_set_label(struct mkgui_ctx *ctx, uint32_t widget_id, uint32_t node_id, char *label) {
+MKGUI_API void mkgui_treeview_set_label(struct mkgui_ctx *ctx, uint32_t widget_id, uint32_t node_id, const char *label) {
 	MKGUI_CHECK(ctx);
 	if(!label) {
 		label = "";

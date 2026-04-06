@@ -50,7 +50,7 @@ static struct ib_theme_state ibt;
 // [=]===^=[ ibt_scan_category ]======================================[=]
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wformat-truncation"
-static void ibt_scan_category(char *theme_dir, int32_t size, char *category, uint32_t cat_idx) {
+static void ibt_scan_category(const char *theme_dir, int32_t size, const char *category, uint32_t cat_idx) {
 	char dir_path[2048];
 	snprintf(dir_path, sizeof(dir_path), "%s/%dx%d/%s", theme_dir, size, size, category);
 
@@ -203,7 +203,7 @@ static void ibt_icon_cb(uint32_t item, char *buf, uint32_t buf_size, void *userd
 }
 
 // [=]===^=[ mkgui_icon_browser_theme ]===============================[=]
-MKGUI_API uint32_t mkgui_icon_browser_theme(struct mkgui_ctx *ctx, char *theme_dir, int32_t size, char *out, uint32_t out_size) {
+MKGUI_API uint32_t mkgui_icon_browser_theme(struct mkgui_ctx *ctx, const char *theme_dir, int32_t size, char *out, uint32_t out_size) {
 	MKGUI_CHECK_VAL(ctx, 0);
 	if(!out || out_size == 0 || !theme_dir) {
 		return 0;

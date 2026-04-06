@@ -604,7 +604,7 @@ static uint32_t handle_textarea_key(struct mkgui_ctx *ctx, struct mkgui_event *e
 }
 
 // [=]===^=[ mkgui_textarea_set ]=================================[=]
-MKGUI_API void mkgui_textarea_set(struct mkgui_ctx *ctx, uint32_t id, char *text) {
+MKGUI_API void mkgui_textarea_set(struct mkgui_ctx *ctx, uint32_t id, const char *text) {
 	MKGUI_CHECK(ctx);
 	if(!text) { text = ""; }
 	struct mkgui_textarea_data *ta = find_textarea_data(ctx, id);
@@ -717,7 +717,7 @@ MKGUI_API void mkgui_textarea_get_selection(struct mkgui_ctx *ctx, uint32_t id, 
 }
 
 // [=]===^=[ mkgui_textarea_insert ]=================================[=]
-MKGUI_API void mkgui_textarea_insert(struct mkgui_ctx *ctx, uint32_t id, char *text) {
+MKGUI_API void mkgui_textarea_insert(struct mkgui_ctx *ctx, uint32_t id, const char *text) {
 	MKGUI_CHECK(ctx);
 	if(!text) { return; }
 	struct mkgui_textarea_data *ta = find_textarea_data(ctx, id);
@@ -741,7 +741,7 @@ MKGUI_API void mkgui_textarea_insert(struct mkgui_ctx *ctx, uint32_t id, char *t
 }
 
 // [=]===^=[ mkgui_textarea_append ]=================================[=]
-MKGUI_API void mkgui_textarea_append(struct mkgui_ctx *ctx, uint32_t id, char *text) {
+MKGUI_API void mkgui_textarea_append(struct mkgui_ctx *ctx, uint32_t id, const char *text) {
 	MKGUI_CHECK(ctx);
 	if(!text) { return; }
 	struct mkgui_textarea_data *ta = find_textarea_data(ctx, id);

@@ -66,7 +66,7 @@ MKGUI_API void mkgui_statusbar_setup(struct mkgui_ctx *ctx, uint32_t id, uint32_
 }
 
 // [=]===^=[ mkgui_statusbar_set ]================================[=]
-MKGUI_API void mkgui_statusbar_set(struct mkgui_ctx *ctx, uint32_t id, uint32_t section, char *text) {
+MKGUI_API void mkgui_statusbar_set(struct mkgui_ctx *ctx, uint32_t id, uint32_t section, const char *text) {
 	MKGUI_CHECK(ctx);
 	if(!text) {
 		text = "";

@@ -640,7 +640,7 @@ MKGUI_API void mkgui_combobox_set(struct mkgui_ctx *ctx, uint32_t id, int32_t in
 }
 
 // [=]===^=[ mkgui_combobox_set_text ]==============================[=]
-MKGUI_API void mkgui_combobox_set_text(struct mkgui_ctx *ctx, uint32_t id, char *text) {
+MKGUI_API void mkgui_combobox_set_text(struct mkgui_ctx *ctx, uint32_t id, const char *text) {
 	MKGUI_CHECK(ctx);
 	if(!text) {
 		text = "";
@@ -681,7 +681,7 @@ MKGUI_API char *mkgui_combobox_get_item_text(struct mkgui_ctx *ctx, uint32_t id,
 }
 
 // [=]===^=[ mkgui_combobox_add ]=================================[=]
-MKGUI_API void mkgui_combobox_add(struct mkgui_ctx *ctx, uint32_t id, char *text) {
+MKGUI_API void mkgui_combobox_add(struct mkgui_ctx *ctx, uint32_t id, const char *text) {
 	MKGUI_CHECK(ctx);
 	if(!text) {
 		return;

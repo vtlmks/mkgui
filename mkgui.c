@@ -517,9 +517,9 @@ static uint32_t icon_count;
 static uint32_t icon_hash[MKGUI_ICON_HASH_SIZE];
 
 // [=]===^=[ icon_hash_fn ]===========================================[=]
-static uint32_t icon_hash_fn(char *name) {
+static uint32_t icon_hash_fn(const char *name) {
 	uint32_t h = 2166136261u;
-	for(char *p = name; *p; ++p) {
+	for(const char *p = name; *p; ++p) {
 		h ^= (uint32_t)(uint8_t)*p;
 		h *= 16777619u;
 	}
@@ -543,7 +543,7 @@ static void icon_hash_insert(uint32_t idx) {
 }
 
 // [=]===^=[ icon_hash_lookup ]=======================================[=]
-static int32_t icon_hash_lookup(char *name) {
+static int32_t icon_hash_lookup(const char *name) {
 	uint32_t h = icon_hash_fn(name);
 	for(;;) {
 		uint32_t idx = icon_hash[h];
@@ -1478,6 +1478,8 @@ static inline int32_t lw_sw(struct mkgui_ctx *ctx, int32_t val) {
 
 // [=]===^=[ lc_find_idx ]===========================================[=]
 static uint32_t lc_find_idx(struct layout_ctx *lc, uint32_t id) {
+	// knuth multiplicative hash (golden ratio constant 0x9e3779b1) for good
+	// distribution across power-of-two table sizes
 	uint32_t h = (id * 2654435761u) & lc->hash_mask;
 	for(;;) {
 		if(lc->id_map[h].idx == UINT32_MAX) {
@@ -1504,6 +1506,9 @@ static void lc_build_index(struct layout_ctx *lc) {
 		lc->first_child[i] = UINT32_MAX;
 		lc->next_sibling[i] = UINT32_MAX;
 	}
+	// build child linked lists by iterating in reverse: each child becomes
+	// the new list head, so forward iteration later yields declaration order
+	// without needing a tail pointer
 	uint32_t i = lc->widget_count;
 	while(i > 0) {
 		--i;
@@ -1736,6 +1741,8 @@ static int32_t lc_measure_container(struct mkgui_ctx *ctx, struct layout_ctx *lc
 	int32_t gap_total = visible > 1 ? (int32_t)(visible - 1) * ctx->box_gap : 0;
 	main_total += gap_total;
 
+	// only apply padding at outermost box level to avoid double-padding in
+	// nested containers; bordered boxes always get padding for visual separation
 	uint32_t has_pad = 0;
 	if(!(w->flags & MKGUI_NO_PAD)) {
 		uint32_t gpidx = lc->parent[idx];
@@ -1878,6 +1885,8 @@ static void lc_layout_node(struct mkgui_ctx *ctx, struct layout_ctx *lc, uint32_
 		ph -= gtop + gpad;
 	}
 
+	// suppress padding for nested containers to avoid compounding insets;
+	// bordered boxes override this to maintain visual separation
 	uint32_t box_has_pad = 0;
 	uint32_t is_panel_vbox = (w->type == MKGUI_PANEL);
 	if(w->type == MKGUI_VBOX || w->type == MKGUI_HBOX || w->type == MKGUI_FORM || is_panel_vbox) {
@@ -1912,7 +1921,9 @@ static void lc_layout_node(struct mkgui_ctx *ctx, struct layout_ctx *lc, uint32_
 					continue;
 				}
 				++child_count;
-				uint32_t treat_fixed = (jw->flags & MKGUI_FIXED) || (jw->type == MKGUI_GROUP && (jw->style & MKGUI_GROUP_COLLAPSIBLE));
+				// collapsible groups are always fixed-height: their size is
+			// deterministic (collapsed header or full content), not weighted
+			uint32_t treat_fixed = (jw->flags & MKGUI_FIXED) || (jw->type == MKGUI_GROUP && (jw->style & MKGUI_GROUP_COLLAPSIBLE));
 				if(treat_fixed) {
 					int32_t fh = lw_sw(ctx, jw->h);
 					if(jw->type == MKGUI_GROUP && (jw->style & MKGUI_GROUP_COLLAPSED)) {
@@ -1946,6 +1957,7 @@ static void lc_layout_node(struct mkgui_ctx *ctx, struct layout_ctx *lc, uint32_
 			int32_t gap_total = child_count > 1 ? (int32_t)(child_count - 1) * ctx->box_gap : 0;
 			int32_t content_h = fixed_total + min_total + gap_total;
 			uint32_t needs_scroll = scrollable && (content_h > ph);
+			// scrollbar steals width from content area after initial measurement
 			if(needs_scroll) {
 				pw -= ctx->scrollbar_w;
 			}
@@ -1956,6 +1968,8 @@ static void lc_layout_node(struct mkgui_ctx *ctx, struct layout_ctx *lc, uint32_
 				}
 			}
 			int32_t remaining = ph - fixed_total - min_total - gap_total;
+			// when scrolling, content already exceeds the viewport; clamp
+			// remaining to zero so weight distribution doesn't go negative
 			if(needs_scroll) {
 				if(remaining < 0) {
 					remaining = 0;
@@ -1983,8 +1997,11 @@ static void lc_layout_node(struct mkgui_ctx *ctx, struct layout_ctx *lc, uint32_
 							base_h = natural_height(ctx, jw->type);
 						}
 					}
+					// 64-bit intermediate prevents overflow when remaining * weight exceeds 2^31
 					ch = base_h + (weight_total > 0 ? (int32_t)((int64_t)remaining * (int32_t)wt / (int32_t)weight_total) : 0);
 				}
+				// floor flexible children at natural size so they never collapse
+				// below usable dimensions; fixed children keep their declared size
 				if(!((jw->flags & MKGUI_FIXED) || (jw->type == MKGUI_GROUP && (jw->style & MKGUI_GROUP_COLLAPSIBLE)))) {
 					int32_t min_ch = natural_height(ctx, jw->type);
 					if(min_ch < 1) { min_ch = 1; }
@@ -2248,6 +2265,8 @@ static void layout_min_size(struct mkgui_ctx *ctx, uint32_t idx, int32_t *out_w,
 	struct mkgui_widget *w = &ctx->widgets[idx];
 	uint32_t t = w->type;
 
+	// scrollable containers don't need to fit all content: use a small fixed
+	// minimum to break the recursion that would otherwise measure every descendant
 	if(!layout_min_full_content && (t == MKGUI_VBOX || t == MKGUI_HBOX || t == MKGUI_PANEL) && !(w->flags & MKGUI_NO_SCROLL)) {
 		*out_w = 100;
 		*out_h = ctx->row_height * 3;
@@ -4009,7 +4028,7 @@ MKGUI_API struct mkgui_ctx *mkgui_create(struct mkgui_widget *widgets, uint32_t 
 }
 
 // [=]===^=[ mkgui_set_app_class ]================================[=]
-MKGUI_API void mkgui_set_app_class(struct mkgui_ctx *ctx, char *app_class) {
+MKGUI_API void mkgui_set_app_class(struct mkgui_ctx *ctx, const char *app_class) {
 	MKGUI_CHECK(ctx);
 	MKGUI_CHECK(app_class);
 	snprintf(ctx->app_class, sizeof(ctx->app_class), "%s", app_class);
@@ -4017,7 +4036,7 @@ MKGUI_API void mkgui_set_app_class(struct mkgui_ctx *ctx, char *app_class) {
 }
 
 // [=]===^=[ mkgui_set_title ]======================================[=]
-MKGUI_API void mkgui_set_title(struct mkgui_ctx *ctx, char *title) {
+MKGUI_API void mkgui_set_title(struct mkgui_ctx *ctx, const char *title) {
 	MKGUI_CHECK(ctx);
 	if(!title) {
 		title = "";
@@ -4030,7 +4049,7 @@ MKGUI_API void mkgui_set_title(struct mkgui_ctx *ctx, char *title) {
 }
 
 // [=]===^=[ mkgui_set_window_instance ]============================[=]
-MKGUI_API void mkgui_set_window_instance(struct mkgui_ctx *ctx, char *instance) {
+MKGUI_API void mkgui_set_window_instance(struct mkgui_ctx *ctx, const char *instance) {
 	MKGUI_CHECK(ctx);
 	MKGUI_CHECK(instance);
 	char *cls = "mkgui";
@@ -4310,7 +4329,7 @@ MKGUI_API void mkgui_destroy(struct mkgui_ctx *ctx) {
 }
 
 // [=]===^=[ mkgui_create_child ]=================================[=]
-MKGUI_API struct mkgui_ctx *mkgui_create_child(struct mkgui_ctx *parent, struct mkgui_widget *widgets, uint32_t count, char *title, int32_t w, int32_t h) {
+MKGUI_API struct mkgui_ctx *mkgui_create_child(struct mkgui_ctx *parent, struct mkgui_widget *widgets, uint32_t count, const char *title, int32_t w, int32_t h) {
 	if(!parent || (!widgets && count > 0)) {
 		return NULL;
 	}
@@ -4561,6 +4580,9 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 
 			// -=[ MOUSE MOVE ]=-
 			case MKGUI_PLAT_MOTION: {
+				// popups are separate platform windows with independent hover
+				// tracking; a motion event targets either a popup or the main
+				// window, never both, so handle popup motion and break early
 				if(popup_idx >= 0) {
 					struct mkgui_popup *mp = &ctx->popups[popup_idx];
 					struct mkgui_widget *mpw = find_widget(ctx, mp->widget_id);
@@ -5163,6 +5185,8 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 								return 1;
 							}
 						}
+						// break (not return): dismiss the menu, then let the click
+						// fall through to the main window dispatcher below
 						popup_destroy_all(ctx);
 						dirty_all(ctx);
 						break;
@@ -6397,6 +6421,8 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 
 			// -=[ BUTTON RELEASE ]=-
 			case MKGUI_PLAT_BUTTON_RELEASE: {
+				// buttons 4+ are scroll wheel; their "release" is meaningless
+				// and must not trigger drag completion or click logic
 				if(pev.button >= 4) {
 					break;
 				}
@@ -6616,6 +6642,9 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 						}
 					}
 
+					// click fires only when release lands on the same widget
+					// that received the press; dragging off and releasing
+					// elsewhere cancels the interaction
 					int32_t hi = hit_test(ctx, pev.x, pev.y);
 					if(hi >= 0 && ctx->widgets[hi].id == was_press) {
 						struct mkgui_widget *hw = &ctx->widgets[hi];
@@ -6716,6 +6745,9 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 					break;
 				}
 
+				// accelerators run before the focused widget so global
+				// shortcuts (ctrl+s, ctrl+q, etc.) are never eaten by
+				// a text input that would otherwise consume the keypress
 				if(accel_dispatch(ctx, ks, pev.keymod, ev)) {
 					return 1;
 				}

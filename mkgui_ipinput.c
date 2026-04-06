@@ -288,7 +288,7 @@ static uint32_t handle_ipinput_key(struct mkgui_ctx *ctx, struct mkgui_event *ev
 }
 
 // [=]===^=[ mkgui_ipinput_set ]===================================[=]
-MKGUI_API void mkgui_ipinput_set(struct mkgui_ctx *ctx, uint32_t id, char *ip_string) {
+MKGUI_API void mkgui_ipinput_set(struct mkgui_ctx *ctx, uint32_t id, const char *ip_string) {
 	MKGUI_CHECK(ctx);
 	if(!ip_string) {
 		ip_string = "";

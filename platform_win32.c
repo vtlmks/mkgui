@@ -406,7 +406,7 @@ static void platform_register_class(void) {
 }
 
 // [=]===^=[ platform_set_class_hint ]==============================[=]
-static void platform_set_class_hint(struct mkgui_platform *plat, char *instance, char *cls) {
+static void platform_set_class_hint(struct mkgui_platform *plat, const char *instance, const char *cls) {
 	(void)plat;
 	(void)instance;
 	(void)cls;

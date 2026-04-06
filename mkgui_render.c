@@ -45,9 +45,13 @@ static void fill_pixels_avx2(uint32_t *dst, uint32_t count, uint32_t color) {
 
 // [=]===^=[ blend_glyph_row_sse2 ]=================================[=]
 static void blend_glyph_row_sse2(uint32_t *rowp, uint8_t *bmp, int32_t col0, int32_t col1, int32_t gx, uint32_t rb_src, uint32_t g_src) {
+	// color is pre-split into red|blue and green channels so we can use
+	// 16-bit multiplies to blend two channels per 32-bit lane simultaneously
 	int32_t col = col0;
 	__m128i src_rb = _mm_set1_epi32((int32_t)rb_src);
 	__m128i src_g8 = _mm_set1_epi32((int32_t)(g_src >> 8));
+	// 0x80 bias per channel implements the "divide by 255" approximation:
+	// (x + 0x80 + (x >> 8)) >> 8 is equivalent to x/255 with correct rounding
 	__m128i round_rb = _mm_set1_epi32(0x00800080);
 	__m128i round_g = _mm_set1_epi32(0x00000080);
 	__m128i mask_rb = _mm_set1_epi32(0x00ff00ff);
@@ -184,6 +188,9 @@ static void blend_glyph_row_avx2(uint32_t *rowp, uint8_t *bmp, int32_t col0, int
 }
 
 // [=]===^=[ blend_icon_row_sse2 ]===================================[=]
+// unlike glyph blending (alpha * src + (1-alpha) * dst), icons use
+// premultiplied alpha: src + (1-alpha) * dst. the source pixels already
+// have their RGB values scaled by alpha in the icon rasterizer
 static void blend_icon_row_sse2(uint32_t *rowp, uint32_t *src, int32_t col0, int32_t col1, int32_t x) {
 	int32_t col = col0;
 	__m128i round_rb = _mm_set1_epi32(0x00800080);
@@ -441,6 +448,10 @@ static void rounded_rect_insets(int32_t radius, int32_t *out) {
 }
 
 // [=]===^=[ corner_coverage ]=====================================[=]
+// computes antialiased coverage for a pixel in a rounded corner by testing
+// a 4x4 subpixel grid against the circle equation (dx^2 + dy^2 <= r^2).
+// coordinates are scaled 8x for integer subpixel precision; the SIMD path
+// evaluates all 4 x-samples per row in one compare via madd + popcount
 static uint32_t corner_coverage(int32_t col, int32_t crow, int32_t radius) {
 	int32_t r8 = 8 * radius;
 	int32_t r8sq = r8 * r8;
@@ -560,6 +571,9 @@ static void draw_rounded_rect_fill(uint32_t *buf, int32_t bw, int32_t bh, int32_
 }
 
 // [=]===^=[ draw_rounded_rect ]===================================[=]
+// 1px border via overdraw: fill the full rect with border color, then fill
+// an inset rect with the background color. simpler than edge detection and
+// naturally handles rounded corners
 static void draw_rounded_rect(uint32_t *buf, int32_t bw, int32_t bh, int32_t x, int32_t y, int32_t w, int32_t h, uint32_t fill, uint32_t border, int32_t radius) {
 	draw_rounded_rect_fill(buf, bw, bh, x, y, w, h, border, radius);
 	if(w > 2 && h > 2) {
@@ -651,6 +665,9 @@ static void draw_triangle_aa(uint32_t *buf, int32_t bw, int32_t bh,
 	int32_t max_y = (y2 + 1) > render_clip_y2 ? render_clip_y2 : (y2 + 1);
 	if(min_y < 0) { min_y = 0; }
 	if(max_y > bh) { max_y = bh; }
+	// 4x supersampling in Y (4 subrows per pixel), 8x in X (subpixel edge
+	// precision). coverage per pixel accumulates over all 4 subrows; max
+	// coverage is 32 (4 rows * 8 subpixel units width)
 	int32_t y0_4 = y0 * 4;
 	int32_t y1_4 = y1 * 4;
 	int32_t y2_4 = y2 * 4;
@@ -947,6 +964,9 @@ static void clip_intersect(int32_t *x1, int32_t *y1, int32_t *x2, int32_t *y2, i
 }
 
 // [=]===^=[ flush_text_to ]======================================[=]
+// text commands are queued in screen coordinates; ox/oy translate them into
+// the target buffer's local space so the same queue can flush to either the
+// main framebuffer (ox=0,oy=0) or a popup window at its own origin
 static void flush_text_to(struct mkgui_ctx *ctx, uint32_t *buf, int32_t bw, int32_t bh, int32_t ox, int32_t oy) {
 	for(uint32_t i = 0; i < text_cmd_count; ++i) {
 		struct mkgui_text_cmd *cmd = &text_cmds[i];

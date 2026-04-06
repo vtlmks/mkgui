@@ -40,7 +40,7 @@ static void render_button(struct mkgui_ctx *ctx, uint32_t idx) {
 }
 
 // [=]===^=[ mkgui_button_set_text ]================================[=]
-MKGUI_API void mkgui_button_set_text(struct mkgui_ctx *ctx, uint32_t id, char *text) {
+MKGUI_API void mkgui_button_set_text(struct mkgui_ctx *ctx, uint32_t id, const char *text) {
 	MKGUI_CHECK(ctx);
 	struct mkgui_widget *w = find_widget(ctx, id);
 	if(!w) {

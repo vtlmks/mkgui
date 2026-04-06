@@ -443,7 +443,7 @@ static void pathbar_focus_lost(struct mkgui_ctx *ctx) {
 }
 
 // [=]===^=[ mkgui_pathbar_set ]=====================================[=]
-MKGUI_API void mkgui_pathbar_set(struct mkgui_ctx *ctx, uint32_t id, char *path) {
+MKGUI_API void mkgui_pathbar_set(struct mkgui_ctx *ctx, uint32_t id, const char *path) {
 	MKGUI_CHECK(ctx);
 	if(!path) {
 		path = "";

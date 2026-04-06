@@ -103,7 +103,7 @@ static void render_label(struct mkgui_ctx *ctx, uint32_t idx) {
 }
 
 // [=]===^=[ mkgui_label_set ]===================================[=]
-MKGUI_API void mkgui_label_set(struct mkgui_ctx *ctx, uint32_t id, char *text) {
+MKGUI_API void mkgui_label_set(struct mkgui_ctx *ctx, uint32_t id, const char *text) {
 	MKGUI_CHECK(ctx);
 	struct mkgui_widget *w = find_widget(ctx, id);
 	if(!w) {

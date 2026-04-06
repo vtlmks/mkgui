@@ -185,7 +185,7 @@ MKGUI_API void mkgui_context_menu_clear(struct mkgui_ctx *ctx) {
 }
 
 // [=]===^=[ mkgui_context_menu_add ]===============================[=]
-MKGUI_API void mkgui_context_menu_add(struct mkgui_ctx *ctx, uint32_t id, char *label, char *icon, uint32_t flags) {
+MKGUI_API void mkgui_context_menu_add(struct mkgui_ctx *ctx, uint32_t id, const char *label, const char *icon, uint32_t flags) {
 	MKGUI_CHECK(ctx);
 	if(!label && !(flags & MKGUI_MENUITEM_SEPARATOR)) {
 		return;

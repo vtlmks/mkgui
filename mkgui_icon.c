@@ -5,7 +5,7 @@
 #define MKGUI_TOOLBAR_ICON_PREFIX_LEN 3
 
 // [=]===^=[ icon_find_idx ]==========================================[=]
-static int32_t icon_find_idx(char *name) {
+static int32_t icon_find_idx(const char *name) {
 	if(name[0] == '\0') {
 		return -1;
 	}
@@ -28,7 +28,7 @@ static struct mkgui_svg_source svg_sources[MKGUI_SVG_ICON_MAX];
 static uint32_t svg_source_count;
 
 // [=]===^=[ svg_read_file ]===========================================[=]
-static char *svg_read_file(char *path, uint32_t *out_len) {
+static char *svg_read_file(const char *path, uint32_t *out_len) {
 	FILE *fp = fopen(path, "rb");
 	if(!fp) {
 		return NULL;
@@ -59,7 +59,7 @@ static char *svg_read_file(char *path, uint32_t *out_len) {
 }
 
 // [=]===^=[ svg_rasterize_icon_ex ]==================================[=]
-static int32_t svg_rasterize_icon_ex(char *name, char *svg_data, uint32_t svg_len, int32_t target_size, uint32_t theme_text_color, uint32_t snap_native) {
+static int32_t svg_rasterize_icon_ex(const char *name, char *svg_data, uint32_t svg_len, int32_t target_size, uint32_t theme_text_color, uint32_t snap_native) {
 	if(!svg_data || target_size <= 0) {
 		return -1;
 	}
@@ -150,7 +150,7 @@ static struct mkgui_svg_source *svg_find_source(char *name) {
 }
 
 // [=]===^=[ icon_resolve ]===========================================[=]
-static int32_t icon_resolve(char *name) {
+static int32_t icon_resolve(const char *name) {
 	return icon_find_idx(name);
 }
 
@@ -202,7 +202,7 @@ static void icon_load_from_widgets(struct mkgui_ctx *ctx) {
 }
 
 // [=]===^=[ mkgui_icon_add ]=========================================[=]
-MKGUI_API int32_t mkgui_icon_add(char *name, uint32_t *pixels, int32_t w, int32_t h) {
+MKGUI_API int32_t mkgui_icon_add(const char *name, uint32_t *pixels, int32_t w, int32_t h) {
 	if(icon_count >= MKGUI_MAX_ICONS) {
 		return -1;
 	}
@@ -250,7 +250,7 @@ MKGUI_API int32_t mkgui_icon_add(char *name, uint32_t *pixels, int32_t w, int32_
 }
 
 // [=]===^=[ mkgui_set_icon ]=========================================[=]
-MKGUI_API void mkgui_set_icon(struct mkgui_ctx *ctx, uint32_t widget_id, char *icon_name) {
+MKGUI_API void mkgui_set_icon(struct mkgui_ctx *ctx, uint32_t widget_id, const char *icon_name) {
 	MKGUI_CHECK(ctx);
 	struct mkgui_widget *w = find_widget(ctx, widget_id);
 	if(!w) {
@@ -267,7 +267,7 @@ MKGUI_API void mkgui_set_icon(struct mkgui_ctx *ctx, uint32_t widget_id, char *i
 }
 
 // [=]===^=[ mkgui_set_treenode_icon ]================================[=]
-MKGUI_API void mkgui_set_treenode_icon(struct mkgui_ctx *ctx, uint32_t widget_id, uint32_t node_id, char *icon_name) {
+MKGUI_API void mkgui_set_treenode_icon(struct mkgui_ctx *ctx, uint32_t widget_id, uint32_t node_id, const char *icon_name) {
 	MKGUI_CHECK(ctx);
 	struct mkgui_treeview_data *tv = find_treeview_data(ctx, widget_id);
 	if(!tv) {
@@ -286,7 +286,7 @@ MKGUI_API void mkgui_set_treenode_icon(struct mkgui_ctx *ctx, uint32_t widget_id
 
 
 // [=]===^=[ mkgui_icon_load_svg ]====================================[=]
-MKGUI_API int32_t mkgui_icon_load_svg(struct mkgui_ctx *ctx, char *name, char *path) {
+MKGUI_API int32_t mkgui_icon_load_svg(struct mkgui_ctx *ctx, const char *name, const char *path) {
 	MKGUI_CHECK_VAL(ctx, -1);
 	if(!name || !path || name[0] == '\0') {
 		return -1;
@@ -317,7 +317,7 @@ MKGUI_API int32_t mkgui_icon_load_svg(struct mkgui_ctx *ctx, char *name, char *p
 }
 
 // [=]===^=[ mkgui_icon_load_svg_dir ]================================[=]
-MKGUI_API uint32_t mkgui_icon_load_svg_dir(struct mkgui_ctx *ctx, char *dir_path) {
+MKGUI_API uint32_t mkgui_icon_load_svg_dir(struct mkgui_ctx *ctx, const char *dir_path) {
 	MKGUI_CHECK_VAL(ctx, 0);
 	if(!dir_path) {
 		return 0;
