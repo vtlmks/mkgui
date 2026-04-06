@@ -306,13 +306,14 @@ static uint32_t handle_pathbar_key(struct mkgui_ctx *ctx, struct mkgui_event *ev
 	uint32_t text_len = (uint32_t)strlen(pb->edit_buf);
 	uint32_t has_sel = (pb->edit_sel_start != pb->edit_sel_end);
 
-	if(ks == MKGUI_KEY_ESCAPE) {
+	switch(ks) {
+	case MKGUI_KEY_ESCAPE: {
 		pathbar_exit_edit(pb);
 		dirty_all(ctx);
 		return 0;
 	}
 
-	if(ks == MKGUI_KEY_RETURN) {
+	case MKGUI_KEY_RETURN: {
 		uint32_t elen = (uint32_t)strlen(pb->edit_buf);
 		memcpy(pb->path, pb->edit_buf, elen + 1);
 		pathbar_rebuild_segments(ctx, pb);
@@ -323,7 +324,7 @@ static uint32_t handle_pathbar_key(struct mkgui_ctx *ctx, struct mkgui_event *ev
 		return 1;
 	}
 
-	if(ks == MKGUI_KEY_LEFT) {
+	case MKGUI_KEY_LEFT: {
 		if(pb->edit_cursor > 0) {
 			--pb->edit_cursor;
 		}
@@ -337,7 +338,7 @@ static uint32_t handle_pathbar_key(struct mkgui_ctx *ctx, struct mkgui_event *ev
 		return 0;
 	}
 
-	if(ks == MKGUI_KEY_RIGHT) {
+	case MKGUI_KEY_RIGHT: {
 		if(pb->edit_cursor < text_len) {
 			++pb->edit_cursor;
 		}
@@ -351,7 +352,7 @@ static uint32_t handle_pathbar_key(struct mkgui_ctx *ctx, struct mkgui_event *ev
 		return 0;
 	}
 
-	if(ks == MKGUI_KEY_HOME) {
+	case MKGUI_KEY_HOME: {
 		pb->edit_cursor = 0;
 		if(shift) {
 			pb->edit_sel_end = 0;
@@ -363,7 +364,7 @@ static uint32_t handle_pathbar_key(struct mkgui_ctx *ctx, struct mkgui_event *ev
 		return 0;
 	}
 
-	if(ks == MKGUI_KEY_END) {
+	case MKGUI_KEY_END: {
 		pb->edit_cursor = text_len;
 		if(shift) {
 			pb->edit_sel_end = text_len;
@@ -375,7 +376,7 @@ static uint32_t handle_pathbar_key(struct mkgui_ctx *ctx, struct mkgui_event *ev
 		return 0;
 	}
 
-	if(ks == MKGUI_KEY_BACKSPACE) {
+	case MKGUI_KEY_BACKSPACE: {
 		if(has_sel) {
 			uint32_t lo = pb->edit_sel_start < pb->edit_sel_end ? pb->edit_sel_start : pb->edit_sel_end;
 			uint32_t hi = pb->edit_sel_start < pb->edit_sel_end ? pb->edit_sel_end : pb->edit_sel_start;
@@ -393,7 +394,7 @@ static uint32_t handle_pathbar_key(struct mkgui_ctx *ctx, struct mkgui_event *ev
 		return 0;
 	}
 
-	if(ks == MKGUI_KEY_DELETE) {
+	case MKGUI_KEY_DELETE: {
 		if(has_sel) {
 			uint32_t lo = pb->edit_sel_start < pb->edit_sel_end ? pb->edit_sel_start : pb->edit_sel_end;
 			uint32_t hi = pb->edit_sel_start < pb->edit_sel_end ? pb->edit_sel_end : pb->edit_sel_start;
@@ -408,26 +409,27 @@ static uint32_t handle_pathbar_key(struct mkgui_ctx *ctx, struct mkgui_event *ev
 		return 0;
 	}
 
-	if(len > 0 && (uint8_t)buf[0] >= 32) {
-		if(has_sel) {
-			uint32_t lo = pb->edit_sel_start < pb->edit_sel_end ? pb->edit_sel_start : pb->edit_sel_end;
-			uint32_t hi = pb->edit_sel_start < pb->edit_sel_end ? pb->edit_sel_end : pb->edit_sel_start;
-			memmove(&pb->edit_buf[lo], &pb->edit_buf[hi], text_len - hi + 1);
-			pb->edit_cursor = lo;
-			text_len = (uint32_t)strlen(pb->edit_buf);
+	default: {
+		if(len > 0 && (uint8_t)buf[0] >= 32) {
+			if(has_sel) {
+				uint32_t lo = pb->edit_sel_start < pb->edit_sel_end ? pb->edit_sel_start : pb->edit_sel_end;
+				uint32_t hi = pb->edit_sel_start < pb->edit_sel_end ? pb->edit_sel_end : pb->edit_sel_start;
+				memmove(&pb->edit_buf[lo], &pb->edit_buf[hi], text_len - hi + 1);
+				pb->edit_cursor = lo;
+				text_len = (uint32_t)strlen(pb->edit_buf);
+			}
+			if(text_len + (uint32_t)len < sizeof(pb->edit_buf) - 1) {
+				memmove(&pb->edit_buf[pb->edit_cursor + (uint32_t)len], &pb->edit_buf[pb->edit_cursor], text_len - pb->edit_cursor + 1);
+				memcpy(&pb->edit_buf[pb->edit_cursor], buf, (uint32_t)len);
+				pb->edit_cursor += (uint32_t)len;
+				pb->edit_sel_start = pb->edit_cursor;
+				pb->edit_sel_end = pb->edit_cursor;
+			}
+			dirty_all(ctx);
 		}
-		if(text_len + (uint32_t)len < sizeof(pb->edit_buf) - 1) {
-			memmove(&pb->edit_buf[pb->edit_cursor + (uint32_t)len], &pb->edit_buf[pb->edit_cursor], text_len - pb->edit_cursor + 1);
-			memcpy(&pb->edit_buf[pb->edit_cursor], buf, (uint32_t)len);
-			pb->edit_cursor += (uint32_t)len;
-			pb->edit_sel_start = pb->edit_cursor;
-			pb->edit_sel_end = pb->edit_cursor;
-		}
-		dirty_all(ctx);
 		return 0;
 	}
-
-	return 0;
+	}
 }
 
 // [=]===^=[ pathbar_focus_lost ]====================================[=]

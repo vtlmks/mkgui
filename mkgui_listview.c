@@ -923,7 +923,8 @@ static uint32_t handle_listview_key(struct mkgui_ctx *ctx, struct mkgui_event *e
 		return 1;
 	}
 
-	if(ks == MKGUI_KEY_UP) {
+	switch(ks) {
+	case MKGUI_KEY_UP: {
 		if(lv->selected_row > 0) {
 			--lv->selected_row;
 			int32_t row_y = lv->selected_row * ctx->row_height;
@@ -936,8 +937,9 @@ static uint32_t handle_listview_key(struct mkgui_ctx *ctx, struct mkgui_event *e
 			ev->value = lv->selected_row;
 			return 1;
 		}
+	} break;
 
-	} else if(ks == MKGUI_KEY_DOWN) {
+	case MKGUI_KEY_DOWN: {
 		if(lv->selected_row < (int32_t)lv->row_count - 1) {
 			++lv->selected_row;
 			int32_t row_bottom = (lv->selected_row + 1) * ctx->row_height;
@@ -950,8 +952,9 @@ static uint32_t handle_listview_key(struct mkgui_ctx *ctx, struct mkgui_event *e
 			ev->value = lv->selected_row;
 			return 1;
 		}
+	} break;
 
-	} else if(ks == MKGUI_KEY_PAGE_UP) {
+	case MKGUI_KEY_PAGE_UP: {
 		lv->selected_row -= visible_rows;
 		if(lv->selected_row < 0) {
 			lv->selected_row = 0;
@@ -965,8 +968,9 @@ static uint32_t handle_listview_key(struct mkgui_ctx *ctx, struct mkgui_event *e
 		ev->id = ctx->focus_id;
 		ev->value = lv->selected_row;
 		return 1;
+	} break;
 
-	} else if(ks == MKGUI_KEY_PAGE_DOWN) {
+	case MKGUI_KEY_PAGE_DOWN: {
 		lv->selected_row += visible_rows;
 		if(lv->selected_row >= (int32_t)lv->row_count) {
 			lv->selected_row = (int32_t)lv->row_count - 1;
@@ -983,8 +987,9 @@ static uint32_t handle_listview_key(struct mkgui_ctx *ctx, struct mkgui_event *e
 		ev->id = ctx->focus_id;
 		ev->value = lv->selected_row;
 		return 1;
+	} break;
 
-	} else if(ks == MKGUI_KEY_HOME) {
+	case MKGUI_KEY_HOME: {
 		lv->selected_row = 0;
 		lv->scroll_y = 0;
 		dirty_all(ctx);
@@ -992,8 +997,9 @@ static uint32_t handle_listview_key(struct mkgui_ctx *ctx, struct mkgui_event *e
 		ev->id = ctx->focus_id;
 		ev->value = 0;
 		return 1;
+	} break;
 
-	} else if(ks == MKGUI_KEY_END) {
+	case MKGUI_KEY_END: {
 		lv->selected_row = (int32_t)lv->row_count - 1;
 		lv->scroll_y = max_scroll;
 		dirty_all(ctx);
@@ -1001,6 +1007,10 @@ static uint32_t handle_listview_key(struct mkgui_ctx *ctx, struct mkgui_event *e
 		ev->id = ctx->focus_id;
 		ev->value = lv->selected_row;
 		return 1;
+	} break;
+
+	default: {
+	} break;
 	}
 
 	return 0;

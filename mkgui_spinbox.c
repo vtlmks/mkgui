@@ -165,13 +165,23 @@ static uint32_t handle_spinbox_key(struct mkgui_ctx *ctx, struct mkgui_event *ev
 		return 0;
 	}
 
-	if(ks == MKGUI_KEY_ESCAPE) {
+	if(ks == MKGUI_KEY_LEFT || ks == MKGUI_KEY_RIGHT) {
+		if(sd->select_all) {
+			sd->select_all = 0;
+			dirty_all(ctx);
+			return 1;
+		}
+	}
+
+	switch(ks) {
+	case MKGUI_KEY_ESCAPE: {
 		sd->editing = 0;
 		dirty_all(ctx);
 		return 1;
 	}
 
-	if(ks == MKGUI_KEY_RETURN || ks == MKGUI_KEY_TAB) {
+	case MKGUI_KEY_RETURN:
+	case MKGUI_KEY_TAB: {
 		if(sd->editing) {
 			spinbox_commit_edit(sd);
 			sd->select_all = 0;
@@ -184,15 +194,10 @@ static uint32_t handle_spinbox_key(struct mkgui_ctx *ctx, struct mkgui_event *ev
 		return 1;
 	}
 
-	if(ks == MKGUI_KEY_LEFT || ks == MKGUI_KEY_RIGHT) {
-		if(sd->select_all) {
-			sd->select_all = 0;
-			dirty_all(ctx);
-			return 1;
-		}
-	}
-
-	if(ks == MKGUI_KEY_UP || ks == MKGUI_KEY_DOWN || ks == MKGUI_KEY_HOME || ks == MKGUI_KEY_END) {
+	case MKGUI_KEY_UP:
+	case MKGUI_KEY_DOWN:
+	case MKGUI_KEY_HOME:
+	case MKGUI_KEY_END: {
 		if(sd->editing) {
 			spinbox_commit_edit(sd);
 		}
@@ -215,7 +220,7 @@ static uint32_t handle_spinbox_key(struct mkgui_ctx *ctx, struct mkgui_event *ev
 		return r ? r : 1;
 	}
 
-	if(ks == MKGUI_KEY_BACKSPACE) {
+	case MKGUI_KEY_BACKSPACE: {
 		if(sd->editing) {
 			if(sd->select_all) {
 				sd->edit_len = 0;
@@ -229,35 +234,39 @@ static uint32_t handle_spinbox_key(struct mkgui_ctx *ctx, struct mkgui_event *ev
 		return 0;
 	}
 
-	if(text_len > 0) {
-		for(uint32_t i = 0; i < (uint32_t)text_len; ++i) {
-			char c = text[i];
-			uint32_t is_digit = (c >= '0' && c <= '9');
-			uint32_t is_minus = (c == '-' && sd->min_val < 0);
-			if(!is_digit && !is_minus) {
-				continue;
-			}
-			if(!sd->editing) {
-				sd->editing = 1;
-				sd->edit_len = 0;
-				sd->select_all = 0;
-			}
-			if(sd->select_all) {
-				sd->edit_len = 0;
-				sd->select_all = 0;
-			}
-			if(is_minus) {
-				if(sd->edit_len == 0) {
-					sd->edit_buf[sd->edit_len++] = '-';
+	default: {
+		if(text_len > 0) {
+			for(uint32_t i = 0; i < (uint32_t)text_len; ++i) {
+				char c = text[i];
+				uint32_t is_digit = (c >= '0' && c <= '9');
+				uint32_t is_minus = (c == '-' && sd->min_val < 0);
+				if(!is_digit && !is_minus) {
+					continue;
 				}
-			} else {
-				if(sd->edit_len < sizeof(sd->edit_buf) - 1) {
-					sd->edit_buf[sd->edit_len++] = c;
+				if(!sd->editing) {
+					sd->editing = 1;
+					sd->edit_len = 0;
+					sd->select_all = 0;
+				}
+				if(sd->select_all) {
+					sd->edit_len = 0;
+					sd->select_all = 0;
+				}
+				if(is_minus) {
+					if(sd->edit_len == 0) {
+						sd->edit_buf[sd->edit_len++] = '-';
+					}
+				} else {
+					if(sd->edit_len < sizeof(sd->edit_buf) - 1) {
+						sd->edit_buf[sd->edit_len++] = c;
+					}
 				}
 			}
+			dirty_all(ctx);
+			return 1;
 		}
-		dirty_all(ctx);
-		return 1;
+		return 0;
+	}
 	}
 
 	return 0;

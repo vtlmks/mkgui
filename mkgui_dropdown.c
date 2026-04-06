@@ -154,32 +154,50 @@ static void dropdown_open_popup(struct mkgui_ctx *ctx, uint32_t widget_id) {
 
 // [=]===^=[ handle_dropdown_key ]===============================[=]
 static uint32_t handle_dropdown_key(struct mkgui_ctx *ctx, struct mkgui_event *ev, uint32_t ks) {
-	if(ks == MKGUI_KEY_RETURN || ks == MKGUI_KEY_SPACE) {
+	struct mkgui_dropdown_data *dd;
+
+	switch(ks) {
+	case MKGUI_KEY_RETURN:
+	case MKGUI_KEY_SPACE: {
 		dropdown_open_popup(ctx, ctx->focus_id);
 		return 0;
 	}
 
-	struct mkgui_dropdown_data *dd = find_dropdown_data(ctx, ctx->focus_id);
-	if(!dd) {
-		return 0;
+	case MKGUI_KEY_UP: {
+		dd = find_dropdown_data(ctx, ctx->focus_id);
+		if(!dd) {
+			return 0;
+		}
+		if(dd->selected > 0) {
+			--dd->selected;
+			dirty_all(ctx);
+			ev->type = MKGUI_EVENT_DROPDOWN_CHANGED;
+			ev->id = ctx->focus_id;
+			ev->value = dd->selected;
+			return 1;
+		}
+		break;
 	}
 
-	if(ks == MKGUI_KEY_UP && dd->selected > 0) {
-		--dd->selected;
-		dirty_all(ctx);
-		ev->type = MKGUI_EVENT_DROPDOWN_CHANGED;
-		ev->id = ctx->focus_id;
-		ev->value = dd->selected;
-		return 1;
+	case MKGUI_KEY_DOWN: {
+		dd = find_dropdown_data(ctx, ctx->focus_id);
+		if(!dd) {
+			return 0;
+		}
+		if(dd->selected < (int32_t)dd->item_count - 1) {
+			++dd->selected;
+			dirty_all(ctx);
+			ev->type = MKGUI_EVENT_DROPDOWN_CHANGED;
+			ev->id = ctx->focus_id;
+			ev->value = dd->selected;
+			return 1;
+		}
+		break;
 	}
 
-	if(ks == MKGUI_KEY_DOWN && dd->selected < (int32_t)dd->item_count - 1) {
-		++dd->selected;
-		dirty_all(ctx);
-		ev->type = MKGUI_EVENT_DROPDOWN_CHANGED;
-		ev->id = ctx->focus_id;
-		ev->value = dd->selected;
-		return 1;
+	default: {
+		break;
+	}
 	}
 
 	return 0;

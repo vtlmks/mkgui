@@ -463,7 +463,8 @@ static uint32_t handle_datepicker_key(struct mkgui_ctx *ctx, struct mkgui_event 
 	}
 	(void)keymod;
 
-	if(ks == MKGUI_KEY_RETURN) {
+	switch(ks) {
+	case MKGUI_KEY_RETURN: {
 		if(dp->editing) {
 			int32_t y, m, d;
 			if(datepicker_parse(dp->edit_buf, &y, &m, &d)) {
@@ -481,7 +482,7 @@ static uint32_t handle_datepicker_key(struct mkgui_ctx *ctx, struct mkgui_event 
 		return 1;
 	}
 
-	if(ks == MKGUI_KEY_ESCAPE) {
+	case MKGUI_KEY_ESCAPE: {
 		if(dp->editing) {
 			dp->editing = 0;
 			dirty_all(ctx);
@@ -490,40 +491,52 @@ static uint32_t handle_datepicker_key(struct mkgui_ctx *ctx, struct mkgui_event 
 		return 0;
 	}
 
-	if(dp->editing) {
-		if(ks == MKGUI_KEY_BACKSPACE) {
-			if(dp->edit_cursor > 0) {
-				uint32_t elen = (uint32_t)strlen(dp->edit_buf);
-				memmove(&dp->edit_buf[dp->edit_cursor - 1], &dp->edit_buf[dp->edit_cursor], elen - dp->edit_cursor + 1);
-				--dp->edit_cursor;
-				dirty_all(ctx);
+	default: {
+		if(dp->editing) {
+			switch(ks) {
+			case MKGUI_KEY_BACKSPACE: {
+				if(dp->edit_cursor > 0) {
+					uint32_t elen = (uint32_t)strlen(dp->edit_buf);
+					memmove(&dp->edit_buf[dp->edit_cursor - 1], &dp->edit_buf[dp->edit_cursor], elen - dp->edit_cursor + 1);
+					--dp->edit_cursor;
+					dirty_all(ctx);
+				}
+				return 1;
 			}
-			return 1;
-		}
-		if(ks == MKGUI_KEY_LEFT && dp->edit_cursor > 0) {
-			--dp->edit_cursor;
-			dirty_all(ctx);
-			return 1;
-		}
-		if(ks == MKGUI_KEY_RIGHT && dp->edit_cursor < (uint32_t)strlen(dp->edit_buf)) {
-			++dp->edit_cursor;
-			dirty_all(ctx);
-			return 1;
-		}
-		if(len == 1 && ((buf[0] >= '0' && buf[0] <= '9') || buf[0] == '-')) {
-			uint32_t elen = (uint32_t)strlen(dp->edit_buf);
-			if(elen < 10) {
-				memmove(&dp->edit_buf[dp->edit_cursor + 1], &dp->edit_buf[dp->edit_cursor], elen - dp->edit_cursor + 1);
-				dp->edit_buf[dp->edit_cursor] = buf[0];
-				++dp->edit_cursor;
-				dirty_all(ctx);
-			}
-			return 1;
-		}
-		return 1;
-	}
 
-	return 0;
+			case MKGUI_KEY_LEFT: {
+				if(dp->edit_cursor > 0) {
+					--dp->edit_cursor;
+					dirty_all(ctx);
+				}
+				return 1;
+			}
+
+			case MKGUI_KEY_RIGHT: {
+				if(dp->edit_cursor < (uint32_t)strlen(dp->edit_buf)) {
+					++dp->edit_cursor;
+					dirty_all(ctx);
+				}
+				return 1;
+			}
+
+			default: {
+				if(len == 1 && ((buf[0] >= '0' && buf[0] <= '9') || buf[0] == '-')) {
+					uint32_t elen = (uint32_t)strlen(dp->edit_buf);
+					if(elen < 10) {
+						memmove(&dp->edit_buf[dp->edit_cursor + 1], &dp->edit_buf[dp->edit_cursor], elen - dp->edit_cursor + 1);
+						dp->edit_buf[dp->edit_cursor] = buf[0];
+						++dp->edit_cursor;
+						dirty_all(ctx);
+					}
+				}
+				return 1;
+			}
+			}
+		}
+		return 0;
+	}
+	}
 }
 
 // [=]===^=[ mkgui_datepicker_set ]================================[=]

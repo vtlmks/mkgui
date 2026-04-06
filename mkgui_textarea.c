@@ -401,41 +401,16 @@ static uint32_t handle_textarea_key(struct mkgui_ctx *ctx, struct mkgui_event *e
 	uint32_t readonly = (w && (w->style & MKGUI_TEXTAREA_READONLY));
 	uint32_t shift = (keymod & MKGUI_MOD_SHIFT);
 
-	if(ks == MKGUI_KEY_RETURN) {
-		if(readonly) {
-			return 0;
-		}
-		textarea_undo_push_force(ta);
-		if(textarea_has_selection(ta)) {
-			textarea_delete_selection(ta);
-		}
-		textarea_insert_char(ta, '\n');
-		textarea_clear_selection(ta);
-		dirty_widget_id(ctx, ctx->focus_id);
-		textarea_scroll_to_cursor(ctx, ctx->focus_id);
-		ev->type = MKGUI_EVENT_TEXTAREA_CHANGED;
-		ev->id = ctx->focus_id;
-		return 1;
-	}
-
-	if(ks == MKGUI_KEY_BACKSPACE) {
-		if(readonly) {
-			return 0;
-		}
-		textarea_undo_push_force(ta);
-		if(textarea_has_selection(ta)) {
-			textarea_delete_selection(ta);
-			dirty_widget_id(ctx, ctx->focus_id);
-			textarea_scroll_to_cursor(ctx, ctx->focus_id);
-			ev->type = MKGUI_EVENT_TEXTAREA_CHANGED;
-			ev->id = ctx->focus_id;
-			return 1;
-		}
-		if(ta->cursor > 0) {
-			uint32_t prev = utf8_prev(ta->text, ta->cursor);
-			memmove(&ta->text[prev], &ta->text[ta->cursor], ta->text_len - ta->cursor + 1);
-			ta->text_len -= (ta->cursor - prev);
-			ta->cursor = prev;
+	switch(ks) {
+		case MKGUI_KEY_RETURN: {
+			if(readonly) {
+				return 0;
+			}
+			textarea_undo_push_force(ta);
+			if(textarea_has_selection(ta)) {
+				textarea_delete_selection(ta);
+			}
+			textarea_insert_char(ta, '\n');
 			textarea_clear_selection(ta);
 			dirty_widget_id(ctx, ctx->focus_id);
 			textarea_scroll_to_cursor(ctx, ctx->focus_id);
@@ -443,161 +418,190 @@ static uint32_t handle_textarea_key(struct mkgui_ctx *ctx, struct mkgui_event *e
 			ev->id = ctx->focus_id;
 			return 1;
 		}
-		return 0;
-	}
 
-	if(ks == MKGUI_KEY_DELETE) {
-		if(readonly) {
+		case MKGUI_KEY_BACKSPACE: {
+			if(readonly) {
+				return 0;
+			}
+			textarea_undo_push_force(ta);
+			if(textarea_has_selection(ta)) {
+				textarea_delete_selection(ta);
+				dirty_widget_id(ctx, ctx->focus_id);
+				textarea_scroll_to_cursor(ctx, ctx->focus_id);
+				ev->type = MKGUI_EVENT_TEXTAREA_CHANGED;
+				ev->id = ctx->focus_id;
+				return 1;
+			}
+			if(ta->cursor > 0) {
+				uint32_t prev = utf8_prev(ta->text, ta->cursor);
+				memmove(&ta->text[prev], &ta->text[ta->cursor], ta->text_len - ta->cursor + 1);
+				ta->text_len -= (ta->cursor - prev);
+				ta->cursor = prev;
+				textarea_clear_selection(ta);
+				dirty_widget_id(ctx, ctx->focus_id);
+				textarea_scroll_to_cursor(ctx, ctx->focus_id);
+				ev->type = MKGUI_EVENT_TEXTAREA_CHANGED;
+				ev->id = ctx->focus_id;
+				return 1;
+			}
 			return 0;
 		}
-		textarea_undo_push_force(ta);
-		if(textarea_has_selection(ta)) {
-			textarea_delete_selection(ta);
+
+		case MKGUI_KEY_DELETE: {
+			if(readonly) {
+				return 0;
+			}
+			textarea_undo_push_force(ta);
+			if(textarea_has_selection(ta)) {
+				textarea_delete_selection(ta);
+				dirty_widget_id(ctx, ctx->focus_id);
+				textarea_scroll_to_cursor(ctx, ctx->focus_id);
+				ev->type = MKGUI_EVENT_TEXTAREA_CHANGED;
+				ev->id = ctx->focus_id;
+				return 1;
+			}
+			if(ta->cursor < ta->text_len) {
+				uint32_t next = utf8_next(ta->text, ta->cursor);
+				memmove(&ta->text[ta->cursor], &ta->text[next], ta->text_len - next + 1);
+				ta->text_len -= (next - ta->cursor);
+				dirty_widget_id(ctx, ctx->focus_id);
+				ev->type = MKGUI_EVENT_TEXTAREA_CHANGED;
+				ev->id = ctx->focus_id;
+				return 1;
+			}
+			return 0;
+		}
+
+		case MKGUI_KEY_LEFT: {
+			if(ta->cursor > 0) {
+				ta->cursor = utf8_prev(ta->text, ta->cursor);
+			}
+			if(shift) {
+				ta->sel_end = ta->cursor;
+			} else {
+				textarea_clear_selection(ta);
+			}
 			dirty_widget_id(ctx, ctx->focus_id);
 			textarea_scroll_to_cursor(ctx, ctx->focus_id);
-			ev->type = MKGUI_EVENT_TEXTAREA_CHANGED;
+			ev->type = MKGUI_EVENT_TEXTAREA_CURSOR;
 			ev->id = ctx->focus_id;
+			ev->value = (int32_t)ta->cursor;
 			return 1;
 		}
-		if(ta->cursor < ta->text_len) {
-			uint32_t next = utf8_next(ta->text, ta->cursor);
-			memmove(&ta->text[ta->cursor], &ta->text[next], ta->text_len - next + 1);
-			ta->text_len -= (next - ta->cursor);
+
+		case MKGUI_KEY_RIGHT: {
+			if(ta->cursor < ta->text_len) {
+				ta->cursor = utf8_next(ta->text, ta->cursor);
+			}
+			if(shift) {
+				ta->sel_end = ta->cursor;
+			} else {
+				textarea_clear_selection(ta);
+			}
 			dirty_widget_id(ctx, ctx->focus_id);
-			ev->type = MKGUI_EVENT_TEXTAREA_CHANGED;
+			textarea_scroll_to_cursor(ctx, ctx->focus_id);
+			ev->type = MKGUI_EVENT_TEXTAREA_CURSOR;
 			ev->id = ctx->focus_id;
+			ev->value = (int32_t)ta->cursor;
 			return 1;
 		}
-		return 0;
-	}
 
-	if(ks == MKGUI_KEY_LEFT) {
-		if(ta->cursor > 0) {
-			ta->cursor = utf8_prev(ta->text, ta->cursor);
+		case MKGUI_KEY_UP: {
+			uint32_t ls = textarea_line_start(ta, ta->cursor);
+			uint32_t col = ta->cursor - ls;
+			if(ls > 0) {
+				uint32_t prev_ls = textarea_line_start(ta, ls - 1);
+				uint32_t prev_len = ls - 1 - prev_ls;
+				ta->cursor = prev_ls + (col < prev_len ? col : prev_len);
+			}
+			if(shift) {
+				ta->sel_end = ta->cursor;
+			} else {
+				textarea_clear_selection(ta);
+			}
+			dirty_widget_id(ctx, ctx->focus_id);
+			textarea_scroll_to_cursor(ctx, ctx->focus_id);
+			ev->type = MKGUI_EVENT_TEXTAREA_CURSOR;
+			ev->id = ctx->focus_id;
+			ev->value = (int32_t)ta->cursor;
+			return 1;
 		}
-		if(shift) {
-			ta->sel_end = ta->cursor;
-		} else {
-			textarea_clear_selection(ta);
-		}
-		dirty_widget_id(ctx, ctx->focus_id);
-		textarea_scroll_to_cursor(ctx, ctx->focus_id);
-		ev->type = MKGUI_EVENT_TEXTAREA_CURSOR;
-		ev->id = ctx->focus_id;
-		ev->value = (int32_t)ta->cursor;
-		return 1;
-	}
 
-	if(ks == MKGUI_KEY_RIGHT) {
-		if(ta->cursor < ta->text_len) {
-			ta->cursor = utf8_next(ta->text, ta->cursor);
+		case MKGUI_KEY_DOWN: {
+			uint32_t le = textarea_line_end(ta, ta->cursor);
+			uint32_t ls = textarea_line_start(ta, ta->cursor);
+			uint32_t col = ta->cursor - ls;
+			if(le < ta->text_len) {
+				uint32_t next_ls = le + 1;
+				uint32_t next_le = textarea_line_end(ta, next_ls);
+				uint32_t next_len = next_le - next_ls;
+				ta->cursor = next_ls + (col < next_len ? col : next_len);
+			}
+			if(shift) {
+				ta->sel_end = ta->cursor;
+			} else {
+				textarea_clear_selection(ta);
+			}
+			dirty_widget_id(ctx, ctx->focus_id);
+			textarea_scroll_to_cursor(ctx, ctx->focus_id);
+			ev->type = MKGUI_EVENT_TEXTAREA_CURSOR;
+			ev->id = ctx->focus_id;
+			ev->value = (int32_t)ta->cursor;
+			return 1;
 		}
-		if(shift) {
-			ta->sel_end = ta->cursor;
-		} else {
-			textarea_clear_selection(ta);
-		}
-		dirty_widget_id(ctx, ctx->focus_id);
-		textarea_scroll_to_cursor(ctx, ctx->focus_id);
-		ev->type = MKGUI_EVENT_TEXTAREA_CURSOR;
-		ev->id = ctx->focus_id;
-		ev->value = (int32_t)ta->cursor;
-		return 1;
-	}
 
-	if(ks == MKGUI_KEY_UP) {
-		uint32_t ls = textarea_line_start(ta, ta->cursor);
-		uint32_t col = ta->cursor - ls;
-		if(ls > 0) {
-			uint32_t prev_ls = textarea_line_start(ta, ls - 1);
-			uint32_t prev_len = ls - 1 - prev_ls;
-			ta->cursor = prev_ls + (col < prev_len ? col : prev_len);
+		case MKGUI_KEY_HOME: {
+			ta->cursor = textarea_line_start(ta, ta->cursor);
+			if(shift) {
+				ta->sel_end = ta->cursor;
+			} else {
+				textarea_clear_selection(ta);
+			}
+			dirty_widget_id(ctx, ctx->focus_id);
+			ev->type = MKGUI_EVENT_TEXTAREA_CURSOR;
+			ev->id = ctx->focus_id;
+			ev->value = (int32_t)ta->cursor;
+			return 1;
 		}
-		if(shift) {
-			ta->sel_end = ta->cursor;
-		} else {
-			textarea_clear_selection(ta);
-		}
-		dirty_widget_id(ctx, ctx->focus_id);
-		textarea_scroll_to_cursor(ctx, ctx->focus_id);
-		ev->type = MKGUI_EVENT_TEXTAREA_CURSOR;
-		ev->id = ctx->focus_id;
-		ev->value = (int32_t)ta->cursor;
-		return 1;
-	}
 
-	if(ks == MKGUI_KEY_DOWN) {
-		uint32_t le = textarea_line_end(ta, ta->cursor);
-		uint32_t ls = textarea_line_start(ta, ta->cursor);
-		uint32_t col = ta->cursor - ls;
-		if(le < ta->text_len) {
-			uint32_t next_ls = le + 1;
-			uint32_t next_le = textarea_line_end(ta, next_ls);
-			uint32_t next_len = next_le - next_ls;
-			ta->cursor = next_ls + (col < next_len ? col : next_len);
+		case MKGUI_KEY_END: {
+			ta->cursor = textarea_line_end(ta, ta->cursor);
+			if(shift) {
+				ta->sel_end = ta->cursor;
+			} else {
+				textarea_clear_selection(ta);
+			}
+			dirty_widget_id(ctx, ctx->focus_id);
+			ev->type = MKGUI_EVENT_TEXTAREA_CURSOR;
+			ev->id = ctx->focus_id;
+			ev->value = (int32_t)ta->cursor;
+			return 1;
 		}
-		if(shift) {
-			ta->sel_end = ta->cursor;
-		} else {
-			textarea_clear_selection(ta);
-		}
-		dirty_widget_id(ctx, ctx->focus_id);
-		textarea_scroll_to_cursor(ctx, ctx->focus_id);
-		ev->type = MKGUI_EVENT_TEXTAREA_CURSOR;
-		ev->id = ctx->focus_id;
-		ev->value = (int32_t)ta->cursor;
-		return 1;
-	}
 
-	if(ks == MKGUI_KEY_HOME) {
-		ta->cursor = textarea_line_start(ta, ta->cursor);
-		if(shift) {
-			ta->sel_end = ta->cursor;
-		} else {
-			textarea_clear_selection(ta);
-		}
-		dirty_widget_id(ctx, ctx->focus_id);
-		ev->type = MKGUI_EVENT_TEXTAREA_CURSOR;
-		ev->id = ctx->focus_id;
-		ev->value = (int32_t)ta->cursor;
-		return 1;
-	}
-
-	if(ks == MKGUI_KEY_END) {
-		ta->cursor = textarea_line_end(ta, ta->cursor);
-		if(shift) {
-			ta->sel_end = ta->cursor;
-		} else {
-			textarea_clear_selection(ta);
-		}
-		dirty_widget_id(ctx, ctx->focus_id);
-		ev->type = MKGUI_EVENT_TEXTAREA_CURSOR;
-		ev->id = ctx->focus_id;
-		ev->value = (int32_t)ta->cursor;
-		return 1;
-	}
-
-	if(len > 0 && (uint8_t)buf[0] >= 32) {
-		if(readonly) {
-			return 0;
-		}
-		textarea_undo_push(ta);
-		if(textarea_has_selection(ta)) {
-			textarea_delete_selection(ta);
-		}
-		uint32_t slen = (uint32_t)len;
-		textarea_ensure_cap(ta, ta->text_len + slen + 1);
-		memmove(&ta->text[ta->cursor + slen], &ta->text[ta->cursor], ta->text_len - ta->cursor);
-		memcpy(&ta->text[ta->cursor], buf, slen);
-		ta->text_len += slen;
-		ta->cursor += slen;
-		ta->text[ta->text_len] = '\0';
-		textarea_clear_selection(ta);
-		dirty_widget_id(ctx, ctx->focus_id);
-		textarea_scroll_to_cursor(ctx, ctx->focus_id);
-		ev->type = MKGUI_EVENT_TEXTAREA_CHANGED;
-		ev->id = ctx->focus_id;
-		return 1;
+		default: {
+			if(len > 0 && (uint8_t)buf[0] >= 32) {
+				if(readonly) {
+					return 0;
+				}
+				textarea_undo_push(ta);
+				if(textarea_has_selection(ta)) {
+					textarea_delete_selection(ta);
+				}
+				uint32_t slen = (uint32_t)len;
+				textarea_ensure_cap(ta, ta->text_len + slen + 1);
+				memmove(&ta->text[ta->cursor + slen], &ta->text[ta->cursor], ta->text_len - ta->cursor);
+				memcpy(&ta->text[ta->cursor], buf, slen);
+				ta->text_len += slen;
+				ta->cursor += slen;
+				ta->text[ta->text_len] = '\0';
+				textarea_clear_selection(ta);
+				dirty_widget_id(ctx, ctx->focus_id);
+				textarea_scroll_to_cursor(ctx, ctx->focus_id);
+				ev->type = MKGUI_EVENT_TEXTAREA_CHANGED;
+				ev->id = ctx->focus_id;
+				return 1;
+			}
+		} break;
 	}
 
 	return 0;

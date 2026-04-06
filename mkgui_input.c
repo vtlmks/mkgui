@@ -228,7 +228,8 @@ static uint32_t handle_input_key(struct mkgui_ctx *ctx, struct mkgui_event *ev, 
 	uint32_t shift = (keymod & MKGUI_MOD_SHIFT);
 	uint32_t text_len = (uint32_t)strlen(inp->text);
 
-	if(ks == MKGUI_KEY_RETURN) {
+	switch(ks) {
+	case MKGUI_KEY_RETURN: {
 		ctx->focus_id = 0;
 		dirty_all(ctx);
 		ev->type = MKGUI_EVENT_INPUT_SUBMIT;
@@ -236,7 +237,7 @@ static uint32_t handle_input_key(struct mkgui_ctx *ctx, struct mkgui_event *ev, 
 		return 1;
 	}
 
-	if(ks == MKGUI_KEY_LEFT) {
+	case MKGUI_KEY_LEFT: {
 		inp->cursor = utf8_prev(inp->text, inp->cursor);
 		if(shift) {
 			inp->sel_end = inp->cursor;
@@ -246,8 +247,9 @@ static uint32_t handle_input_key(struct mkgui_ctx *ctx, struct mkgui_event *ev, 
 		dirty_all(ctx);
 		input_scroll_to_cursor(ctx, ctx->focus_id);
 		return 0;
+	}
 
-	} else if(ks == MKGUI_KEY_RIGHT) {
+	case MKGUI_KEY_RIGHT: {
 		inp->cursor = utf8_next(inp->text, inp->cursor);
 		if(shift) {
 			inp->sel_end = inp->cursor;
@@ -257,8 +259,9 @@ static uint32_t handle_input_key(struct mkgui_ctx *ctx, struct mkgui_event *ev, 
 		dirty_all(ctx);
 		input_scroll_to_cursor(ctx, ctx->focus_id);
 		return 0;
+	}
 
-	} else if(ks == MKGUI_KEY_HOME) {
+	case MKGUI_KEY_HOME: {
 		inp->cursor = 0;
 		if(shift) {
 			inp->sel_end = inp->cursor;
@@ -268,8 +271,9 @@ static uint32_t handle_input_key(struct mkgui_ctx *ctx, struct mkgui_event *ev, 
 		dirty_all(ctx);
 		input_scroll_to_cursor(ctx, ctx->focus_id);
 		return 0;
+	}
 
-	} else if(ks == MKGUI_KEY_END) {
+	case MKGUI_KEY_END: {
 		inp->cursor = text_len;
 		if(shift) {
 			inp->sel_end = inp->cursor;
@@ -279,8 +283,9 @@ static uint32_t handle_input_key(struct mkgui_ctx *ctx, struct mkgui_event *ev, 
 		dirty_all(ctx);
 		input_scroll_to_cursor(ctx, ctx->focus_id);
 		return 0;
+	}
 
-	} else if(ks == MKGUI_KEY_BACKSPACE) {
+	case MKGUI_KEY_BACKSPACE: {
 		if(readonly) {
 			return 0;
 		}
@@ -307,8 +312,9 @@ static uint32_t handle_input_key(struct mkgui_ctx *ctx, struct mkgui_event *ev, 
 			return 1;
 		}
 		return 0;
+	}
 
-	} else if(ks == MKGUI_KEY_DELETE) {
+	case MKGUI_KEY_DELETE: {
 		if(readonly) {
 			return 0;
 		}
@@ -333,36 +339,39 @@ static uint32_t handle_input_key(struct mkgui_ctx *ctx, struct mkgui_event *ev, 
 			return 1;
 		}
 		return 0;
+	}
 
-	} else if(len > 0 && (uint8_t)buf[0] >= 32) {
-		if(readonly) {
-			return 0;
-		}
-		if(w && (w->style & MKGUI_INPUT_NUMERIC)) {
-			for(int32_t ci = 0; ci < len; ++ci) {
-				char ch = buf[ci];
-				if(!((ch >= '0' && ch <= '9') || ch == '.' || ch == '-' || ch == '+' || ch == 'e' || ch == 'E')) {
-					return 0;
+	default: {
+		if(len > 0 && (uint8_t)buf[0] >= 32) {
+			if(readonly) {
+				return 0;
+			}
+			if(w && (w->style & MKGUI_INPUT_NUMERIC)) {
+				for(int32_t ci = 0; ci < len; ++ci) {
+					char ch = buf[ci];
+					if(!((ch >= '0' && ch <= '9') || ch == '.' || ch == '-' || ch == '+' || ch == 'e' || ch == 'E')) {
+						return 0;
+					}
 				}
 			}
+			input_undo_push(inp);
+			if(input_has_selection(inp)) {
+				input_delete_selection(inp);
+				text_len = (uint32_t)strlen(inp->text);
+			}
+			if(text_len + (uint32_t)len < MKGUI_MAX_TEXT - 1) {
+				memmove(&inp->text[inp->cursor + (uint32_t)len], &inp->text[inp->cursor], text_len - inp->cursor + 1);
+				memcpy(&inp->text[inp->cursor], buf, (uint32_t)len);
+				inp->cursor += (uint32_t)len;
+				input_clear_selection(inp);
+				dirty_all(ctx);
+				input_scroll_to_cursor(ctx, ctx->focus_id);
+				ev->type = MKGUI_EVENT_INPUT_CHANGED;
+				ev->id = ctx->focus_id;
+				return 1;
+			}
 		}
-		input_undo_push(inp);
-		if(input_has_selection(inp)) {
-			input_delete_selection(inp);
-			text_len = (uint32_t)strlen(inp->text);
-		}
-		if(text_len + (uint32_t)len < MKGUI_MAX_TEXT - 1) {
-			memmove(&inp->text[inp->cursor + (uint32_t)len], &inp->text[inp->cursor], text_len - inp->cursor + 1);
-			memcpy(&inp->text[inp->cursor], buf, (uint32_t)len);
-			inp->cursor += (uint32_t)len;
-			input_clear_selection(inp);
-			dirty_all(ctx);
-			input_scroll_to_cursor(ctx, ctx->focus_id);
-			ev->type = MKGUI_EVENT_INPUT_CHANGED;
-			ev->id = ctx->focus_id;
-			return 1;
-		}
-		return 0;
+	} break;
 	}
 
 	return 0;

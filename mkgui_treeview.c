@@ -363,7 +363,8 @@ static uint32_t handle_treeview_key(struct mkgui_ctx *ctx, struct mkgui_event *e
 	}
 	tv_idx_build(tv);
 
-	if(ks == MKGUI_KEY_UP) {
+	switch(ks) {
+	case MKGUI_KEY_UP: {
 		int32_t prev = -1;
 		for(uint32_t i = 0; i < tv->node_count; ++i) {
 			if(!treeview_node_visible(tv, i)) {
@@ -383,8 +384,10 @@ static uint32_t handle_treeview_key(struct mkgui_ctx *ctx, struct mkgui_event *e
 			ev->value = tv->selected_node;
 			return 1;
 		}
+		break;
+	}
 
-	} else if(ks == MKGUI_KEY_DOWN) {
+	case MKGUI_KEY_DOWN: {
 		uint32_t found = 0;
 		for(uint32_t i = 0; i < tv->node_count; ++i) {
 			if(!treeview_node_visible(tv, i)) {
@@ -403,8 +406,10 @@ static uint32_t handle_treeview_key(struct mkgui_ctx *ctx, struct mkgui_event *e
 				found = 1;
 			}
 		}
+		break;
+	}
 
-	} else if(ks == MKGUI_KEY_RIGHT) {
+	case MKGUI_KEY_RIGHT: {
 		for(uint32_t i = 0; i < tv->node_count; ++i) {
 			if((int32_t)tv->nodes[i].id == tv->selected_node && tv->nodes[i].has_children && !tv->nodes[i].expanded) {
 				tv->nodes[i].expanded = 1;
@@ -415,8 +420,13 @@ static uint32_t handle_treeview_key(struct mkgui_ctx *ctx, struct mkgui_event *e
 				return 1;
 			}
 		}
+		break;
+	}
 
-	} else if(ks == MKGUI_KEY_PAGE_UP || ks == MKGUI_KEY_PAGE_DOWN || ks == MKGUI_KEY_HOME || ks == MKGUI_KEY_END) {
+	case MKGUI_KEY_PAGE_UP:
+	case MKGUI_KEY_PAGE_DOWN:
+	case MKGUI_KEY_HOME:
+	case MKGUI_KEY_END: {
 		uint32_t vis_idx = 0;
 		uint32_t vis_total = 0;
 		for(uint32_t i = 0; i < tv->node_count; ++i) {
@@ -468,8 +478,10 @@ static uint32_t handle_treeview_key(struct mkgui_ctx *ctx, struct mkgui_event *e
 			}
 			++vis_cur;
 		}
+		break;
+	}
 
-	} else if(ks == MKGUI_KEY_LEFT) {
+	case MKGUI_KEY_LEFT: {
 		for(uint32_t i = 0; i < tv->node_count; ++i) {
 			if((int32_t)tv->nodes[i].id == tv->selected_node) {
 				if(tv->nodes[i].has_children && tv->nodes[i].expanded) {
@@ -492,6 +504,12 @@ static uint32_t handle_treeview_key(struct mkgui_ctx *ctx, struct mkgui_event *e
 				break;
 			}
 		}
+		break;
+	}
+
+	default: {
+		break;
+	}
 	}
 
 	return 0;

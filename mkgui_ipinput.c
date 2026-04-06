@@ -158,7 +158,8 @@ static uint32_t handle_ipinput_key(struct mkgui_ctx *ctx, struct mkgui_event *ev
 	}
 	(void)keymod;
 
-	if(ks == MKGUI_KEY_TAB) {
+	switch(ks) {
+	case MKGUI_KEY_TAB: {
 		if(keymod & MKGUI_MOD_SHIFT) {
 			if(ip->active_field > 0) {
 				ipinput_select_field(ip, ip->active_field - 1);
@@ -176,7 +177,7 @@ static uint32_t handle_ipinput_key(struct mkgui_ctx *ctx, struct mkgui_event *ev
 		}
 	}
 
-	if(ks == MKGUI_KEY_LEFT) {
+	case MKGUI_KEY_LEFT: {
 		if(ip->editing) {
 			ipinput_commit_edit(ip);
 			ev->type = MKGUI_EVENT_IPINPUT_CHANGED;
@@ -189,7 +190,7 @@ static uint32_t handle_ipinput_key(struct mkgui_ctx *ctx, struct mkgui_event *ev
 		return 1;
 	}
 
-	if(ks == MKGUI_KEY_RIGHT) {
+	case MKGUI_KEY_RIGHT: {
 		if(ip->editing) {
 			ipinput_commit_edit(ip);
 			ev->type = MKGUI_EVENT_IPINPUT_CHANGED;
@@ -202,7 +203,7 @@ static uint32_t handle_ipinput_key(struct mkgui_ctx *ctx, struct mkgui_event *ev
 		return 1;
 	}
 
-	if(ks == MKGUI_KEY_BACKSPACE) {
+	case MKGUI_KEY_BACKSPACE: {
 		if(ip->sel_all) {
 			ip->octets[ip->active_field] = 0;
 			ipinput_start_edit(ip);
@@ -225,7 +226,7 @@ static uint32_t handle_ipinput_key(struct mkgui_ctx *ctx, struct mkgui_event *ev
 		return 1;
 	}
 
-	if(ks == MKGUI_KEY_RETURN) {
+	case MKGUI_KEY_RETURN: {
 		ipinput_commit_edit(ip);
 		ev->type = MKGUI_EVENT_IPINPUT_CHANGED;
 		ev->id = ctx->focus_id;
@@ -233,58 +234,59 @@ static uint32_t handle_ipinput_key(struct mkgui_ctx *ctx, struct mkgui_event *ev
 		return 1;
 	}
 
-	if(len == 1 && buf[0] == '.') {
-		ipinput_commit_edit(ip);
-		if(ip->active_field < 3) {
-			ipinput_select_field(ip, ip->active_field + 1);
-		}
-		ev->type = MKGUI_EVENT_IPINPUT_CHANGED;
-		ev->id = ctx->focus_id;
-		dirty_all(ctx);
-		return 1;
-	}
-
-	if(len == 1 && buf[0] >= '0' && buf[0] <= '9') {
-		if(ip->sel_all) {
-			ip->octets[ip->active_field] = 0;
-			ipinput_start_edit(ip);
-		}
-		if(!ip->editing) {
-			ipinput_start_edit(ip);
-		}
-		if(ip->edit_len < 3) {
-			char tmp[4];
-			memcpy(tmp, ip->edit_buf, ip->edit_len);
-			tmp[ip->edit_len] = buf[0];
-			tmp[ip->edit_len + 1] = '\0';
-			uint32_t val = 0;
-			for(uint32_t i = 0; tmp[i]; ++i) {
-				val = val * 10 + (uint32_t)(tmp[i] - '0');
+	default: {
+		if(len == 1 && buf[0] == '.') {
+			ipinput_commit_edit(ip);
+			if(ip->active_field < 3) {
+				ipinput_select_field(ip, ip->active_field + 1);
 			}
-			if(val > 255) {
-				return 1;
+			ev->type = MKGUI_EVENT_IPINPUT_CHANGED;
+			ev->id = ctx->focus_id;
+			dirty_all(ctx);
+			return 1;
+		}
+		if(len == 1 && buf[0] >= '0' && buf[0] <= '9') {
+			if(ip->sel_all) {
+				ip->octets[ip->active_field] = 0;
+				ipinput_start_edit(ip);
 			}
-			ip->edit_buf[ip->edit_len] = buf[0];
-			++ip->edit_len;
-			ip->edit_buf[ip->edit_len] = '\0';
-
-			if(ip->edit_len == 3) {
-				ipinput_commit_edit(ip);
-				if(ip->active_field < 3) {
-					ipinput_select_field(ip, ip->active_field + 1);
+			if(!ip->editing) {
+				ipinput_start_edit(ip);
+			}
+			if(ip->edit_len < 3) {
+				char tmp[4];
+				memcpy(tmp, ip->edit_buf, ip->edit_len);
+				tmp[ip->edit_len] = buf[0];
+				tmp[ip->edit_len + 1] = '\0';
+				uint32_t val = 0;
+				for(uint32_t i = 0; tmp[i]; ++i) {
+					val = val * 10 + (uint32_t)(tmp[i] - '0');
 				}
-				ev->type = MKGUI_EVENT_IPINPUT_CHANGED;
-				ev->id = ctx->focus_id;
+				if(val > 255) {
+					return 1;
+				}
+				ip->edit_buf[ip->edit_len] = buf[0];
+				++ip->edit_len;
+				ip->edit_buf[ip->edit_len] = '\0';
+
+				if(ip->edit_len == 3) {
+					ipinput_commit_edit(ip);
+					if(ip->active_field < 3) {
+						ipinput_select_field(ip, ip->active_field + 1);
+					}
+					ev->type = MKGUI_EVENT_IPINPUT_CHANGED;
+					ev->id = ctx->focus_id;
+					dirty_all(ctx);
+					return 1;
+				}
 				dirty_all(ctx);
 				return 1;
 			}
-			dirty_all(ctx);
 			return 1;
 		}
 		return 1;
 	}
-
-	return 1;
+	}
 }
 
 // [=]===^=[ mkgui_ipinput_set ]===================================[=]

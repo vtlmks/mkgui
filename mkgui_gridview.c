@@ -503,29 +503,42 @@ static uint32_t handle_gridview_key(struct mkgui_ctx *ctx, struct mkgui_event *e
 		page = 1;
 	}
 
-	if(ks == MKGUI_KEY_UP) {
+	switch(ks) {
+	case MKGUI_KEY_UP: {
 		if(gv->selected_row > 0) {
 			--gv->selected_row;
 		}
-	} else if(ks == MKGUI_KEY_DOWN) {
+	} break;
+
+	case MKGUI_KEY_DOWN: {
 		if(gv->selected_row < (int32_t)gv->row_count - 1) {
 			++gv->selected_row;
 		}
-	} else if(ks == MKGUI_KEY_PAGE_UP) {
+	} break;
+
+	case MKGUI_KEY_PAGE_UP: {
 		gv->selected_row -= page;
 		if(gv->selected_row < 0) {
 			gv->selected_row = 0;
 		}
-	} else if(ks == MKGUI_KEY_PAGE_DOWN) {
+	} break;
+
+	case MKGUI_KEY_PAGE_DOWN: {
 		gv->selected_row += page;
 		if(gv->selected_row >= (int32_t)gv->row_count) {
 			gv->selected_row = (int32_t)gv->row_count - 1;
 		}
-	} else if(ks == MKGUI_KEY_HOME) {
+	} break;
+
+	case MKGUI_KEY_HOME: {
 		gv->selected_row = 0;
-	} else if(ks == MKGUI_KEY_END) {
+	} break;
+
+	case MKGUI_KEY_END: {
 		gv->selected_row = (int32_t)gv->row_count - 1;
-	} else if(ks == MKGUI_KEY_SPACE) {
+	} break;
+
+	case MKGUI_KEY_SPACE: {
 		if(gv->selected_col >= 0 && gv->selected_col < (int32_t)gv->col_count) {
 			uint32_t ct = gv->columns[gv->selected_col].col_type;
 			if(ct == MKGUI_GRID_CHECK || ct == MKGUI_GRID_CHECK_TEXT) {
@@ -540,7 +553,9 @@ static uint32_t handle_gridview_key(struct mkgui_ctx *ctx, struct mkgui_event *e
 			}
 		}
 		return 0;
-	} else if(ks == MKGUI_KEY_LEFT) {
+	}
+
+	case MKGUI_KEY_LEFT: {
 		if(gv->selected_col > 0) {
 			--gv->selected_col;
 		}
@@ -550,7 +565,9 @@ static uint32_t handle_gridview_key(struct mkgui_ctx *ctx, struct mkgui_event *e
 		ev->value = gv->selected_row;
 		ev->col = gv->selected_col;
 		return 1;
-	} else if(ks == MKGUI_KEY_RIGHT) {
+	}
+
+	case MKGUI_KEY_RIGHT: {
 		if(gv->selected_col < (int32_t)gv->col_count - 1) {
 			++gv->selected_col;
 		}
@@ -560,8 +577,11 @@ static uint32_t handle_gridview_key(struct mkgui_ctx *ctx, struct mkgui_event *e
 		ev->value = gv->selected_row;
 		ev->col = gv->selected_col;
 		return 1;
-	} else {
+	}
+
+	default: {
 		return 0;
+	}
 	}
 
 	int32_t row_y = gv->selected_row * ctx->row_height;

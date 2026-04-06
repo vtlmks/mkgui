@@ -374,30 +374,44 @@ static uint32_t handle_richlist_key(struct mkgui_ctx *ctx, struct mkgui_event *e
 		page = 1;
 	}
 
-	if(ks == MKGUI_KEY_UP) {
+	switch(ks) {
+	case MKGUI_KEY_UP: {
 		if(rl->selected_row > 0) {
 			--rl->selected_row;
 		}
-	} else if(ks == MKGUI_KEY_DOWN) {
+	} break;
+
+	case MKGUI_KEY_DOWN: {
 		if(rl->selected_row < (int32_t)rl->row_count - 1) {
 			++rl->selected_row;
 		}
-	} else if(ks == MKGUI_KEY_PAGE_UP) {
+	} break;
+
+	case MKGUI_KEY_PAGE_UP: {
 		rl->selected_row -= page;
 		if(rl->selected_row < 0) {
 			rl->selected_row = 0;
 		}
-	} else if(ks == MKGUI_KEY_PAGE_DOWN) {
+	} break;
+
+	case MKGUI_KEY_PAGE_DOWN: {
 		rl->selected_row += page;
 		if(rl->selected_row >= (int32_t)rl->row_count) {
 			rl->selected_row = (int32_t)rl->row_count - 1;
 		}
-	} else if(ks == MKGUI_KEY_HOME) {
+	} break;
+
+	case MKGUI_KEY_HOME: {
 		rl->selected_row = 0;
-	} else if(ks == MKGUI_KEY_END) {
+	} break;
+
+	case MKGUI_KEY_END: {
 		rl->selected_row = (int32_t)rl->row_count - 1;
-	} else {
+	} break;
+
+	default: {
 		return 0;
+	}
 	}
 
 	int32_t row_y = rl->selected_row * rl->row_height;

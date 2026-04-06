@@ -871,86 +871,149 @@ static uint32_t handle_itemview_key(struct mkgui_ctx *ctx, struct mkgui_itemview
 		if(rows_per_col < 1) {
 			rows_per_col = 1;
 		}
-		if(keysym == MKGUI_KEY_UP) {
+		switch(keysym) {
+		case MKGUI_KEY_UP: {
 			if(iv->selected > 0) {
 				--iv->selected;
 			}
-		} else if(keysym == MKGUI_KEY_DOWN) {
+			break;
+		}
+
+		case MKGUI_KEY_DOWN: {
 			if(iv->selected < (int32_t)iv->item_count - 1) {
 				++iv->selected;
 			}
-		} else if(keysym == MKGUI_KEY_LEFT) {
+			break;
+		}
+
+		case MKGUI_KEY_LEFT: {
 			if(iv->selected >= rows_per_col) {
 				iv->selected -= rows_per_col;
 			}
-		} else if(keysym == MKGUI_KEY_RIGHT) {
+			break;
+		}
+
+		case MKGUI_KEY_RIGHT: {
 			if(iv->selected + rows_per_col < (int32_t)iv->item_count) {
 				iv->selected += rows_per_col;
 			}
-		} else if(keysym == MKGUI_KEY_PAGE_UP) {
+			break;
+		}
+
+		case MKGUI_KEY_PAGE_UP: {
 			int32_t page = ca_h / ch;
 			iv->selected -= page;
 			if(iv->selected < 0) {
 				iv->selected = 0;
 			}
-		} else if(keysym == MKGUI_KEY_PAGE_DOWN) {
+			break;
+		}
+
+		case MKGUI_KEY_PAGE_DOWN: {
 			int32_t page = ca_h / ch;
 			iv->selected += page;
 			if(iv->selected >= (int32_t)iv->item_count) {
 				iv->selected = (int32_t)iv->item_count - 1;
 			}
-		} else if(keysym == MKGUI_KEY_HOME) {
+			break;
+		}
+
+		case MKGUI_KEY_HOME: {
 			iv->selected = 0;
-		} else if(keysym == MKGUI_KEY_END) {
+			break;
+		}
+
+		case MKGUI_KEY_END: {
 			iv->selected = (int32_t)iv->item_count - 1;
+			break;
+		}
+
+		default: {
+			break;
+		}
 		}
 
 	} else if(iv->view_mode == MKGUI_VIEW_DETAIL) {
-		if(keysym == MKGUI_KEY_UP) {
+		switch(keysym) {
+		case MKGUI_KEY_UP: {
 			if(iv->selected > 0) {
 				--iv->selected;
 			}
-		} else if(keysym == MKGUI_KEY_DOWN) {
+			break;
+		}
+
+		case MKGUI_KEY_DOWN: {
 			if(iv->selected < (int32_t)iv->item_count - 1) {
 				++iv->selected;
 			}
-		} else if(keysym == MKGUI_KEY_PAGE_UP) {
+			break;
+		}
+
+		case MKGUI_KEY_PAGE_UP: {
 			int32_t page = ca_h / ch;
 			iv->selected -= page;
 			if(iv->selected < 0) {
 				iv->selected = 0;
 			}
-		} else if(keysym == MKGUI_KEY_PAGE_DOWN) {
+			break;
+		}
+
+		case MKGUI_KEY_PAGE_DOWN: {
 			int32_t page = ca_h / ch;
 			iv->selected += page;
 			if(iv->selected >= (int32_t)iv->item_count) {
 				iv->selected = (int32_t)iv->item_count - 1;
 			}
-		} else if(keysym == MKGUI_KEY_HOME) {
+			break;
+		}
+
+		case MKGUI_KEY_HOME: {
 			iv->selected = 0;
-		} else if(keysym == MKGUI_KEY_END) {
+			break;
+		}
+
+		case MKGUI_KEY_END: {
 			iv->selected = (int32_t)iv->item_count - 1;
+			break;
+		}
+
+		default: {
+			break;
+		}
 		}
 
 	} else {
 		int32_t cols = itemview_grid_cols(ca_w, cw);
-		if(keysym == MKGUI_KEY_LEFT) {
+		switch(keysym) {
+		case MKGUI_KEY_LEFT: {
 			if(iv->selected > 0) {
 				--iv->selected;
 			}
-		} else if(keysym == MKGUI_KEY_RIGHT) {
+			break;
+		}
+
+		case MKGUI_KEY_RIGHT: {
 			if(iv->selected < (int32_t)iv->item_count - 1) {
 				++iv->selected;
 			}
-		} else if(keysym == MKGUI_KEY_UP) {
+			break;
+		}
+
+		case MKGUI_KEY_UP: {
 			if(iv->selected >= cols) {
 				iv->selected -= cols;
 			}
-		} else if(keysym == MKGUI_KEY_DOWN) {
+			break;
+		}
+
+		case MKGUI_KEY_DOWN: {
 			if(iv->selected + cols < (int32_t)iv->item_count) {
 				iv->selected += cols;
 			}
-		} else if(keysym == MKGUI_KEY_PAGE_UP) {
+			break;
+		}
+
+		case MKGUI_KEY_PAGE_UP: {
 			int32_t page_rows = ca_h / ch;
 			if(page_rows < 1) {
 				page_rows = 1;
@@ -959,7 +1022,10 @@ static uint32_t handle_itemview_key(struct mkgui_ctx *ctx, struct mkgui_itemview
 			if(iv->selected < 0) {
 				iv->selected = 0;
 			}
-		} else if(keysym == MKGUI_KEY_PAGE_DOWN) {
+			break;
+		}
+
+		case MKGUI_KEY_PAGE_DOWN: {
 			int32_t page_rows = ca_h / ch;
 			if(page_rows < 1) {
 				page_rows = 1;
@@ -968,10 +1034,22 @@ static uint32_t handle_itemview_key(struct mkgui_ctx *ctx, struct mkgui_itemview
 			if(iv->selected >= (int32_t)iv->item_count) {
 				iv->selected = (int32_t)iv->item_count - 1;
 			}
-		} else if(keysym == MKGUI_KEY_HOME) {
+			break;
+		}
+
+		case MKGUI_KEY_HOME: {
 			iv->selected = 0;
-		} else if(keysym == MKGUI_KEY_END) {
+			break;
+		}
+
+		case MKGUI_KEY_END: {
 			iv->selected = (int32_t)iv->item_count - 1;
+			break;
+		}
+
+		default: {
+			break;
+		}
 		}
 	}
 
