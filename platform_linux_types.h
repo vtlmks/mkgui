@@ -25,6 +25,7 @@ struct mkgui_platform {
 	int32_t screen;
 	GC gc;
 	Visual *visual;
+	Colormap colormap;
 	uint32_t depth;
 	Atom wm_delete;
 	Atom clipboard;

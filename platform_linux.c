@@ -97,14 +97,24 @@ static uint32_t platform_init(struct mkgui_ctx *ctx, const char *title, int32_t 
 
 	plat->screen = DefaultScreen(plat->dpy);
 	plat->root = RootWindow(plat->dpy, plat->screen);
-	plat->visual = DefaultVisual(plat->dpy, plat->screen);
-	plat->depth = (uint32_t)DefaultDepth(plat->dpy, plat->screen);
+
+	XVisualInfo vinfo;
+	if(XMatchVisualInfo(plat->dpy, plat->screen, 32, TrueColor, &vinfo)) {
+		plat->visual = vinfo.visual;
+		plat->depth = 32;
+	} else {
+		plat->visual = DefaultVisual(plat->dpy, plat->screen);
+		plat->depth = (uint32_t)DefaultDepth(plat->dpy, plat->screen);
+	}
+	plat->colormap = XCreateColormap(plat->dpy, plat->root, plat->visual, AllocNone);
 
 	XSetWindowAttributes wa;
 	wa.background_pixmap = None;
 	wa.bit_gravity = NorthWestGravity;
+	wa.colormap = plat->colormap;
+	wa.border_pixel = 0;
 	plat->win = XCreateWindow(plat->dpy, plat->root, 0, 0, (uint32_t)w, (uint32_t)h, 0,
-		(int)plat->depth, InputOutput, plat->visual, CWBackPixmap | CWBitGravity, &wa);
+		(int)plat->depth, InputOutput, plat->visual, CWBackPixmap | CWBitGravity | CWColormap | CWBorderPixel, &wa);
 	XStoreName(plat->dpy, plat->win, title);
 	platform_set_class_hint(plat, "main", ctx->app_class[0] ? ctx->app_class : "mkgui");
 
@@ -178,6 +188,7 @@ static uint32_t platform_init_child(struct mkgui_ctx *ctx, struct mkgui_ctx *par
 	plat->screen = pplat->screen;
 	plat->root = pplat->root;
 	plat->visual = pplat->visual;
+	plat->colormap = pplat->colormap;
 	plat->depth = pplat->depth;
 	plat->clipboard = pplat->clipboard;
 	plat->utf8_string = pplat->utf8_string;
@@ -189,8 +200,10 @@ static uint32_t platform_init_child(struct mkgui_ctx *ctx, struct mkgui_ctx *par
 	XSetWindowAttributes wa;
 	wa.background_pixmap = None;
 	wa.bit_gravity = NorthWestGravity;
+	wa.colormap = plat->colormap;
+	wa.border_pixel = 0;
 	plat->win = XCreateWindow(plat->dpy, plat->root, 0, 0, (uint32_t)w, (uint32_t)h, 0,
-		(int)plat->depth, InputOutput, plat->visual, CWBackPixmap | CWBitGravity, &wa);
+		(int)plat->depth, InputOutput, plat->visual, CWBackPixmap | CWBitGravity | CWColormap | CWBorderPixel, &wa);
 	XStoreName(plat->dpy, plat->win, title);
 	platform_set_class_hint(plat, "dialog", parent->app_class[0] ? parent->app_class : "mkgui");
 
@@ -411,10 +424,12 @@ static uint32_t platform_popup_init(struct mkgui_ctx *ctx, struct mkgui_popup *p
 	attrs.override_redirect = True;
 	attrs.save_under = True;
 	attrs.event_mask = ExposureMask | ButtonPressMask | ButtonReleaseMask | PointerMotionMask | LeaveWindowMask;
+	attrs.colormap = plat->colormap;
+	attrs.border_pixel = 0;
 
 	p->plat.xwin = XCreateWindow(plat->dpy, plat->root, x, y, (uint32_t)w, (uint32_t)h, 0,
 		(int)plat->depth, InputOutput, plat->visual,
-		CWOverrideRedirect | CWSaveUnder | CWEventMask, &attrs);
+		CWOverrideRedirect | CWSaveUnder | CWEventMask | CWColormap | CWBorderPixel, &attrs);
 
 	if(!p->plat.xwin) {
 		return 0;
