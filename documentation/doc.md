@@ -283,9 +283,12 @@ Style flags use per-widget-type naming. Each flag is prefixed with the widget ty
 |------|-------|--------|-------------|
 | `MKGUI_IMAGE_STRETCH` | `1 << 9` | Image | Stretch image to fill widget area |
 | `MKGUI_TAB_CLOSABLE` | `1 << 10` | Tab | Show close button (emits `MKGUI_EVENT_TAB_CLOSE`) |
-| `MKGUI_LISTVIEW_MULTI_SELECT` | `1 << 11` | Listview | Enable multi-selection |
-| `MKGUI_TREEVIEW_MULTI_SELECT` | `1 << 11` | Treeview | Enable multi-selection |
-| `MKGUI_GRIDVIEW_MULTI_SELECT` | `1 << 11` | Gridview | Enable multi-selection |
+| `MKGUI_LISTVIEW_MULTI_SELECT` | `1 << 0` | Listview | Enable multi-selection |
+| `MKGUI_LISTVIEW_EDITABLE` | `1 << 1` | Listview | Enable slow-click cell editing |
+| `MKGUI_TREEVIEW_MULTI_SELECT` | `1 << 0` | Treeview | Enable multi-selection |
+| `MKGUI_TREEVIEW_EDITABLE` | `1 << 1` | Treeview | Enable slow-click cell editing |
+| `MKGUI_GRIDVIEW_MULTI_SELECT` | `1 << 0` | Gridview | Enable multi-selection |
+| `MKGUI_ITEMVIEW_EDITABLE` | `1 << 0` | Itemview | Enable slow-click cell editing |
 | `MKGUI_LABEL_TRUNCATE` | `1 << 12` | Label | Truncate text with "..." when it exceeds widget width |
 | `MKGUI_TOOLBAR_ICONS_ONLY` | `1 << 13` | Toolbar | Show only icons |
 | `MKGUI_TOOLBAR_TEXT_ONLY` | `2 << 13` | Toolbar | Show only text |
@@ -1442,19 +1445,37 @@ void mkgui_set_treenode_icon(struct mkgui_ctx *ctx, uint32_t widget_id, uint32_t
 ```c
 int32_t mkgui_icon_load_svg(struct mkgui_ctx *ctx, char *name, char *path);
 uint32_t mkgui_icon_load_svg_dir(struct mkgui_ctx *ctx, char *dir_path);
+uint32_t mkgui_icon_load_app_icons(struct mkgui_ctx *ctx, char *app_name);
+const char *mkgui_icon_get_dir(struct mkgui_ctx *ctx);
 ```
 
-`mkgui_icon_load_svg` loads a single SVG file and registers it under `name`. `mkgui_icon_load_svg_dir` batch-loads all `.svg` files from a directory (filename minus `.svg` extension becomes the icon name). A `toolbar/` subdirectory, if present, is loaded with the `tb:` prefix at toolbar icon size.
+`mkgui_icon_load_svg` loads a single SVG file and registers it under `name`. `mkgui_icon_load_svg_dir` batch-loads all `.svg` files from a flat directory (filename minus `.svg` extension becomes the icon name). All icons (including toolbar icons) are loaded at the same size.
+
+`mkgui_icon_load_app_icons` resolves the icon directory automatically using standard platform paths, then loads all SVGs from it. The search order is:
+
+1. `$<APPNAME>_ICON_DIR` environment variable (override for development/packaging)
+2. `../share/<app_name>/icons/` relative to the executable (covers FHS installs)
+3. `$XDG_DATA_HOME/<app_name>/icons/` (default: `~/.local/share/`)
+4. Each `$XDG_DATA_DIRS` entry + `/<app_name>/icons/` (default: `/usr/share:/usr/local/share`)
+5. `./icons/` (development fallback)
+
+On Windows, the executable's own directory is checked instead of the XDG paths.
+
+`mkgui_icon_get_dir` returns the resolved icon directory path, or NULL if no icons were loaded.
 
 ```c
-mkgui_icon_load_svg_dir(ctx, "icons");
-// Loads icons/document-save.svg as "document-save"
-// Loads icons/toolbar/document-save.svg as "tb:document-save"
+mkgui_set_app_class(ctx, "myapp");
+mkgui_icon_load_app_icons(ctx, "myapp");
+// Loads /usr/share/myapp/icons/document-save.svg as "document-save"
 ```
 
 SVG sources are cached in memory. Icons are automatically re-rasterized on scale or theme changes. Icons use `currentColor` from the SVG spec, so they follow the theme text color.
 
-The `tools/extract_icons` build tool extracts SVGs from Freedesktop icon theme directories (e.g. Breeze), resolves symlinks, and outputs small + toolbar sizes.
+The `extract_icons` build tool (built to `out/extract_icons`) reads the editor-generated icon list (`myapp_icons.txt`) and an optional user-managed file (`myapp_icons_extra.txt`) for dynamically loaded icons. The output directory is cleaned and rebuilt from scratch each run. Icons with source paths are copied directly; icons without are resolved from a theme directory. The extra file is never touched by the editor.
+
+### Missing icons
+
+If a widget references an icon name that isn't loaded, a built-in placeholder (magenta diamond) is shown instead. This makes unresolved icons immediately visible during development.
 
 ### Custom icons
 
@@ -1467,10 +1488,14 @@ Register custom ARGB icons at any size. Custom icons override SVG icons with the
 ### Icon browser
 
 ```c
-uint32_t mkgui_icon_browser_theme(struct mkgui_ctx *ctx, char *theme_dir, char *out, uint32_t out_size);
+uint32_t mkgui_icon_browser(struct mkgui_ctx *ctx, int32_t size, char *out_name, uint32_t name_size, char *out_path, uint32_t path_size);
 ```
 
-Opens a modal browser showing icons from a Freedesktop theme directory, organized by category with search filtering.
+Opens a modal browser showing icons from locally available Freedesktop icon themes. The browser scans the current directory for subdirectories containing `index.theme` and presents a theme dropdown for switching between them. Returns both the icon name and the full source path of the selected SVG.
+
+Multiple themes can coexist, allowing users to mix icons from different icon sets. Place theme directories (e.g. `Papirus/`, `Breeze/`) next to the editor or application binary.
+
+The legacy `mkgui_icon_browser_theme` function is still available for passing an explicit theme directory.
 
 ### Font
 

@@ -210,8 +210,11 @@ enum {
 
 // -- Listview / Gridview / Treeview --
 #define MKGUI_LISTVIEW_MULTI_SELECT    (1u << 0)
+#define MKGUI_LISTVIEW_EDITABLE        (1u << 1)
 #define MKGUI_GRIDVIEW_MULTI_SELECT    (1u << 0)
 #define MKGUI_TREEVIEW_MULTI_SELECT    (1u << 0)
+#define MKGUI_TREEVIEW_EDITABLE        (1u << 1)
+#define MKGUI_ITEMVIEW_EDITABLE        (1u << 0)
 
 // -- Label --
 #define MKGUI_LABEL_TRUNCATE           (1u << 0)
@@ -523,9 +526,12 @@ MKGUI_API char *mkgui_get_tooltip(struct mkgui_ctx *ctx, uint32_t id);
 MKGUI_API int32_t mkgui_icon_add(const char *name, uint32_t *pixels, int32_t w, int32_t h);
 MKGUI_API int32_t mkgui_icon_load_svg(struct mkgui_ctx *ctx, const char *name, const char *path);
 MKGUI_API uint32_t mkgui_icon_load_svg_dir(struct mkgui_ctx *ctx, const char *dir_path);
+MKGUI_API uint32_t mkgui_icon_load_app_icons(struct mkgui_ctx *ctx, const char *app_name);
+MKGUI_API const char *mkgui_icon_get_dir(struct mkgui_ctx *ctx);
 MKGUI_API void mkgui_set_icon(struct mkgui_ctx *ctx, uint32_t widget_id, const char *icon_name);
 MKGUI_API void mkgui_set_treenode_icon(struct mkgui_ctx *ctx, uint32_t widget_id, uint32_t node_id, const char *icon_name);
 MKGUI_API uint32_t mkgui_icon_browser_theme(struct mkgui_ctx *ctx, const char *theme_dir, int32_t size, char *out, uint32_t out_size);
+MKGUI_API uint32_t mkgui_icon_browser(struct mkgui_ctx *ctx, int32_t size, char *out_name, uint32_t name_size, char *out_path, uint32_t path_size);
 
 // ---------------------------------------------------------------------------
 // Button

@@ -407,7 +407,8 @@ static void demo_event(struct mkgui_ctx *ctx, struct mkgui_event *ev, void *user
 
 			} else if(ev->id == ID_BTN_BROWSE) {
 				char icon_name[64];
-				if(mkgui_icon_browser_theme(ctx, "/usr/share/icons/Papirus", 16, icon_name, sizeof(icon_name))) {
+				char icon_path[1024];
+				if(mkgui_icon_browser(ctx, 16, icon_name, sizeof(icon_name), icon_path, sizeof(icon_path))) {
 					mkgui_statusbar_set(ctx, ID_STATUSBAR, 0, icon_name);
 				}
 

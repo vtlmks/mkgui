@@ -1,8 +1,6 @@
 // Copyright (c) 2026, Peter Fors
 // SPDX-License-Identifier: MIT
 
-#define MKGUI_TOOLBAR_ICON_PREFIX "tb:"
-#define MKGUI_TOOLBAR_ICON_PREFIX_LEN 3
 
 // [=]===^=[ icon_find_idx ]==========================================[=]
 static int32_t icon_find_idx(const char *name) {
@@ -59,10 +57,31 @@ static char *svg_read_file(const char *path, uint32_t *out_len) {
 }
 
 // [=]===^=[ svg_rasterize_icon_ex ]==================================[=]
+// strip <style>...</style> blocks that plutosvg cannot parse (breeze icons)
+static void svg_strip_style_blocks(char *data, uint32_t len) {
+	char *p = data;
+	char *end = data + len;
+	while(p < end) {
+		char *open = strstr(p, "<style");
+		if(!open || open >= end) {
+			break;
+		}
+		char *close = strstr(open, "</style>");
+		if(!close || close >= end) {
+			break;
+		}
+		close += 8;
+		memset(open, ' ', (size_t)(close - open));
+		p = close;
+	}
+}
+
 static int32_t svg_rasterize_icon_ex(const char *name, char *svg_data, uint32_t svg_len, int32_t target_size, uint32_t theme_text_color, uint32_t snap_native) {
 	if(!svg_data || target_size <= 0) {
 		return -1;
 	}
+
+	svg_strip_style_blocks(svg_data, svg_len);
 
 	plutosvg_document_t *doc = plutosvg_document_load_from_data(svg_data, (int)svg_len, -1, -1, NULL, NULL);
 	if(!doc) {
@@ -72,12 +91,11 @@ static int32_t svg_rasterize_icon_ex(const char *name, char *svg_data, uint32_t 
 	int32_t render_size = target_size;
 	if(snap_native) {
 		int32_t native_w = (int32_t)(plutosvg_document_get_width(doc) + 0.5f);
-		if(native_w > 0) {
+		if(native_w > 0 && native_w <= target_size) {
 			int32_t mult = target_size / native_w;
-			if(mult < 1) {
-				mult = 1;
+			if(mult >= 1) {
+				render_size = native_w * mult;
 			}
-			render_size = native_w * mult;
 		}
 	}
 
@@ -151,23 +169,11 @@ static struct mkgui_svg_source *svg_find_source(char *name) {
 
 // [=]===^=[ icon_resolve ]===========================================[=]
 static int32_t icon_resolve(const char *name) {
-	return icon_find_idx(name);
-}
-
-// [=]===^=[ toolbar_icon_resolve_ctx ]================================[=]
-static int32_t toolbar_icon_resolve_ctx(struct mkgui_ctx *ctx, char *name) {
-	char tb_name[MKGUI_ICON_NAME_LEN + MKGUI_TOOLBAR_ICON_PREFIX_LEN];
-	snprintf(tb_name, sizeof(tb_name), "%s%s", MKGUI_TOOLBAR_ICON_PREFIX, name);
-	int32_t idx = icon_find_idx(tb_name);
-	if(idx >= 0) {
-		return idx;
+	int32_t idx = icon_find_idx(name);
+	if(idx >= 0 && (uint32_t)idx >= icon_count) {
+		return -1;
 	}
-	struct mkgui_svg_source *src = svg_find_source(name);
-	if(src) {
-		int32_t tb_icon_sz = ctx->toolbar_icon_size;
-		return svg_rasterize_icon_ex(tb_name, src->svg_data, src->svg_len, tb_icon_sz, ctx->theme.text & 0x00ffffff, 0);
-	}
-	return -1;
+	return idx;
 }
 
 // [=]===^=[ widget_icon_idx ]========================================[=]
@@ -175,21 +181,42 @@ static int32_t widget_icon_idx(struct mkgui_widget *w) {
 	if(w->icon[0] == '\0') {
 		return -1;
 	}
-	return icon_resolve(w->icon);
+	int32_t idx = icon_resolve(w->icon);
+	if(idx < 0) {
+		return icon_find_idx("_missing");
+	}
+	return idx;
 }
 
-// [=]===^=[ toolbar_icon_idx ]========================================[=]
-static int32_t toolbar_icon_idx(struct mkgui_ctx *ctx, struct mkgui_widget *w) {
-	if(w->icon[0] == '\0') {
-		return -1;
+// [=]===^=[ icon_generate_missing ]=================================[=]
+static void icon_generate_missing(void) {
+	uint32_t sz = 16;
+	uint32_t pixels[16 * 16];
+	memset(pixels, 0, sizeof(pixels));
+	uint32_t color = 0xffff00ff;
+	int32_t cx = (int32_t)sz / 2;
+	int32_t cy = (int32_t)sz / 2;
+	int32_t r = (int32_t)sz / 2 - 2;
+	for(uint32_t y = 0; y < sz; ++y) {
+		for(uint32_t x = 0; x < sz; ++x) {
+			int32_t dx = (int32_t)x - cx;
+			int32_t dy = (int32_t)y - cy;
+			if(dx < 0) { dx = -dx; }
+			if(dy < 0) { dy = -dy; }
+			if(dx + dy <= r) {
+				pixels[y * sz + x] = color;
+			}
+		}
 	}
-	return toolbar_icon_resolve_ctx(ctx, w->icon);
+	mkgui_icon_add("_missing", pixels, (int32_t)sz, (int32_t)sz);
 }
 
 // [=]===^=[ mkgui_icon_init ]========================================[=]
 static void mkgui_icon_init(void) {
 	icon_count = 0;
 	icon_hash_clear();
+	icon_generate_missing();
+	icon_atlas_rebuild();
 }
 
 // [=]===^=[ icon_load_from_widgets ]=================================[=]
@@ -304,11 +331,16 @@ MKGUI_API int32_t mkgui_icon_load_svg(struct mkgui_ctx *ctx, const char *name, c
 	uint32_t theme_color = ctx->theme.text & 0x00ffffff;
 	int32_t idx = svg_rasterize_icon_ex(name, svg_data, svg_len, target_size, theme_color, 1);
 
-	if(idx >= 0 && svg_source_count < MKGUI_SVG_ICON_MAX) {
-		struct mkgui_svg_source *src = &svg_sources[svg_source_count++];
-		snprintf(src->name, MKGUI_ICON_NAME_LEN, "%s", name);
-		src->svg_data = svg_data;
-		src->svg_len = svg_len;
+	if(idx >= 0) {
+		icon_atlas_rebuild();
+		if(svg_source_count < MKGUI_SVG_ICON_MAX) {
+			struct mkgui_svg_source *src = &svg_sources[svg_source_count++];
+			snprintf(src->name, MKGUI_ICON_NAME_LEN, "%s", name);
+			src->svg_data = svg_data;
+			src->svg_len = svg_len;
+		} else {
+			free(svg_data);
+		}
 	} else {
 		free(svg_data);
 	}
@@ -387,96 +419,22 @@ MKGUI_API uint32_t mkgui_icon_load_svg_dir(struct mkgui_ctx *ctx, const char *di
 		fprintf(stderr, "mkgui: loaded %u SVG icons from %s\n", loaded, dir_path);
 	}
 
-	char tb_dir[4096];
-	snprintf(tb_dir, sizeof(tb_dir), "%s/toolbar", dir_path);
-	DIR *td = opendir(tb_dir);
-	if(td) {
-		uint32_t tb_loaded = 0;
-		while((ent = readdir(td)) != NULL) {
-			char *fname = ent->d_name;
-			uint32_t len = (uint32_t)strlen(fname);
-			if(len < 5 || strcmp(fname + len - 4, ".svg") != 0) {
-				continue;
-			}
-
-			char name[MKGUI_ICON_NAME_LEN];
-			uint32_t name_len = len - 4;
-			if(name_len >= MKGUI_ICON_NAME_LEN) {
-				name_len = MKGUI_ICON_NAME_LEN - 1;
-			}
-			memcpy(name, fname, name_len);
-			name[name_len] = '\0';
-
-			char tb_name[MKGUI_ICON_NAME_LEN + MKGUI_TOOLBAR_ICON_PREFIX_LEN];
-			snprintf(tb_name, sizeof(tb_name), "%s%s", MKGUI_TOOLBAR_ICON_PREFIX, name);
-
-			if(icon_find_idx(tb_name) >= 0) {
-				continue;
-			}
-
-			char full_path[4096];
-			uint32_t td_len = (uint32_t)strlen(tb_dir);
-			if(td_len + 1 + len >= sizeof(full_path)) {
-				continue;
-			}
-			memcpy(full_path, tb_dir, td_len);
-			full_path[td_len] = '/';
-			memcpy(full_path + td_len + 1, fname, len + 1);
-
-			uint32_t svg_len = 0;
-			char *svg_data = svg_read_file(full_path, &svg_len);
-			if(!svg_data) {
-				continue;
-			}
-
-			int32_t target_size = ctx->toolbar_icon_size;
-			uint32_t theme_color = ctx->theme.text & 0x00ffffff;
-			int32_t idx = svg_rasterize_icon_ex(tb_name, svg_data, svg_len, target_size, theme_color, 0);
-			if(idx >= 0) {
-				++tb_loaded;
-				if(svg_source_count < MKGUI_SVG_ICON_MAX) {
-					struct mkgui_svg_source *src = &svg_sources[svg_source_count++];
-					snprintf(src->name, MKGUI_ICON_NAME_LEN, "%s", name);
-					src->svg_data = svg_data;
-					src->svg_len = svg_len;
-				} else {
-					free(svg_data);
-				}
-			} else {
-				free(svg_data);
-			}
-		}
-		closedir(td);
-		if(tb_loaded > 0) {
-			fprintf(stderr, "mkgui: loaded %u toolbar SVG icons from %s\n", tb_loaded, tb_dir);
-		}
-	}
-
 	icon_atlas_rebuild();
 	return loaded;
 }
 
 // [=]===^=[ svg_rerasterize_all ]====================================[=]
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wformat-truncation"
 static void svg_rerasterize_all(struct mkgui_ctx *ctx) {
 	if(svg_source_count == 0) {
 		return;
 	}
 	int32_t target_size = ctx->icon_size;
-	int32_t tb_size = ctx->toolbar_icon_size;
 	uint32_t theme_color = ctx->theme.text & 0x00ffffff;
 	for(uint32_t i = 0; i < svg_source_count; ++i) {
 		svg_rasterize_icon_ex(svg_sources[i].name, svg_sources[i].svg_data, svg_sources[i].svg_len, target_size, theme_color, 1);
-		char tb_name[MKGUI_ICON_NAME_LEN + MKGUI_TOOLBAR_ICON_PREFIX_LEN];
-		snprintf(tb_name, sizeof(tb_name), "%s%s", MKGUI_TOOLBAR_ICON_PREFIX, svg_sources[i].name);
-		if(icon_find_idx(tb_name) >= 0) {
-			svg_rasterize_icon_ex(tb_name, svg_sources[i].svg_data, svg_sources[i].svg_len, tb_size, theme_color, 0);
-		}
 	}
 	icon_atlas_rebuild();
 }
-#pragma GCC diagnostic pop
 
 // [=]===^=[ svg_cleanup ]============================================[=]
 static void svg_cleanup(void) {
@@ -485,4 +443,159 @@ static void svg_cleanup(void) {
 		svg_sources[i].svg_data = NULL;
 	}
 	svg_source_count = 0;
+}
+
+// [=]===^=[ icon_dir_exists ]========================================[=]
+static uint32_t icon_dir_exists(const char *path) {
+	struct stat st;
+	return stat(path, &st) == 0 && S_ISDIR(st.st_mode);
+}
+
+// [=]===^=[ icon_resolve_dir ]=======================================[=]
+// Search order:
+// 1. $<APPNAME_UPPER>_ICON_DIR env override
+// 2. <exe_dir>/../share/<app_name>/icons/  (relative to /proc/self/exe)
+// 3. $XDG_DATA_HOME/<app_name>/icons/  (default: ~/.local/share/)
+// 4. each $XDG_DATA_DIRS entry/<app_name>/icons/  (default: /usr/share:/usr/local/share)
+// 5. ./icons/  (development fallback)
+static uint32_t icon_resolve_dir(const char *app_name, char *out, uint32_t out_size) {
+	if(!app_name || !app_name[0] || !out || out_size < 2) {
+		return 0;
+	}
+
+	// 1. env override: <APPNAME>_ICON_DIR (uppercase, hyphens become underscores)
+	{
+		char env_name[128];
+		uint32_t i = 0;
+		for(const char *p = app_name; *p && i < sizeof(env_name) - 10; ++p, ++i) {
+			if(*p >= 'a' && *p <= 'z') {
+				env_name[i] = *p - 32;
+			} else if(*p == '-') {
+				env_name[i] = '_';
+			} else {
+				env_name[i] = *p;
+			}
+		}
+		env_name[i] = '\0';
+		strcat(env_name, "_ICON_DIR");
+		const char *env = getenv(env_name);
+		if(env && env[0] && icon_dir_exists(env)) {
+			snprintf(out, out_size, "%s", env);
+			return 1;
+		}
+	}
+
+#ifndef _WIN32
+	// 2. relative to executable via /proc/self/exe
+	{
+		char exe_path[2048];
+		ssize_t len = readlink("/proc/self/exe", exe_path, sizeof(exe_path) - 1);
+		if(len > 0) {
+			exe_path[len] = '\0';
+			// strip executable name to get directory
+			char *slash = strrchr(exe_path, '/');
+			if(slash) {
+				*slash = '\0';
+				// strip one more level (bin/) to get prefix
+				slash = strrchr(exe_path, '/');
+				if(slash) {
+					*slash = '\0';
+					snprintf(out, out_size, "%s/share/%s/icons", exe_path, app_name);
+					if(icon_dir_exists(out)) {
+						return 1;
+					}
+				}
+			}
+		}
+	}
+
+	// 3. XDG_DATA_HOME/<app_name>/icons/ (default: ~/.local/share/)
+	{
+		const char *xdg_home = getenv("XDG_DATA_HOME");
+		if(xdg_home && xdg_home[0]) {
+			snprintf(out, out_size, "%s/%s/icons", xdg_home, app_name);
+		} else {
+			const char *home = getenv("HOME");
+			if(home && home[0]) {
+				snprintf(out, out_size, "%s/.local/share/%s/icons", home, app_name);
+			} else {
+				out[0] = '\0';
+			}
+		}
+		if(out[0] && icon_dir_exists(out)) {
+			return 1;
+		}
+	}
+
+	// 4. each entry in XDG_DATA_DIRS/<app_name>/icons/ (default: /usr/share:/usr/local/share)
+	{
+		const char *xdg_dirs = getenv("XDG_DATA_DIRS");
+		const char *defaults = "/usr/share:/usr/local/share";
+		const char *dirs = (xdg_dirs && xdg_dirs[0]) ? xdg_dirs : defaults;
+		const char *p = dirs;
+		while(*p) {
+			const char *colon = p;
+			while(*colon && *colon != ':') {
+				++colon;
+			}
+			uint32_t seg_len = (uint32_t)(colon - p);
+			if(seg_len > 0) {
+				snprintf(out, out_size, "%.*s/%s/icons", (int)seg_len, p, app_name);
+				if(icon_dir_exists(out)) {
+					return 1;
+				}
+			}
+			p = *colon ? colon + 1 : colon;
+		}
+	}
+#else
+	// Windows: same directory as executable
+	{
+		char exe_path[2048];
+		DWORD len = GetModuleFileNameA(NULL, exe_path, sizeof(exe_path));
+		if(len > 0 && len < sizeof(exe_path)) {
+			char *slash = strrchr(exe_path, '\\');
+			if(slash) {
+				*slash = '\0';
+			}
+			snprintf(out, out_size, "%s\\icons", exe_path);
+			if(icon_dir_exists(out)) {
+				return 1;
+			}
+		}
+	}
+#endif
+
+	// 5. ./icons/ development fallback
+	snprintf(out, out_size, "icons");
+	if(icon_dir_exists(out)) {
+		return 1;
+	}
+
+	out[0] = '\0';
+	return 0;
+}
+
+// [=]===^=[ mkgui_icon_load_app_icons ]==============================[=]
+MKGUI_API uint32_t mkgui_icon_load_app_icons(struct mkgui_ctx *ctx, const char *app_name) {
+	MKGUI_CHECK_VAL(ctx, 0);
+	if(!app_name || !app_name[0]) {
+		return 0;
+	}
+
+	char resolved[4096];
+	if(!icon_resolve_dir(app_name, resolved, sizeof(resolved))) {
+		fprintf(stderr, "mkgui: could not find icon directory for '%s'\n", app_name);
+		return 0;
+	}
+
+	snprintf(ctx->icon_dir, sizeof(ctx->icon_dir), "%s", resolved);
+	fprintf(stderr, "mkgui: resolved icon directory: %s\n", resolved);
+	return mkgui_icon_load_svg_dir(ctx, resolved);
+}
+
+// [=]===^=[ mkgui_icon_get_dir ]=====================================[=]
+MKGUI_API const char *mkgui_icon_get_dir(struct mkgui_ctx *ctx) {
+	MKGUI_CHECK_VAL(ctx, NULL);
+	return ctx->icon_dir[0] ? ctx->icon_dir : NULL;
 }

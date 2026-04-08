@@ -732,7 +732,6 @@ struct mkgui_ctx {
 	int32_t box_pad;
 	int32_t ui_margin;
 	int32_t icon_size;
-	int32_t toolbar_icon_size;
 	int32_t dialog_icon_size;
 	int32_t pathbar_height;
 	int32_t toolbar_height;
@@ -773,6 +772,7 @@ struct mkgui_ctx {
 	int32_t ctxmenu_x, ctxmenu_y;
 
 	char app_class[64];
+	char icon_dir[4096];
 };
 
 // ---------------------------------------------------------------------------
@@ -1033,7 +1033,6 @@ static void mkgui_recompute_metrics(struct mkgui_ctx *ctx) {
 	ctx->box_pad         = sc(ctx, MKGUI_BOX_PAD);
 	ctx->ui_margin       = sc(ctx, MKGUI_MARGIN);
 	ctx->icon_size           = sc(ctx, MKGUI_ICON_SIZE);
-	ctx->toolbar_icon_size   = sc(ctx, 22);
 	ctx->dialog_icon_size    = sc(ctx, 32);
 	ctx->pathbar_height  = sc(ctx, MKGUI_PATHBAR_HEIGHT);
 	ctx->toolbar_height  = sc(ctx, MKGUI_TOOLBAR_HEIGHT_DEFAULT);
@@ -1083,24 +1082,29 @@ static void icon_atlas_rebuild(void) {
 		total += (uint32_t)icons[i].w * (uint32_t)icons[i].h;
 	}
 
-	free(icon_atlas);
+	uint32_t *old_atlas = icon_atlas;
 	icon_atlas = (uint32_t *)calloc(total > 0 ? total : 1, sizeof(uint32_t));
 	if(!icon_atlas) {
+		icon_atlas = old_atlas;
 		return;
 	}
 
 	uint32_t offset = 0;
 	for(uint32_t i = 0; i < icon_count; ++i) {
 		struct mkgui_icon *ic = &icons[i];
+		uint32_t size = (uint32_t)ic->w * (uint32_t)ic->h;
+		uint32_t old_offset = ic->atlas_offset;
 		ic->atlas_offset = offset;
 		if(ic->pixels) {
-			uint32_t size = (uint32_t)ic->w * (uint32_t)ic->h;
 			memcpy(&icon_atlas[offset], ic->pixels, size * sizeof(uint32_t));
-			offset += size;
 			free(ic->pixels);
 			ic->pixels = NULL;
+		} else if(old_atlas && size > 0) {
+			memcpy(&icon_atlas[offset], &old_atlas[old_offset], size * sizeof(uint32_t));
 		}
+		offset += size;
 	}
+	free(old_atlas);
 }
 
 #include "mkgui_render.c"
@@ -1819,8 +1823,8 @@ static void lc_layout_node(struct mkgui_ctx *ctx, struct layout_ctx *lc, uint32_
 							break;
 						}
 					}
-					if(tb_has_icons && ctx->toolbar_icon_size > 0) {
-						int32_t ih = ctx->toolbar_icon_size;
+					if(tb_has_icons && ctx->icon_size > 0) {
+						int32_t ih = ctx->icon_size;
 						th = (tb_mode == MKGUI_TOOLBAR_ICONS_ONLY) ? ih + 10 : ((ih > ctx->font_height ? ih : ctx->font_height) + 10);
 					} else {
 						th = ctx->font_height + 10;
@@ -6121,7 +6125,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 												dirty_widget(ctx, (uint32_t)hi);
 												return 1;
 											}
-											if(was_selected && slow_click) {
+											if(was_selected && slow_click && (hw->style & MKGUI_LISTVIEW_EDITABLE)) {
 												char cell_buf[MKGUI_MAX_TEXT] = {0};
 												if(lv->row_cb) {
 													lv->row_cb((uint32_t)row, 0, cell_buf, MKGUI_MAX_TEXT, lv->userdata);
@@ -6293,7 +6297,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 									if(is_dblclick) {
 										ev->type = MKGUI_EVENT_ITEMVIEW_DBLCLICK;
 										ctx->dblclick_id = 0;
-									} else if(was_selected && slow_click) {
+									} else if(was_selected && slow_click && (hw->style & MKGUI_ITEMVIEW_EDITABLE)) {
 										char label[MKGUI_MAX_TEXT] = {0};
 										if(iv->label_cb) {
 											iv->label_cb((uint32_t)item, label, MKGUI_MAX_TEXT, iv->userdata);
@@ -6426,7 +6430,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 									if(is_dblclick) {
 										ev->type = MKGUI_EVENT_TREEVIEW_DBLCLICK;
 										ctx->dblclick_id = 0;
-									} else if(was_selected && slow_click) {
+									} else if(was_selected && slow_click && (hw->style & MKGUI_TREEVIEW_EDITABLE)) {
 										celledit_begin(ctx, hw->id, node_id, 0, tv->nodes[node_idx].label);
 										return 0;
 									} else {

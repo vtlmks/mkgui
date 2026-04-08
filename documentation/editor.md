@@ -159,10 +159,11 @@ Visible when a TOOLBAR widget is selected:
 - **Add Button** -- create a new toolbar button
 - **Remove Button** -- delete the last toolbar button
 
-Select a toolbar button child to set its icon (the icon browser shows toolbar-size
-icons from the `icons/toolbar/` directory), label, and the **TbSep** flag (draws
-a vertical separator before this button). The toolbar **Mode** dropdown sets the
-display mode: Icons + Text, Icons Only, or Text Only.
+Select a toolbar button child to set its icon via the icon browser, label, and the
+**TbSep** flag (draws a vertical separator before this button). The icon browser
+scans for Freedesktop icon themes next to the editor and offers a dropdown to switch
+between them. Icons from different themes can be mixed. The toolbar **Mode** dropdown
+sets the display mode: Icons + Text, Icons Only, or Text Only.
 
 ### Data items / Sections
 

@@ -12,7 +12,7 @@ pacman -S gcc freetype2 libx11 libxext
 apt install gcc libfreetype-dev libx11-dev libxext-dev
 ```
 
-**Windows (cross-compile from Linux):** MinGW-w64.
+**Windows (cross-compile from Linux):** MinGW-w64. FreeType and font rendering are handled through GDI on Windows, so no extra libraries are needed.
 
 ```sh
 # Arch
@@ -34,10 +34,10 @@ This produces:
 
 | Output | Description |
 |--------|-------------|
-| `libmkgui.a` | Static library for linking |
-| `editor` | Visual UI designer |
-| `tools/extract_icons` | Icon extraction tool |
-| `demo` | Demo application |
+| `out/libmkgui.a` | Static library for linking |
+| `out/editor` | Visual UI designer |
+| `out/extract_icons` | Icon extraction tool |
+| `out/demo` | Demo application |
 
 Build variants: `./build.sh release` (stripped), `./build.sh debug` (no optimization), `./build.sh clean`.
 
@@ -65,7 +65,8 @@ int main(void) {
 		MKGUI_W(MKGUI_BUTTON, ID_BUTTON, "Click me",  "edit-find", ID_VBOX, 120, 0, MKGUI_FIXED, 0, 0),
 	};
 	struct mkgui_ctx *ctx = mkgui_create(widgets, 4);
-	mkgui_icon_load_svg_dir(ctx, "icons");
+	mkgui_set_app_class(ctx, "myapp");
+	mkgui_icon_load_app_icons(ctx, "myapp");
 	mkgui_run(ctx, on_event, NULL);
 	mkgui_destroy(ctx);
 	return 0;
@@ -100,26 +101,51 @@ mkgui uses SVG icons from Freedesktop-compatible icon themes (Papirus, Breeze, A
 
 ### Setting up icons
 
-1. **Design your UI** in the editor. The editor tracks which icons are used.
+1. **Unpack an icon theme** next to the editor binary. Download a Freedesktop icon theme (e.g. Papirus) and extract it so the directory sits alongside the editor (e.g. `./Papirus/`). The editor detects any directory containing an `index.theme` file. You can have multiple themes side by side.
 
-2. **Extract icons** from an installed icon theme:
+2. **Design your UI** in the editor. When browsing icons, a dropdown lets you pick which theme to select from. You can mix icons from different themes. The editor tracks which icons are used and their source paths.
+
+3. **Extract icons** using the generated icon list:
 ```sh
-# Extract icons listed in icons_used.txt from Papirus
-./tools/extract_icons /usr/share/icons/Papirus icons_used.txt icons/ 16 22
+# Copy icons listed by the editor, resolve mkgui required icons from Papirus
+# Last argument is the preferred SVG source size (16px) for theme lookup
+extract_icons myapp_icons.txt icons/ ./Papirus 16
 ```
-This creates:
-- `icons/*.svg` -- small icons (16x16 source, for buttons/menus/trees)
-- `icons/toolbar/*.svg` -- toolbar icons (22x22 source)
+The tool reads `myapp_icons.txt` (editor-managed) and also `myapp_icons_extra.txt` if it exists (user-managed, for icons loaded dynamically in code). The output directory is cleaned and rebuilt from scratch each run.
 
-The tool automatically includes mkgui's internal required icons (file dialog, message box, etc.) in addition to your listed icons.
+Icons with source paths are copied directly. Icons without a source path (including mkgui's required internal icons) are resolved from the theme directory.
 
-3. **Load icons** at startup:
+4. **Add dynamic icons** (optional). If your code loads icons at runtime that aren't in the editor's UI, list them in `myapp_icons_extra.txt`:
+```
+# Extra icons loaded dynamically in code
+audio-volume-high
+media-playback-start
+media-playback-pause
+```
+This file is never touched by the editor, so your additions are safe across re-exports.
+
+5. **Load icons** at startup:
 ```c
 struct mkgui_ctx *ctx = mkgui_create(widgets, count);
-mkgui_icon_load_svg_dir(ctx, "icons");
+mkgui_set_app_class(ctx, "myapp");
+mkgui_icon_load_app_icons(ctx, "myapp");
 ```
 
-4. **Ship** the `icons/` directory alongside your executable.
+On Linux, this searches the following paths in order:
+
+1. `$MYAPP_ICON_DIR` environment variable (override for development/packaging)
+2. `../share/myapp/icons/` relative to the executable (covers FHS installs at any prefix)
+3. `$XDG_DATA_HOME/myapp/icons/` (default: `~/.local/share/myapp/icons/`)
+4. Each `$XDG_DATA_DIRS` entry + `/myapp/icons/` (default: `/usr/share/` and `/usr/local/share/`)
+5. `./icons/` (development fallback)
+
+On Windows, it checks the executable's own directory for an `icons/` subdirectory.
+
+6. **Install** the `icons/` directory to `<prefix>/share/<app_name>/icons/` (e.g. `/usr/share/myapp/icons/`).
+
+### Mixing icon themes
+
+You can pick icons from different themes (e.g. Papirus for toolbar icons, Breeze for status icons). However, all icons are stored in a flat directory keyed by name. If you select the same icon name (e.g. "document-save") from two different themes, only one version is kept. The editor warns when this happens during export.
 
 ### Icon names
 
@@ -143,6 +169,10 @@ Icons use standard Freedesktop names. Common examples:
 | `dialog-error` | Error indicator |
 
 Browse all available icons in the editor's icon browser, or see the [Freedesktop Icon Naming Specification](https://specifications.freedesktop.org/icon-naming-spec/latest/).
+
+### Icons on Windows
+
+Freedesktop icon themes often use symlinks for icon aliases (e.g., `media-floppy.svg` linking to `document-save.svg`). On Linux this works transparently. On Windows, symlinks may not be preserved when extracting the theme archive. Use an extraction tool that resolves symlinks to copies (e.g., 7-Zip or tar with `--dereference`), or the aliased icons will be missing.
 
 ### Theme compatibility
 
@@ -168,7 +198,7 @@ Widgets are defined as a flat array of `struct mkgui_widget`. Each widget has a 
 struct mkgui_widget widgets[] = {
 //   MKGUI_W(type, id, label, icon, parent, w, h, flags, style, weight)
     MKGUI_W(MKGUI_WINDOW, ID_WINDOW, "Title",  "", 0,      800, 600, 0, 0, 0),
-    MKGUI_W(MKGUI_VBOX,   ID_VBOX,   "",       "", ID_WIN, 0,   0,   0, 0, 0),
+    MKGUI_W(MKGUI_VBOX,   ID_VBOX,   "",       "", ID_WINDOW, 0, 0,   0, 0, 0),
     MKGUI_W(MKGUI_LABEL,  ID_LABEL,  "Hello",  "", ID_VBOX,0,   0,   0, 0, 0),
     MKGUI_W(MKGUI_BUTTON, ID_BTN,    "OK",     "", ID_VBOX,100, 0, MKGUI_FIXED, 0, 0),
 };
@@ -204,7 +234,7 @@ mkgui runs on Linux (X11) and Windows (Win32). Write once, compile for both:
 # Linux
 gcc -std=c99 -O2 myapp.c -lmkgui $(pkg-config --cflags --libs freetype2) -lX11 -lXext -lm
 
-# Windows (cross-compile)
+# Windows (cross-compile, no FreeType needed -- uses GDI for fonts)
 x86_64-w64-mingw32-gcc -std=c99 -O2 myapp.c -lmkgui -lgdi32 -mwindows
 ```
 

@@ -140,32 +140,58 @@ static void fd_url_decode(char *dst, char *src, uint32_t dst_size) {
 	dst[di] = '\0';
 }
 
+// [=]===^=[ fd_icon_for_ext ]=====================================[=]
+static char *fd_icon_for_ext(char *dot) {
+	if(strcmp(dot, ".c") == 0 || strcmp(dot, ".h") == 0) {
+		return "text-x-csrc";
+	}
+	if(strcmp(dot, ".cpp") == 0 || strcmp(dot, ".cc") == 0 || strcmp(dot, ".cxx") == 0 || strcmp(dot, ".hpp") == 0) {
+		return "text-x-c++src";
+	}
+	if(strcmp(dot, ".sh") == 0 || strcmp(dot, ".bash") == 0 || strcmp(dot, ".zsh") == 0) {
+		return "text-x-script";
+	}
+	if(strcmp(dot, ".py") == 0) {
+		return "text-x-python";
+	}
+	if(strcmp(dot, ".js") == 0 || strcmp(dot, ".ts") == 0 || strcmp(dot, ".json") == 0) {
+		return "text-x-script";
+	}
+	if(strcmp(dot, ".html") == 0 || strcmp(dot, ".htm") == 0) {
+		return "text-html";
+	}
+	if(strcmp(dot, ".xml") == 0 || strcmp(dot, ".svg") == 0) {
+		return "text-xml";
+	}
+	if(strcmp(dot, ".css") == 0) {
+		return "text-css";
+	}
+	if(strcmp(dot, ".png") == 0 || strcmp(dot, ".jpg") == 0 || strcmp(dot, ".jpeg") == 0 || strcmp(dot, ".gif") == 0 || strcmp(dot, ".bmp") == 0 || strcmp(dot, ".webp") == 0 || strcmp(dot, ".ico") == 0) {
+		return "image-x-generic";
+	}
+	if(strcmp(dot, ".pdf") == 0) {
+		return "application-pdf";
+	}
+	if(strcmp(dot, ".zip") == 0 || strcmp(dot, ".tar") == 0 || strcmp(dot, ".gz") == 0 || strcmp(dot, ".bz2") == 0 || strcmp(dot, ".xz") == 0 || strcmp(dot, ".7z") == 0 || strcmp(dot, ".rar") == 0) {
+		return "package-x-generic";
+	}
+	if(strcmp(dot, ".o") == 0 || strcmp(dot, ".so") == 0 || strcmp(dot, ".a") == 0 || strcmp(dot, ".dll") == 0) {
+		return "application-x-object";
+	}
+	return NULL;
+}
+
 // [=]===^=[ fd_icon_for_name ]====================================[=]
 static char *fd_icon_for_name(char *name, uint32_t is_dir) {
 	if(is_dir) {
 		return "folder";
 	}
 	char *dot = strrchr(name, '.');
-	if(!dot) {
-		return "text-x-generic";
-	}
-	if(strcmp(dot, ".c") == 0 || strcmp(dot, ".cpp") == 0 || strcmp(dot, ".cc") == 0) {
-		return "text-x-csrc";
-	}
-	if(strcmp(dot, ".h") == 0 || strcmp(dot, ".hpp") == 0) {
-		return "text-x-csrc";
-	}
-	if(strcmp(dot, ".sh") == 0) {
-		return "text-x-script";
-	}
-	if(strcmp(dot, ".py") == 0) {
-		return "text-x-python";
-	}
-	if(strcmp(dot, ".md") == 0 || strcmp(dot, ".txt") == 0) {
-		return "text-x-generic";
-	}
-	if(strcmp(dot, ".png") == 0 || strcmp(dot, ".jpg") == 0 || strcmp(dot, ".jpeg") == 0 || strcmp(dot, ".gif") == 0 || strcmp(dot, ".svg") == 0) {
-		return "image-x-generic";
+	if(dot) {
+		char *specific = fd_icon_for_ext(dot);
+		if(specific && icon_find_idx(specific) >= 0) {
+			return specific;
+		}
 	}
 	return "text-x-generic";
 }
@@ -1103,7 +1129,7 @@ static uint32_t fd_run_dialog(struct mkgui_ctx *ctx, uint32_t mode, struct mkgui
 		MKGUI_W(MKGUI_VBOX,     FD_ID_CONTENT_VBOX,   "",              "",             FD_ID_WINDOW,       0, 0, 0, 0, 0),
 		MKGUI_W(MKGUI_VSPLIT,   FD_ID_SPLIT,          "",              "",             FD_ID_CONTENT_VBOX, 0, 0, 0, 0, 1),
 		MKGUI_W(MKGUI_LISTVIEW, FD_ID_BOOKMARKS,      "",              "",             FD_ID_SPLIT,        0, 0, MKGUI_REGION_LEFT, 0, 0),
-		MKGUI_W(MKGUI_LISTVIEW, FD_ID_FILES,          "",              "",             FD_ID_SPLIT,        0, 0, MKGUI_REGION_RIGHT, multi, 0),
+		MKGUI_W(MKGUI_LISTVIEW, FD_ID_FILES,          "",              "",             FD_ID_SPLIT,        0, 0, MKGUI_REGION_RIGHT, multi | MKGUI_LISTVIEW_EDITABLE, 0),
 
 		MKGUI_W(MKGUI_HBOX,     FD_ID_NAME_HBOX,      "",              "",             FD_ID_CONTENT_VBOX, 0, 24, MKGUI_FIXED, 0, 0),
 		MKGUI_W(MKGUI_LABEL,    FD_ID_NAME_LABEL,     "File name:",    "",             FD_ID_NAME_HBOX,    80, 0, MKGUI_FIXED, 0, 0),
