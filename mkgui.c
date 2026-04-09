@@ -762,6 +762,9 @@ struct mkgui_ctx {
 	mkgui_render_cb render_cb;
 	void *render_cb_data;
 
+	mkgui_event_cb event_cb;
+	void *event_cb_data;
+
 	struct mkgui_ctx *parent;
 
 	char clip_text[MKGUI_CLIP_MAX];
@@ -7544,7 +7547,9 @@ static void mkgui_flush(struct mkgui_ctx *ctx) {
 // [=]===^=[ mkgui_wait ]=========================================[=]
 MKGUI_API void mkgui_wait(struct mkgui_ctx *ctx) {
 	MKGUI_CHECK(ctx);
-	mkgui_flush(ctx);
+	for(uint32_t i = 0; i < window_registry_count; ++i) {
+		mkgui_flush(window_registry[i]);
+	}
 
 	if(ctx->close_requested) {
 		return;
@@ -7637,6 +7642,13 @@ MKGUI_API void mkgui_remove_timer(struct mkgui_ctx *ctx, uint32_t timer_id) {
 	}
 }
 
+// [=]===^=[ mkgui_set_callback ]=================================[=]
+MKGUI_API void mkgui_set_callback(struct mkgui_ctx *ctx, mkgui_event_cb cb, void *userdata) {
+	MKGUI_CHECK(ctx);
+	ctx->event_cb = cb;
+	ctx->event_cb_data = userdata;
+}
+
 // [=]===^=[ mkgui_run ]===========================================[=]
 MKGUI_API void mkgui_run(struct mkgui_ctx *ctx, mkgui_event_cb cb, void *userdata) {
 	MKGUI_CHECK(ctx);
@@ -7645,6 +7657,15 @@ MKGUI_API void mkgui_run(struct mkgui_ctx *ctx, mkgui_event_cb cb, void *userdat
 		while(mkgui_poll(ctx, &ev)) {
 			if(cb) {
 				cb(ctx, &ev, userdata);
+			}
+		}
+		for(uint32_t i = 0; i < window_registry_count; ++i) {
+			struct mkgui_ctx *c = window_registry[i];
+			if(c == ctx || c->close_requested || !c->event_cb) {
+				continue;
+			}
+			while(mkgui_poll(c, &ev)) {
+				c->event_cb(c, &ev, c->event_cb_data);
 			}
 		}
 		mkgui_wait(ctx);

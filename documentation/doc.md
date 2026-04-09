@@ -368,6 +368,7 @@ struct mkgui_event {
 ```c
 struct mkgui_ctx *mkgui_create(struct mkgui_widget *widgets, uint32_t count);
 void mkgui_destroy(struct mkgui_ctx *ctx);
+void mkgui_set_callback(struct mkgui_ctx *ctx, mkgui_event_cb cb, void *userdata);
 void mkgui_run(struct mkgui_ctx *ctx, mkgui_event_cb cb, void *userdata);
 void mkgui_quit(struct mkgui_ctx *ctx);
 void mkgui_set_title(struct mkgui_ctx *ctx, char *title);
@@ -379,7 +380,9 @@ void mkgui_remove_timer(struct mkgui_ctx *ctx, uint32_t timer_id);
 
 `mkgui_create` takes a widget array and returns a context.
 
-`mkgui_run` runs the event loop. It drains all pending events, delivers each to `cb`, renders the frame, then blocks until the next event or timer. This repeats until `mkgui_quit` is called.
+`mkgui_run` runs the event loop. It drains all pending events, delivers each to `cb`, renders the frame, then blocks until the next event or timer. This repeats until `mkgui_quit` is called. It also pumps events for all other registered contexts that have a callback set via `mkgui_set_callback`, rendering and dispatching their events automatically.
+
+`mkgui_set_callback` registers a per-context event callback without starting an event loop. Use this for secondary windows that should be pumped by an existing `mkgui_run` loop. The context is automatically picked up on the next iteration.
 
 `mkgui_run` handles frame pacing automatically:
 - When animated widgets are visible (spinners, progress bars, GL views), it runs at ~60fps
@@ -390,7 +393,7 @@ On Linux, blocking uses `poll()` on the X11 connection fd and timer fds. On Wind
 
 Mouse motion events are automatically compressed. When multiple consecutive motion events are queued, only the last position is delivered.
 
-**Example:**
+**Single-window example:**
 
 ```c
 static void on_event(struct mkgui_ctx *ctx, struct mkgui_event *ev, void *userdata) {
@@ -410,6 +413,29 @@ int main(void) {
     struct mkgui_ctx *ctx = mkgui_create(widgets, count);
     mkgui_run(ctx, on_event, NULL);
     mkgui_destroy(ctx);
+}
+```
+
+**Multi-window example (e.g. plugin config):**
+
+```c
+static struct mkgui_ctx *plugin_ctx;
+
+static void plugin_event(struct mkgui_ctx *ctx, struct mkgui_event *ev, void *ud) {
+    (void)ud;
+    switch(ev->type) {
+        case MKGUI_EVENT_CLOSE: {
+            mkgui_destroy(ctx);
+            plugin_ctx = NULL;
+        } break;
+    }
+}
+
+// Called from the main window's event callback
+void open_plugin_config(void) {
+    plugin_ctx = mkgui_create(plugin_widgets, plugin_count);
+    mkgui_set_callback(plugin_ctx, plugin_event, NULL);
+    // Returns immediately; the main mkgui_run() loop pumps this context
 }
 ```
 
