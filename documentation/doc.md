@@ -106,7 +106,7 @@ The `MKGUI_W` macro provides a shorthand for widget initializers using the origi
 MKGUI_W(type, id, label, icon, parent_id, w, h, flags, style, weight)
 ```
 
-The `flags` field holds universal layout and state flags: `MKGUI_FIXED`, `MKGUI_HIDDEN`, `MKGUI_DISABLED`, `MKGUI_NO_SCROLL`, `MKGUI_NO_PAD`, `MKGUI_VERTICAL`, `MKGUI_REGION_*`, `MKGUI_ALIGN_*`. The `style` field holds per-widget-type appearance flags, named with the widget type prefix: `MKGUI_CHECKBOX_CHECKED`, `MKGUI_INPUT_PASSWORD`, `MKGUI_INPUT_READONLY`, `MKGUI_MENUITEM_SEPARATOR`, `MKGUI_MENUITEM_CHECK`, `MKGUI_MENUITEM_RADIO`, `MKGUI_PANEL_BORDER`, `MKGUI_PANEL_SUNKEN`, `MKGUI_SLIDER_MIXER`, `MKGUI_METER_TEXT`, `MKGUI_IMAGE_STRETCH`, `MKGUI_TAB_CLOSABLE`, `MKGUI_LISTVIEW_MULTI_SELECT`, `MKGUI_LABEL_TRUNCATE`, `MKGUI_TOOLBAR_ICONS_ONLY`, `MKGUI_TOOLBAR_TEXT_ONLY`, `MKGUI_LABEL_LINK`, `MKGUI_GROUP_COLLAPSIBLE`, `MKGUI_GROUP_COLLAPSED`, `MKGUI_LABEL_WRAP`, `MKGUI_INPUT_NUMERIC`.
+The `flags` field holds universal layout and state flags: `MKGUI_FIXED`, `MKGUI_HIDDEN`, `MKGUI_DISABLED`, `MKGUI_SCROLL`, `MKGUI_NO_PAD`, `MKGUI_VERTICAL`, `MKGUI_REGION_*`, `MKGUI_ALIGN_*`. The `style` field holds per-widget-type appearance flags, named with the widget type prefix: `MKGUI_CHECKBOX_CHECKED`, `MKGUI_INPUT_PASSWORD`, `MKGUI_INPUT_READONLY`, `MKGUI_MENUITEM_SEPARATOR`, `MKGUI_MENUITEM_CHECK`, `MKGUI_MENUITEM_RADIO`, `MKGUI_PANEL_BORDER`, `MKGUI_PANEL_SUNKEN`, `MKGUI_SLIDER_MIXER`, `MKGUI_METER_TEXT`, `MKGUI_IMAGE_STRETCH`, `MKGUI_TAB_CLOSABLE`, `MKGUI_LISTVIEW_MULTI_SELECT`, `MKGUI_LABEL_TRUNCATE`, `MKGUI_TOOLBAR_ICONS_ONLY`, `MKGUI_TOOLBAR_TEXT_ONLY`, `MKGUI_LABEL_LINK`, `MKGUI_GROUP_COLLAPSIBLE`, `MKGUI_GROUP_COLLAPSED`, `MKGUI_LABEL_WRAP`, `MKGUI_INPUT_NUMERIC`.
 
 There are no `x, y` fields. All positioning is handled by the container-based layout system. The `w` and `h` fields specify size; when `h` is 0, the widget uses its natural height (derived from the font height for most widget types).
 
@@ -212,12 +212,12 @@ MKGUI_W(MKGUI_INPUT, ID_I1,   "",       "", ID_FORM, 0, 0, 0, 0, 0),
 | `MKGUI_REGION_RIGHT` | `1 << 7` | Right region |
 | `MKGUI_HIDDEN` | `1 << 8` | Widget not visible |
 | `MKGUI_DISABLED` | `1 << 9` | Widget not interactive |
-| `MKGUI_NO_SCROLL` | `1 << 10` | Disable automatic scrolling on VBOX/HBOX (content clips instead) |
+| `MKGUI_SCROLL` | `1 << 10` | Enable scrollbar on VBOX/HBOX when content exceeds bounds. Without this flag, containers enforce their content's minimum size. |
 | `MKGUI_NO_PAD` | `1 << 11` | Suppress automatic container padding |
 | `MKGUI_ALIGN_START` | `1 << 12` | Align to start (left in VBOX, top in HBOX) |
 | `MKGUI_ALIGN_CENTER` | `2 << 12` | Center in cross-axis |
 | `MKGUI_ALIGN_END` | `3 << 12` | Align to end (right in VBOX, bottom in HBOX) |
-| `MKGUI_FIXED` | `1 << 14` | Fixed size in container layout. Widget keeps its declared dimensions; weight is ignored. |
+| `MKGUI_FIXED` | `1 << 14` | Fixed size; removed from flex distribution. With `w`/`h` > 0: use that exact size. With `w`/`h` = 0: use natural size. Weight is ignored. |
 | `MKGUI_VERTICAL` | `1 << 15` | Vertical orientation for scrollbar, slider, meter, divider |
 
 Cross-axis alignment flags are used on children of HBOX/VBOX to control alignment perpendicular to the layout direction. Default is stretch (fill container).
@@ -1339,19 +1339,17 @@ Layout containers (VBOX, HBOX, FORM) automatically apply 6px internal padding fo
 
 Children in HBOX/VBOX use a weight-based distribution system. The `weight` field controls how space is allocated:
 
-- **`MKGUI_FIXED`** flag -- Fixed size. The child uses its declared `w`/`h` as exact size. Weight is ignored.
+- **`MKGUI_FIXED`** flag -- Removed from flex distribution. With `w`/`h` > 0: use that exact pixel size. With `w`/`h` = 0: use natural size (font-derived for leaf widgets, content-measured for containers). Weight is ignored.
 - **`weight = 0`** (default) -- Flexible with effective weight 1. Zero-initialized widgets are flexible by default.
 - **`weight > 0`** -- Flexible with explicit weight. Remaining space is distributed proportionally. A weight-2 child gets twice the extra space of a weight-1 child.
 
 For flexible children, `w`/`h` is the minimum size in the layout direction. The child gets at least that much, plus its proportional share of remaining space. When `h` is 0, the natural height (derived from font height) is used as the minimum.
 
-A container with `MKGUI_FIXED` and size 0 in the layout direction measures its children and sizes to fit them (size-to-content).
-
 Use `mkgui_set_weight(ctx, id, weight)` to change weight at runtime.
 
 ### VBox
 
-Stacks children vertically with 6px gap. By default children stretch to the full container width (override with `MKGUI_ALIGN_START/CENTER/END`). Scrolls automatically when content overflows. Set `MKGUI_NO_SCROLL` to disable scrolling and clip instead.
+Stacks children vertically with 6px gap. By default children stretch to the full container width (override with `MKGUI_ALIGN_START/CENTER/END`). Content clips when it exceeds the container bounds. Set `MKGUI_SCROLL` to enable automatic scrollbars instead.
 
 ```c
 MKGUI_W(MKGUI_VBOX,   ID_VBOX,  "", "", ID_TAB1, 0, 0, 0, 0, 0),
@@ -1362,7 +1360,7 @@ MKGUI_W(MKGUI_BUTTON, ID_BTN2,  "Flex (fills)", "", ID_VBOX, 0, 0, 0, 0, 0),
 
 ### HBox
 
-Stacks children horizontally with 6px gap. By default children stretch to the full container height (override with `MKGUI_ALIGN_START/CENTER/END`). Scrolls automatically when content overflows. Set `MKGUI_NO_SCROLL` to disable scrolling and clip instead.
+Stacks children horizontally with 6px gap. By default children stretch to the full container height (override with `MKGUI_ALIGN_START/CENTER/END`). Content clips when it exceeds the container bounds. Set `MKGUI_SCROLL` to enable automatic scrollbars instead.
 
 ```c
 MKGUI_W(MKGUI_HBOX,   ID_HBOX, "", "", ID_TAB1, 0, 0, 0, 0, 0),

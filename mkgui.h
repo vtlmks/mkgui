@@ -135,7 +135,7 @@ enum {
 #define MKGUI_REGION_RIGHT         (1u << 7)
 #define MKGUI_HIDDEN               (1u << 8)
 #define MKGUI_DISABLED             (1u << 9)
-#define MKGUI_NO_SCROLL            (1u << 10)
+#define MKGUI_SCROLL               (1u << 10)
 #define MKGUI_NO_PAD               (1u << 11)
 #define MKGUI_ALIGN_START          (1u << 12)
 #define MKGUI_ALIGN_CENTER         (2u << 12)

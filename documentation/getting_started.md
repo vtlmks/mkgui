@@ -205,7 +205,7 @@ struct mkgui_widget widgets[] = {
 ```
 
 - `w=0, h=0`: widget takes its natural size from font height
-- `MKGUI_FIXED`: widget uses its specified `w`/`h` instead of stretching
+- `MKGUI_FIXED`: widget is removed from flex distribution. Uses exact `w`/`h` if set, or natural size if 0
 - `weight`: controls how flexible widgets share remaining space in a container
 
 See `documentation/doc.md` for the full API reference.

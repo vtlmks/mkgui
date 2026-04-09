@@ -752,7 +752,7 @@ static void test_hbox_min_width(void) {
 	struct mkgui_ctx *ctx = create_and_layout(widgets, 22);
 	CHECK(ctx, "create failed");
 	if(ctx) {
-		int32_t min_w = natural_width(ctx, MKGUI_BUTTON);
+		int32_t min_w = natural_width(ctx, find_widget(ctx, 10));
 		for(uint32_t i = 0; i < 20; ++i) {
 			struct mkgui_rect r = get_rect(ctx, 10 + i);
 			CHECK(r.w >= min_w, "id=%u w=%d, minimum should be %d", 10 + i, r.w, min_w);
@@ -815,15 +815,16 @@ static void test_split_pane_min_height(void) {
 // [=]===^=[ test_hbox_label_progress_spinner ]=====================[=]
 static void test_hbox_label_progress_spinner(void) {
 	TEST_BEGIN("hbox: label(fixed) + progress(flex) + spinner(fixed) all fit");
-	enum { WIN = 1, HBOX1 = 2, LBL = 3, PG = 4, SP = 5 };
+	enum { WIN = 1, VBOX1 = 2, HBOX1 = 3, LBL = 4, PG = 5, SP = 6 };
 	struct mkgui_widget widgets[] = {
 		MKGUI_W(MKGUI_WINDOW,   WIN,   "Test", "", 0,     600, 400, 0, 0, 0),
-		MKGUI_W(MKGUI_HBOX,     HBOX1, "",     "", WIN,   0,   28,  MKGUI_FIXED, 0, 0),
+		MKGUI_W(MKGUI_VBOX,     VBOX1, "",     "", WIN,   0,   0,   0, 0, 0),
+		MKGUI_W(MKGUI_HBOX,     HBOX1, "",     "", VBOX1, 0,   28,  MKGUI_FIXED, 0, 0),
 		MKGUI_W(MKGUI_LABEL,    LBL,   "Progress:", "", HBOX1, 80, 0, MKGUI_FIXED, 0, 0),
 		MKGUI_W(MKGUI_PROGRESS, PG,    "",     "", HBOX1, 0,   0,   0, 0, 1),
 		MKGUI_W(MKGUI_SPINNER,  SP,    "",     "", HBOX1, 28,  0,   MKGUI_FIXED, 0, 0),
 	};
-	struct mkgui_ctx *ctx = create_and_layout(widgets, 5);
+	struct mkgui_ctx *ctx = create_and_layout(widgets, 6);
 	CHECK(ctx, "create failed");
 	if(ctx) {
 		struct mkgui_rect hbox_r = get_rect(ctx, HBOX1);
@@ -931,6 +932,51 @@ static void test_form_shrink_no_overlap(void) {
 	TEST_END();
 }
 
+// [=]===^=[ test_hbox_fixed_zero_width ]==============================[=]
+static void test_hbox_fixed_zero_width(void) {
+	TEST_BEGIN("hbox: FIXED widget with w=0 gets natural width, not zero");
+	enum { WIN = 1, HBOX1 = 2, BTN1 = 3, BTN2 = 4 };
+	struct mkgui_widget widgets[] = {
+		MKGUI_W(MKGUI_WINDOW, WIN,   "Test", "", 0,     600, 400, 0, 0, 0),
+		MKGUI_W(MKGUI_HBOX,   HBOX1, "",     "", WIN,   0,   0,   0, 0, 0),
+		MKGUI_W(MKGUI_BUTTON, BTN1,  "Fix",  "", HBOX1, 0,   0,   MKGUI_FIXED, 0, 0),
+		MKGUI_W(MKGUI_BUTTON, BTN2,  "Flex", "", HBOX1, 0,   0,   0, 0, 0),
+	};
+	struct mkgui_ctx *ctx = create_and_layout(widgets, 4);
+	CHECK(ctx, "create failed");
+	if(ctx) {
+		struct mkgui_rect r1 = get_rect(ctx, BTN1);
+		int32_t nw = natural_width(ctx, find_widget(ctx, BTN1));
+		CHECK(r1.w == nw, "fixed w=0 btn w=%d, expected natural_width %d", r1.w, nw);
+		CHECK(r1.w > 0, "fixed w=0 btn must not be zero width");
+		mkgui_destroy(ctx);
+	}
+	TEST_END();
+}
+
+// [=]===^=[ test_generic_fixed_zero_size ]============================[=]
+static void test_generic_fixed_zero_size(void) {
+	TEST_BEGIN("generic container: FIXED widget with w=0 h=0 gets natural size, not parent fill");
+	enum { WIN = 1, BTN1 = 2 };
+	struct mkgui_widget widgets[] = {
+		MKGUI_W(MKGUI_WINDOW, WIN,  "Test", "", 0,   600, 400, 0, 0, 0),
+		MKGUI_W(MKGUI_BUTTON, BTN1, "OK",   "", WIN, 0,   0,   MKGUI_FIXED, 0, 0),
+	};
+	struct mkgui_ctx *ctx = create_and_layout(widgets, 2);
+	CHECK(ctx, "create failed");
+	if(ctx) {
+		struct mkgui_rect win_r = get_rect(ctx, WIN);
+		struct mkgui_rect btn_r = get_rect(ctx, BTN1);
+		struct mkgui_widget *bw = find_widget(ctx, BTN1);
+		int32_t nw = natural_width(ctx, bw);
+		int32_t nh = natural_height(ctx, MKGUI_BUTTON);
+		CHECK(btn_r.w == nw, "fixed btn w=%d, expected natural_width %d (not parent %d)", btn_r.w, nw, win_r.w);
+		CHECK(btn_r.h == nh, "fixed btn h=%d, expected natural_height %d (not parent %d)", btn_r.h, nh, win_r.h);
+		mkgui_destroy(ctx);
+	}
+	TEST_END();
+}
+
 // ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
@@ -969,6 +1015,8 @@ int main(void) {
 	test_vbox_shrink_no_overlap();
 	test_hbox_shrink_stays_inside();
 	test_form_shrink_no_overlap();
+	test_hbox_fixed_zero_width();
+	test_generic_fixed_zero_size();
 
 	fprintf(stderr, "\n========================\n");
 	fprintf(stderr, "%u tests: %u passed, %u failed\n", tests_run, tests_passed, tests_failed);

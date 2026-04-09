@@ -218,7 +218,7 @@ static void cp_render_hue_cursor(uint32_t *pixels, int32_t bw, int32_t bh, int32
 }
 
 // [=]===^=[ cp_render_wheel_base ]=================================[=]
-static void cp_render_wheel_base(uint32_t *buf, int32_t rw, int32_t rh) {
+static void cp_render_wheel_base(uint32_t *buf, int32_t rw, int32_t rh, uint32_t bg_color) {
 	uint32_t hue_lut[3600];
 	for(uint32_t i = 0; i < 3600; ++i) {
 		hue_lut[i] = cp_hsv_to_rgb((float)i * 0.1f, 1.0f, 1.0f);
@@ -231,7 +231,9 @@ static void cp_render_wheel_base(uint32_t *buf, int32_t rw, int32_t rh) {
 	int32_t isq_half = iinner * 6 / 10;
 	int32_t outer_sq = iouter * iouter;
 	int32_t inner_sq = iinner * iinner;
-	memset(buf, 0, (size_t)rw * (size_t)rh * sizeof(uint32_t));
+	for(int32_t i = 0; i < rw * rh; ++i) {
+		buf[i] = bg_color;
+	}
 	for(int32_t y = 0; y < rh; ++y) {
 		int32_t dy = y - hcy;
 		uint32_t *row = buf + y * rw;
@@ -352,7 +354,7 @@ static void cp_render_cb(struct mkgui_ctx *ctx, void *userdata) {
 			int32_t prev_wh = cp_state.wheel_h;
 			cp_state.wheel_cache = cp_cache_realloc(cp_state.wheel_cache, &cp_state.wheel_w, &cp_state.wheel_h, ww, wh);
 			if(cp_state.wheel_cache && (prev_ww != ww || prev_wh != wh || cp_state.wheel_hue != cp_state.h)) {
-				cp_render_wheel_base(cp_state.wheel_cache, ww, wh);
+				cp_render_wheel_base(cp_state.wheel_cache, ww, wh, ctx->theme.bg);
 				cp_state.wheel_hue = cp_state.h;
 			}
 			if(cp_state.wheel_cache) {

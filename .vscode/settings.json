@@ -5,5 +5,6 @@
 		"editor": true,
 		"editor.exe": true,
 		"tools/gen_icons": true,
-	}
+	},
+	"git.ignoreLimitWarning": true
 }
