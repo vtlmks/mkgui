@@ -689,7 +689,7 @@ int main(void) {
 		MKGUI_W(MKGUI_LABEL,    ID_LBL_AMOUNT,"Amount:",           "", ID_EXTRA_FORM, 0, 0, 0, 0, 0),
 		MKGUI_W(MKGUI_INPUT,    ID_AMOUNT_INPUT,"",                "", ID_EXTRA_FORM, 0, 0, 0, MKGUI_INPUT_NUMERIC, 0),
 		MKGUI_W(MKGUI_LABEL,    ID_LBL_COLOR, "Color:",            "", ID_EXTRA_FORM, 0, 0, 0, 0, 0),
-		MKGUI_W(MKGUI_BUTTON,   ID_BTN_COLOR, "Pick Color",  "palette", ID_EXTRA_FORM, 0, 0, 0, 0, 0),
+		MKGUI_W(MKGUI_BUTTON,   ID_BTN_COLOR, "Pick Color",  "color-management", ID_EXTRA_FORM, 0, 0, 0, 0, 0),
 
 		MKGUI_W(MKGUI_DIVIDER,  ID_DIVIDER1,  "",                  "", ID_CTL_RVBOX, 0, 0, MKGUI_FIXED, 0, 0),
 
@@ -727,8 +727,8 @@ int main(void) {
 		/* ---- Layout tab ---- */
 		MKGUI_W(MKGUI_HBOX,     ID_LAY_HBOX,  "",                  "", ID_TAB_LAYOUT, 0, 0, 0, 0, 0),
 		MKGUI_W(MKGUI_VBOX,     ID_LAY_VBOX,  "",                  "", ID_LAY_HBOX, 200, 0, MKGUI_FIXED, MKGUI_VBOX_BORDER, 0),
-		MKGUI_W(MKGUI_BUTTON,   ID_VBOX_BTN1, "First",             "file-plus",    ID_LAY_VBOX, 0, 28, MKGUI_FIXED, 0, 0),
-		MKGUI_W(MKGUI_BUTTON,   ID_VBOX_BTN2, "Second",            "content-save", ID_LAY_VBOX, 0, 28, MKGUI_FIXED, 0, 0),
+		MKGUI_W(MKGUI_BUTTON,   ID_VBOX_BTN1, "First",             "document-new",  ID_LAY_VBOX, 0, 28, MKGUI_FIXED, 0, 0),
+		MKGUI_W(MKGUI_BUTTON,   ID_VBOX_BTN2, "Second",            "document-save", ID_LAY_VBOX, 0, 28, MKGUI_FIXED, 0, 0),
 		MKGUI_W(MKGUI_INPUT,    ID_VBOX_INPUT,"",                  "", ID_LAY_VBOX, 0, 24, MKGUI_FIXED, 0, 0),
 		MKGUI_W(MKGUI_SPACER,   ID_VBOX_SPACER,"",                 "", ID_LAY_VBOX, 0, 0, 0, 0, 1),
 		MKGUI_W(MKGUI_BUTTON,   ID_VBOX_BTN3, "Bottom (after spacer)", "", ID_LAY_VBOX, 0, 28, MKGUI_FIXED, 0, 0),

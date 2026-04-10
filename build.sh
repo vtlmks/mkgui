@@ -6,6 +6,7 @@ WINCC=x86_64-w64-mingw32-gcc
 
 CFLAGS="-std=c99 "
 CFLAGS+="-O2 "
+# CFLAGS+="-fno-inline -Wframe-larger-than=100000 "
 CFLAGS+="-march=x86-64-v2 "
 CFLAGS+="-fwrapv "
 CFLAGS+="-Wall "

@@ -22,7 +22,7 @@ static void render_button(struct mkgui_ctx *ctx, uint32_t idx) {
 	draw_patch(ctx, style, rx, ry, rw, rh, bg, border);
 
 	uint32_t tc = (w->flags & MKGUI_DISABLED) ? ctx->theme.text_disabled : ctx->theme.text;
-	int32_t ii = widget_icon_idx(w);
+	int32_t ii = widget_icon_idx(ctx, w);
 	uint32_t has_icon = (ii >= 0);
 	int32_t tw = label_text_width(ctx, w);
 	int32_t icon_w = has_icon ? (icons[ii].w + (w->label[0] ? sc(ctx, 4) : 0)) : 0;

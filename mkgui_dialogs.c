@@ -98,6 +98,7 @@ static int32_t dlg_icon_resolve(struct mkgui_ctx *ctx, uint32_t icon_type) {
 		return -1;
 	}
 	char *name = dlg_icon_defs[icon_type].name;
+	uint32_t color = dlg_icon_defs[icon_type].color;
 	char cache_name[MKGUI_ICON_NAME_LEN];
 	snprintf(cache_name, sizeof(cache_name), "dlg:%s", name);
 	int32_t idx = icon_find_idx(cache_name);
@@ -106,8 +107,37 @@ static int32_t dlg_icon_resolve(struct mkgui_ctx *ctx, uint32_t icon_type) {
 	}
 	struct mkgui_svg_source *src = svg_find_source(name);
 	if(src) {
-		return svg_rasterize_icon_ex(cache_name, src->svg_data, src->svg_len, ctx->dialog_icon_size, 0, 0);
+		return svg_rasterize_icon_ex(cache_name, src->svg_data, src->svg_len, ctx->dialog_icon_size, color, 0);
 	}
+#ifndef _WIN32
+	// try system theme
+	if(ctx->system_theme_count > 0) {
+		char svg_path[4096];
+		for(uint32_t ti = 0; ti < ctx->system_theme_count; ++ti) {
+			if(icon_find_in_system_theme(ctx->system_theme_dirs[ti], name, svg_path, sizeof(svg_path))) {
+				uint32_t svg_len = 0;
+				char *svg_data = svg_read_file(svg_path, &svg_len);
+				if(svg_data) {
+					idx = svg_rasterize_icon_ex(cache_name, svg_data, svg_len, ctx->dialog_icon_size, color, 0);
+					if(idx >= 0) {
+						icon_atlas_rebuild();
+						if(svg_source_count < MKGUI_SVG_ICON_MAX) {
+							struct mkgui_svg_source *s = &svg_sources[svg_source_count++];
+							snprintf(s->name, MKGUI_ICON_NAME_LEN, "%s", cache_name);
+							s->svg_data = svg_data;
+							s->svg_len = svg_len;
+						} else {
+							free(svg_data);
+						}
+					} else {
+						free(svg_data);
+					}
+					return idx;
+				}
+			}
+		}
+	}
+#endif
 	return icon_find_idx(name);
 }
 

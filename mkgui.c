@@ -518,7 +518,7 @@ static uint32_t *icon_atlas;
 static struct mkgui_icon icons[MKGUI_MAX_ICONS];
 static uint32_t icon_count;
 
-#define MKGUI_ICON_HASH_SIZE 16384
+#define MKGUI_ICON_HASH_SIZE 65536
 #define MKGUI_ICON_HASH_MASK (MKGUI_ICON_HASH_SIZE - 1)
 
 static uint32_t icon_hash[MKGUI_ICON_HASH_SIZE];
@@ -776,6 +776,11 @@ struct mkgui_ctx {
 
 	char app_class[64];
 	char icon_dir[4096];
+#ifndef _WIN32
+#define MKGUI_THEME_CHAIN_MAX 8
+	char system_theme_dirs[MKGUI_THEME_CHAIN_MAX][4096];
+	uint32_t system_theme_count;
+#endif
 };
 
 // ---------------------------------------------------------------------------

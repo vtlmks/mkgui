@@ -207,7 +207,7 @@ static void render_menu_popup(struct mkgui_ctx *ctx, struct mkgui_popup *p, uint
 			int32_t ty = iy + (ctx->row_height - ctx->font_height) / 2;
 			push_text_clip(p->x + icon_col, ty + p->y, mi->label, ctx->theme.text, p->x + 1, p->y + 1, p->x + p->w - 1, p->y + p->h - 1);
 
-			int32_t mi_icon = widget_icon_idx(mi);
+			int32_t mi_icon = widget_icon_idx(ctx, mi);
 			if(mi_icon >= 0 && !(mi->style & (MKGUI_MENUITEM_CHECK | MKGUI_MENUITEM_RADIO))) {
 				int32_t iy2 = iy + (ctx->row_height - icons[mi_icon].h) / 2;
 				draw_icon_popup(p, &icons[mi_icon], icon_off, iy2);

@@ -10,6 +10,11 @@ static int32_t icon_find_idx(const char *name) {
 	return icon_hash_lookup(name);
 }
 
+// ctx used by icon_resolve for system theme lazy-load (set once at init)
+#ifndef _WIN32
+static struct mkgui_ctx *icon_lazy_ctx;
+#endif
+
 // ---------------------------------------------------------------------------
 // SVG icon support (forward declarations for resolve functions)
 // ---------------------------------------------------------------------------
@@ -167,17 +172,472 @@ static struct mkgui_svg_source *svg_find_source(char *name) {
 	return NULL;
 }
 
+// [=]===^=[ icon_dir_exists ]========================================[=]
+static uint32_t icon_dir_exists(const char *path) {
+	struct stat st;
+	return stat(path, &st) == 0 && S_ISDIR(st.st_mode);
+}
+
+// ---------------------------------------------------------------------------
+// System icon theme support (Linux only)
+// ---------------------------------------------------------------------------
+
+#ifndef _WIN32
+// [=]===^=[ icon_detect_theme_name ]================================[=]
+// Detect the user's icon theme name from config files.
+// Checks: $MKGUI_ICON_THEME env, gtk-4.0/gtk-3.0 settings, kdeglobals.
+static void icon_detect_theme_name(char *out, uint32_t out_size) {
+	out[0] = '\0';
+
+	// 1. explicit override
+	{
+		const char *env = getenv("MKGUI_ICON_THEME");
+		if(env && env[0]) {
+			snprintf(out, out_size, "%s", env);
+			return;
+		}
+	}
+
+	// 2. parse gtk settings files for gtk-icon-theme-name
+	{
+		const char *config_home = getenv("XDG_CONFIG_HOME");
+		char path[2048];
+		static const char *gtk_files[] = {
+			"%s/gtk-4.0/settings.ini",
+			"%s/gtk-3.0/settings.ini",
+			NULL
+		};
+		char config_dir[1024];
+		if(config_home && config_home[0]) {
+			snprintf(config_dir, sizeof(config_dir), "%s", config_home);
+		} else {
+			const char *home = getenv("HOME");
+			if(home && home[0]) {
+				snprintf(config_dir, sizeof(config_dir), "%s/.config", home);
+			} else {
+				config_dir[0] = '\0';
+			}
+		}
+		if(config_dir[0]) {
+			for(const char **gf = gtk_files; *gf && !out[0]; ++gf) {
+				snprintf(path, sizeof(path), *gf, config_dir);
+				FILE *fp = fopen(path, "r");
+				if(!fp) {
+					continue;
+				}
+				char line[512];
+				while(fgets(line, sizeof(line), fp)) {
+					char *p = line;
+					while(*p == ' ' || *p == '\t') { ++p; }
+					if(strncmp(p, "gtk-icon-theme-name", 19) != 0) {
+						continue;
+					}
+					p += 19;
+					while(*p == ' ' || *p == '\t') { ++p; }
+					if(*p != '=') {
+						continue;
+					}
+					++p;
+					while(*p == ' ' || *p == '\t') { ++p; }
+					uint32_t len = (uint32_t)strlen(p);
+					while(len > 0 && (p[len - 1] == '\n' || p[len - 1] == '\r' || p[len - 1] == ' ')) {
+						--len;
+					}
+					if(len > 0 && len < out_size) {
+						memcpy(out, p, len);
+						out[len] = '\0';
+					}
+					break;
+				}
+				fclose(fp);
+			}
+		}
+		if(out[0]) {
+			return;
+		}
+	}
+
+	// 3. KDE kdeglobals
+	{
+		const char *config_home = getenv("XDG_CONFIG_HOME");
+		char path[2048];
+		if(config_home && config_home[0]) {
+			snprintf(path, sizeof(path), "%s/kdeglobals", config_home);
+		} else {
+			const char *home = getenv("HOME");
+			if(home && home[0]) {
+				snprintf(path, sizeof(path), "%s/.config/kdeglobals", home);
+			} else {
+				path[0] = '\0';
+			}
+		}
+		if(path[0]) {
+			FILE *fp = fopen(path, "r");
+			if(fp) {
+				uint32_t in_icons = 0;
+				char line[512];
+				while(fgets(line, sizeof(line), fp)) {
+					char *p = line;
+					while(*p == ' ' || *p == '\t') { ++p; }
+					if(p[0] == '[') {
+						in_icons = (strncmp(p, "[Icons]", 7) == 0);
+						continue;
+					}
+					if(!in_icons) {
+						continue;
+					}
+					if(strncmp(p, "Theme", 5) != 0) {
+						continue;
+					}
+					p += 5;
+					while(*p == ' ' || *p == '\t') { ++p; }
+					if(*p != '=') {
+						continue;
+					}
+					++p;
+					while(*p == ' ' || *p == '\t') { ++p; }
+					uint32_t len = (uint32_t)strlen(p);
+					while(len > 0 && (p[len - 1] == '\n' || p[len - 1] == '\r' || p[len - 1] == ' ')) {
+						--len;
+					}
+					if(len > 0 && len < out_size) {
+						memcpy(out, p, len);
+						out[len] = '\0';
+					}
+					break;
+				}
+				fclose(fp);
+			}
+		}
+	}
+
+	// 4. fallback
+	if(!out[0]) {
+		snprintf(out, out_size, "hicolor");
+	}
+}
+
+// [=]===^=[ icon_resolve_theme_dir ]================================[=]
+// Resolve a theme name to a directory path by searching XDG data dirs.
+// Returns 1 if found, 0 if not.
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wformat-truncation"
+static uint32_t icon_resolve_theme_dir(const char *theme_name, char *out, uint32_t out_size) {
+	{
+		const char *data_home = getenv("XDG_DATA_HOME");
+		char home_icons[2048];
+		if(data_home && data_home[0]) {
+			snprintf(home_icons, sizeof(home_icons), "%s/icons/%s", data_home, theme_name);
+		} else {
+			const char *home = getenv("HOME");
+			if(home && home[0]) {
+				snprintf(home_icons, sizeof(home_icons), "%s/.local/share/icons/%s", home, theme_name);
+			} else {
+				home_icons[0] = '\0';
+			}
+		}
+		if(home_icons[0] && icon_dir_exists(home_icons)) {
+			snprintf(out, out_size, "%s", home_icons);
+			return 1;
+		}
+	}
+
+	{
+		const char *xdg_dirs = getenv("XDG_DATA_DIRS");
+		const char *defaults = "/usr/share:/usr/local/share";
+		const char *dirs = (xdg_dirs && xdg_dirs[0]) ? xdg_dirs : defaults;
+		const char *p = dirs;
+		while(*p) {
+			const char *colon = p;
+			while(*colon && *colon != ':') {
+				++colon;
+			}
+			uint32_t seg_len = (uint32_t)(colon - p);
+			if(seg_len > 0) {
+				snprintf(out, out_size, "%.*s/icons/%s", (int)seg_len, p, theme_name);
+				if(icon_dir_exists(out)) {
+					return 1;
+				}
+			}
+			p = *colon ? colon + 1 : colon;
+		}
+	}
+
+	out[0] = '\0';
+	return 0;
+}
+#pragma GCC diagnostic pop
+
+// [=]===^=[ icon_read_inherits ]=====================================[=]
+// Read the Inherits= line from a theme's index.theme file.
+// Writes a comma-separated list of parent theme names to out.
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wformat-truncation"
+static void icon_read_inherits(const char *theme_dir, char *out, uint32_t out_size) {
+	out[0] = '\0';
+	char path[4096];
+	snprintf(path, sizeof(path), "%s/index.theme", theme_dir);
+	FILE *fp = fopen(path, "r");
+	if(!fp) {
+		return;
+	}
+	char line[1024];
+	while(fgets(line, sizeof(line), fp)) {
+		char *p = line;
+		while(*p == ' ' || *p == '\t') { ++p; }
+		if(strncmp(p, "Inherits", 8) != 0) {
+			continue;
+		}
+		p += 8;
+		while(*p == ' ' || *p == '\t') { ++p; }
+		if(*p != '=') {
+			continue;
+		}
+		++p;
+		while(*p == ' ' || *p == '\t') { ++p; }
+		uint32_t len = (uint32_t)strlen(p);
+		while(len > 0 && (p[len - 1] == '\n' || p[len - 1] == '\r' || p[len - 1] == ' ')) {
+			--len;
+		}
+		if(len > 0 && len < out_size) {
+			memcpy(out, p, len);
+			out[len] = '\0';
+		}
+		break;
+	}
+	fclose(fp);
+}
+#pragma GCC diagnostic pop
+
+// [=]===^=[ icon_build_theme_chain ]=================================[=]
+// Build the full theme search chain: primary theme + all inherited themes.
+// Follows the Inherits= chain recursively, avoids duplicates.
+// Also adds the base variant for -Dark/-Light themes (e.g. Papirus for Papirus-Dark).
+static void icon_build_theme_chain(struct mkgui_ctx *ctx, const char *theme_name) {
+	ctx->system_theme_count = 0;
+
+	// queue for BFS through inheritance
+	char queue[MKGUI_THEME_CHAIN_MAX][256];
+	uint32_t qhead = 0;
+	uint32_t qtail = 0;
+	snprintf(queue[qtail++], sizeof(queue[0]), "%s", theme_name);
+
+	// if theme has a -Dark or -Light suffix, also queue the base name
+	{
+		uint32_t nlen = (uint32_t)strlen(theme_name);
+		if(nlen > 5 && strcmp(theme_name + nlen - 5, "-Dark") == 0) {
+			char base[256];
+			snprintf(base, sizeof(base), "%.*s", (int)(nlen - 5), theme_name);
+			snprintf(queue[qtail++], sizeof(queue[0]), "%s", base);
+		} else if(nlen > 6 && strcmp(theme_name + nlen - 6, "-Light") == 0) {
+			char base[256];
+			snprintf(base, sizeof(base), "%.*s", (int)(nlen - 6), theme_name);
+			snprintf(queue[qtail++], sizeof(queue[0]), "%s", base);
+		}
+	}
+
+	while(qhead < qtail && ctx->system_theme_count < MKGUI_THEME_CHAIN_MAX) {
+		char *name = queue[qhead++];
+
+		// skip if already in the chain
+		uint32_t dup = 0;
+		for(uint32_t i = 0; i < ctx->system_theme_count; ++i) {
+			// compare by theme name (last path component)
+			char *slash = strrchr(ctx->system_theme_dirs[i], '/');
+			const char *existing = slash ? slash + 1 : ctx->system_theme_dirs[i];
+			if(strcmp(existing, name) == 0) {
+				dup = 1;
+				break;
+			}
+		}
+		if(dup) {
+			continue;
+		}
+
+		char resolved[4096];
+		if(!icon_resolve_theme_dir(name, resolved, sizeof(resolved))) {
+			continue;
+		}
+
+		uint32_t idx = ctx->system_theme_count++;
+		snprintf(ctx->system_theme_dirs[idx], sizeof(ctx->system_theme_dirs[idx]), "%s", resolved);
+
+		// read Inherits= and queue parent themes
+		char inherits[1024];
+		icon_read_inherits(resolved, inherits, sizeof(inherits));
+		if(inherits[0]) {
+			char *p = inherits;
+			while(*p && qtail < MKGUI_THEME_CHAIN_MAX) {
+				char *comma = p;
+				while(*comma && *comma != ',') {
+					++comma;
+				}
+				uint32_t seg_len = (uint32_t)(comma - p);
+				while(seg_len > 0 && (p[seg_len - 1] == ' ' || p[seg_len - 1] == '\t')) {
+					--seg_len;
+				}
+				while(seg_len > 0 && (*p == ' ' || *p == '\t')) {
+					++p;
+					--seg_len;
+				}
+				if(seg_len > 0 && seg_len < sizeof(queue[0])) {
+					memcpy(queue[qtail], p, seg_len);
+					queue[qtail][seg_len] = '\0';
+					++qtail;
+				}
+				p = *comma ? comma + 1 : comma;
+			}
+		}
+	}
+}
+
+// [=]===^=[ icon_find_in_system_theme ]==============================[=]
+// Search a Freedesktop icon theme hierarchy for a single icon by name.
+// Returns 1 and writes the full SVG path to out, or 0 if not found.
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wformat-truncation"
+static uint32_t icon_find_in_system_theme(const char *theme_dir, const char *name, char *out, uint32_t out_size) {
+	if(!theme_dir || !theme_dir[0] || !name || !name[0]) {
+		return 0;
+	}
+
+	static const char *categories[] = {
+		"actions", "places", "status", "devices", "mimetypes",
+		"emblems", "apps", "panel", "emotes", "categories", NULL
+	};
+	static const int32_t sizes[] = { 16, 22, 24, 32, 48, 64 };
+
+	// scalable first (best for SVG)
+	for(const char **cat = categories; *cat; ++cat) {
+		snprintf(out, out_size, "%s/scalable/%s/%s.svg", theme_dir, *cat, name);
+		if(access(out, R_OK) == 0) {
+			return 1;
+		}
+	}
+
+	// fixed sizes
+	for(uint32_t si = 0; si < 6; ++si) {
+		for(const char **cat = categories; *cat; ++cat) {
+			snprintf(out, out_size, "%s/%dx%d/%s/%s.svg", theme_dir, sizes[si], sizes[si], *cat, name);
+			if(access(out, R_OK) == 0) {
+				return 1;
+			}
+		}
+	}
+
+	// category-first layout (breeze, elementary)
+	for(const char **cat = categories; *cat; ++cat) {
+		snprintf(out, out_size, "%s/%s/scalable/%s.svg", theme_dir, *cat, name);
+		if(access(out, R_OK) == 0) {
+			return 1;
+		}
+		for(uint32_t si = 0; si < 6; ++si) {
+			snprintf(out, out_size, "%s/%s/%d/%s.svg", theme_dir, *cat, sizes[si], name);
+			if(access(out, R_OK) == 0) {
+				return 1;
+			}
+		}
+	}
+
+	out[0] = '\0';
+	return 0;
+}
+#pragma GCC diagnostic pop
+
+// negative cache for icon names not found in the system theme
+#define ICON_NEG_CACHE_SIZE 256
+static char icon_neg_cache[ICON_NEG_CACHE_SIZE][MKGUI_ICON_NAME_LEN];
+static uint32_t icon_neg_cache_count;
+
+// [=]===^=[ icon_neg_cache_has ]=====================================[=]
+static uint32_t icon_neg_cache_has(const char *name) {
+	for(uint32_t i = 0; i < icon_neg_cache_count; ++i) {
+		if(strcmp(icon_neg_cache[i], name) == 0) {
+			return 1;
+		}
+	}
+	return 0;
+}
+
+// [=]===^=[ icon_neg_cache_add ]=====================================[=]
+static void icon_neg_cache_add(const char *name) {
+	if(icon_neg_cache_count >= ICON_NEG_CACHE_SIZE) {
+		return;
+	}
+	snprintf(icon_neg_cache[icon_neg_cache_count], MKGUI_ICON_NAME_LEN, "%s", name);
+	++icon_neg_cache_count;
+}
+
+// [=]===^=[ icon_lazy_load_system ]=================================[=]
+// Attempt to load an icon from the system theme chain. Searches primary
+// theme first, then inherited themes in order.
+static int32_t icon_lazy_load_system(struct mkgui_ctx *ctx, const char *name) {
+	if(!ctx || ctx->system_theme_count == 0) {
+		return -1;
+	}
+
+	if(icon_neg_cache_has(name)) {
+		return -1;
+	}
+
+	char svg_path[4096];
+	uint32_t found = 0;
+	for(uint32_t ti = 0; ti < ctx->system_theme_count; ++ti) {
+		if(icon_find_in_system_theme(ctx->system_theme_dirs[ti], name, svg_path, sizeof(svg_path))) {
+			found = 1;
+			break;
+		}
+	}
+	if(!found) {
+		icon_neg_cache_add(name);
+		return -1;
+	}
+
+	uint32_t svg_len = 0;
+	char *svg_data = svg_read_file(svg_path, &svg_len);
+	if(!svg_data) {
+		return -1;
+	}
+
+	int32_t target_size = ctx->icon_size;
+	uint32_t theme_color = ctx->theme.text & 0x00ffffff;
+	int32_t idx = svg_rasterize_icon_ex(name, svg_data, svg_len, target_size, theme_color, 1);
+
+	if(idx >= 0) {
+		icon_atlas_rebuild();
+		if(svg_source_count < MKGUI_SVG_ICON_MAX) {
+			struct mkgui_svg_source *src = &svg_sources[svg_source_count++];
+			snprintf(src->name, MKGUI_ICON_NAME_LEN, "%s", name);
+			src->svg_data = svg_data;
+			src->svg_len = svg_len;
+		} else {
+			free(svg_data);
+		}
+	} else {
+		free(svg_data);
+	}
+
+	return idx;
+}
+#endif
+
 // [=]===^=[ icon_resolve ]===========================================[=]
 static int32_t icon_resolve(const char *name) {
 	int32_t idx = icon_find_idx(name);
 	if(idx >= 0 && (uint32_t)idx >= icon_count) {
 		return -1;
 	}
+#ifndef _WIN32
+	if(idx < 0 && name[0] != '\0' && icon_lazy_ctx) {
+		idx = icon_lazy_load_system(icon_lazy_ctx, name);
+	}
+#endif
 	return idx;
 }
 
 // [=]===^=[ widget_icon_idx ]========================================[=]
-static int32_t widget_icon_idx(struct mkgui_widget *w) {
+static int32_t widget_icon_idx(struct mkgui_ctx *ctx, struct mkgui_widget *w) {
+	(void)ctx;
 	if(w->icon[0] == '\0') {
 		return -1;
 	}
@@ -351,6 +811,21 @@ MKGUI_API int32_t mkgui_icon_load_svg(struct mkgui_ctx *ctx, const char *name, c
 // [=]===^=[ mkgui_icon_load_svg_dir ]================================[=]
 MKGUI_API uint32_t mkgui_icon_load_svg_dir(struct mkgui_ctx *ctx, const char *dir_path) {
 	MKGUI_CHECK_VAL(ctx, 0);
+#ifndef _WIN32
+	if(ctx->system_theme_count == 0) {
+		char theme_name[256];
+		icon_detect_theme_name(theme_name, sizeof(theme_name));
+		icon_build_theme_chain(ctx, theme_name);
+		icon_lazy_ctx = ctx;
+		if(ctx->system_theme_count > 0) {
+			fprintf(stderr, "mkgui: system icon theme chain:");
+			for(uint32_t i = 0; i < ctx->system_theme_count; ++i) {
+				fprintf(stderr, " %s", ctx->system_theme_dirs[i]);
+			}
+			fprintf(stderr, "\n");
+		}
+	}
+#endif
 	if(!dir_path) {
 		return 0;
 	}
@@ -443,12 +918,6 @@ static void svg_cleanup(void) {
 		svg_sources[i].svg_data = NULL;
 	}
 	svg_source_count = 0;
-}
-
-// [=]===^=[ icon_dir_exists ]========================================[=]
-static uint32_t icon_dir_exists(const char *path) {
-	struct stat st;
-	return stat(path, &st) == 0 && S_ISDIR(st.st_mode);
 }
 
 // [=]===^=[ icon_resolve_dir ]=======================================[=]
@@ -583,8 +1052,23 @@ MKGUI_API uint32_t mkgui_icon_load_app_icons(struct mkgui_ctx *ctx, const char *
 		return 0;
 	}
 
+#ifndef _WIN32
+	if(ctx->system_theme_count == 0) {
+		char theme_name[256];
+		icon_detect_theme_name(theme_name, sizeof(theme_name));
+		icon_build_theme_chain(ctx, theme_name);
+		icon_lazy_ctx = ctx;
+	}
+#endif
+
 	char resolved[4096];
 	if(!icon_resolve_dir(app_name, resolved, sizeof(resolved))) {
+#ifndef _WIN32
+		if(ctx->system_theme_count > 0) {
+			fprintf(stderr, "mkgui: no bundled icon directory for '%s', using system theme fallback\n", app_name);
+			return 0;
+		}
+#endif
 		fprintf(stderr, "mkgui: could not find icon directory for '%s'\n", app_name);
 		return 0;
 	}

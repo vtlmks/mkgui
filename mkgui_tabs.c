@@ -7,7 +7,7 @@ static int32_t tab_calc_width(struct mkgui_ctx *ctx, struct mkgui_widget *child)
 	int32_t icon_gap = sc(ctx, 4);
 	int32_t close_w = sc(ctx, 16);
 	int32_t tw = label_text_width(ctx, child) + tab_pad * 2;
-	int32_t ii = widget_icon_idx(child);
+	int32_t ii = widget_icon_idx(ctx, child);
 	if(ii >= 0) {
 		tw += icons[ii].w + icon_gap;
 	}
@@ -107,7 +107,7 @@ static void render_tabs(struct mkgui_ctx *ctx, uint32_t idx) {
 			draw_hline(ctx->pixels, ctx->win_w, ctx->win_h, tx, ry, tw, ctx->theme.highlight);
 		}
 		int32_t cx = tx + tab_pad;
-		int32_t ii = widget_icon_idx(child);
+		int32_t ii = widget_icon_idx(ctx, child);
 		if(ii >= 0) {
 			int32_t iy = ry + (ctx->tab_height - icons[ii].h) / 2;
 			draw_icon(ctx->pixels, ctx->win_w, ctx->win_h, &icons[ii], cx, iy, tx + 1, ry + 1, tx + tw - 1, ry + ctx->tab_height - 1);

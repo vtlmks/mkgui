@@ -94,9 +94,72 @@ static void ibt_try_add_theme(const char *dir_path, const char *name) {
 	++ibt.theme_count;
 }
 
+// [=]===^=[ ibt_scan_icon_dir ]=====================================[=]
+// Scan a directory containing icon themes (e.g. /usr/share/icons/).
+// Each subdirectory with an index.theme is added as a browseable theme.
+static void ibt_scan_icon_dir(const char *base_dir) {
+	DIR *d = opendir(base_dir);
+	if(!d) {
+		return;
+	}
+	struct dirent *ent;
+	while((ent = readdir(d)) != NULL && ibt.theme_count < IB_MAX_THEMES) {
+		if(ent->d_name[0] == '.') {
+			continue;
+		}
+		char sub_path[2048];
+		snprintf(sub_path, sizeof(sub_path), "%s/%s", base_dir, ent->d_name);
+		struct stat st;
+		if(stat(sub_path, &st) != 0 || !S_ISDIR(st.st_mode)) {
+			continue;
+		}
+		ibt_try_add_theme(sub_path, ent->d_name);
+	}
+	closedir(d);
+}
+
 // [=]===^=[ ibt_scan_local_themes ]=================================[=]
 static void ibt_scan_local_themes(void) {
 	ibt.theme_count = 0;
+
+#ifndef _WIN32
+	// scan system icon theme directories on Linux
+	{
+		const char *data_home = getenv("XDG_DATA_HOME");
+		char path[2048];
+		if(data_home && data_home[0]) {
+			snprintf(path, sizeof(path), "%s/icons", data_home);
+			ibt_scan_icon_dir(path);
+		} else {
+			const char *home = getenv("HOME");
+			if(home && home[0]) {
+				snprintf(path, sizeof(path), "%s/.local/share/icons", home);
+				ibt_scan_icon_dir(path);
+			}
+		}
+	}
+	{
+		const char *xdg_dirs = getenv("XDG_DATA_DIRS");
+		const char *defaults = "/usr/share:/usr/local/share";
+		const char *dirs = (xdg_dirs && xdg_dirs[0]) ? xdg_dirs : defaults;
+		const char *p = dirs;
+		while(*p && ibt.theme_count < IB_MAX_THEMES) {
+			const char *colon = p;
+			while(*colon && *colon != ':') {
+				++colon;
+			}
+			uint32_t seg_len = (uint32_t)(colon - p);
+			if(seg_len > 0) {
+				char path[2048];
+				snprintf(path, sizeof(path), "%.*s/icons", (int)seg_len, p);
+				ibt_scan_icon_dir(path);
+			}
+			p = *colon ? colon + 1 : colon;
+		}
+	}
+#endif
+
+	// also scan cwd and one level deeper (local/unpacked themes, Windows)
 	DIR *d = opendir(".");
 	if(!d) {
 		return;
@@ -519,8 +582,10 @@ static void ibt_confirm_selection(uint32_t filtered_item) {
 	ibt.confirmed = 1;
 }
 
-// [=]===^=[ ibt_cleanup ]============================================[=]
-static void ibt_cleanup(struct mkgui_ctx *ctx) {
+// [=]===^=[ ibt_reset_icons ]========================================[=]
+// Reset icon array back to pre-browser state, freeing any icons loaded
+// during browsing. Called on theme switch and browser close.
+static void ibt_reset_icons(void) {
 	for(uint32_t i = ibt.saved_svg_source_count; i < svg_source_count; ++i) {
 		free(svg_sources[i].svg_data);
 		svg_sources[i].svg_data = NULL;
@@ -532,6 +597,11 @@ static void ibt_cleanup(struct mkgui_ctx *ctx) {
 		icon_hash_insert(i);
 	}
 	icon_atlas_rebuild();
+}
+
+// [=]===^=[ ibt_cleanup ]============================================[=]
+static void ibt_cleanup(struct mkgui_ctx *ctx) {
+	ibt_reset_icons();
 	dirty_all(ctx);
 }
 
@@ -627,6 +697,7 @@ MKGUI_API uint32_t mkgui_icon_browser(struct mkgui_ctx *ctx, int32_t size, char 
 
 				case MKGUI_EVENT_DROPDOWN_CHANGED: {
 					if(ev.id == IB_TH_THEME_DROP && ev.value >= 0 && ev.value < (int32_t)ibt.theme_count) {
+						ibt_reset_icons();
 						ibt_load_theme((uint32_t)ev.value);
 						ibt_rebuild_tabs(dlg);
 						ibt.active_cat = 0;
@@ -680,13 +751,22 @@ MKGUI_API uint32_t mkgui_icon_browser(struct mkgui_ctx *ctx, int32_t size, char 
 	}
 
 	mkgui_destroy_child(dlg);
+
+	char confirmed_name[IB_ICON_NAME] = {0};
+	char confirmed_path[1024] = {0};
+	if(ibt.confirmed && ibt.result_name[0] != '\0') {
+		strncpy(confirmed_name, ibt.result_name, IB_ICON_NAME - 1);
+		strncpy(confirmed_path, ibt.result_path, sizeof(confirmed_path) - 1);
+	}
+
 	ibt_cleanup(ctx);
 
-	if(ibt.confirmed && ibt.result_name[0] != '\0') {
-		strncpy(out_name, ibt.result_name, name_size - 1);
+	if(confirmed_name[0] != '\0') {
+		mkgui_icon_load_svg(ctx, confirmed_name, confirmed_path);
+		strncpy(out_name, confirmed_name, name_size - 1);
 		out_name[name_size - 1] = '\0';
 		if(out_path && path_size > 0) {
-			strncpy(out_path, ibt.result_path, path_size - 1);
+			strncpy(out_path, confirmed_path, path_size - 1);
 			out_path[path_size - 1] = '\0';
 		}
 		return 1;

@@ -467,6 +467,11 @@ struct ed_state {
 };
 
 static struct ed_state ed;
+static union {
+	struct mkgui_widget test_widgets[ED_MAX_WIDGETS];
+	struct ed_widget reorder[ED_MAX_WIDGETS];
+	struct { char name[MKGUI_ICON_NAME_LEN]; char source[1024]; } seen_icons[256];
+} ed_scratch;
 
 // ---------------------------------------------------------------------------
 // Editor config (recent files, settings)
@@ -3148,6 +3153,9 @@ static void ed_save_project(struct mkgui_ctx *ctx, uint32_t save_as) {
 		fprintf(f, "id_name %s\n", w->id_name);
 		fprintf(f, "label %s\n", w->label);
 		fprintf(f, "icon %s\n", w->icon);
+		if(w->icon_source[0]) {
+			fprintf(f, "icon_source %s\n", w->icon_source);
+		}
 		fprintf(f, "parent %u\n", w->parent_id);
 		fprintf(f, "size %d %d\n", w->w, w->h);
 		fprintf(f, "flags 0x%08x\n", w->flags);
@@ -3295,6 +3303,9 @@ static void ed_load_file(struct mkgui_ctx *ctx, char *path) {
 			} else if(strncmp(line, "icon", 4) == 0 && line[4] == '\0') {
 				w->icon[0] = '\0';
 
+			} else if(strncmp(line, "icon_source ", 12) == 0) {
+				snprintf(w->icon_source, sizeof(w->icon_source), "%s", line + 12);
+
 			} else if(strncmp(line, "parent ", 7) == 0) {
 				sscanf(line + 7, "%u", &w->parent_id);
 
@@ -3348,6 +3359,13 @@ static void ed_load_file(struct mkgui_ctx *ctx, char *path) {
 	}
 
 	fclose(f);
+
+	for(uint32_t i = 0; i < ed.widget_count; ++i) {
+		struct ed_widget *w = &ed.widgets[i];
+		if(w->icon[0] && w->icon_source[0]) {
+			mkgui_icon_load_svg(ctx, w->icon, w->icon_source);
+		}
+	}
 
 	ed.undo_pos = 0;
 	ed.undo_count = 0;
@@ -3957,10 +3975,6 @@ static void ed_generate_code(struct mkgui_ctx *ctx) {
 		snprintf(icon_list_path, sizeof(icon_list_path), "%.*s_icons.txt", (int32_t)base_len, out_path);
 	}
 
-	struct {
-		char name[MKGUI_ICON_NAME_LEN];
-		char source[1024];
-	} seen_icons[256];
 	uint32_t seen_count = 0;
 
 	for(uint32_t i = 0; i < ed.widget_count; ++i) {
@@ -3970,8 +3984,8 @@ static void ed_generate_code(struct mkgui_ctx *ctx) {
 		}
 		uint32_t dup = 0;
 		for(uint32_t j = 0; j < seen_count; ++j) {
-			if(strcmp(seen_icons[j].name, w->icon) == 0) {
-				if(w->icon_source[0] && seen_icons[j].source[0] && strcmp(seen_icons[j].source, w->icon_source) != 0) {
+			if(strcmp(ed_scratch.seen_icons[j].name, w->icon) == 0) {
+				if(w->icon_source[0] && ed_scratch.seen_icons[j].source[0] && strcmp(ed_scratch.seen_icons[j].source, w->icon_source) != 0) {
 					fprintf(stderr, "mkgui editor: warning: icon '%s' used from multiple sources, keeping first\n", w->icon);
 				}
 				dup = 1;
@@ -3979,8 +3993,8 @@ static void ed_generate_code(struct mkgui_ctx *ctx) {
 			}
 		}
 		if(!dup && seen_count < 256) {
-			snprintf(seen_icons[seen_count].name, MKGUI_ICON_NAME_LEN, "%s", w->icon);
-			snprintf(seen_icons[seen_count].source, sizeof(seen_icons[seen_count].source), "%s", w->icon_source);
+			snprintf(ed_scratch.seen_icons[seen_count].name, MKGUI_ICON_NAME_LEN, "%s", w->icon);
+			snprintf(ed_scratch.seen_icons[seen_count].source, sizeof(ed_scratch.seen_icons[seen_count].source), "%s", w->icon_source);
 			++seen_count;
 		}
 	}
@@ -3992,10 +4006,10 @@ static void ed_generate_code(struct mkgui_ctx *ctx) {
 			fprintf(fi, "# Format: source_path<tab>icon_name\n");
 			fprintf(fi, "# Icons without a source path need manual resolution\n\n");
 			for(uint32_t i = 0; i < seen_count; ++i) {
-				if(seen_icons[i].source[0]) {
-					fprintf(fi, "%s\t%s\n", seen_icons[i].source, seen_icons[i].name);
+				if(ed_scratch.seen_icons[i].source[0]) {
+					fprintf(fi, "%s\t%s\n", ed_scratch.seen_icons[i].source, ed_scratch.seen_icons[i].name);
 				} else {
-					fprintf(fi, "\t%s\n", seen_icons[i].name);
+					fprintf(fi, "\t%s\n", ed_scratch.seen_icons[i].name);
 				}
 			}
 			fclose(fi);
@@ -4123,7 +4137,7 @@ static void ed_test_gui(struct mkgui_ctx *editor_ctx) {
 		return;
 	}
 
-	struct mkgui_widget test_widgets[ED_MAX_WIDGETS];
+	struct mkgui_widget *test_widgets = ed_scratch.test_widgets;
 	for(uint32_t i = 0; i < ed.widget_count; ++i) {
 		struct ed_widget *ew = &ed.widgets[i];
 		struct mkgui_widget *tw = &test_widgets[i];
@@ -4918,7 +4932,7 @@ int main(void) {
 						}
 						ed_push_undo();
 						uint32_t src_id = ed.widgets[src_idx].id;
-						struct ed_widget block[ED_MAX_WIDGETS];
+						struct ed_widget *block = ed_scratch.reorder;
 						uint32_t block_count = 0;
 						block[block_count++] = ed.widgets[src_idx];
 						for(uint32_t k = (uint32_t)src_idx + 1; k < ed.widget_count; ++k) {

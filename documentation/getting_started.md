@@ -6,10 +6,10 @@
 
 ```sh
 # Arch
-pacman -S gcc freetype2 libx11 libxext
+pacman -S gcc freetype2 fontconfig libx11 libxext
 
 # Debian/Ubuntu
-apt install gcc libfreetype-dev libx11-dev libxext-dev
+apt install gcc libfreetype-dev libfontconfig-dev libx11-dev libxext-dev
 ```
 
 **Windows (cross-compile from Linux):** MinGW-w64. FreeType and font rendering are handled through GDI on Windows, so no extra libraries are needed.
@@ -76,7 +76,7 @@ int main(void) {
 **Compile:**
 ```sh
 gcc -std=c99 -O2 myapp.c -I/path/to/mkgui -L/path/to/mkgui -lmkgui \
-    $(pkg-config --cflags --libs freetype2) -lX11 -lXext -lm -o myapp
+    $(pkg-config --cflags --libs freetype2 fontconfig) -lX11 -lXext -lm -o myapp
 ```
 
 ## Option B: Unity build
@@ -92,7 +92,7 @@ Include `mkgui.c` directly in your source file. No separate compilation or linki
 
 **Compile:**
 ```sh
-gcc -std=c99 -O2 myapp.c $(pkg-config --cflags --libs freetype2) -lX11 -lXext -lm -o myapp
+gcc -std=c99 -O2 myapp.c $(pkg-config --cflags --libs freetype2 fontconfig) -lX11 -lXext -lm -o myapp
 ```
 
 ## Icons
@@ -232,7 +232,7 @@ mkgui runs on Linux (X11) and Windows (Win32). Write once, compile for both:
 
 ```sh
 # Linux
-gcc -std=c99 -O2 myapp.c -lmkgui $(pkg-config --cflags --libs freetype2) -lX11 -lXext -lm
+gcc -std=c99 -O2 myapp.c -lmkgui $(pkg-config --cflags --libs freetype2 fontconfig) -lX11 -lXext -lm
 
 # Windows (cross-compile, no FreeType needed -- uses GDI for fonts)
 x86_64-w64-mingw32-gcc -std=c99 -O2 myapp.c -lmkgui -lgdi32 -mwindows

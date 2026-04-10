@@ -1,6 +1,6 @@
 # mkgui
 
-Minimal GUI toolkit for Linux (X11) and Windows (Win32) with software rendering. Single-file unity build, no third-party dependencies beyond FreeType2 and Xlib (Linux) or GDI (Windows).
+Minimal GUI toolkit for Linux (X11) and Windows (Win32) with software rendering. Single-file unity build, no third-party dependencies beyond FreeType2, Fontconfig, and Xlib (Linux) or GDI (Windows).
 
 ## Building
 
@@ -8,7 +8,7 @@ mkgui uses a unity build. You compile a single `.c` file that `#include`s `mkgui
 
 ```bash
 gcc -std=c99 -O2 -Wall -Wextra myapp.c -o myapp \
-    $(pkg-config --cflags freetype2) -lX11 -lXext $(pkg-config --libs freetype2)
+    $(pkg-config --cflags freetype2 fontconfig) -lX11 -lXext $(pkg-config --libs freetype2 fontconfig)
 ```
 
 Or use the included `build.sh`:
@@ -1497,9 +1497,19 @@ SVG sources are cached in memory. Icons are automatically re-rasterized on scale
 
 The `extract_icons` build tool (built to `out/extract_icons`) reads the editor-generated icon list (`myapp_icons.txt`) and an optional user-managed file (`myapp_icons_extra.txt`) for dynamically loaded icons. The output directory is cleaned and rebuilt from scratch each run. Icons with source paths are copied directly; icons without are resolved from a theme directory. The extra file is never touched by the editor.
 
+### System icon theme fallback (Linux)
+
+On Linux, if an icon name is not found in the bundled `icons/` directory, mkgui automatically searches the user's installed system icon theme. This means applications can run without a bundled icon directory on Linux and still display correct icons.
+
+The system theme is detected once at init from (in order): `$MKGUI_ICON_THEME` environment variable, `gtk-icon-theme-name` in GTK 3/4 settings, KDE `kdeglobals` `[Icons] Theme=`, or `hicolor` as final fallback. The full Freedesktop `Inherits=` chain is followed (e.g. Papirus-Dark -> Papirus -> breeze-dark -> hicolor). For `-Dark`/`-Light` theme variants, the base theme is automatically inserted into the chain.
+
+Icons are loaded lazily on first use and cached. A negative cache prevents repeated filesystem lookups for names that don't exist in any theme. Bundled icons always take priority over the system theme.
+
+On Windows, there is no system theme support. The bundled `icons/` directory is required.
+
 ### Missing icons
 
-If a widget references an icon name that isn't loaded, a built-in placeholder (magenta diamond) is shown instead. This makes unresolved icons immediately visible during development.
+If a widget references an icon name that isn't loaded and it cannot be resolved from the system theme, a built-in placeholder (magenta diamond) is shown instead. This makes unresolved icons immediately visible during development.
 
 ### Custom icons
 
@@ -1515,11 +1525,9 @@ Register custom ARGB icons at any size. Custom icons override SVG icons with the
 uint32_t mkgui_icon_browser(struct mkgui_ctx *ctx, int32_t size, char *out_name, uint32_t name_size, char *out_path, uint32_t path_size);
 ```
 
-Opens a modal browser showing icons from locally available Freedesktop icon themes. The browser scans the current directory for subdirectories containing `index.theme` and presents a theme dropdown for switching between them. Returns both the icon name and the full source path of the selected SVG.
+Opens a modal browser showing icons from available Freedesktop icon themes. On Linux, the browser scans system icon directories (`/usr/share/icons/`, `$XDG_DATA_HOME/icons/`, etc.) in addition to local directories. On Windows, only local theme directories are scanned. A theme dropdown allows switching between themes; the icon array is reset on each switch to avoid stale icons.
 
-Multiple themes can coexist, allowing users to mix icons from different icon sets. Place theme directories (e.g. `Papirus/`, `Breeze/`) next to the editor or application binary.
-
-The legacy `mkgui_icon_browser_theme` function is still available for passing an explicit theme directory.
+Returns both the icon name and the full source path of the selected SVG. Multiple themes can coexist, allowing users to mix icons from different icon sets.
 
 ### Font
 

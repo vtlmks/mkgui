@@ -36,7 +36,7 @@
 #define MKGUI_MARGIN               3
 #define MKGUI_ICON_SIZE            18
 #define MKGUI_ICON_NAME_LEN        64
-#define MKGUI_MAX_ICONS            8192
+#define MKGUI_MAX_ICONS            32768
 #define MKGUI_MAX_MULTI_SEL        4096
 #define MKGUI_MAX_STATUSBAR_SECTIONS 8
 #define MKGUI_MAX_CTXMENU          64
