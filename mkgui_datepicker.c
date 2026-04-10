@@ -301,7 +301,7 @@ static void render_datepicker_popup(struct mkgui_ctx *ctx, struct mkgui_popup *p
 					draw_rounded_rect(p->pixels, p->w, p->h, center_x - circ_r, center_y - circ_r, circ_r * 2, circ_r * 2, ctx->theme.menu_bg, ctx->theme.accent, circ_r);
 				}
 
-				char dbuf[4];
+				char dbuf[12];
 				snprintf(dbuf, sizeof(dbuf), "%d", day_num);
 				int32_t dw = text_width(ctx, dbuf);
 				int32_t tx = cx + (cw - dw) / 2;

@@ -15,9 +15,10 @@ gcc -std=c99 -O2 -Wall -Wextra myapp.c -o myapp \
 Or use the included `build.sh`:
 
 ```bash
-./build.sh          # normal (debug symbols)
-./build.sh release  # optimized, stripped
+./build.sh          # normal (-O2, debug symbols)
+./build.sh release  # -O2 stripped
 ./build.sh debug    # -g -O0
+./build.sh size     # -Os stripped (~26% smaller than release, also catches more -Wformat-truncation warnings)
 ./build.sh asan     # -O0 -fsanitize=address,undefined (Linux only)
 ./build.sh clean    # remove out/
 ```

@@ -41,7 +41,7 @@ This produces:
 | `out/extract_icons` | Icon extraction tool |
 | `out/demo` | Demo application |
 
-Build variants: `./build.sh release` (stripped), `./build.sh debug` (no optimization), `./build.sh clean`.
+Build variants: `./build.sh release` (stripped), `./build.sh debug` (no optimization), `./build.sh size` (`-Os`, ~26% smaller than release), `./build.sh asan` (AddressSanitizer + UBSan, Linux only), `./build.sh clean`.
 
 ## Option A: Static library (recommended)
 

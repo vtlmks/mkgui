@@ -38,6 +38,11 @@ case "$BUILD_TYPE" in
 	"debug")
 		CFLAGS+="-g -O0 "
 		;;
+	"size")
+		# -Os overrides the earlier -O2. Different inlining heuristics expose
+		# format-truncation and other VRP-driven warnings that -O2 misses.
+		CFLAGS+="-Os -s -Wl,--strip-all "
+		;;
 	"asan")
 		CFLAGS+="-g -O0 -fsanitize=address,undefined -fno-omit-frame-pointer "
 		SKIP_WINDOWS=1

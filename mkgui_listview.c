@@ -121,15 +121,20 @@ static void format_size(int64_t bytes, char *buf, uint32_t buf_size) {
 }
 
 // [=]===^=[ format_date ]========================================[=]
+// Formats a unix timestamp string as "YYYY-MM-DD HH:MM". The caller provides
+// a small fixed buffer (typically 32 bytes) that fits the output. Invalid or
+// out-of-range timestamps render as "-" rather than copying the raw input
+// back verbatim, which would silently truncate if the row callback returned
+// a long string for a CELL_DATE column.
 static void format_date(char *timestamp_str, char *buf, uint32_t buf_size) {
 	time_t ts = (time_t)strtoll(timestamp_str, NULL, 10);
 	if(ts <= 0) {
-		snprintf(buf, buf_size, "%s", timestamp_str);
+		snprintf(buf, buf_size, "-");
 		return;
 	}
 	struct tm *tm = localtime(&ts);
 	if(!tm) {
-		snprintf(buf, buf_size, "%s", timestamp_str);
+		snprintf(buf, buf_size, "-");
 		return;
 	}
 	strftime(buf, buf_size, "%Y-%m-%d %H:%M", tm);
