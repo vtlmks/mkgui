@@ -198,7 +198,57 @@ static void icon_detect_theme_name(char *out, uint32_t out_size) {
 		}
 	}
 
-	// 2. parse gtk settings files for gtk-icon-theme-name
+	// 2. XFCE xsettings.xml (only if XFCE is the current desktop session)
+	{
+		const char *current_desktop = getenv("XDG_CURRENT_DESKTOP");
+		uint32_t is_xfce = current_desktop && strcasestr(current_desktop, "XFCE") != NULL;
+		char path[2048];
+		path[0] = '\0';
+		if(is_xfce) {
+			const char *config_home = getenv("XDG_CONFIG_HOME");
+			if(config_home && config_home[0]) {
+				snprintf(path, sizeof(path), "%s/xfce4/xfconf/xfce-perchannel-xml/xsettings.xml", config_home);
+			} else {
+				const char *home = getenv("HOME");
+				if(home && home[0]) {
+					snprintf(path, sizeof(path), "%s/.config/xfce4/xfconf/xfce-perchannel-xml/xsettings.xml", home);
+				}
+			}
+		}
+		if(path[0]) {
+			FILE *fp = fopen(path, "r");
+			if(fp) {
+				char line[1024];
+				while(fgets(line, sizeof(line), fp)) {
+					char *name_pos = strstr(line, "name=\"IconThemeName\"");
+					if(!name_pos) {
+						continue;
+					}
+					char *value_pos = strstr(name_pos, "value=\"");
+					if(!value_pos) {
+						continue;
+					}
+					value_pos += 7;
+					char *end = strchr(value_pos, '"');
+					if(!end) {
+						continue;
+					}
+					uint32_t len = (uint32_t)(end - value_pos);
+					if(len > 0 && len < out_size) {
+						memcpy(out, value_pos, len);
+						out[len] = '\0';
+					}
+					break;
+				}
+				fclose(fp);
+			}
+		}
+		if(out[0]) {
+			return;
+		}
+	}
+
+	// 3. parse gtk settings files for gtk-icon-theme-name
 	{
 		const char *config_home = getenv("XDG_CONFIG_HOME");
 		char path[2048];
@@ -317,54 +367,57 @@ static void icon_detect_theme_name(char *out, uint32_t out_size) {
 	}
 }
 
-// [=]===^=[ icon_resolve_theme_dir ]================================[=]
-// Resolve a theme name to a directory path by searching XDG data dirs.
-// Returns 1 if found, 0 if not.
+// [=]===^=[ icon_resolve_theme_dirs ]===============================[=]
+// Resolve a theme name to one or more directory paths. Per the XDG Icon
+// Theme Spec, user ($XDG_DATA_HOME/icons) takes precedence over system
+// ($XDG_DATA_DIRS/icons). Writes up to max_out full paths, returns count.
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wformat-truncation"
-static uint32_t icon_resolve_theme_dir(const char *theme_name, char *out, uint32_t out_size) {
-	{
+static uint32_t icon_resolve_theme_dirs(const char *theme_name, char (*out)[4096], uint32_t max_out) {
+	uint32_t count = 0;
+
+	// user-installed themes first (per XDG spec)
+	if(count < max_out) {
 		const char *data_home = getenv("XDG_DATA_HOME");
 		char home_icons[2048];
+		home_icons[0] = '\0';
 		if(data_home && data_home[0]) {
 			snprintf(home_icons, sizeof(home_icons), "%s/icons/%s", data_home, theme_name);
 		} else {
 			const char *home = getenv("HOME");
 			if(home && home[0]) {
 				snprintf(home_icons, sizeof(home_icons), "%s/.local/share/icons/%s", home, theme_name);
-			} else {
-				home_icons[0] = '\0';
 			}
 		}
 		if(home_icons[0] && icon_dir_exists(home_icons)) {
-			snprintf(out, out_size, "%s", home_icons);
-			return 1;
+			snprintf(out[count++], 4096, "%s", home_icons);
 		}
 	}
 
+	// system-wide XDG data dirs
 	{
 		const char *xdg_dirs = getenv("XDG_DATA_DIRS");
 		const char *defaults = "/usr/share:/usr/local/share";
 		const char *dirs = (xdg_dirs && xdg_dirs[0]) ? xdg_dirs : defaults;
 		const char *p = dirs;
-		while(*p) {
+		while(*p && count < max_out) {
 			const char *colon = p;
 			while(*colon && *colon != ':') {
 				++colon;
 			}
 			uint32_t seg_len = (uint32_t)(colon - p);
 			if(seg_len > 0) {
-				snprintf(out, out_size, "%.*s/icons/%s", (int)seg_len, p, theme_name);
-				if(icon_dir_exists(out)) {
-					return 1;
+				char candidate[4096];
+				snprintf(candidate, sizeof(candidate), "%.*s/icons/%s", (int)seg_len, p, theme_name);
+				if(icon_dir_exists(candidate)) {
+					snprintf(out[count++], 4096, "%s", candidate);
 				}
 			}
 			p = *colon ? colon + 1 : colon;
 		}
 	}
 
-	out[0] = '\0';
-	return 0;
+	return count;
 }
 #pragma GCC diagnostic pop
 
@@ -413,6 +466,8 @@ static void icon_read_inherits(const char *theme_dir, char *out, uint32_t out_si
 // Build the full theme search chain: primary theme + all inherited themes.
 // Follows the Inherits= chain recursively, avoids duplicates.
 // Also adds the base variant for -Dark/-Light themes (e.g. Papirus for Papirus-Dark).
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wformat-truncation"
 static void icon_build_theme_chain(struct mkgui_ctx *ctx, const char *theme_name) {
 	ctx->system_theme_count = 0;
 
@@ -436,35 +491,47 @@ static void icon_build_theme_chain(struct mkgui_ctx *ctx, const char *theme_name
 		}
 	}
 
+	// hicolor is the universal fallback per Freedesktop spec
+	if(qtail < MKGUI_THEME_CHAIN_MAX) {
+		snprintf(queue[qtail++], sizeof(queue[0]), "hicolor");
+	}
+
 	while(qhead < qtail && ctx->system_theme_count < MKGUI_THEME_CHAIN_MAX) {
 		char *name = queue[qhead++];
 
-		// skip if already in the chain
-		uint32_t dup = 0;
-		for(uint32_t i = 0; i < ctx->system_theme_count; ++i) {
-			// compare by theme name (last path component)
-			char *slash = strrchr(ctx->system_theme_dirs[i], '/');
-			const char *existing = slash ? slash + 1 : ctx->system_theme_dirs[i];
-			if(strcmp(existing, name) == 0) {
-				dup = 1;
-				break;
+		// resolve all paths for this theme name (user + system)
+		char resolved[4][4096];
+		uint32_t resolved_count = icon_resolve_theme_dirs(name, resolved, 4);
+		if(resolved_count == 0) {
+			continue;
+		}
+
+		// skip paths already in the chain, add new ones
+		uint32_t first_added = UINT32_MAX;
+		for(uint32_t r = 0; r < resolved_count && ctx->system_theme_count < MKGUI_THEME_CHAIN_MAX; ++r) {
+			uint32_t dup = 0;
+			for(uint32_t i = 0; i < ctx->system_theme_count; ++i) {
+				if(strcmp(ctx->system_theme_dirs[i], resolved[r]) == 0) {
+					dup = 1;
+					break;
+				}
 			}
+			if(dup) {
+				continue;
+			}
+			if(first_added == UINT32_MAX) {
+				first_added = ctx->system_theme_count;
+			}
+			snprintf(ctx->system_theme_dirs[ctx->system_theme_count], sizeof(ctx->system_theme_dirs[0]), "%s", resolved[r]);
+			++ctx->system_theme_count;
 		}
-		if(dup) {
+		if(first_added == UINT32_MAX) {
 			continue;
 		}
 
-		char resolved[4096];
-		if(!icon_resolve_theme_dir(name, resolved, sizeof(resolved))) {
-			continue;
-		}
-
-		uint32_t idx = ctx->system_theme_count++;
-		snprintf(ctx->system_theme_dirs[idx], sizeof(ctx->system_theme_dirs[idx]), "%s", resolved);
-
-		// read Inherits= and queue parent themes
+		// read Inherits= from the first located path for parent queueing
 		char inherits[1024];
-		icon_read_inherits(resolved, inherits, sizeof(inherits));
+		icon_read_inherits(ctx->system_theme_dirs[first_added], inherits, sizeof(inherits));
 		if(inherits[0]) {
 			char *p = inherits;
 			while(*p && qtail < MKGUI_THEME_CHAIN_MAX) {
@@ -490,6 +557,7 @@ static void icon_build_theme_chain(struct mkgui_ctx *ctx, const char *theme_name
 		}
 	}
 }
+#pragma GCC diagnostic pop
 
 // [=]===^=[ icon_find_in_system_theme ]==============================[=]
 // Search a Freedesktop icon theme hierarchy for a single icon by name.

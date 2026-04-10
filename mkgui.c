@@ -518,7 +518,7 @@ static uint32_t *icon_atlas;
 static struct mkgui_icon icons[MKGUI_MAX_ICONS];
 static uint32_t icon_count;
 
-#define MKGUI_ICON_HASH_SIZE 65536
+#define MKGUI_ICON_HASH_SIZE (MKGUI_MAX_ICONS * 2)
 #define MKGUI_ICON_HASH_MASK (MKGUI_ICON_HASH_SIZE - 1)
 
 static uint32_t icon_hash[MKGUI_ICON_HASH_SIZE];

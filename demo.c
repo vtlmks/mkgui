@@ -1,6 +1,7 @@
 // Copyright (c) 2026, Peter Fors
 // SPDX-License-Identifier: MIT
 
+#define MKGUI_MAX_ICONS         32768
 #include "mkgui.c"
 
 #ifdef _WIN32
@@ -311,10 +312,15 @@ static void demo_handle_file_action(struct mkgui_ctx *ctx, uint32_t id) {
 
 	} else if(id == ID_OPEN || id == ID_TB_OPEN) {
 		struct mkgui_file_dialog_opts open_opts = {0};
+		open_opts.multi_select = 1;
 		uint32_t count = mkgui_open_dialog(ctx, &open_opts);
 		if(count > 0) {
 			char buf[FD_PATH_SIZE + 320];
-			snprintf(buf, sizeof(buf), "Opened %u file(s): %s", count, mkgui_dialog_path(ctx, 0));
+			if(count == 1) {
+				snprintf(buf, sizeof(buf), "Opened: %s", mkgui_dialog_path(ctx, 0));
+			} else {
+				snprintf(buf, sizeof(buf), "Opened %u files (first: %s)", count, mkgui_dialog_path(ctx, 0));
+			}
 			mkgui_statusbar_set(ctx, ID_STATUSBAR, 0, buf);
 		}
 

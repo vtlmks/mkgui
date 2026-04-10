@@ -12,6 +12,8 @@
 // ---------------------------------------------------------------------------
 
 #define IB_THEME_MAX_ICONS   32768
+#define IBT_HASH_SIZE        65536
+#define IBT_HASH_MASK        (IBT_HASH_SIZE - 1)
 
 enum {
 	IB_TH_WINDOW = 100,
@@ -50,22 +52,24 @@ struct ib_theme_state {
 	uint32_t active_theme;
 
 	int32_t size;
+
+	uint32_t hash_table[IBT_HASH_SIZE];
 };
 
-static struct ib_theme_state ibt;
+static struct ib_theme_state *ibt;
 
 // [=]===^=[ ibt_try_add_theme ]=====================================[=]
 static void ibt_try_add_theme(const char *dir_path, const char *name) {
-	if(ibt.theme_count >= IB_MAX_THEMES) {
+	if(ibt->theme_count >= IB_MAX_THEMES) {
 		return;
 	}
 	char idx_path[2048];
 	snprintf(idx_path, sizeof(idx_path), "%s/index.theme", dir_path);
 	if(access(idx_path, R_OK) == 0) {
-		uint32_t ti = ibt.theme_count;
-		snprintf(ibt.theme_dirs[ti], sizeof(ibt.theme_dirs[ti]), "%s", dir_path);
-		snprintf(ibt.theme_names[ti], sizeof(ibt.theme_names[ti]), "%s", name);
-		++ibt.theme_count;
+		uint32_t ti = ibt->theme_count;
+		snprintf(ibt->theme_dirs[ti], sizeof(ibt->theme_dirs[ti]), "%s", dir_path);
+		snprintf(ibt->theme_names[ti], sizeof(ibt->theme_names[ti]), "%s", name);
+		++ibt->theme_count;
 		return;
 	}
 	// source repos (e.g. breeze) may have icons/ subdir with .theme.in files
@@ -88,10 +92,10 @@ static void ibt_try_add_theme(const char *dir_path, const char *name) {
 	if(!has_theme_in) {
 		return;
 	}
-	uint32_t ti = ibt.theme_count;
-	snprintf(ibt.theme_dirs[ti], sizeof(ibt.theme_dirs[ti]), "%s/icons", dir_path);
-	snprintf(ibt.theme_names[ti], sizeof(ibt.theme_names[ti]), "%s", name);
-	++ibt.theme_count;
+	uint32_t ti = ibt->theme_count;
+	snprintf(ibt->theme_dirs[ti], sizeof(ibt->theme_dirs[ti]), "%s/icons", dir_path);
+	snprintf(ibt->theme_names[ti], sizeof(ibt->theme_names[ti]), "%s", name);
+	++ibt->theme_count;
 }
 
 // [=]===^=[ ibt_scan_icon_dir ]=====================================[=]
@@ -103,7 +107,7 @@ static void ibt_scan_icon_dir(const char *base_dir) {
 		return;
 	}
 	struct dirent *ent;
-	while((ent = readdir(d)) != NULL && ibt.theme_count < IB_MAX_THEMES) {
+	while((ent = readdir(d)) != NULL && ibt->theme_count < IB_MAX_THEMES) {
 		if(ent->d_name[0] == '.') {
 			continue;
 		}
@@ -120,7 +124,7 @@ static void ibt_scan_icon_dir(const char *base_dir) {
 
 // [=]===^=[ ibt_scan_local_themes ]=================================[=]
 static void ibt_scan_local_themes(void) {
-	ibt.theme_count = 0;
+	ibt->theme_count = 0;
 
 #ifndef _WIN32
 	// scan system icon theme directories on Linux
@@ -143,7 +147,7 @@ static void ibt_scan_local_themes(void) {
 		const char *defaults = "/usr/share:/usr/local/share";
 		const char *dirs = (xdg_dirs && xdg_dirs[0]) ? xdg_dirs : defaults;
 		const char *p = dirs;
-		while(*p && ibt.theme_count < IB_MAX_THEMES) {
+		while(*p && ibt->theme_count < IB_MAX_THEMES) {
 			const char *colon = p;
 			while(*colon && *colon != ':') {
 				++colon;
@@ -165,7 +169,7 @@ static void ibt_scan_local_themes(void) {
 		return;
 	}
 	struct dirent *ent;
-	while((ent = readdir(d)) != NULL && ibt.theme_count < IB_MAX_THEMES) {
+	while((ent = readdir(d)) != NULL && ibt->theme_count < IB_MAX_THEMES) {
 		if(ent->d_name[0] == '.') {
 			continue;
 		}
@@ -178,7 +182,7 @@ static void ibt_scan_local_themes(void) {
 		DIR *sub = opendir(ent->d_name);
 		if(sub) {
 			struct dirent *sent;
-			while((sent = readdir(sub)) != NULL && ibt.theme_count < IB_MAX_THEMES) {
+			while((sent = readdir(sub)) != NULL && ibt->theme_count < IB_MAX_THEMES) {
 				if(sent->d_name[0] == '.') {
 					continue;
 				}
@@ -199,11 +203,6 @@ static void ibt_scan_local_themes(void) {
 // Hash table for fast icon name dedup during scanning
 // ---------------------------------------------------------------------------
 
-#define IBT_HASH_SIZE  65536
-#define IBT_HASH_MASK  (IBT_HASH_SIZE - 1)
-
-static uint32_t ibt_hash_table[IBT_HASH_SIZE];
-
 // [=]===^=[ ibt_hash_fn ]===========================================[=]
 static uint32_t ibt_hash_fn(const char *name) {
 	uint32_t h = 2166136261u;
@@ -217,28 +216,28 @@ static uint32_t ibt_hash_fn(const char *name) {
 // [=]===^=[ ibt_hash_clear ]========================================[=]
 static void ibt_hash_clear(void) {
 	for(uint32_t i = 0; i < IBT_HASH_SIZE; ++i) {
-		ibt_hash_table[i] = UINT32_MAX;
+		ibt->hash_table[i] = UINT32_MAX;
 	}
 }
 
 // [=]===^=[ ibt_hash_insert ]=======================================[=]
 static void ibt_hash_insert(uint32_t idx) {
-	uint32_t h = ibt_hash_fn(ibt.names[idx]);
-	while(ibt_hash_table[h] != UINT32_MAX) {
+	uint32_t h = ibt_hash_fn(ibt->names[idx]);
+	while(ibt->hash_table[h] != UINT32_MAX) {
 		h = (h + 1) & IBT_HASH_MASK;
 	}
-	ibt_hash_table[h] = idx;
+	ibt->hash_table[h] = idx;
 }
 
 // [=]===^=[ ibt_find_name ]==========================================[=]
 static int32_t ibt_find_name(const char *name) {
 	uint32_t h = ibt_hash_fn(name);
 	for(;;) {
-		uint32_t idx = ibt_hash_table[h];
+		uint32_t idx = ibt->hash_table[h];
 		if(idx == UINT32_MAX) {
 			return -1;
 		}
-		if(strcmp(ibt.names[idx], name) == 0) {
+		if(strcmp(ibt->names[idx], name) == 0) {
 			return (int32_t)idx;
 		}
 		h = (h + 1) & IBT_HASH_MASK;
@@ -269,21 +268,21 @@ static void ibt_scan_one_dir(const char *dir_path, uint32_t cat_idx) {
 		name[name_len] = '\0';
 		int32_t existing = ibt_find_name(name);
 		if(existing >= 0) {
-			ibt.cat_mask[existing] |= (1u << cat_idx);
+			ibt->cat_mask[existing] |= (1u << cat_idx);
 			continue;
 		}
-		if(ibt.total_count >= IB_THEME_MAX_ICONS) {
+		if(ibt->total_count >= IB_THEME_MAX_ICONS) {
 			continue;
 		}
 		char full_path[2048];
 		snprintf(full_path, sizeof(full_path), "%s/%s", dir_path, fname);
-		uint32_t idx = ibt.total_count;
-		memcpy(ibt.names[idx], name, name_len + 1);
-		strncpy(ibt.paths[idx], full_path, sizeof(ibt.paths[idx]) - 1);
-		ibt.paths[idx][sizeof(ibt.paths[idx]) - 1] = '\0';
-		ibt.cat_mask[idx] = (1u << cat_idx);
+		uint32_t idx = ibt->total_count;
+		memcpy(ibt->names[idx], name, name_len + 1);
+		strncpy(ibt->paths[idx], full_path, sizeof(ibt->paths[idx]) - 1);
+		ibt->paths[idx][sizeof(ibt->paths[idx]) - 1] = '\0';
+		ibt->cat_mask[idx] = (1u << cat_idx);
 		ibt_hash_insert(idx);
-		++ibt.total_count;
+		++ibt->total_count;
 	}
 	closedir(d);
 }
@@ -329,7 +328,7 @@ static void ibt_scan_category(const char *theme_dir, int32_t size, const char *c
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wformat-truncation"
 static void ibt_discover_categories(const char *theme_dir) {
-	ibt.cat_count = 0;
+	ibt->cat_count = 0;
 	static const char *size_dirs[] = { "scalable", "16x16", "22x22", "24x24", "32x32", "48x48", "64x64", NULL };
 	static const int cat_first_sizes[] = { 16, 22, 24, 32, 48, 64 };
 
@@ -342,7 +341,7 @@ static void ibt_discover_categories(const char *theme_dir) {
 			continue;
 		}
 		struct dirent *ent;
-		while((ent = readdir(d)) != NULL && ibt.cat_count < IB_MAX_CATS) {
+		while((ent = readdir(d)) != NULL && ibt->cat_count < IB_MAX_CATS) {
 			if(ent->d_name[0] == '.') {
 				continue;
 			}
@@ -353,16 +352,16 @@ static void ibt_discover_categories(const char *theme_dir) {
 				continue;
 			}
 			uint32_t exists = 0;
-			for(uint32_t i = 0; i < ibt.cat_count; ++i) {
-				if(strcmp(ibt.cat_names[i], ent->d_name) == 0) {
+			for(uint32_t i = 0; i < ibt->cat_count; ++i) {
+				if(strcmp(ibt->cat_names[i], ent->d_name) == 0) {
 					exists = 1;
 					break;
 				}
 			}
 			if(!exists) {
-				strncpy(ibt.cat_names[ibt.cat_count], ent->d_name, sizeof(ibt.cat_names[0]) - 1);
-				ibt.cat_names[ibt.cat_count][sizeof(ibt.cat_names[0]) - 1] = '\0';
-				++ibt.cat_count;
+				strncpy(ibt->cat_names[ibt->cat_count], ent->d_name, sizeof(ibt->cat_names[0]) - 1);
+				ibt->cat_names[ibt->cat_count][sizeof(ibt->cat_names[0]) - 1] = '\0';
+				++ibt->cat_count;
 			}
 		}
 		closedir(d);
@@ -372,7 +371,7 @@ static void ibt_discover_categories(const char *theme_dir) {
 	DIR *root = opendir(theme_dir);
 	if(root) {
 		struct dirent *ent;
-		while((ent = readdir(root)) != NULL && ibt.cat_count < IB_MAX_CATS) {
+		while((ent = readdir(root)) != NULL && ibt->cat_count < IB_MAX_CATS) {
 			if(ent->d_name[0] == '.') {
 				continue;
 			}
@@ -389,16 +388,16 @@ static void ibt_discover_categories(const char *theme_dir) {
 				struct stat pst;
 				if(stat(probe, &pst) == 0 && S_ISDIR(pst.st_mode)) {
 					uint32_t exists = 0;
-					for(uint32_t i = 0; i < ibt.cat_count; ++i) {
-						if(strcmp(ibt.cat_names[i], ent->d_name) == 0) {
+					for(uint32_t i = 0; i < ibt->cat_count; ++i) {
+						if(strcmp(ibt->cat_names[i], ent->d_name) == 0) {
 							exists = 1;
 							break;
 						}
 					}
-					if(!exists && ibt.cat_count < IB_MAX_CATS) {
-						strncpy(ibt.cat_names[ibt.cat_count], ent->d_name, sizeof(ibt.cat_names[0]) - 1);
-						ibt.cat_names[ibt.cat_count][sizeof(ibt.cat_names[0]) - 1] = '\0';
-						++ibt.cat_count;
+					if(!exists && ibt->cat_count < IB_MAX_CATS) {
+						strncpy(ibt->cat_names[ibt->cat_count], ent->d_name, sizeof(ibt->cat_names[0]) - 1);
+						ibt->cat_names[ibt->cat_count][sizeof(ibt->cat_names[0]) - 1] = '\0';
+						++ibt->cat_count;
 					}
 					break;
 				}
@@ -408,12 +407,12 @@ static void ibt_discover_categories(const char *theme_dir) {
 	}
 
 	// sort categories alphabetically
-	for(uint32_t i = 1; i < ibt.cat_count; ++i) {
-		for(uint32_t j = i; j > 0 && strcmp(ibt.cat_names[j - 1], ibt.cat_names[j]) > 0; --j) {
+	for(uint32_t i = 1; i < ibt->cat_count; ++i) {
+		for(uint32_t j = i; j > 0 && strcmp(ibt->cat_names[j - 1], ibt->cat_names[j]) > 0; --j) {
 			char tmp[64];
-			memcpy(tmp, ibt.cat_names[j], 64);
-			memcpy(ibt.cat_names[j], ibt.cat_names[j - 1], 64);
-			memcpy(ibt.cat_names[j - 1], tmp, 64);
+			memcpy(tmp, ibt->cat_names[j], 64);
+			memcpy(ibt->cat_names[j], ibt->cat_names[j - 1], 64);
+			memcpy(ibt->cat_names[j - 1], tmp, 64);
 		}
 	}
 }
@@ -424,26 +423,26 @@ static void ibt_discover_categories(const char *theme_dir) {
 static int ibt_sort_compare(const void *a, const void *b) {
 	uint32_t ia = *(uint32_t *)a;
 	uint32_t ib = *(uint32_t *)b;
-	return strcmp(ibt.names[ia], ibt.names[ib]);
+	return strcmp(ibt->names[ia], ibt->names[ib]);
 }
 
 // [=]===^=[ ibt_sort ]===============================================[=]
 static void ibt_sort(void) {
-	if(ibt.total_count == 0) {
+	if(ibt->total_count == 0) {
 		return;
 	}
-	uint32_t *order = (uint32_t *)malloc(ibt.total_count * sizeof(uint32_t));
+	uint32_t *order = (uint32_t *)malloc(ibt->total_count * sizeof(uint32_t));
 	if(!order) {
 		return;
 	}
-	for(uint32_t i = 0; i < ibt.total_count; ++i) {
+	for(uint32_t i = 0; i < ibt->total_count; ++i) {
 		order[i] = i;
 	}
-	qsort(order, ibt.total_count, sizeof(uint32_t), ibt_sort_compare);
+	qsort(order, ibt->total_count, sizeof(uint32_t), ibt_sort_compare);
 
-	char (*tmp_names)[IB_ICON_NAME] = (char (*)[IB_ICON_NAME])malloc(ibt.total_count * IB_ICON_NAME);
-	char (*tmp_paths)[1024] = (char (*)[1024])malloc(ibt.total_count * 1024);
-	uint32_t *tmp_masks = (uint32_t *)malloc(ibt.total_count * sizeof(uint32_t));
+	char (*tmp_names)[IB_ICON_NAME] = (char (*)[IB_ICON_NAME])malloc(ibt->total_count * IB_ICON_NAME);
+	char (*tmp_paths)[1024] = (char (*)[1024])malloc(ibt->total_count * 1024);
+	uint32_t *tmp_masks = (uint32_t *)malloc(ibt->total_count * sizeof(uint32_t));
 	if(!tmp_names || !tmp_paths || !tmp_masks) {
 		free(order);
 		free(tmp_names);
@@ -452,14 +451,14 @@ static void ibt_sort(void) {
 		return;
 	}
 
-	for(uint32_t i = 0; i < ibt.total_count; ++i) {
-		memcpy(tmp_names[i], ibt.names[order[i]], IB_ICON_NAME);
-		memcpy(tmp_paths[i], ibt.paths[order[i]], 1024);
-		tmp_masks[i] = ibt.cat_mask[order[i]];
+	for(uint32_t i = 0; i < ibt->total_count; ++i) {
+		memcpy(tmp_names[i], ibt->names[order[i]], IB_ICON_NAME);
+		memcpy(tmp_paths[i], ibt->paths[order[i]], 1024);
+		tmp_masks[i] = ibt->cat_mask[order[i]];
 	}
-	memcpy(ibt.names, tmp_names, ibt.total_count * IB_ICON_NAME);
-	memcpy(ibt.paths, tmp_paths, ibt.total_count * 1024);
-	memcpy(ibt.cat_mask, tmp_masks, ibt.total_count * sizeof(uint32_t));
+	memcpy(ibt->names, tmp_names, ibt->total_count * IB_ICON_NAME);
+	memcpy(ibt->paths, tmp_paths, ibt->total_count * 1024);
+	memcpy(ibt->cat_mask, tmp_masks, ibt->total_count * sizeof(uint32_t));
 
 	free(order);
 	free(tmp_names);
@@ -469,21 +468,21 @@ static void ibt_sort(void) {
 
 // [=]===^=[ ibt_load_theme ]=========================================[=]
 static void ibt_load_theme(uint32_t theme_idx) {
-	ibt.total_count = 0;
-	ibt.filtered_count = 0;
+	ibt->total_count = 0;
+	ibt->filtered_count = 0;
 	ibt_hash_clear();
-	if(theme_idx >= ibt.theme_count) {
+	if(theme_idx >= ibt->theme_count) {
 		return;
 	}
-	ibt.active_theme = theme_idx;
-	ibt_discover_categories(ibt.theme_dirs[theme_idx]);
-	for(uint32_t ci = 0; ci < ibt.cat_count; ++ci) {
-		ibt_scan_category(ibt.theme_dirs[theme_idx], ibt.size, ibt.cat_names[ci], ci);
+	ibt->active_theme = theme_idx;
+	ibt_discover_categories(ibt->theme_dirs[theme_idx]);
+	for(uint32_t ci = 0; ci < ibt->cat_count; ++ci) {
+		ibt_scan_category(ibt->theme_dirs[theme_idx], ibt->size, ibt->cat_names[ci], ci);
 	}
 	ibt_sort();
 	// rebuild hash after sort (indices changed)
 	ibt_hash_clear();
-	for(uint32_t i = 0; i < ibt.total_count; ++i) {
+	for(uint32_t i = 0; i < ibt->total_count; ++i) {
 		ibt_hash_insert(i);
 	}
 }
@@ -495,9 +494,9 @@ static void ibt_rebuild_tabs(struct mkgui_ctx *dlg) {
 		mkgui_remove_widget(dlg, IB_TH_TAB_FIRST + i);
 	}
 	// add new tabs for discovered categories
-	for(uint32_t ci = 0; ci < ibt.cat_count; ++ci) {
+	for(uint32_t ci = 0; ci < ibt->cat_count; ++ci) {
 		char label[64];
-		strncpy(label, ibt.cat_names[ci], sizeof(label) - 1);
+		strncpy(label, ibt->cat_names[ci], sizeof(label) - 1);
 		label[sizeof(label) - 1] = '\0';
 		if(label[0] >= 'a' && label[0] <= 'z') {
 			label[0] = (char)(label[0] - 32);
@@ -510,15 +509,15 @@ static void ibt_rebuild_tabs(struct mkgui_ctx *dlg) {
 
 // [=]===^=[ ibt_filter ]=============================================[=]
 static void ibt_filter(char *search) {
-	ibt.filtered_count = 0;
+	ibt->filtered_count = 0;
 	uint32_t search_len = search ? (uint32_t)strlen(search) : 0;
 
-	for(uint32_t i = 0; i < ibt.total_count && ibt.filtered_count < IB_THEME_MAX_ICONS; ++i) {
-		if(ibt.active_cat > 0 && !(ibt.cat_mask[i] & (1u << (ibt.active_cat - 1)))) {
+	for(uint32_t i = 0; i < ibt->total_count && ibt->filtered_count < IB_THEME_MAX_ICONS; ++i) {
+		if(ibt->active_cat > 0 && !(ibt->cat_mask[i] & (1u << (ibt->active_cat - 1)))) {
 			continue;
 		}
 		if(search_len > 0) {
-			char *p = ibt.names[i];
+			char *p = ibt->names[i];
 			uint32_t found = 0;
 			while(*p) {
 				uint32_t match = 1;
@@ -537,15 +536,15 @@ static void ibt_filter(char *search) {
 				continue;
 			}
 		}
-		ibt.filtered_idx[ibt.filtered_count++] = i;
+		ibt->filtered_idx[ibt->filtered_count++] = i;
 	}
 }
 
 // [=]===^=[ ibt_label_cb ]===========================================[=]
 static void ibt_label_cb(uint32_t item, char *buf, uint32_t buf_size, void *userdata) {
 	(void)userdata;
-	if(item < ibt.filtered_count) {
-		strncpy(buf, ibt.names[ibt.filtered_idx[item]], buf_size - 1);
+	if(item < ibt->filtered_count) {
+		strncpy(buf, ibt->names[ibt->filtered_idx[item]], buf_size - 1);
 		buf[buf_size - 1] = '\0';
 	} else {
 		buf[0] = '\0';
@@ -555,14 +554,14 @@ static void ibt_label_cb(uint32_t item, char *buf, uint32_t buf_size, void *user
 // [=]===^=[ ibt_icon_cb ]============================================[=]
 static void ibt_icon_cb(uint32_t item, char *buf, uint32_t buf_size, void *userdata) {
 	struct mkgui_ctx *ctx = (struct mkgui_ctx *)userdata;
-	if(item < ibt.filtered_count) {
-		uint32_t idx = ibt.filtered_idx[item];
-		char *name = ibt.names[idx];
+	if(item < ibt->filtered_count) {
+		uint32_t idx = ibt->filtered_idx[item];
+		char *name = ibt->names[idx];
 		strncpy(buf, name, buf_size - 1);
 		buf[buf_size - 1] = '\0';
 
 		if(icon_find_idx(name) < 0) {
-			mkgui_icon_load_svg(ctx, name, ibt.paths[idx]);
+			mkgui_icon_load_svg(ctx, name, ibt->paths[idx]);
 		}
 	} else {
 		buf[0] = '\0';
@@ -571,27 +570,27 @@ static void ibt_icon_cb(uint32_t item, char *buf, uint32_t buf_size, void *userd
 
 // [=]===^=[ ibt_confirm_selection ]==================================[=]
 static void ibt_confirm_selection(uint32_t filtered_item) {
-	if(filtered_item >= ibt.filtered_count) {
+	if(filtered_item >= ibt->filtered_count) {
 		return;
 	}
-	uint32_t idx = ibt.filtered_idx[filtered_item];
-	strncpy(ibt.result_name, ibt.names[idx], IB_ICON_NAME - 1);
-	ibt.result_name[IB_ICON_NAME - 1] = '\0';
-	strncpy(ibt.result_path, ibt.paths[idx], sizeof(ibt.result_path) - 1);
-	ibt.result_path[sizeof(ibt.result_path) - 1] = '\0';
-	ibt.confirmed = 1;
+	uint32_t idx = ibt->filtered_idx[filtered_item];
+	strncpy(ibt->result_name, ibt->names[idx], IB_ICON_NAME - 1);
+	ibt->result_name[IB_ICON_NAME - 1] = '\0';
+	strncpy(ibt->result_path, ibt->paths[idx], sizeof(ibt->result_path) - 1);
+	ibt->result_path[sizeof(ibt->result_path) - 1] = '\0';
+	ibt->confirmed = 1;
 }
 
 // [=]===^=[ ibt_reset_icons ]========================================[=]
 // Reset icon array back to pre-browser state, freeing any icons loaded
 // during browsing. Called on theme switch and browser close.
 static void ibt_reset_icons(void) {
-	for(uint32_t i = ibt.saved_svg_source_count; i < svg_source_count; ++i) {
+	for(uint32_t i = ibt->saved_svg_source_count; i < svg_source_count; ++i) {
 		free(svg_sources[i].svg_data);
 		svg_sources[i].svg_data = NULL;
 	}
-	icon_count = ibt.saved_icon_count;
-	svg_source_count = ibt.saved_svg_source_count;
+	icon_count = ibt->saved_icon_count;
+	svg_source_count = ibt->saved_svg_source_count;
 	icon_hash_clear();
 	for(uint32_t i = 0; i < icon_count; ++i) {
 		icon_hash_insert(i);
@@ -602,6 +601,8 @@ static void ibt_reset_icons(void) {
 // [=]===^=[ ibt_cleanup ]============================================[=]
 static void ibt_cleanup(struct mkgui_ctx *ctx) {
 	ibt_reset_icons();
+	free(ibt);
+	ibt = NULL;
 	dirty_all(ctx);
 }
 
@@ -623,15 +624,20 @@ MKGUI_API uint32_t mkgui_icon_browser(struct mkgui_ctx *ctx, int32_t size, char 
 		return 0;
 	}
 
-	memset(&ibt, 0, sizeof(ibt));
-	ibt.prev_selected = -1;
-	ibt.saved_icon_count = icon_count;
-	ibt.saved_svg_source_count = svg_source_count;
-	ibt.size = size > 0 ? size : 16;
+	ibt = (struct ib_theme_state *)calloc(1, sizeof(struct ib_theme_state));
+	if(!ibt) {
+		return 0;
+	}
+	ibt->prev_selected = -1;
+	ibt->saved_icon_count = icon_count;
+	ibt->saved_svg_source_count = svg_source_count;
+	ibt->size = size > 0 ? size : 16;
 
 	ibt_scan_local_themes();
-	if(ibt.theme_count == 0) {
+	if(ibt->theme_count == 0) {
 		fprintf(stderr, "mkgui: no icon themes found (place a Freedesktop icon theme directory next to the editor)\n");
+		free(ibt);
+		ibt = NULL;
 		return 0;
 	}
 
@@ -661,16 +667,16 @@ MKGUI_API uint32_t mkgui_icon_browser(struct mkgui_ctx *ctx, int32_t size, char 
 	struct mkgui_widget ivw = MKGUI_W(MKGUI_ITEMVIEW, iv_id, "", "", IB_TH_VBOX, 0, 0, 0, 0, 1);
 	mkgui_add_widget(dlg, ivw, 0);
 
-	for(uint32_t i = 0; i < ibt.theme_count; ++i) {
-		mkgui_dropdown_add(dlg, IB_TH_THEME_DROP, ibt.theme_names[i]);
+	for(uint32_t i = 0; i < ibt->theme_count; ++i) {
+		mkgui_dropdown_add(dlg, IB_TH_THEME_DROP, ibt->theme_names[i]);
 	}
 	mkgui_dropdown_set(dlg, IB_TH_THEME_DROP, 0);
 
 	ibt_rebuild_tabs(dlg);
 
-	ibt.active_cat = 0;
+	ibt->active_cat = 0;
 	ibt_filter(NULL);
-	mkgui_itemview_setup(dlg, iv_id, ibt.filtered_count, MKGUI_VIEW_COMPACT, ibt_label_cb, ibt_icon_cb, dlg);
+	mkgui_itemview_setup(dlg, iv_id, ibt->filtered_count, MKGUI_VIEW_COMPACT, ibt_label_cb, ibt_icon_cb, dlg);
 
 	mkgui_set_focus(dlg, IB_TH_SEARCH);
 
@@ -688,7 +694,7 @@ MKGUI_API uint32_t mkgui_icon_browser(struct mkgui_ctx *ctx, int32_t size, char 
 						running = 0;
 					} else if(ev.keysym == MKGUI_KEY_RETURN) {
 						struct mkgui_itemview_data *iv = find_itemview_data(dlg, iv_id);
-						if(iv && iv->selected >= 0 && iv->selected < (int32_t)ibt.filtered_count) {
+						if(iv && iv->selected >= 0 && iv->selected < (int32_t)ibt->filtered_count) {
 							ibt_confirm_selection((uint32_t)iv->selected);
 							running = 0;
 						}
@@ -696,15 +702,15 @@ MKGUI_API uint32_t mkgui_icon_browser(struct mkgui_ctx *ctx, int32_t size, char 
 				} break;
 
 				case MKGUI_EVENT_DROPDOWN_CHANGED: {
-					if(ev.id == IB_TH_THEME_DROP && ev.value >= 0 && ev.value < (int32_t)ibt.theme_count) {
+					if(ev.id == IB_TH_THEME_DROP && ev.value >= 0 && ev.value < (int32_t)ibt->theme_count) {
 						ibt_reset_icons();
 						ibt_load_theme((uint32_t)ev.value);
 						ibt_rebuild_tabs(dlg);
-						ibt.active_cat = 0;
+						ibt->active_cat = 0;
 						mkgui_tabs_set_current(dlg, IB_TH_TABS, IB_TH_TAB_ALL);
 						char *filter = mkgui_input_get(dlg, IB_TH_SEARCH);
 						ibt_filter(filter);
-						mkgui_itemview_set_items(dlg, iv_id, ibt.filtered_count);
+						mkgui_itemview_set_items(dlg, iv_id, ibt->filtered_count);
 						mkgui_itemview_set_selected(dlg, iv_id, -1);
 					}
 				} break;
@@ -713,7 +719,7 @@ MKGUI_API uint32_t mkgui_icon_browser(struct mkgui_ctx *ctx, int32_t size, char 
 					if(ev.id == IB_TH_SEARCH) {
 						char *filter = mkgui_input_get(dlg, IB_TH_SEARCH);
 						ibt_filter(filter);
-						mkgui_itemview_set_items(dlg, iv_id, ibt.filtered_count);
+						mkgui_itemview_set_items(dlg, iv_id, ibt->filtered_count);
 						mkgui_itemview_set_selected(dlg, iv_id, -1);
 					}
 				} break;
@@ -722,26 +728,26 @@ MKGUI_API uint32_t mkgui_icon_browser(struct mkgui_ctx *ctx, int32_t size, char 
 					if(ev.id == IB_TH_TABS) {
 						uint32_t tab_id = (uint32_t)ev.value;
 						if(tab_id == IB_TH_TAB_ALL) {
-							ibt.active_cat = 0;
-						} else if(tab_id >= IB_TH_TAB_FIRST && tab_id < IB_TH_TAB_FIRST + ibt.cat_count) {
-							ibt.active_cat = tab_id - IB_TH_TAB_FIRST + 1;
+							ibt->active_cat = 0;
+						} else if(tab_id >= IB_TH_TAB_FIRST && tab_id < IB_TH_TAB_FIRST + ibt->cat_count) {
+							ibt->active_cat = tab_id - IB_TH_TAB_FIRST + 1;
 						}
 						char *filter = mkgui_input_get(dlg, IB_TH_SEARCH);
 						ibt_filter(filter);
-						mkgui_itemview_set_items(dlg, iv_id, ibt.filtered_count);
+						mkgui_itemview_set_items(dlg, iv_id, ibt->filtered_count);
 						mkgui_itemview_set_selected(dlg, iv_id, -1);
 					}
 				} break;
 
 				case MKGUI_EVENT_ITEMVIEW_DBLCLICK: {
-					if(ev.id == iv_id && ev.value >= 0 && ev.value < (int32_t)ibt.filtered_count) {
+					if(ev.id == iv_id && ev.value >= 0 && ev.value < (int32_t)ibt->filtered_count) {
 						ibt_confirm_selection((uint32_t)ev.value);
 						running = 0;
 					}
 				} break;
 
 				case MKGUI_EVENT_ITEMVIEW_SELECT: {
-					ibt.prev_selected = ev.value;
+					ibt->prev_selected = ev.value;
 				} break;
 
 				default: break;
@@ -754,9 +760,9 @@ MKGUI_API uint32_t mkgui_icon_browser(struct mkgui_ctx *ctx, int32_t size, char 
 
 	char confirmed_name[IB_ICON_NAME] = {0};
 	char confirmed_path[1024] = {0};
-	if(ibt.confirmed && ibt.result_name[0] != '\0') {
-		strncpy(confirmed_name, ibt.result_name, IB_ICON_NAME - 1);
-		strncpy(confirmed_path, ibt.result_path, sizeof(confirmed_path) - 1);
+	if(ibt->confirmed && ibt->result_name[0] != '\0') {
+		strncpy(confirmed_name, ibt->result_name, IB_ICON_NAME - 1);
+		strncpy(confirmed_path, ibt->result_path, sizeof(confirmed_path) - 1);
 	}
 
 	ibt_cleanup(ctx);
