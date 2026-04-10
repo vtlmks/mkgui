@@ -38,12 +38,15 @@ See [documentation/editor.md](documentation/editor.md) for the full editor guide
    ```bash
    # Linux
    gcc -std=c99 -O2 myapp.c -o myapp \
-       $(pkg-config --cflags freetype2) -lX11 -lXext $(pkg-config --libs freetype2)
+       $(pkg-config --cflags freetype2 fontconfig) -lX11 -lXext \
+       $(pkg-config --libs freetype2 fontconfig) -lm
 
    # Windows (MinGW)
    x86_64-w64-mingw32-gcc -std=c99 -O2 myapp.c -o myapp.exe -lgdi32 -mwindows
    ```
 4. Place an `icons/` directory next to your executable with SVG icons (see Icon section below)
+
+OpenGL is only required if the application uses the `MKGUI_GLVIEW` widget (add `-lGL` on Linux or `-lopengl32` on Windows). The core library, editor, and all other widgets have no GPU dependency.
 
 ## Quick example
 
@@ -122,11 +125,11 @@ The easiest option is **MSYS2**, which gives you a native MinGW GCC on Windows:
    ```bash
    pacman -S mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-freetype
    ```
-4. Build:
+4. Build your application (Windows uses GDI for fonts, so no fontconfig is needed):
    ```bash
-   gcc -std=c99 -O2 demo.c -o demo.exe -lgdi32 -mwindows \
-       $(pkg-config --cflags freetype2) $(pkg-config --libs freetype2)
+   gcc -std=c99 -O2 myapp.c -o myapp.exe -lgdi32 -mwindows
    ```
+   Add `-lopengl32` only if the application uses `MKGUI_GLVIEW`. Building `demo.c` requires `-lopengl32` since the demo showcases the GL view widget.
 
 Alternatively, if you already use **WSL2** on Windows, just build the Linux version -- it runs natively under WSL2 with X11 forwarding or WSLg.
 

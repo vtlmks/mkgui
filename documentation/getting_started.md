@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-**Linux:** GCC, FreeType2, Xlib + XShm development headers.
+**Linux:** GCC, FreeType2, Fontconfig, Xlib + XShm development headers.
 
 ```sh
 # Arch
@@ -12,7 +12,7 @@ pacman -S gcc freetype2 fontconfig libx11 libxext
 apt install gcc libfreetype-dev libfontconfig-dev libx11-dev libxext-dev
 ```
 
-**Windows (cross-compile from Linux):** MinGW-w64. FreeType and font rendering are handled through GDI on Windows, so no extra libraries are needed.
+**Windows (cross-compile from Linux):** MinGW-w64. Font rendering goes through GDI on Windows, so FreeType and Fontconfig are not required.
 
 ```sh
 # Arch
@@ -21,6 +21,8 @@ pacman -S mingw-w64-gcc
 # Debian/Ubuntu
 apt install gcc-mingw-w64-x86-64
 ```
+
+**OpenGL is optional.** The core library, editor, static library, and all widgets except `MKGUI_GLVIEW` build and run without any OpenGL dependency. Only link `-lGL` (Linux) or `-lopengl32` (Windows) if your application actually uses the GL view widget. The bundled `demo` binary uses `MKGUI_GLVIEW`, so the demo build pulls in OpenGL; the editor and `libmkgui.a` do not.
 
 ## Building mkgui
 
@@ -81,7 +83,7 @@ gcc -std=c99 -O2 myapp.c -I/path/to/mkgui -L/path/to/mkgui -lmkgui \
 
 ## Option B: Unity build
 
-Include `mkgui.c` directly in your source file. No separate compilation or linking needed -- everything compiles as one translation unit.
+Include `mkgui.c` directly in your source file. No separate compilation or linking needed -- everything compiles as one translation unit. All mkgui sources (PlutoSVG/PlutoVG, platform backend, every `mkgui_*.c` widget file) are pulled in transitively through `mkgui.c`.
 
 **myapp.c:**
 ```c
@@ -94,6 +96,8 @@ Include `mkgui.c` directly in your source file. No separate compilation or linki
 ```sh
 gcc -std=c99 -O2 myapp.c $(pkg-config --cflags --libs freetype2 fontconfig) -lX11 -lXext -lm -o myapp
 ```
+
+Add `-lGL` only if your application uses `MKGUI_GLVIEW`. On Windows, the equivalent is `-lopengl32`.
 
 ## Icons
 

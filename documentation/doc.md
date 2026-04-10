@@ -1,6 +1,6 @@
 # mkgui
 
-Minimal GUI toolkit for Linux (X11) and Windows (Win32) with software rendering. Single-file unity build, no third-party dependencies beyond FreeType2, Fontconfig, and Xlib (Linux) or GDI (Windows).
+Minimal GUI toolkit for Linux (X11) and Windows (Win32) with software rendering. Single-file unity build, no third-party dependencies beyond FreeType2, Fontconfig, and Xlib (Linux) or GDI (Windows). PlutoSVG/PlutoVG are embedded in the source tree, not external dependencies.
 
 ## Building
 
@@ -8,7 +8,8 @@ mkgui uses a unity build. You compile a single `.c` file that `#include`s `mkgui
 
 ```bash
 gcc -std=c99 -O2 -Wall -Wextra myapp.c -o myapp \
-    $(pkg-config --cflags freetype2 fontconfig) -lX11 -lXext $(pkg-config --libs freetype2 fontconfig)
+    $(pkg-config --cflags freetype2 fontconfig) -lX11 -lXext \
+    $(pkg-config --libs freetype2 fontconfig) -lm
 ```
 
 Or use the included `build.sh`:
@@ -17,9 +18,28 @@ Or use the included `build.sh`:
 ./build.sh          # normal (debug symbols)
 ./build.sh release  # optimized, stripped
 ./build.sh debug    # -g -O0
+./build.sh asan     # -O0 -fsanitize=address,undefined (Linux only)
+./build.sh clean    # remove out/
 ```
 
-Dependencies: FreeType2, X11, Xext (MIT-SHM) on Linux. GDI on Windows.
+`build.sh` produces `out/demo`, `out/editor`, `out/libmkgui.a`, `out/extract_icons`, and the test binaries. It also cross-compiles `out/demo.exe` and `out/editor.exe` if `x86_64-w64-mingw32-gcc` is available.
+
+### Linux dependencies
+
+- **FreeType2** -- glyph rasterization
+- **Fontconfig** -- font file lookup
+- **Xlib** (`-lX11`) -- windowing
+- **Xext** (`-lXext`) -- MIT-SHM framebuffer blit
+- **-lm** -- used by PlutoVG path math
+
+### Windows dependencies
+
+- **GDI** (`-lgdi32`) -- windowing, font rendering, framebuffer blit
+- `-mwindows` to mark the executable as a GUI app (no console)
+
+### OpenGL is optional
+
+OpenGL (`-lGL` / `-lopengl32`) is only required if your application instantiates a `MKGUI_GLVIEW` widget. The core library, static library, editor, and all other widgets have no GPU dependency. The bundled `demo` binary uses `MKGUI_GLVIEW`, so building `demo.c` pulls in OpenGL; `libmkgui.a`, the editor, and user applications that do not use GL views do not.
 
 ## Quick start
 
@@ -226,78 +246,111 @@ Change toolbar display mode at runtime with `mkgui_toolbar_set_mode()`. The tool
 
 ### Style flags (`style` field)
 
-Style flags use per-widget-type naming. Each flag is prefixed with the widget type it applies to. Flags at the same bit position are reused across unrelated widget types (e.g. `MKGUI_CHECKBOX_CHECKED` and `MKGUI_BUTTON_CHECKED` share bit 0).
+Each widget type has its own private flag namespace inside the `style` field, starting at bit 0. Different widget types reuse the same bit positions -- for example `MKGUI_CHECKBOX_CHECKED`, `MKGUI_BUTTON_CHECKED`, and `MKGUI_INPUT_PASSWORD` all live at bit 0, but that is harmless because the `style` field is interpreted relative to the widget's `type`. Always reference flags by name; the numeric bit layout is an internal detail and may change between releases.
 
-**Checked state** (bit 0):
+**Button:**
 
-| Flag | Widget | Description |
-|------|--------|-------------|
-| `MKGUI_CHECKBOX_CHECKED` | Checkbox | Checked state |
-| `MKGUI_RADIO_CHECKED` | Radio | Selected state |
-| `MKGUI_TOGGLE_CHECKED` | Toggle | On state |
-| `MKGUI_BUTTON_CHECKED` | Button | Toggle button pressed state |
-| `MKGUI_MENUITEM_CHECKED` | Menu item | Check/radio item is active |
+| Flag | Description |
+|------|-------------|
+| `MKGUI_BUTTON_CHECKED` | Toggle button pressed state (renders sunken) |
+| `MKGUI_BUTTON_SEPARATOR` | Toolbar button separator (draws a vertical divider, no click) |
 
-**Input flags:**
+**Checkbox / Radio / Toggle:**
 
-| Flag | Value | Widget | Description |
-|------|-------|--------|-------------|
-| `MKGUI_INPUT_PASSWORD` | `1 << 1` | Input | Show dots instead of text |
-| `MKGUI_INPUT_READONLY` | `1 << 2` | Input | Not editable |
-| `MKGUI_INPUT_NUMERIC` | `1 << 18` | Input | Filter to numeric characters |
-| `MKGUI_TEXTAREA_READONLY` | `1 << 2` | Textarea | Not editable |
-| `MKGUI_DATEPICKER_READONLY` | `1 << 2` | DatePicker | Not editable |
+| Flag | Description |
+|------|-------------|
+| `MKGUI_CHECKBOX_CHECKED` | Initial checked state |
+| `MKGUI_RADIO_CHECKED` | Initial selected state |
+| `MKGUI_TOGGLE_CHECKED` | Initial on state |
 
-**Menu item flags:**
+**Input:**
 
-| Flag | Value | Description |
-|------|-------|-------------|
-| `MKGUI_MENUITEM_SEPARATOR` | `1 << 3` | Separator line |
-| `MKGUI_MENUITEM_CHECK` | `1 << 4` | Checkbox indicator |
-| `MKGUI_MENUITEM_RADIO` | `1 << 5` | Radio indicator |
+| Flag | Description |
+|------|-------------|
+| `MKGUI_INPUT_PASSWORD` | Render dots instead of text, disables copy |
+| `MKGUI_INPUT_READONLY` | Not editable, disables paste |
+| `MKGUI_INPUT_NUMERIC` | Filter keyboard input to digits, decimal point, sign, and scientific notation |
 
-**Border and sunken flags:**
+**Textarea / DatePicker:**
 
-| Flag | Value | Widget | Description |
-|------|-------|--------|-------------|
-| `MKGUI_PANEL_BORDER` | `1 << 6` | Panel | Draw border |
-| `MKGUI_PANEL_SUNKEN` | `1 << 7` | Panel | Recessed background |
-| `MKGUI_VBOX_BORDER` | `1 << 6` | VBox | Draw border |
-| `MKGUI_HBOX_BORDER` | `1 << 6` | HBox | Draw border |
-| `MKGUI_FORM_BORDER` | `1 << 6` | Form | Draw border |
-| `MKGUI_IMAGE_BORDER` | `1 << 6` | Image | Draw border |
-| `MKGUI_CANVAS_BORDER` | `1 << 6` | Canvas | Draw border |
-| `MKGUI_CANVAS_SUNKEN` | `1 << 7` | Canvas | Recessed background |
-| `MKGUI_GLVIEW_BORDER` | `1 << 6` | GL View | Draw border |
+| Flag | Description |
+|------|-------------|
+| `MKGUI_TEXTAREA_READONLY` | Not editable |
+| `MKGUI_DATEPICKER_READONLY` | Not editable |
 
-**Slider and meter flags:**
+**Label:**
 
-| Flag | Value | Description |
-|------|-------|-------------|
-| `MKGUI_SLIDER_MIXER` | `1 << 8` | Tapered volume style with meter support for slider |
-| `MKGUI_METER_TEXT` | `1 << 8` | Display centered percentage on meter |
+| Flag | Description |
+|------|-------------|
+| `MKGUI_LABEL_TRUNCATE` | Clip overflow with "..." |
+| `MKGUI_LABEL_LINK` | Clickable hyperlink style, emits `MKGUI_EVENT_CLICK` |
+| `MKGUI_LABEL_WRAP` | Word-wrap multi-line text |
 
-**Other per-widget flags:**
+**Menu item / context menu item:**
 
-| Flag | Value | Widget | Description |
-|------|-------|--------|-------------|
-| `MKGUI_IMAGE_STRETCH` | `1 << 9` | Image | Stretch image to fill widget area |
-| `MKGUI_TAB_CLOSABLE` | `1 << 10` | Tab | Show close button (emits `MKGUI_EVENT_TAB_CLOSE`) |
-| `MKGUI_LISTVIEW_MULTI_SELECT` | `1 << 0` | Listview | Enable multi-selection |
-| `MKGUI_LISTVIEW_EDITABLE` | `1 << 1` | Listview | Enable slow-click cell editing |
-| `MKGUI_TREEVIEW_MULTI_SELECT` | `1 << 0` | Treeview | Enable multi-selection |
-| `MKGUI_TREEVIEW_EDITABLE` | `1 << 1` | Treeview | Enable slow-click cell editing |
-| `MKGUI_GRIDVIEW_MULTI_SELECT` | `1 << 0` | Gridview | Enable multi-selection |
-| `MKGUI_ITEMVIEW_EDITABLE` | `1 << 0` | Itemview | Enable slow-click cell editing |
-| `MKGUI_LABEL_TRUNCATE` | `1 << 12` | Label | Truncate text with "..." when it exceeds widget width |
-| `MKGUI_TOOLBAR_ICONS_ONLY` | `1 << 13` | Toolbar | Show only icons |
-| `MKGUI_TOOLBAR_TEXT_ONLY` | `2 << 13` | Toolbar | Show only text |
-| `MKGUI_LABEL_LINK` | `1 << 15` | Label | Make clickable (renders as hyperlink) |
-| `MKGUI_GROUP_COLLAPSED` | `1 << 16` | Group | Start collapsed |
-| `MKGUI_LABEL_WRAP` | `1 << 17` | Label | Word-wrap text |
-| `MKGUI_GROUP_COLLAPSIBLE` | `1 << 19` | Group | Allow collapse/expand by clicking header |
-| `MKGUI_PROGRESS_SHIMMER` | `1 << 20` | Progress | Animated shimmer effect |
-| `MKGUI_BUTTON_SEPARATOR` | `1 << 3` | Button | Toolbar button separator |
+| Flag | Description |
+|------|-------------|
+| `MKGUI_MENUITEM_SEPARATOR` | Render as separator line |
+| `MKGUI_MENUITEM_CHECK` | Checkbox indicator |
+| `MKGUI_MENUITEM_RADIO` | Radio indicator (auto-unchecks siblings) |
+| `MKGUI_MENUITEM_CHECKED` | Initial check/radio state |
+
+**Panel / VBox / HBox / Form / Canvas / Image / GLView:**
+
+| Flag | Widget(s) | Description |
+|------|-----------|-------------|
+| `MKGUI_PANEL_BORDER` | Panel | Draw rounded border |
+| `MKGUI_PANEL_SUNKEN` | Panel | Recessed background |
+| `MKGUI_VBOX_BORDER` | VBox | Draw border |
+| `MKGUI_HBOX_BORDER` | HBox | Draw border |
+| `MKGUI_FORM_BORDER` | Form | Draw border |
+| `MKGUI_CANVAS_BORDER` | Canvas | Draw border |
+| `MKGUI_CANVAS_SUNKEN` | Canvas | Recessed background |
+| `MKGUI_IMAGE_BORDER` | Image | Draw border |
+| `MKGUI_IMAGE_STRETCH` | Image | Stretch image to fill widget |
+| `MKGUI_GLVIEW_BORDER` | GL View | Draw border |
+
+**Slider / Meter / Progress:**
+
+| Flag | Description |
+|------|-------------|
+| `MKGUI_SLIDER_MIXER` | Tapered volume style with optional meter overlay |
+| `MKGUI_METER_TEXT` | Display centered percentage |
+| `MKGUI_PROGRESS_SHIMMER` | Animated shimmer sweep (default on) |
+
+**Toolbar (display mode):**
+
+| Flag | Description |
+|------|-------------|
+| `MKGUI_TOOLBAR_ICONS_TEXT` | Icons and text (default, value 0) |
+| `MKGUI_TOOLBAR_ICONS_ONLY` | Icons only |
+| `MKGUI_TOOLBAR_TEXT_ONLY` | Text only |
+
+The toolbar mode is selected by masking `MKGUI_TOOLBAR_MODE_MASK`. Change at runtime with `mkgui_toolbar_set_mode()`; the toolbar height adapts automatically.
+
+**Tab:**
+
+| Flag | Description |
+|------|-------------|
+| `MKGUI_TAB_CLOSABLE` | Show close button (emits `MKGUI_EVENT_TAB_CLOSE`) |
+
+**Listview / Treeview / Gridview / Itemview:**
+
+| Flag | Description |
+|------|-------------|
+| `MKGUI_LISTVIEW_MULTI_SELECT` | Enable multi-selection |
+| `MKGUI_LISTVIEW_EDITABLE` | Enable F2 / slow-double-click cell editing |
+| `MKGUI_TREEVIEW_MULTI_SELECT` | Enable multi-selection |
+| `MKGUI_TREEVIEW_EDITABLE` | Enable F2 / slow-double-click cell editing |
+| `MKGUI_GRIDVIEW_MULTI_SELECT` | Enable multi-selection |
+| `MKGUI_ITEMVIEW_EDITABLE` | Enable F2 / slow-double-click cell editing |
+
+**Group:**
+
+| Flag | Description |
+|------|-------------|
+| `MKGUI_GROUP_COLLAPSIBLE` | Header click toggles collapse state; adds arrow indicator |
+| `MKGUI_GROUP_COLLAPSED` | Start collapsed (requires `MKGUI_GROUP_COLLAPSIBLE`) |
 
 ## Events
 
@@ -343,6 +396,7 @@ struct mkgui_event {
 | `MKGUI_EVENT_CONTEXT_HEADER` | Right-click on column header | mouse x | column index |
 | `MKGUI_EVENT_CONTEXT_MENU` | Context menu item selected | item id | checked state (0/1) |
 | `MKGUI_EVENT_GRIDVIEW_SELECT` | Grid cell selected | row | column |
+| `MKGUI_EVENT_GRIDVIEW_SELECT` | Grid row selected (keyboard navigation / single click) | row | column |
 | `MKGUI_EVENT_GRIDVIEW_REORDER` | Row drag-and-drop reorder | source row | target row |
 | `MKGUI_EVENT_RICHLIST_SELECT` | Rich list row selected | row | -- |
 | `MKGUI_EVENT_RICHLIST_DBLCLICK` | Rich list row double-clicked | row | -- |
@@ -360,6 +414,16 @@ struct mkgui_event {
 | `MKGUI_EVENT_TREEVIEW_MOVE` | Tree node moved via DnD | source node id | target node id |
 | `MKGUI_EVENT_TAB_CLOSE` | Tab close button clicked | tab id | -- |
 | `MKGUI_EVENT_TIMER` | Timer fired (when cb is NULL) | timer id | -- |
+| `MKGUI_EVENT_ACCEL` | Keyboard accelerator matched (non-menu target) | -- | -- |
+| `MKGUI_EVENT_FILE_DROP` | Files dropped on window from OS | file count | -- |
+| `MKGUI_EVENT_PATHBAR_NAV` | Pathbar segment clicked | segment index | -- |
+| `MKGUI_EVENT_PATHBAR_SUBMIT` | Pathbar edit-mode Enter pressed | -- | -- |
+| `MKGUI_EVENT_IPINPUT_CHANGED` | IPv4 address octet changed | -- | -- |
+| `MKGUI_EVENT_TOGGLE_CHANGED` | Toggle switched | 0 or 1 | -- |
+| `MKGUI_EVENT_COMBOBOX_CHANGED` | Combobox selection or text changed | selected index (-1 if custom text) | -- |
+| `MKGUI_EVENT_COMBOBOX_SUBMIT` | Enter pressed in combobox | -- | -- |
+| `MKGUI_EVENT_DATEPICKER_CHANGED` | Date picker value changed | -- | -- |
+| `MKGUI_EVENT_CELL_EDIT_COMMIT` | Cell edit confirmed (Enter or focus out) | row | column |
 
 ## API reference
 
@@ -372,6 +436,8 @@ void mkgui_set_callback(struct mkgui_ctx *ctx, mkgui_event_cb cb, void *userdata
 void mkgui_run(struct mkgui_ctx *ctx, mkgui_event_cb cb, void *userdata);
 void mkgui_quit(struct mkgui_ctx *ctx);
 void mkgui_set_title(struct mkgui_ctx *ctx, char *title);
+void mkgui_set_app_class(struct mkgui_ctx *ctx, char *app_class);
+void mkgui_set_window_instance(struct mkgui_ctx *ctx, char *instance);
 uint32_t mkgui_add_timer(struct mkgui_ctx *ctx, uint64_t interval_ns, mkgui_timer_cb cb, void *userdata);
 void mkgui_remove_timer(struct mkgui_ctx *ctx, uint32_t timer_id);
 ```
@@ -379,6 +445,12 @@ void mkgui_remove_timer(struct mkgui_ctx *ctx, uint32_t timer_id);
 `mkgui_set_title` changes the window title bar text at runtime. Does not trigger a widget redraw.
 
 `mkgui_create` takes a widget array and returns a context.
+
+`mkgui_set_app_class` sets the application class name used by window managers to group windows, match `.desktop` files, and select taskbar icons. On X11 this sets the `WM_CLASS` class field and the `_NET_WM_PID`; on Windows it maps to the window class. Call before showing the window (i.e. right after `mkgui_create`) for best results. The string is copied internally.
+
+`mkgui_set_window_instance` sets the per-window instance name in `WM_CLASS`. Useful when one application spawns several windows that window managers should treat as distinct (e.g. "editor", "preview", "icon-browser"). The default instance is the class name. Has no effect on Windows.
+
+`mkgui_icon_load_app_icons` takes its own `app_name` argument for the icon directory lookup. It is independent from the WM class, but in practice most applications pass the same string to both calls.
 
 `mkgui_run` runs the event loop. It drains all pending events, delivers each to `cb`, renders the frame, then blocks until the next event or timer. This repeats until `mkgui_quit` is called. It also pumps events for all other registered contexts that have a callback set via `mkgui_set_callback`, rendering and dispatching their events automatically.
 
@@ -1522,12 +1594,17 @@ Register custom ARGB icons at any size. Custom icons override SVG icons with the
 ### Icon browser
 
 ```c
-uint32_t mkgui_icon_browser(struct mkgui_ctx *ctx, int32_t size, char *out_name, uint32_t name_size, char *out_path, uint32_t path_size);
+uint32_t mkgui_icon_browser(struct mkgui_ctx *ctx, int32_t size,
+                            char *out_name, uint32_t name_size,
+                            char *out_path, uint32_t path_size);
+
+uint32_t mkgui_icon_browser_theme(struct mkgui_ctx *ctx, char *theme_dir,
+                                  int32_t size, char *out, uint32_t out_size);
 ```
 
-Opens a modal browser showing icons from available Freedesktop icon themes. On Linux, the browser scans system icon directories (`/usr/share/icons/`, `$XDG_DATA_HOME/icons/`, etc.) in addition to local directories. On Windows, only local theme directories are scanned. A theme dropdown allows switching between themes; the icon array is reset on each switch to avoid stale icons.
+`mkgui_icon_browser` opens a modal browser showing icons from available Freedesktop icon themes. On Linux, it scans system icon directories (`/usr/share/icons/`, `$XDG_DATA_HOME/icons/`, etc.) in addition to local directories. On Windows, only local theme directories are scanned. A theme dropdown allows switching between themes; the icon array is reset on each switch to avoid stale icons. Returns 1 and writes the selected icon name to `out_name` and the full source path of the selected SVG to `out_path` if the user picked an icon, 0 on cancel. Multiple themes can coexist, allowing users to mix icons from different icon sets.
 
-Returns both the icon name and the full source path of the selected SVG. Multiple themes can coexist, allowing users to mix icons from different icon sets.
+`mkgui_icon_browser_theme` is a narrower variant that browses only the icons in a single explicit theme directory. It writes the chosen icon name (no path) to `out`. Useful when an application bundles its own custom theme and wants a browser scoped to it.
 
 ### Font
 
@@ -1637,10 +1714,49 @@ Convenience functions for common dialog patterns. All are blocking (modal).
 ### Message box
 
 ```c
-void mkgui_message_box(struct mkgui_ctx *ctx, char *title, char *message);
+uint32_t mkgui_message_box(struct mkgui_ctx *ctx, char *title, char *message,
+                           uint32_t icon_type, uint32_t buttons);
 ```
 
-Displays a message with an OK button. Closes on OK, Enter, Escape, or window close.
+Displays a message with a stock icon and a configurable button set. Blocks until dismissed. Returns one of the `MKGUI_DLG_RESULT_*` constants indicating which button was pressed (or `MKGUI_DLG_RESULT_CANCEL` if the window was closed).
+
+**Icon constants:**
+
+| Constant | Icon |
+|----------|------|
+| `MKGUI_DLG_ICON_NONE` | No icon |
+| `MKGUI_DLG_ICON_INFO` | `dialog-information` |
+| `MKGUI_DLG_ICON_WARNING` | `dialog-warning` |
+| `MKGUI_DLG_ICON_ERROR` | `dialog-error` |
+| `MKGUI_DLG_ICON_QUESTION` | `dialog-question` |
+
+**Button set constants:**
+
+| Constant | Buttons |
+|----------|---------|
+| `MKGUI_DLG_BUTTONS_OK` | OK |
+| `MKGUI_DLG_BUTTONS_OK_CANCEL` | OK, Cancel |
+| `MKGUI_DLG_BUTTONS_YES_NO` | Yes, No |
+| `MKGUI_DLG_BUTTONS_YES_NO_CANCEL` | Yes, No, Cancel |
+| `MKGUI_DLG_BUTTONS_RETRY_CANCEL` | Retry, Cancel |
+
+**Result constants:**
+
+| Constant | Meaning |
+|----------|---------|
+| `MKGUI_DLG_RESULT_OK` | OK pressed |
+| `MKGUI_DLG_RESULT_CANCEL` | Cancel pressed or window closed |
+| `MKGUI_DLG_RESULT_YES` | Yes pressed |
+| `MKGUI_DLG_RESULT_NO` | No pressed |
+| `MKGUI_DLG_RESULT_RETRY` | Retry pressed |
+
+```c
+uint32_t r = mkgui_message_box(ctx, "Save?", "Save changes before exit?",
+                               MKGUI_DLG_ICON_QUESTION, MKGUI_DLG_BUTTONS_YES_NO_CANCEL);
+if(r == MKGUI_DLG_RESULT_YES)    { save_and_exit(); }
+if(r == MKGUI_DLG_RESULT_NO)     { exit_no_save(); }
+if(r == MKGUI_DLG_RESULT_CANCEL) { /* keep editing */ }
+```
 
 ### Confirm dialog
 
@@ -1648,7 +1764,7 @@ Displays a message with an OK button. Closes on OK, Enter, Escape, or window clo
 uint32_t mkgui_confirm_dialog(struct mkgui_ctx *ctx, char *title, char *message);
 ```
 
-Displays a message with OK and Cancel buttons. Returns 1 if OK, 0 if cancelled.
+Shorthand for `mkgui_message_box` with `MKGUI_DLG_ICON_QUESTION` and `MKGUI_DLG_BUTTONS_OK_CANCEL`. Returns 1 if OK, 0 if cancelled.
 
 ### Input dialog
 
@@ -1912,6 +2028,49 @@ Maximum 64 accelerators per context.
 Input and textarea widgets support undo/redo via Ctrl+Z and Ctrl+Y (or Ctrl+Shift+Z). This is built-in and requires no setup.
 
 Each widget maintains its own undo ring buffer (32 snapshots). All text mutations are covered: typing, backspace, delete, cut, paste, Enter (textarea), and text drag-and-drop. Consecutive single-character inserts within 500ms are coalesced into one undo step to avoid excessive snapshots during normal typing.
+
+## Inline cell editing
+
+Listview, treeview, gridview, and itemview support inline cell editing. The widget must opt in with the appropriate style flag:
+
+- `MKGUI_LISTVIEW_EDITABLE` -- first column of listview
+- `MKGUI_TREEVIEW_EDITABLE` -- node label in treeview
+- `MKGUI_GRIDVIEW_MULTI_SELECT` enables selection, editing uses `MKGUI_EVENT_GRID_CLICK` plus programmatic `mkgui_cell_edit_begin`
+- `MKGUI_ITEMVIEW_EDITABLE` -- label of itemview item
+
+Once enabled, cell editing starts in two ways:
+
+1. **F2** on the selected row/node/item begins editing.
+2. **Slow double-click**: clicking an already-selected item a second time within a 400ms-1500ms window (longer than a normal double-click) begins editing, matching file manager rename behavior.
+
+While editing, the cell shows a text input with cursor and selection. Click inside the cell to position the cursor, drag to select. Click outside the cell commits. Scrolling cancels. Enter commits, Escape cancels. Clipboard (Ctrl+C/X/V), Ctrl+A, and undo/redo all work inside the edit overlay.
+
+On commit, `MKGUI_EVENT_CELL_EDIT_COMMIT` fires with `ev->id` set to the widget, `ev->value` set to the row (or node id), and `ev->col` set to the column. Retrieve the new text with `mkgui_cell_edit_get_text` while the event is being handled. The application is responsible for applying the change to its backing data.
+
+```c
+void mkgui_cell_edit_begin(struct mkgui_ctx *ctx, uint32_t widget_id,
+                           int32_t row, int32_t col, char *text);
+void mkgui_cell_edit_cancel(struct mkgui_ctx *ctx);
+char *mkgui_cell_edit_get_text(struct mkgui_ctx *ctx);
+uint32_t mkgui_cell_edit_active(struct mkgui_ctx *ctx);
+```
+
+- `mkgui_cell_edit_begin` programmatically starts editing a specific cell with a pre-filled initial text. Useful for "Rename" context menu actions.
+- `mkgui_cell_edit_cancel` dismisses the edit overlay without committing.
+- `mkgui_cell_edit_get_text` returns the current edit buffer (valid during `MKGUI_EVENT_CELL_EDIT_COMMIT`).
+- `mkgui_cell_edit_active` returns non-zero while an edit is in progress.
+
+Only one cell edit can be active per context at a time (similar to focus).
+
+```c
+case MKGUI_EVENT_CELL_EDIT_COMMIT: {
+    if(ev->id == ID_FILE_LIST) {
+        char *new_name = mkgui_cell_edit_get_text(ctx);
+        rename_file(ev->value, new_name);
+        refresh_listview();
+    }
+} break;
+```
 
 ## File drag-and-drop
 

@@ -14,47 +14,63 @@ For shared library use, define `MKGUI_LIBRARY` to make `MKGUI_API` expand to not
 mkgui.c
   mkgui.h                  Public API (types, enums, function prototypes)
   platform_win32_types.h    Platform struct definitions (Win32)
-  platform_linux_types.h    Platform struct definitions (X11/FreeType)
+  platform_linux_types.h    Platform struct definitions (X11/FreeType/Fontconfig)
+  plutovg/plutosvg          Embedded SVG rasterizer (PlutoVG + PlutoSVG, MIT)
   mkgui_render.c            Drawing primitives, text command queue
+  mkgui_drop.c              OS file drag-and-drop
   platform_win32.c          Window, events, fonts, framebuffer (Win32)
   platform_linux.c          Window, events, fonts, framebuffer (X11)
-  mkgui_icon.c              Icon loading, hashing, rendering
-  mkgui_button.c            Widget implementations (35 files)
+  mkgui_icon.c              Icon loading (SVG via PlutoSVG), hashing, rendering
+  mkgui_textedit.c          Shared text-edit primitives used by input/combobox/pathbar/cell edit
+  mkgui_undo.c              Undo/redo ring buffers
+  mkgui_button.c            Widget implementations (one .c per widget)
   mkgui_label.c
   ...
+  mkgui_celledit.c          Inline cell edit overlay (F2 rename)
   mkgui_tooltip.c
-  mkgui_dialogs.c           Built-in dialogs (message box, file dialog)
-  mkgui_filedialog.c
-  mkgui_iconbrowser.c
+  mkgui_dialogs.c           Message box, confirm, input dialogs
+  mkgui_filedialog.c        Open/save file dialog
+  mkgui_iconbrowser.c       Freedesktop icon theme browser
+  mkgui_colorpicker.c       Color picker dialog
 ```
 
 ### Targets
 
 Linux (X11, GCC) and Windows (Win32, MinGW cross-compile). Both are first-class. The build script compiles both in parallel when a MinGW cross-compiler is available.
 
-Dependencies: FreeType2, Xlib + XShm (Linux), GDI (Windows), OpenGL (optional, for MKGUI_GLVIEW).
+Dependencies:
+- Linux: FreeType2, Fontconfig, Xlib + XShm.
+- Windows: GDI (font rendering, framebuffer blit).
+- OpenGL is optional and only required when an application actually instantiates a `MKGUI_GLVIEW` widget. `libmkgui.a`, the editor, and all other widgets build and run without it.
 
 ## File map
 
 | File | Role |
 |------|------|
-| `mkgui.h` | Public API. All types, enums, and function prototypes. |
-| `mkgui.c` | Core: context lifecycle, widget management, layout engine, event dispatch, main loop. ~6200 lines. |
+| `mkgui.h` | Public API. All types, enums, and function prototypes. Single source of truth for consumers. |
+| `mkgui.c` | Core: context lifecycle, widget management, layout engine, event dispatch, main loop. Includes every other `.c` file. |
 | `mkgui_render.c` | Drawing primitives (`draw_rect_fill`, `draw_rounded_rect`, `draw_text_sw`), text command queue, icon drawing. |
-| `platform_linux.c` | X11 backend: window creation, XShm framebuffer, event translation, FreeType font loading, timerfd. |
-| `platform_linux_types.h` | Platform struct definitions for Linux (Display, Window, XShmSegmentInfo, FT_Face). |
-| `platform_win32.c` | Win32 backend: window creation, DIB section framebuffer, message loop, font loading, waitable timers. |
+| `platform_linux.c` | X11 backend: window creation, XShm framebuffer, event translation, FreeType + Fontconfig font loading, timerfd, XDnd. |
+| `platform_linux_types.h` | Platform struct definitions for Linux (Display, Window, XShmSegmentInfo, FT_Face, FcConfig). |
+| `platform_win32.c` | Win32 backend: window creation, DIB section framebuffer, message loop, GDI font loading, waitable timers, WM_DROPFILES. |
 | `platform_win32_types.h` | Platform struct definitions for Windows (HWND, HDC, HBITMAP, HFONT). |
-| `mkgui_icon.c` | Icon hash table, pixel pool, MDI icon pack loading, icon drawing with clipping. |
-| `mkgui_*.c` (35 files) | One file per widget type. Each contains rendering, event handling, and public API for that widget. |
-| `mkgui_dialogs.c` | Built-in message box dialog. |
+| `mkgui_icon.c` | Icon hash table, SVG source cache, PlutoSVG rasterization, system icon theme fallback, icon drawing with clipping. |
+| `mkgui_textedit.c` | Shared text-edit primitives (cursor movement, selection, insert/delete, render) used by input/combobox/pathbar/cell edit. |
+| `mkgui_celledit.c` | Inline cell edit overlay used by listview, treeview, gridview, and itemview. F2 / slow-double-click rename. |
+| `mkgui_drop.c` | OS file drag-and-drop (XDnd on Linux, WM_DROPFILES on Windows). |
+| `mkgui_*.c` (~40 files) | One file per widget type. Each contains rendering, event handling, and public API for that widget. |
+| `mkgui_dialogs.c` | Built-in message box, confirm, and input dialogs. |
 | `mkgui_filedialog.c` | Built-in file open/save dialog. |
-| `mkgui_iconbrowser.c` | Built-in icon browser dialog. |
-| `incbin.h` | Helper macro for embedding binary data (icon packs). |
-| `editor.c` | Visual widget designer (GadToolsBox-style). Includes `mkgui.c`. |
+| `mkgui_iconbrowser.c` | Built-in Freedesktop icon theme browser. |
+| `mkgui_colorpicker.c` | Built-in color picker dialog (SV square, wheel, RGB sliders). |
+| `plutovg/`, `plutosvg/` | Embedded PlutoVG path renderer and PlutoSVG parser (MIT). Compiled into the unity build. |
+| `incbin.h` | Helper macro for embedding binary data. |
+| `editor.c` | Visual widget designer. Includes `mkgui.c`. |
 | `demo.c` | Comprehensive demo application. Includes `mkgui.c`. |
-| `test_dynamic.c` | Stress tests for widget add/remove, boundary growth, aux data consistency. |
-| `tools/gen_icons.c` | Offline tool: reads a TTF icon font and generates a binary icon pack (`.dat`). |
+| `tests/test_layout.c` | Layout geometry unit tests. |
+| `tests/test_widgets.c` | Widget behavior unit tests. |
+| `tests/test_events.c` | Event dispatch tests. |
+| `tools/extract_icons.c` | Offline tool: reads the editor-generated icon list and copies/resolves SVGs from a Freedesktop theme directory. |
 
 ## Core data structures
 
@@ -75,7 +91,7 @@ Everything lives here. One context per window. Key members:
 | `theme` | Current color theme |
 | `hover_id`, `press_id`, `focus_id` | Interaction state |
 | `dirty_rects[32]`, `dirty_count`, `dirty_full` | Dirty region tracking |
-| `timers[16]` | Active timers (timerfd on Linux, WaitableTimer on Windows) |
+| `timers[MKGUI_MAX_TIMERS]` | Active timers, 8 slots (timerfd on Linux, WaitableTimer on Windows) |
 | `parent` | Pointer to parent context (for child windows) |
 
 ### struct mkgui_widget
@@ -83,10 +99,10 @@ Everything lives here. One context per window. Key members:
 Flat, value-type definition of a widget:
 
 ```
-type, id, label[256], icon[64], parent_id, w, h, flags, weight, margin_l, margin_r, margin_t, margin_b
+type, id, parent_id, w, h, flags, style, weight, margin_l, margin_r, margin_t, margin_b, label[256], icon[64]
 ```
 
-There are no `x, y` fields. All positioning is container-based (VBOX, HBOX, FORM, PANEL acts as VBOX). The `w` and `h` fields specify size; when `h` is 0, the widget uses its natural height derived from the font height. The actual computed position lives in the parallel `rects[]` array.
+There are no `x, y` fields. All positioning is container-based (VBOX, HBOX, FORM, PANEL acts as VBOX). The `w` and `h` fields specify size; when `h` is 0, the widget uses its natural height derived from the font height. The `flags` field holds universal layout/visibility flags; the `style` field holds per-widget-type style flags (each widget type has its own bit-0-based namespace). The actual computed position lives in the parallel `rects[]` array.
 
 ### Auxiliary data (the aux system)
 
@@ -248,9 +264,11 @@ Each platform translates native events into a uniform `struct mkgui_plat_event`:
 | X11 LeaveNotify / WM_MOUSELEAVE | `MKGUI_PLAT_LEAVE` |
 | X11 FocusOut / WM_KILLFOCUS | `MKGUI_PLAT_FOCUS_OUT` |
 
-### Dispatch (mkgui_poll)
+### Dispatch (internal mkgui_poll)
 
-`mkgui_poll()` is the main event processing function. Each call:
+Internally the dispatch loop is still named `mkgui_poll()` / `mkgui_wait()` / `mkgui_flush()`, but these are `static` helpers used only by `mkgui_run()` and by nested dialog event loops (`mkgui_dialogs.c`, `mkgui_filedialog.c`, `mkgui_iconbrowser.c`, `mkgui_colorpicker.c`). They are not part of the public API -- applications talk to mkgui exclusively through `mkgui_run()` plus per-context callbacks registered with `mkgui_set_callback()`.
+
+`mkgui_poll()` does the following on each call:
 
 1. Update animation time.
 2. Fire expired timer callbacks.
@@ -259,25 +277,32 @@ Each platform translates native events into a uniform `struct mkgui_plat_event`:
    - **Mouse motion**: hit-test to find widget under cursor, update `hover_id`, handle drag operations (splits, listview column resize, scrollbar thumb, etc.).
    - **Button press**: set `press_id`, delegate to widget-specific press handler.
    - **Button release**: generate click events, delegate to widget-specific release handler.
-   - **Key press**: route to focused widget's key handler (text input, arrow navigation, etc.).
+   - **Key press**: route to focused widget's key handler (text input, arrow navigation, etc.). Accelerators are matched after context menu keys but before Tab and clipboard shortcuts.
    - **Resize**: reallocate framebuffer, re-layout.
    - **Close**: set `close_requested`.
-5. Return the resulting `struct mkgui_event` (type, id, value) to the application.
+5. Return the resulting `struct mkgui_event` to the application via the registered callback.
 
 ### Application event loop
 
 ```c
-// Simple loop (mkgui_run does this internally):
+// Public API: one function, no manual poll/wait:
+mkgui_run(ctx, on_event, userdata);
+```
+
+`mkgui_run()` is the only public event loop. Internally it is roughly:
+
+```c
 while(!ctx->close_requested) {
     struct mkgui_event ev;
     while(mkgui_poll(ctx, &ev)) {
-        // handle ev
+        cb(ctx, &ev, userdata);
     }
+    // pump any other contexts registered via mkgui_set_callback()
     mkgui_wait(ctx);  // flush + block until next event or timer
 }
 ```
 
-`mkgui_wait()` calls `mkgui_flush()` then blocks on `platform_wait_event()` (poll/select on Linux, MsgWaitForMultipleObjects on Windows).
+`mkgui_wait()` calls `mkgui_flush()` then blocks on `platform_wait_event()` (poll/select on Linux, MsgWaitForMultipleObjects on Windows). It also drains events for secondary contexts that were registered via `mkgui_set_callback()`, so multi-window applications work without a manual pump.
 
 ## Platform abstraction
 
@@ -310,11 +335,18 @@ Both platforms implement the same set of `platform_*()` functions. The correct i
 
 ## Icon system
 
-Icons are stored in a global hash table (`icons[MKGUI_MAX_ICONS]`, max 8192) with a pre-allocated pixel pool. Each icon is `MKGUI_ICON_SIZE` x `MKGUI_ICON_SIZE` pixels (18x18 by default).
+Icons are SVG-based. Source SVG bytes are cached per name and rasterized on demand via PlutoSVG/PlutoVG into ARGB bitmaps stored in a flat linear pixel buffer (one contiguous block per icon, row-major, no stride padding). Names are hashed (FNV-1a) into a hash table for O(1) lookup.
 
-Icon packs are generated offline by `tools/gen_icons.c` from a TTF icon font (Material Design Icons). The binary `.dat` file is embedded into the application via `incbin.h` and loaded at startup with `mkgui_set_icon_data()`.
+Loading paths:
 
-Lookup by name uses FNV-1a hashing with linear probing. Drawing is done by `draw_icon()` / `draw_icon_popup()` with per-pixel alpha blending and clip rect support.
+1. `mkgui_icon_load_svg(ctx, name, path)` -- single SVG file registered under `name`.
+2. `mkgui_icon_load_svg_dir(ctx, dir)` -- batch load every `.svg` in a flat directory (filename minus extension = icon name).
+3. `mkgui_icon_load_app_icons(ctx, app_name)` -- resolve the directory via XDG/FHS paths, then batch load.
+4. Lazy system theme fallback (Linux): if an icon is referenced but not found in the loaded set, `icon_resolve()` walks the detected system theme chain (Papirus -> breeze -> hicolor, etc.) and loads the first match. Results are cached; a negative cache prevents repeated filesystem lookups for names that don't exist in any theme.
+
+Icons are automatically re-rasterized on scale change (`mkgui_set_scale`) and theme change (`mkgui_set_theme`) because `currentColor` in the SVG follows `theme.text`. The SVG source cache makes this cheap. Drawing is done by `draw_icon()` / `draw_icon_popup()` with per-pixel alpha blending and clip rect support.
+
+The base table is sized by `MKGUI_MAX_ICONS` (default 2048; can be overridden at compile time, the editor defines it as 32768 to support browsing entire system themes).
 
 ## Popup system
 
@@ -331,9 +363,9 @@ Each popup has its own pixel buffer and is rendered/blitted independently. Max 8
 
 ## Multi-window support
 
-`mkgui_create_child()` creates a second context with its own window, framebuffer, and widget tree. The child shares the parent's font data, icon packs, and display connection. It is marked as a transient window of the parent (window manager handles stacking/modality).
+`mkgui_create_child()` creates a second context with its own window, framebuffer, and widget tree. The child shares the parent's font data, icon cache, and display connection. It is marked as a transient window of the parent (window manager handles stacking/modality). Destroy children with `mkgui_destroy_child()`, not `mkgui_destroy()`.
 
-A deferred event queue handles events for non-focused windows. Each context is registered in a global `window_registry[]` (max 16 windows).
+Each context can register an event callback via `mkgui_set_callback()`. A global window registry maps platform window handles to their owning `mkgui_ctx`, so `mkgui_run()` routes events to the correct context without manual pumping. For events that arrive while another context is the running loop, the event is pushed onto the target context's deferred event queue and delivered on its next iteration.
 
 ## Widget lifecycle
 
@@ -358,12 +390,16 @@ A deferred event queue handles events for non-focused windows. Each context is r
 |----------|---------|------------|
 | Widgets (layout) | 65,536 | `MKGUI_VM_MAX_WIDGETS` |
 | Text commands/frame | 32,768 | `MKGUI_VM_MAX_TEXT_CMDS` |
-| Icons | 8,192 | `MKGUI_MAX_ICONS` |
+| Icons | 2,048 (default) | `MKGUI_MAX_ICONS` (overridable at compile time; editor uses 32,768) |
 | Popups | 8 | `MKGUI_MAX_POPUPS` |
-| Windows | 16 | `MKGUI_MAX_WINDOWS` |
-| Timers | 16 | `MKGUI_MAX_TIMERS` |
+| Timers per context | 8 | `MKGUI_MAX_TIMERS` |
+| Accelerators per context | 64 | `MKGUI_MAX_ACCELS` |
 | Dirty rects | 32 | Fixed array on ctx |
 | Widget label length | 256 chars | `MKGUI_MAX_TEXT` |
 | Icon name length | 64 chars | `MKGUI_ICON_NAME_LEN` |
 | Context menu items | 64 | `MKGUI_MAX_CTXMENU` |
-| Clipboard | 4,096 bytes | `MKGUI_CLIP_MAX` |
+| Statusbar sections | 8 | `MKGUI_MAX_STATUSBAR_SECTIONS` |
+| Dropdown items | 64 | `MKGUI_MAX_DROPDOWN` |
+| Pathbar segments | 64 | `MKGUI_PATHBAR_MAX_SEGS` |
+| File drop items | 256 | `MKGUI_DROP_MAX` |
+| Multi-selection rows | 4,096 | `MKGUI_MAX_MULTI_SEL` |

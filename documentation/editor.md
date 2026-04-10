@@ -217,7 +217,7 @@ the checkboxes. Enabled events generate `case` stubs in the output code.
 - **Open** -- load a .mkgui project
 - **Save** -- save to current file
 - **Save As...** -- save with new filename
-- **Recent Files** -- submenu with up to 10 recently opened projects
+- **Recent Files** -- submenu with up to 10 recently opened projects (persisted between editor sessions)
 - **Generate Code** -- export complete compilable C source
 - **Generate Snippet** -- export IDs and widget array only
 - **Exit** -- close editor
@@ -227,6 +227,8 @@ the checkboxes. Enabled events generate `case` stubs in the output code.
 - **Undo** -- undo last action
 - **Redo** -- redo next action
 - **Delete** -- delete selected widget
+
+The editor remembers window size, last open path, and recent files across sessions via its config file.
 
 ## Layout system
 
