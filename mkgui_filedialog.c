@@ -145,36 +145,47 @@ static char *fd_icon_for_ext(char *dot) {
 	if(strcmp(dot, ".c") == 0 || strcmp(dot, ".h") == 0) {
 		return "text-x-csrc";
 	}
+
 	if(strcmp(dot, ".cpp") == 0 || strcmp(dot, ".cc") == 0 || strcmp(dot, ".cxx") == 0 || strcmp(dot, ".hpp") == 0) {
 		return "text-x-c++src";
 	}
+
 	if(strcmp(dot, ".sh") == 0 || strcmp(dot, ".bash") == 0 || strcmp(dot, ".zsh") == 0) {
 		return "text-x-script";
 	}
+
 	if(strcmp(dot, ".py") == 0) {
 		return "text-x-python";
 	}
+
 	if(strcmp(dot, ".js") == 0 || strcmp(dot, ".ts") == 0 || strcmp(dot, ".json") == 0) {
 		return "text-x-script";
 	}
+
 	if(strcmp(dot, ".html") == 0 || strcmp(dot, ".htm") == 0) {
 		return "text-html";
 	}
+
 	if(strcmp(dot, ".xml") == 0 || strcmp(dot, ".svg") == 0) {
 		return "text-xml";
 	}
+
 	if(strcmp(dot, ".css") == 0) {
 		return "text-css";
 	}
+
 	if(strcmp(dot, ".png") == 0 || strcmp(dot, ".jpg") == 0 || strcmp(dot, ".jpeg") == 0 || strcmp(dot, ".gif") == 0 || strcmp(dot, ".bmp") == 0 || strcmp(dot, ".webp") == 0 || strcmp(dot, ".ico") == 0) {
 		return "image-x-generic";
 	}
+
 	if(strcmp(dot, ".pdf") == 0) {
 		return "application-pdf";
 	}
+
 	if(strcmp(dot, ".zip") == 0 || strcmp(dot, ".tar") == 0 || strcmp(dot, ".gz") == 0 || strcmp(dot, ".bz2") == 0 || strcmp(dot, ".xz") == 0 || strcmp(dot, ".7z") == 0 || strcmp(dot, ".rar") == 0) {
 		return "package-x-generic";
 	}
+
 	if(strcmp(dot, ".o") == 0 || strcmp(dot, ".so") == 0 || strcmp(dot, ".a") == 0 || strcmp(dot, ".dll") == 0) {
 		return "application-x-object";
 	}
@@ -240,6 +251,7 @@ static uint32_t fd_match_pattern(char *name, char *pattern) {
 		while(*tok == ' ' || *tok == ';') {
 			++tok;
 		}
+
 		if(*tok == '\0') {
 			break;
 		}
@@ -279,12 +291,15 @@ static int fd_compare_entries(const void *a, const void *b) {
 	if(strcmp(ea->name, "..") == 0) {
 		return -1;
 	}
+
 	if(strcmp(eb->name, "..") == 0) {
 		return 1;
 	}
+
 	if(ea->is_dir && !eb->is_dir) {
 		return -1;
 	}
+
 	if(!ea->is_dir && eb->is_dir) {
 		return 1;
 	}
@@ -359,10 +374,12 @@ static void fd_scan_dir(void) {
 		if(fd->entry_count >= FD_MAX_FILES) {
 			break;
 		}
+
 		if(wfd.cFileName[0] == '.') {
 			if(!fd->show_hidden) {
 				continue;
 			}
+
 			if(strcmp(wfd.cFileName, ".") == 0 || strcmp(wfd.cFileName, "..") == 0) {
 				continue;
 			}
@@ -402,6 +419,7 @@ static void fd_scan_dir(void) {
 			if(!fd->show_hidden) {
 				continue;
 			}
+
 			if(strcmp(de->d_name, ".") == 0 || strcmp(de->d_name, "..") == 0) {
 				continue;
 			}
@@ -488,6 +506,7 @@ static void fd_load_bookmarks(void) {
 			if(nl) {
 				*nl = '\0';
 			}
+
 			if(strncmp(line, "file://", 7) != 0) {
 				continue;
 			}
@@ -529,14 +548,7 @@ static void fd_load_bookmarks(void) {
 				continue;
 			}
 
-			if(strcmp(fs, "proc") == 0 || strcmp(fs, "sysfs") == 0 || strcmp(fs, "tmpfs") == 0 ||
-			   strcmp(fs, "devtmpfs") == 0 || strcmp(fs, "devpts") == 0 || strcmp(fs, "cgroup") == 0 ||
-			   strcmp(fs, "cgroup2") == 0 || strcmp(fs, "securityfs") == 0 || strcmp(fs, "debugfs") == 0 ||
-			   strcmp(fs, "configfs") == 0 || strcmp(fs, "fusectl") == 0 || strcmp(fs, "hugetlbfs") == 0 ||
-			   strcmp(fs, "mqueue") == 0 || strcmp(fs, "pstore") == 0 || strcmp(fs, "binfmt_misc") == 0 ||
-			   strcmp(fs, "autofs") == 0 || strcmp(fs, "efivarfs") == 0 || strcmp(fs, "tracefs") == 0 ||
-			   strcmp(fs, "bpf") == 0 || strcmp(fs, "nsfs") == 0 || strcmp(fs, "overlay") == 0 ||
-			   strcmp(fs, "squashfs") == 0 || strcmp(fs, "fuse.portal") == 0) {
+			if(strcmp(fs, "proc") == 0 || strcmp(fs, "sysfs") == 0 || strcmp(fs, "tmpfs") == 0 || strcmp(fs, "devtmpfs") == 0 || strcmp(fs, "devpts") == 0 || strcmp(fs, "cgroup") == 0 || strcmp(fs, "cgroup2") == 0 || strcmp(fs, "securityfs") == 0 || strcmp(fs, "debugfs") == 0 || strcmp(fs, "configfs") == 0 || strcmp(fs, "fusectl") == 0 || strcmp(fs, "hugetlbfs") == 0 || strcmp(fs, "mqueue") == 0 || strcmp(fs, "pstore") == 0 || strcmp(fs, "binfmt_misc") == 0 || strcmp(fs, "autofs") == 0 || strcmp(fs, "efivarfs") == 0 || strcmp(fs, "tracefs") == 0 || strcmp(fs, "bpf") == 0 || strcmp(fs, "nsfs") == 0 || strcmp(fs, "overlay") == 0 || strcmp(fs, "squashfs") == 0 || strcmp(fs, "fuse.portal") == 0) {
 				continue;
 			}
 
@@ -553,6 +565,7 @@ static void fd_load_bookmarks(void) {
 					break;
 				}
 			}
+
 			if(already) {
 				continue;
 			}
@@ -624,14 +637,17 @@ static uint32_t fd_strcasestr(char *haystack, char *needle, uint32_t needle_len)
 			if(ca >= 'A' && ca <= 'Z') {
 				ca += 32;
 			}
+
 			if(cb >= 'A' && cb <= 'Z') {
 				cb += 32;
 			}
+
 			if(ca != cb) {
 				match = 0;
 				break;
 			}
 		}
+
 		if(match) {
 			return 1;
 		}
@@ -647,6 +663,7 @@ static void fd_apply_filter(struct mkgui_ctx *dlg) {
 			fd->filtered[fd->filtered_count++] = i;
 			continue;
 		}
+
 		if(fd->filter_len == 0 || fd_strcasestr(fd->entries[i].name, fd->filter, fd->filter_len)) {
 			fd->filtered[fd->filtered_count++] = i;
 		}
@@ -659,6 +676,7 @@ static void fd_apply_filter(struct mkgui_ctx *dlg) {
 		memset(lv->multi_sel, 0, sizeof(lv->multi_sel));
 		lv->multi_sel_count = 0;
 	}
+
 	if(fd->filter_len > 0) {
 		char label[80];
 		snprintf(label, sizeof(label), "Filter: %s", fd->filter);
@@ -770,9 +788,11 @@ static void fd_navigate_up(struct mkgui_ctx *dlg) {
 	if(last_bs && (!last || last_bs > last)) {
 		last = last_bs;
 	}
+
 	if(!last) {
 		return;
 	}
+
 	if(last == fd->path + 2 && fd->path[1] == ':') {
 		char newpath[4] = { fd->path[0], ':', '\\', '\0' };
 		fd_navigate(dlg, newpath);
@@ -782,6 +802,7 @@ static void fd_navigate_up(struct mkgui_ctx *dlg) {
 	if(!last) {
 		return;
 	}
+
 	if(last == fd->path) {
 		if(strcmp(fd->path, "/") != 0) {
 			fd_navigate(dlg, "/");
@@ -833,6 +854,7 @@ static void fd_append_filter_ext(char *name, uint32_t name_size) {
 	if(!fd->filters || fd->active_filter >= fd->filter_count) {
 		return;
 	}
+
 	if(strchr(name, '.')) {
 		return;
 	}
@@ -844,6 +866,7 @@ static void fd_append_filter_ext(char *name, uint32_t name_size) {
 	while(*pat == ' ' || *pat == ';') {
 		++pat;
 	}
+
 	if(pat[0] == '*' && pat[1] == '.') {
 		uint32_t nlen = (uint32_t)strlen(name);
 		char *ext = pat + 1;
@@ -851,6 +874,7 @@ static void fd_append_filter_ext(char *name, uint32_t name_size) {
 		while(ext[elen] && ext[elen] != ';' && ext[elen] != ' ') {
 			++elen;
 		}
+
 		if(nlen + elen < name_size - 1) {
 			memcpy(&name[nlen], ext, elen);
 			name[nlen + elen] = '\0';
@@ -970,6 +994,7 @@ static void fd_bookmark_row_cb(uint32_t row, uint32_t col, char *buf, uint32_t b
 			if(strncmp(fd->bookmarks[row].path, "/media/", 7) == 0 || strncmp(fd->bookmarks[row].path, "/mnt/", 5) == 0) {
 				is_mount = 1;
 			}
+
 			if(is_mount) {
 				icon = "drive-harddisk";
 			}
@@ -1034,6 +1059,7 @@ static void fd_update_name_from_selection(struct mkgui_ctx *dlg) {
 				if(pos > 0 && pos < sizeof(combined) - 1) {
 					combined[pos++] = ' ';
 				}
+
 				if(has_space && pos < sizeof(combined) - 2) {
 					combined[pos++] = '"';
 				}
@@ -1041,6 +1067,7 @@ static void fd_update_name_from_selection(struct mkgui_ctx *dlg) {
 				for(uint32_t j = 0; j < nlen && pos < sizeof(combined) - 2; ++j) {
 					combined[pos++] = e->name[j];
 				}
+
 				if(has_space && pos < sizeof(combined) - 1) {
 					combined[pos++] = '"';
 				}
@@ -1063,6 +1090,7 @@ static void fd_new_folder(struct mkgui_ctx *dlg) {
 	if(!mkgui_input_dialog(dlg, "New Folder", "Name:", "", name, sizeof(name))) {
 		return;
 	}
+
 	if(name[0] == '\0') {
 		return;
 	}
@@ -1090,6 +1118,7 @@ static uint32_t fd_run_dialog(struct mkgui_ctx *ctx, uint32_t mode, struct mkgui
 	if(!fd) {
 		return 0;
 	}
+
 	if(!fd_results) {
 		fd_results = (char (*)[FD_PATH_SIZE + 260])calloc(FD_MAX_RESULTS, FD_PATH_SIZE + 260);
 		if(!fd_results) {
@@ -1387,6 +1416,7 @@ static uint32_t fd_run_dialog(struct mkgui_ctx *ctx, uint32_t mode, struct mkgui
 								} else {
 									mkgui_input_set(dlg, FD_ID_NAME_INPUT, e->name);
 								}
+
 								if(fd_confirm(dlg)) {
 									running = 0;
 								}

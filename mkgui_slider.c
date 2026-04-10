@@ -4,10 +4,7 @@
 #define MKGUI_SLIDER_WEDGE_MAX_W      10
 
 // [=]===^=[ slider_draw_wedge_v ]================================[=]
-static void slider_draw_wedge_v(uint32_t *buf, int32_t bw, int32_t bh,
-	int32_t x, int32_t y, int32_t h,
-	int32_t row_start, int32_t row_count,
-	int32_t max_w, uint32_t color) {
+static void slider_draw_wedge_v(uint32_t *buf, int32_t bw, int32_t bh, int32_t x, int32_t y, int32_t h, int32_t row_start, int32_t row_count, int32_t max_w, uint32_t color) {
 	if(h <= 1 || row_count <= 0 || max_w <= 0) {
 		return;
 	}
@@ -16,6 +13,7 @@ static void slider_draw_wedge_v(uint32_t *buf, int32_t bw, int32_t bh,
 	if(y + row_start < 0) {
 		i_start = -(y + row_start);
 	}
+
 	if(y + row_start + row_count > bh) {
 		i_end = bh - y - row_start;
 	}
@@ -33,6 +31,7 @@ static void slider_draw_wedge_v(uint32_t *buf, int32_t bw, int32_t bh,
 				buf[py * bw + px] = color;
 			}
 		}
+
 		if(frac > 0.01f) {
 			int32_t ex = x + w_full;
 			if(ex >= 0 && ex < bw) {
@@ -43,10 +42,7 @@ static void slider_draw_wedge_v(uint32_t *buf, int32_t bw, int32_t bh,
 }
 
 // [=]===^=[ slider_draw_wedge_h ]================================[=]
-static void slider_draw_wedge_h(uint32_t *buf, int32_t bw, int32_t bh,
-	int32_t x, int32_t y, int32_t w,
-	int32_t col_start, int32_t col_count,
-	int32_t max_h, uint32_t color) {
+static void slider_draw_wedge_h(uint32_t *buf, int32_t bw, int32_t bh, int32_t x, int32_t y, int32_t w, int32_t col_start, int32_t col_count, int32_t max_h, uint32_t color) {
 	if(w <= 1 || col_count <= 0 || max_h <= 0) {
 		return;
 	}
@@ -55,6 +51,7 @@ static void slider_draw_wedge_h(uint32_t *buf, int32_t bw, int32_t bh,
 	if(x + col_start < 0) {
 		ci_start = -(x + col_start);
 	}
+
 	if(x + col_start + col_count > bw) {
 		ci_end = bw - x - col_start;
 	}
@@ -72,6 +69,7 @@ static void slider_draw_wedge_h(uint32_t *buf, int32_t bw, int32_t bh,
 				buf[py * bw + px] = color;
 			}
 		}
+
 		if(frac > 0.01f) {
 			int32_t ey = y + h_full;
 			if(ey >= 0 && ey < bh) {
@@ -129,6 +127,7 @@ static void render_slider(struct mkgui_ctx *ctx, uint32_t idx) {
 					draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, meter_x, meter_y + meter_h - ph, meter_w, ph, sd->meter_pre_color);
 				}
 			}
+
 			if(sd->meter_post_color != 0 && sd->meter_post > 0.0f) {
 				float post = sd->meter_post > 1.0f ? 1.0f : sd->meter_post;
 				int32_t ph = (int32_t)(post * (float)meter_h);
@@ -161,6 +160,7 @@ static void render_slider(struct mkgui_ctx *ctx, uint32_t idx) {
 					draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, meter_x, meter_y, pw, meter_h, sd->meter_pre_color);
 				}
 			}
+
 			if(sd->meter_post_color != 0 && sd->meter_post > 0.0f) {
 				float post = sd->meter_post > 1.0f ? 1.0f : sd->meter_post;
 				int32_t pw = (int32_t)(post * (float)meter_w);
@@ -236,6 +236,7 @@ MKGUI_API void mkgui_slider_setup(struct mkgui_ctx *ctx, uint32_t id, int32_t mi
 	if(sd->value < sd->min_val) {
 		sd->value = sd->min_val;
 	}
+
 	if(sd->value > sd->max_val) {
 		sd->value = sd->max_val;
 	}
@@ -256,9 +257,11 @@ MKGUI_API void mkgui_slider_set(struct mkgui_ctx *ctx, uint32_t id, int32_t valu
 	if(!sd) {
 		return;
 	}
+
 	if(value < sd->min_val) {
 		value = sd->min_val;
 	}
+
 	if(value > sd->max_val) {
 		value = sd->max_val;
 	}
@@ -275,6 +278,7 @@ MKGUI_API void mkgui_slider_get_range(struct mkgui_ctx *ctx, uint32_t id, int32_
 		if(max_val) { *max_val = 0; }
 		return;
 	}
+
 	if(min_val) { *min_val = sd->min_val; }
 	if(max_val) { *max_val = sd->max_val; }
 }
@@ -291,6 +295,7 @@ MKGUI_API void mkgui_slider_set_range(struct mkgui_ctx *ctx, uint32_t id, int32_
 	if(sd->value < sd->min_val) {
 		sd->value = sd->min_val;
 	}
+
 	if(sd->value > sd->max_val) {
 		sd->value = sd->max_val;
 	}

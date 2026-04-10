@@ -40,6 +40,7 @@ static void pathbar_rebuild_segments(struct mkgui_ctx *ctx, struct mkgui_pathbar
 		while(i < len && (pb->path[i] == '/' || pb->path[i] == '\\')) {
 			++i;
 		}
+
 		if(i >= len) {
 			break;
 		}

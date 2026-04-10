@@ -38,9 +38,11 @@ MKGUI_API void mkgui_split_set_ratio(struct mkgui_ctx *ctx, uint32_t id, float r
 	if(!sd) {
 		return;
 	}
+
 	if(ratio < 0.0f) {
 		ratio = 0.0f;
 	}
+
 	if(ratio > 1.0f) {
 		ratio = 1.0f;
 	}

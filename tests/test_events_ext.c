@@ -143,6 +143,7 @@ static uint32_t poll_for_event(struct mkgui_ctx *ctx, uint32_t event_type, uint3
 		if(got && ev.type == event_type && (target_id == 0 || ev.id == target_id)) {
 			found = 1;
 		}
+
 		if(!got && ctx->plat.deferred_head == ctx->plat.deferred_tail) {
 			mkgui_poll(ctx, &ev);
 			if(ev.type == event_type && (target_id == 0 || ev.id == target_id)) {
@@ -608,8 +609,7 @@ static void test_tab_close(void) {
 		int32_t hx = ctx->rects[idx].x + text_width(ctx, "A") + 20;
 		int32_t hy = ctx->rects[idx].y + ctx->tab_height / 2;
 		inject_click_at(ctx, hx, hy);
-		CHECK(poll_for_event(ctx, MKGUI_EVENT_TAB_CLOSE, TABS1) || poll_for_event(ctx, MKGUI_EVENT_TAB_CHANGED, TABS1),
-			"expected TAB_CLOSE or TAB_CHANGED");
+		CHECK(poll_for_event(ctx, MKGUI_EVENT_TAB_CLOSE, TABS1) || poll_for_event(ctx, MKGUI_EVENT_TAB_CHANGED, TABS1), "expected TAB_CLOSE or TAB_CHANGED");
 		mkgui_destroy(ctx);
 	}
 	TEST_END();

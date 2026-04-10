@@ -10,6 +10,7 @@ static void draw_aa_line(uint32_t *buf, int32_t bw, int32_t bh, int32_t x0, int3
 	if(ady > steps) {
 		steps = ady;
 	}
+
 	if(steps == 0) {
 		return;
 	}
@@ -24,12 +25,15 @@ static void draw_aa_line(uint32_t *buf, int32_t bw, int32_t bh, int32_t x0, int3
 		if(py_lo < 0) {
 			py_lo = 0;
 		}
+
 		if(py_hi >= bh) {
 			py_hi = bh - 1;
 		}
+
 		if(px_lo < 0) {
 			px_lo = 0;
 		}
+
 		if(px_hi >= bw) {
 			px_hi = bw - 1;
 		}
@@ -133,6 +137,7 @@ MKGUI_API void mkgui_checkbox_set(struct mkgui_ctx *ctx, uint32_t id, uint32_t c
 	if(!w) {
 		return;
 	}
+
 	if(checked) {
 		w->style |= MKGUI_CHECKBOX_CHECKED;
 

@@ -50,6 +50,7 @@ static void glview_sync_all(struct mkgui_ctx *ctx) {
 		if(rw < 1) {
 			rw = 1;
 		}
+
 		if(rh < 1) {
 			rh = 1;
 		}
@@ -120,6 +121,7 @@ MKGUI_API uint32_t mkgui_glview_init(struct mkgui_ctx *ctx, uint32_t id) {
 	if(rw < 1) {
 		rw = 1;
 	}
+
 	if(rh < 1) {
 		rh = 1;
 	}
@@ -161,14 +163,17 @@ MKGUI_API void mkgui_glview_get_size(struct mkgui_ctx *ctx, uint32_t id, int32_t
 		if(w) {
 			*w = 0;
 		}
+
 		if(h) {
 			*h = 0;
 		}
 		return;
 	}
+
 	if(w) {
 		*w = gv->last_w;
 	}
+
 	if(h) {
 		*h = gv->last_h;
 	}

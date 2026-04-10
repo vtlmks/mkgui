@@ -84,9 +84,11 @@ static void textedit_move_left(struct mkgui_text_edit *te, uint32_t shift) {
 		textedit_clear_selection(te);
 		return;
 	}
+
 	if(te->cursor > 0) {
 		te->cursor = utf8_prev(te->text, te->cursor);
 	}
+
 	if(shift) {
 		te->sel_end = te->cursor;
 	} else {
@@ -108,6 +110,7 @@ static void textedit_move_right(struct mkgui_text_edit *te, uint32_t shift) {
 	if(te->cursor < len) {
 		te->cursor = utf8_next(te->text, te->cursor);
 	}
+
 	if(shift) {
 		te->sel_end = te->cursor;
 	} else {
@@ -141,6 +144,7 @@ static uint32_t textedit_backspace(struct mkgui_text_edit *te) {
 		textedit_delete_selection(te);
 		return 1;
 	}
+
 	if(te->cursor > 0) {
 		uint32_t prev = utf8_prev(te->text, te->cursor);
 		uint32_t text_len = (uint32_t)strlen(te->text);
@@ -229,6 +233,7 @@ static void textedit_scroll_to_cursor(struct mkgui_ctx *ctx, struct mkgui_text_e
 	if(cx - te->scroll_x > visible_w) {
 		te->scroll_x = cx - visible_w;
 	}
+
 	if(cx - te->scroll_x < 0) {
 		te->scroll_x = cx;
 	}
@@ -254,6 +259,7 @@ static void textedit_render(struct mkgui_ctx *ctx, struct mkgui_text_edit *te, c
 		if(lo > dlen) {
 			lo = dlen;
 		}
+
 		if(hi > dlen) {
 			hi = dlen;
 		}

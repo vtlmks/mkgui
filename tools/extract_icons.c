@@ -71,6 +71,7 @@ static void add_icon(const char *name, const char *source) {
 	if(icon_count >= MAX_ICONS) {
 		return;
 	}
+
 	if(icon_name_exists(name)) {
 		return;
 	}
@@ -101,6 +102,7 @@ static int read_icon_list(const char *path, int required) {
 		while(len > 0 && (line[len - 1] == '\n' || line[len - 1] == '\r' || line[len - 1] == ' ')) {
 			line[--len] = '\0';
 		}
+
 		if(len == 0 || line[0] == '#') {
 			continue;
 		}

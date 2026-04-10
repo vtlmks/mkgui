@@ -39,9 +39,11 @@ MKGUI_API void mkgui_scrollbar_set(struct mkgui_ctx *ctx, uint32_t id, int32_t v
 	if(max_scroll < 0) {
 		max_scroll = 0;
 	}
+
 	if(value < 0) {
 		value = 0;
 	}
+
 	if(value > max_scroll) {
 		value = max_scroll;
 	}
@@ -82,6 +84,7 @@ static void scrollbar_thumb_rect(struct mkgui_ctx *ctx, uint32_t idx, struct mkg
 	if(thumb < min_thumb) {
 		thumb = min_thumb;
 	}
+
 	if(thumb > track) {
 		thumb = track;
 	}
@@ -94,6 +97,7 @@ static void scrollbar_thumb_rect(struct mkgui_ctx *ctx, uint32_t idx, struct mkg
 	if(pos < 0) {
 		pos = 0;
 	}
+
 	if(pos > track - thumb) {
 		pos = track - thumb;
 	}
@@ -197,6 +201,7 @@ static void scrollbar_drag_to(struct mkgui_ctx *ctx, uint32_t id, int32_t mx, in
 	if(thumb < min_thumb) {
 		thumb = min_thumb;
 	}
+
 	if(thumb > track) {
 		thumb = track;
 	}
@@ -215,6 +220,7 @@ static void scrollbar_drag_to(struct mkgui_ctx *ctx, uint32_t id, int32_t mx, in
 	if(frac < 0.0f) {
 		frac = 0.0f;
 	}
+
 	if(frac > 1.0f) {
 		frac = 1.0f;
 	}
@@ -241,6 +247,7 @@ static void scrollbar_scroll(struct mkgui_ctx *ctx, uint32_t id, int32_t directi
 	if(sb->value < 0) {
 		sb->value = 0;
 	}
+
 	if(sb->value > max_scroll) {
 		sb->value = max_scroll;
 	}

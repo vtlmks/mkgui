@@ -33,8 +33,7 @@ static void render_dropdown(struct mkgui_ctx *ctx, uint32_t idx) {
 	int32_t as = sc(ctx, 4);
 	int32_t acx = rx + rw - arrow_margin + as;
 	int32_t acy = ry + rh / 2;
-	draw_triangle_aa(ctx->pixels, ctx->win_w, ctx->win_h,
-		acx - as, acy - as / 2, acx + as, acy - as / 2, acx, acy + as / 2, tc);
+	draw_triangle_aa(ctx->pixels, ctx->win_w, ctx->win_h, acx - as, acy - as / 2, acx + as, acy - as / 2, acx, acy + as / 2, tc);
 }
 
 // [=]===^=[ dropdown_clamp_scroll ]=============================[=]
@@ -45,9 +44,11 @@ static void dropdown_clamp_scroll(struct mkgui_ctx *ctx, struct mkgui_dropdown_d
 	if(max_scroll < 0) {
 		max_scroll = 0;
 	}
+
 	if(dd->scroll_y < 0) {
 		dd->scroll_y = 0;
 	}
+
 	if(dd->scroll_y > max_scroll) {
 		dd->scroll_y = max_scroll;
 	}
@@ -168,6 +169,7 @@ static uint32_t handle_dropdown_key(struct mkgui_ctx *ctx, struct mkgui_event *e
 		if(!dd) {
 			return 0;
 		}
+
 		if(dd->selected > 0) {
 			--dd->selected;
 			dirty_all(ctx);
@@ -176,14 +178,14 @@ static uint32_t handle_dropdown_key(struct mkgui_ctx *ctx, struct mkgui_event *e
 			ev->value = dd->selected;
 			return 1;
 		}
-		break;
-	}
+	} break;
 
 	case MKGUI_KEY_DOWN: {
 		dd = find_dropdown_data(ctx, ctx->focus_id);
 		if(!dd) {
 			return 0;
 		}
+
 		if(dd->selected < (int32_t)dd->item_count - 1) {
 			++dd->selected;
 			dirty_all(ctx);
@@ -192,12 +194,10 @@ static uint32_t handle_dropdown_key(struct mkgui_ctx *ctx, struct mkgui_event *e
 			ev->value = dd->selected;
 			return 1;
 		}
-		break;
-	}
+	} break;
 
 	default: {
-		break;
-	}
+	} break;
 	}
 
 	return 0;
@@ -237,6 +237,7 @@ MKGUI_API void mkgui_dropdown_set(struct mkgui_ctx *ctx, uint32_t id, int32_t in
 	if(!dd) {
 		return;
 	}
+
 	if(index < 0 || (uint32_t)index >= dd->item_count) {
 		dd->selected = -1;
 

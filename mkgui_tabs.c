@@ -11,6 +11,7 @@ static int32_t tab_calc_width(struct mkgui_ctx *ctx, struct mkgui_widget *child)
 	if(ii >= 0) {
 		tw += icons[ii].w + icon_gap;
 	}
+
 	if(child->style & MKGUI_TAB_CLOSABLE) {
 		tw += close_w;
 	}
@@ -134,6 +135,7 @@ static uint32_t handle_tabs_key(struct mkgui_ctx *ctx, struct mkgui_event *ev, u
 	if(!w) {
 		return 0;
 	}
+
 	if(ks != MKGUI_KEY_LEFT && ks != MKGUI_KEY_RIGHT) {
 		return 0;
 	}
@@ -155,11 +157,13 @@ static uint32_t handle_tabs_key(struct mkgui_ctx *ctx, struct mkgui_event *ev, u
 		if(child->type != MKGUI_TAB) {
 			continue;
 		}
+
 		if(child->id == td->active_tab) {
 			cur = count;
 		}
 		++count;
 	}
+
 	if(count <= 1 || cur < 0) {
 		return 0;
 	}
@@ -168,6 +172,7 @@ static uint32_t handle_tabs_key(struct mkgui_ctx *ctx, struct mkgui_event *ev, u
 	if(next < 0) {
 		next = count - 1;
 	}
+
 	if(next >= count) {
 		next = 0;
 	}
@@ -184,6 +189,7 @@ static uint32_t handle_tabs_key(struct mkgui_ctx *ctx, struct mkgui_event *ev, u
 			++n;
 		}
 	}
+
 	if(tab && tab->id != td->active_tab) {
 		td->active_tab = tab->id;
 		dirty_all(ctx);

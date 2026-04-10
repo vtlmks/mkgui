@@ -49,6 +49,7 @@ static void render_meter(struct mkgui_ctx *ctx, uint32_t idx) {
 		if(z1_px > ih) {
 			z1_px = ih;
 		}
+
 		if(z2_px > ih) {
 			z2_px = ih;
 		}
@@ -58,6 +59,7 @@ static void render_meter(struct mkgui_ctx *ctx, uint32_t idx) {
 		if(fill_h < 0) {
 			fill_h = 0;
 		}
+
 		if(fill_h > ih) {
 			fill_h = ih;
 		}
@@ -90,6 +92,7 @@ static void render_meter(struct mkgui_ctx *ctx, uint32_t idx) {
 			if(lit < 0) {
 				lit = 0;
 			}
+
 			if(lit > zh) {
 				lit = zh;
 			}
@@ -99,6 +102,7 @@ static void render_meter(struct mkgui_ctx *ctx, uint32_t idx) {
 			if(dim_h > 0) {
 				draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, ix, dim_y, iw, dim_h, meter_dim_color(md->zone_c2));
 			}
+
 			if(lit > 0) {
 				draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, ix, lit_y, iw, lit, md->zone_c2);
 			}
@@ -112,6 +116,7 @@ static void render_meter(struct mkgui_ctx *ctx, uint32_t idx) {
 			if(lit < 0) {
 				lit = 0;
 			}
+
 			if(lit > zh) {
 				lit = zh;
 			}
@@ -121,6 +126,7 @@ static void render_meter(struct mkgui_ctx *ctx, uint32_t idx) {
 			if(dim_h > 0) {
 				draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, ix, dim_y, iw, dim_h, meter_dim_color(md->zone_c3));
 			}
+
 			if(lit > 0) {
 				draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, ix, lit_y, iw, lit, md->zone_c3);
 			}
@@ -155,6 +161,7 @@ static void render_meter(struct mkgui_ctx *ctx, uint32_t idx) {
 		if(z1_px > iw) {
 			z1_px = iw;
 		}
+
 		if(z2_px > iw) {
 			z2_px = iw;
 		}
@@ -163,6 +170,7 @@ static void render_meter(struct mkgui_ctx *ctx, uint32_t idx) {
 		if(fill_w < 0) {
 			fill_w = 0;
 		}
+
 		if(fill_w > iw) {
 			fill_w = iw;
 		}
@@ -173,6 +181,7 @@ static void render_meter(struct mkgui_ctx *ctx, uint32_t idx) {
 			if(lit > z1_px) {
 				lit = z1_px;
 			}
+
 			if(lit > 0) {
 				draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, ix, iy, lit, ih, md->zone_c1);
 			}
@@ -189,9 +198,11 @@ static void render_meter(struct mkgui_ctx *ctx, uint32_t idx) {
 			if(lit < 0) {
 				lit = 0;
 			}
+
 			if(lit > zh) {
 				lit = zh;
 			}
+
 			if(lit > 0) {
 				draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, ix + z1_px, iy, lit, ih, md->zone_c2);
 			}
@@ -208,9 +219,11 @@ static void render_meter(struct mkgui_ctx *ctx, uint32_t idx) {
 			if(lit < 0) {
 				lit = 0;
 			}
+
 			if(lit > zh) {
 				lit = zh;
 			}
+
 			if(lit > 0) {
 				draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, ix + z2_px, iy, lit, ih, md->zone_c3);
 			}
@@ -266,6 +279,7 @@ MKGUI_API void mkgui_meter_set(struct mkgui_ctx *ctx, uint32_t id, int32_t value
 		if(md->value < 0) {
 			md->value = 0;
 		}
+
 		if(md->value > md->max_val) {
 			md->value = md->max_val;
 		}

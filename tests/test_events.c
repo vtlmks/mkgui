@@ -152,6 +152,7 @@ static uint32_t poll_for_event(struct mkgui_ctx *ctx, uint32_t event_type, uint3
 		if(got && ev.type == event_type && (target_id == 0 || ev.id == target_id)) {
 			found = 1;
 		}
+
 		if(!got && ctx->plat.deferred_head == ctx->plat.deferred_tail) {
 			// One more poll to catch hover/focus state changes
 			mkgui_poll(ctx, &ev);
@@ -173,11 +174,11 @@ static struct mkgui_event poll_first_widget_event(struct mkgui_ctx *ctx) {
 		if(!mkgui_poll(ctx, &ev)) {
 			break;
 		}
-		if(ev.type == MKGUI_EVENT_HOVER_ENTER || ev.type == MKGUI_EVENT_HOVER_LEAVE ||
-		   ev.type == MKGUI_EVENT_FOCUS || ev.type == MKGUI_EVENT_UNFOCUS ||
-		   ev.type == MKGUI_EVENT_RESIZE) {
+
+		if(ev.type == MKGUI_EVENT_HOVER_ENTER || ev.type == MKGUI_EVENT_HOVER_LEAVE || ev.type == MKGUI_EVENT_FOCUS || ev.type == MKGUI_EVENT_UNFOCUS || ev.type == MKGUI_EVENT_RESIZE) {
 			continue;
 		}
+
 		if(result.type == MKGUI_EVENT_NONE) {
 			result = ev;
 		}

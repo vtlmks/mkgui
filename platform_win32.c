@@ -56,9 +56,11 @@ static uint32_t platform_get_keymod(void) {
 	if(GetKeyState(VK_SHIFT) & 0x8000) {
 		mod |= 0x01;
 	}
+
 	if(GetKeyState(VK_CONTROL) & 0x8000) {
 		mod |= 0x04;
 	}
+
 	if(GetKeyState(VK_MENU) & 0x8000) {
 		mod |= 0x08;
 	}
@@ -107,6 +109,7 @@ static LRESULT CALLBACK mkgui_wndproc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 				if(owner->plat.min_w > 0) {
 					mmi->ptMinTrackSize.x = owner->plat.min_w;
 				}
+
 				if(owner->plat.min_h > 0) {
 					mmi->ptMinTrackSize.y = owner->plat.min_h;
 				}
@@ -464,13 +467,17 @@ static void platform_set_window_icon(struct mkgui_platform *plat, struct mkgui_i
 	int32_t dist_small = 0x7fffffff;
 	for(uint32_t i = 0; i < count; ++i) {
 		int32_t d = sizes[i].w - sm_big;
-		if(d < 0) { d = -d; }
+		if(d < 0) {
+			d = -d;
+		}
 		if(d < dist_big) {
 			dist_big = d;
 			best_big = i;
 		}
 		d = sizes[i].w - sm_small;
-		if(d < 0) { d = -d; }
+		if(d < 0) {
+			d = -d;
+		}
 		if(d < dist_small) {
 			dist_small = d;
 			best_small = i;
@@ -481,6 +488,7 @@ static void platform_set_window_icon(struct mkgui_platform *plat, struct mkgui_i
 	if(big) {
 		SendMessageA(plat->hwnd, WM_SETICON, ICON_BIG, (LPARAM)big);
 	}
+
 	if(small) {
 		SendMessageA(plat->hwnd, WM_SETICON, ICON_SMALL, (LPARAM)small);
 	}
@@ -494,9 +502,7 @@ static uint32_t platform_init(struct mkgui_ctx *ctx, const char *title, int32_t 
 	RECT rc = { 0, 0, w, h };
 	AdjustWindowRect(&rc, WS_OVERLAPPEDWINDOW, FALSE);
 
-	plat->hwnd = CreateWindowExA(0, "mkgui", title, WS_OVERLAPPEDWINDOW,
-		CW_USEDEFAULT, CW_USEDEFAULT, rc.right - rc.left, rc.bottom - rc.top,
-		NULL, NULL, GetModuleHandleA(NULL), NULL);
+	plat->hwnd = CreateWindowExA(0, "mkgui", title, WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, rc.right - rc.left, rc.bottom - rc.top, NULL, NULL, GetModuleHandleA(NULL), NULL);
 
 	if(!plat->hwnd) {
 		return 0;
@@ -528,9 +534,7 @@ static uint32_t platform_init_child(struct mkgui_ctx *ctx, struct mkgui_ctx *par
 	RECT rc = { 0, 0, w, h };
 	AdjustWindowRect(&rc, WS_OVERLAPPEDWINDOW, FALSE);
 
-	plat->hwnd = CreateWindowExA(0, "mkgui", title, WS_OVERLAPPEDWINDOW,
-		CW_USEDEFAULT, CW_USEDEFAULT, rc.right - rc.left, rc.bottom - rc.top,
-		parent->plat.hwnd, NULL, GetModuleHandleA(NULL), NULL);
+	plat->hwnd = CreateWindowExA(0, "mkgui", title, WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, rc.right - rc.left, rc.bottom - rc.top, parent->plat.hwnd, NULL, GetModuleHandleA(NULL), NULL);
 
 	if(!plat->hwnd) {
 		return 0;
@@ -624,6 +628,7 @@ static float platform_detect_scale(struct mkgui_ctx *ctx) {
 			} else if((end[0] == 'd' || end[0] == 'D') && (end[1] == 'p' || end[1] == 'P') && (end[2] == 'i' || end[2] == 'I')) {
 				val /= 96.0;
 			}
+
 			if(val >= 0.5 && val <= 4.0) {
 				return (float)val;
 			}
@@ -658,8 +663,7 @@ static float platform_detect_scale(struct mkgui_ctx *ctx) {
 static void platform_resize_window(struct mkgui_ctx *ctx, int32_t w, int32_t h) {
 	RECT rc = { 0, 0, w, h };
 	AdjustWindowRect(&rc, WS_OVERLAPPEDWINDOW, FALSE);
-	SetWindowPos(ctx->plat.hwnd, NULL, 0, 0, rc.right - rc.left, rc.bottom - rc.top,
-		SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
+	SetWindowPos(ctx->plat.hwnd, NULL, 0, 0, rc.right - rc.left, rc.bottom - rc.top, SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
 	ctx->win_w = w;
 	ctx->win_h = h;
 	platform_fb_resize(ctx);
@@ -689,11 +693,23 @@ static void platform_blit(struct mkgui_ctx *ctx) {
 
 // [=]===^=[ platform_blit_region ]================================[=]
 static void platform_blit_region(struct mkgui_ctx *ctx, int32_t x, int32_t y, int32_t w, int32_t h) {
-	if(x < 0) { w += x; x = 0; }
-	if(y < 0) { h += y; y = 0; }
-	if(x + w > ctx->win_w) { w = ctx->win_w - x; }
-	if(y + h > ctx->win_h) { h = ctx->win_h - y; }
-	if(w <= 0 || h <= 0) { return; }
+	if(x < 0) {
+		w += x;
+		x = 0;
+	}
+	if(y < 0) {
+		h += y;
+		y = 0;
+	}
+	if(x + w > ctx->win_w) {
+		w = ctx->win_w - x;
+	}
+	if(y + h > ctx->win_h) {
+		h = ctx->win_h - y;
+	}
+	if(w <= 0 || h <= 0) {
+		return;
+	}
 	struct mkgui_platform *plat = &ctx->plat;
 	HDC hdc = GetDC(plat->hwnd);
 	SelectClipRgn(hdc, NULL);
@@ -732,9 +748,7 @@ static void platform_flush(struct mkgui_ctx *ctx) {
 static uint32_t platform_popup_init(struct mkgui_ctx *ctx, struct mkgui_popup *p, int32_t x, int32_t y, int32_t w, int32_t h) {
 	struct mkgui_platform *plat = &ctx->plat;
 
-	p->plat.hwnd = CreateWindowExA(WS_EX_TOPMOST | WS_EX_TOOLWINDOW, "mkgui", "",
-		WS_POPUP | WS_VISIBLE, x, y, w, h,
-		plat->hwnd, NULL, GetModuleHandleA(NULL), NULL);
+	p->plat.hwnd = CreateWindowExA(WS_EX_TOPMOST | WS_EX_TOOLWINDOW, "mkgui", "", WS_POPUP | WS_VISIBLE, x, y, w, h, plat->hwnd, NULL, GetModuleHandleA(NULL), NULL);
 
 	if(!p->plat.hwnd) {
 		return 0;
@@ -815,6 +829,7 @@ static void platform_wait_event(struct mkgui_ctx *ctx, int32_t timeout_ms) {
 			if(timer_ms < 1) {
 				timer_ms = 1;
 			}
+
 			if(timer_ms < wait_ms) {
 				wait_ms = timer_ms;
 			}
@@ -855,18 +870,10 @@ static void platform_font_rasterize(struct mkgui_ctx *ctx, int32_t pixel_size) {
 		DeleteObject(plat_font_handle);
 	}
 
-	plat_font_handle = CreateFontA(
-		-pixel_size, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
-		DEFAULT_CHARSET, OUT_TT_PRECIS, CLIP_DEFAULT_PRECIS,
-		CLEARTYPE_NATURAL_QUALITY, DEFAULT_PITCH | FF_DONTCARE,
-		"Segoe UI");
+	plat_font_handle = CreateFontA(-pixel_size, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_TT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_NATURAL_QUALITY, DEFAULT_PITCH | FF_DONTCARE, "Segoe UI");
 
 	if(!plat_font_handle) {
-		plat_font_handle = CreateFontA(
-			-pixel_size, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
-			DEFAULT_CHARSET, OUT_TT_PRECIS, CLIP_DEFAULT_PRECIS,
-			CLEARTYPE_NATURAL_QUALITY, DEFAULT_PITCH | FF_DONTCARE,
-			"Tahoma");
+		plat_font_handle = CreateFontA(-pixel_size, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_TT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_NATURAL_QUALITY, DEFAULT_PITCH | FF_DONTCARE, "Tahoma");
 	}
 
 	if(!plat_font_handle) {
@@ -967,6 +974,7 @@ static void platform_font_fini(struct mkgui_ctx *ctx) {
 		DeleteObject(plat_font_handle);
 		plat_font_handle = NULL;
 	}
+
 	if(plat_font_dc) {
 		DeleteDC(plat_font_dc);
 		plat_font_dc = NULL;
@@ -1084,8 +1092,7 @@ static uint32_t platform_glview_create(struct mkgui_ctx *ctx, struct mkgui_glvie
 		RegisterClassExA(&wc);
 		glview_wc_registered = 1;
 	}
-	gv->plat.hwnd = CreateWindowExA(0, "mkgui_glview", "", WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS,
-		x, y, w, h, ctx->plat.hwnd, NULL, GetModuleHandle(NULL), NULL);
+	gv->plat.hwnd = CreateWindowExA(0, "mkgui_glview", "", WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS, x, y, w, h, ctx->plat.hwnd, NULL, GetModuleHandle(NULL), NULL);
 	if(!gv->plat.hwnd) {
 		return 0;
 	}

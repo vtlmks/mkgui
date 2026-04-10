@@ -237,6 +237,7 @@ static int32_t ibt_find_name(const char *name) {
 		if(idx == UINT32_MAX) {
 			return -1;
 		}
+
 		if(strcmp(ibt->names[idx], name) == 0) {
 			return (int32_t)idx;
 		}
@@ -271,6 +272,7 @@ static void ibt_scan_one_dir(const char *dir_path, uint32_t cat_idx) {
 			ibt->cat_mask[existing] |= (1u << cat_idx);
 			continue;
 		}
+
 		if(ibt->total_count >= IB_THEME_MAX_ICONS) {
 			continue;
 		}
@@ -358,6 +360,7 @@ static void ibt_discover_categories(const char *theme_dir) {
 					break;
 				}
 			}
+
 			if(!exists) {
 				strncpy(ibt->cat_names[ibt->cat_count], ent->d_name, sizeof(ibt->cat_names[0]) - 1);
 				ibt->cat_names[ibt->cat_count][sizeof(ibt->cat_names[0]) - 1] = '\0';
@@ -394,6 +397,7 @@ static void ibt_discover_categories(const char *theme_dir) {
 							break;
 						}
 					}
+
 					if(!exists && ibt->cat_count < IB_MAX_CATS) {
 						strncpy(ibt->cat_names[ibt->cat_count], ent->d_name, sizeof(ibt->cat_names[0]) - 1);
 						ibt->cat_names[ibt->cat_count][sizeof(ibt->cat_names[0]) - 1] = '\0';
@@ -516,6 +520,7 @@ static void ibt_filter(char *search) {
 		if(ibt->active_cat > 0 && !(ibt->cat_mask[i] & (1u << (ibt->active_cat - 1)))) {
 			continue;
 		}
+
 		if(search_len > 0) {
 			char *p = ibt->names[i];
 			uint32_t found = 0;
@@ -524,14 +529,29 @@ static void ibt_filter(char *search) {
 				for(uint32_t fi = 0; fi < search_len; ++fi) {
 					char fc = search[fi];
 					char nc = p[fi];
-					if(nc == '\0') { match = 0; break; }
-					if(fc >= 'A' && fc <= 'Z') { fc = (char)(fc + 32); }
-					if(nc >= 'A' && nc <= 'Z') { nc = (char)(nc + 32); }
-					if(fc != nc) { match = 0; break; }
+					if(nc == '\0') {
+						match = 0;
+						break;
+					}
+					if(fc >= 'A' && fc <= 'Z') {
+						fc = (char)(fc + 32);
+					}
+					if(nc >= 'A' && nc <= 'Z') {
+						nc = (char)(nc + 32);
+					}
+					if(fc != nc) {
+						match = 0;
+						break;
+					}
 				}
-				if(match) { found = 1; break; }
+
+				if(match) {
+					found = 1;
+					break;
+				}
 				++p;
 			}
+
 			if(!found) {
 				continue;
 			}

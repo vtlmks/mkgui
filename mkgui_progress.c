@@ -17,6 +17,7 @@ static void render_progress(struct mkgui_ctx *ctx, uint32_t idx) {
 		if(fill_w < 0) {
 			fill_w = 0;
 		}
+
 		if(fill_w > rw - 2) {
 			fill_w = rw - 2;
 		}
@@ -45,6 +46,7 @@ static void render_progress(struct mkgui_ctx *ctx, uint32_t idx) {
 			if(sx_min < 0) {
 				sx_min = 0;
 			}
+
 			if(sx_max > fill_w) {
 				sx_max = fill_w;
 			}
@@ -54,12 +56,15 @@ static void render_progress(struct mkgui_ctx *ctx, uint32_t idx) {
 			if(clip_y0 < 0) {
 				clip_y0 = 0;
 			}
+
 			if(clip_y0 < render_clip_y1) {
 				clip_y0 = render_clip_y1;
 			}
+
 			if(clip_y1_s > ctx->win_h) {
 				clip_y1_s = ctx->win_h;
 			}
+
 			if(clip_y1_s > render_clip_y2) {
 				clip_y1_s = render_clip_y2;
 			}
@@ -69,12 +74,15 @@ static void render_progress(struct mkgui_ctx *ctx, uint32_t idx) {
 			if(lx_min < 0) {
 				lx_min = 0;
 			}
+
 			if(lx_max > fill_w) {
 				lx_max = fill_w;
 			}
+
 			if(sx_min < lx_min) {
 				sx_min = lx_min;
 			}
+
 			if(sx_max > lx_max) {
 				sx_max = lx_max;
 			}
@@ -86,6 +94,7 @@ static void render_progress(struct mkgui_ctx *ctx, uint32_t idx) {
 				if(row_min < sx_min) {
 					row_min = sx_min;
 				}
+
 				if(row_max > sx_max) {
 					row_max = sx_max;
 				}
@@ -134,6 +143,7 @@ MKGUI_API void mkgui_progress_set(struct mkgui_ctx *ctx, uint32_t id, int32_t va
 		if(pd->value < 0) {
 			pd->value = 0;
 		}
+
 		if(pd->value > pd->max_val) {
 			pd->value = pd->max_val;
 		}

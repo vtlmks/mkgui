@@ -13,6 +13,7 @@ static int32_t spinbox_btn_hit(struct mkgui_ctx *ctx, uint32_t idx, int32_t mx, 
 	if(mx < bx || mx >= rx + rw) {
 		return 0;
 	}
+
 	if(my < ry + rh / 2) {
 		return 1;
 	}
@@ -39,12 +40,15 @@ static void spinbox_commit_edit(struct mkgui_spinbox_data *sd) {
 	for(; i < sd->edit_len; ++i) {
 		v = v * 10 + (sd->edit_buf[i] - '0');
 	}
+
 	if(neg) {
 		v = -v;
 	}
+
 	if(v < sd->min_val) {
 		v = sd->min_val;
 	}
+
 	if(v > sd->max_val) {
 		v = sd->max_val;
 	}
@@ -98,6 +102,7 @@ static void render_spinbox(struct mkgui_ctx *ctx, uint32_t idx) {
 			if(rx + text_pad + sel_w > text_right) {
 				sel_w = text_right - rx - text_pad;
 			}
+
 			if(sel_w > 0) {
 				draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, rx + text_pad, ry + inset2, sel_w, rh - inset2 * 2, ctx->theme.selection);
 				push_text_clip(rx + text_pad, ty, display, ctx->theme.sel_text, rx + 1, ry + 1, text_right, ry + rh - 1);
@@ -105,6 +110,7 @@ static void render_spinbox(struct mkgui_ctx *ctx, uint32_t idx) {
 		} else {
 			push_text_clip(rx + text_pad, ty, display, tc, rx + 1, ry + 1, text_right, ry + rh - 1);
 		}
+
 		if(sd->editing && focused && !sd->select_all) {
 			int32_t cur_x = rx + text_pad + text_width(ctx, display);
 			if(cur_x < text_right) {
@@ -123,15 +129,13 @@ static void render_spinbox(struct mkgui_ctx *ctx, uint32_t idx) {
 	int32_t as = sc(ctx, 3);
 	int32_t acx = bx + btn_w / 2;
 	int32_t acy = ry + half / 2;
-	draw_triangle_aa(ctx->pixels, ctx->win_w, ctx->win_h,
-		acx, acy - as / 2, acx - as, acy + as / 2, acx + as, acy + as / 2, tc);
+	draw_triangle_aa(ctx->pixels, ctx->win_w, ctx->win_h, acx, acy - as / 2, acx - as, acy + as / 2, acx + as, acy + as / 2, tc);
 
 	uint32_t dn_bg = (hover_btn == -1) ? ctx->theme.widget_hover : ctx->theme.widget_bg;
 	draw_patch(ctx, MKGUI_STYLE_RAISED, bx, ry + half, btn_w, rh - half, dn_bg, ctx->theme.widget_border);
 
 	int32_t acy2 = ry + half + (rh - half) / 2;
-	draw_triangle_aa(ctx->pixels, ctx->win_w, ctx->win_h,
-		acx - as, acy2 - as / 2, acx + as, acy2 - as / 2, acx, acy2 + as / 2, tc);
+	draw_triangle_aa(ctx->pixels, ctx->win_w, ctx->win_h, acx - as, acy2 - as / 2, acx + as, acy2 - as / 2, acx, acy2 + as / 2, tc);
 }
 
 // [=]===^=[ spinbox_adjust ]=====================================[=]
@@ -144,9 +148,11 @@ static uint32_t spinbox_adjust(struct mkgui_ctx *ctx, struct mkgui_event *ev, ui
 	if(new_val < sd->min_val) {
 		new_val = sd->min_val;
 	}
+
 	if(new_val > sd->max_val) {
 		new_val = sd->max_val;
 	}
+
 	if(new_val != sd->value) {
 		sd->value = new_val;
 		dirty_all(ctx);
@@ -243,15 +249,18 @@ static uint32_t handle_spinbox_key(struct mkgui_ctx *ctx, struct mkgui_event *ev
 				if(!is_digit && !is_minus) {
 					continue;
 				}
+
 				if(!sd->editing) {
 					sd->editing = 1;
 					sd->edit_len = 0;
 					sd->select_all = 0;
 				}
+
 				if(sd->select_all) {
 					sd->edit_len = 0;
 					sd->select_all = 0;
 				}
+
 				if(is_minus) {
 					if(sd->edit_len == 0) {
 						sd->edit_buf[sd->edit_len++] = '-';
@@ -283,6 +292,7 @@ MKGUI_API void mkgui_spinbox_setup(struct mkgui_ctx *ctx, uint32_t id, int32_t m
 		if(sd->value < sd->min_val) {
 			sd->value = sd->min_val;
 		}
+
 		if(sd->value > sd->max_val) {
 			sd->value = sd->max_val;
 		}
@@ -307,6 +317,7 @@ MKGUI_API void mkgui_spinbox_set(struct mkgui_ctx *ctx, uint32_t id, int32_t val
 		if(sd->value < sd->min_val) {
 			sd->value = sd->min_val;
 		}
+
 		if(sd->value > sd->max_val) {
 			sd->value = sd->max_val;
 		}
@@ -326,6 +337,7 @@ MKGUI_API void mkgui_spinbox_set_range(struct mkgui_ctx *ctx, uint32_t id, int32
 	if(sd->value < sd->min_val) {
 		sd->value = sd->min_val;
 	}
+
 	if(sd->value > sd->max_val) {
 		sd->value = sd->max_val;
 	}
@@ -350,6 +362,7 @@ MKGUI_API void mkgui_spinbox_get_range(struct mkgui_ctx *ctx, uint32_t id, int32
 		if(max_val) { *max_val = 0; }
 		return;
 	}
+
 	if(min_val) { *min_val = sd->min_val; }
 	if(max_val) { *max_val = sd->max_val; }
 }

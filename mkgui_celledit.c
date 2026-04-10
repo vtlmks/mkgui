@@ -59,6 +59,7 @@ static uint32_t celledit_compute_rect_listview(struct mkgui_ctx *ctx, int32_t wi
 		}
 		cx += lv->columns[c].width;
 	}
+
 	if(col_w <= 0) {
 		return 0;
 	}
@@ -90,9 +91,11 @@ static uint32_t celledit_compute_rect_treeview(struct mkgui_ctx *ctx, int32_t wi
 			break;
 		}
 	}
+
 	if(node_idx == UINT32_MAX) {
 		return 0;
 	}
+
 	if(!treeview_node_visible(tv, node_idx)) {
 		return 0;
 	}
@@ -160,6 +163,7 @@ static uint32_t celledit_compute_rect_gridview(struct mkgui_ctx *ctx, int32_t wi
 		}
 		cx += gv->columns[c].width;
 	}
+
 	if(col_w <= 0) {
 		return 0;
 	}
@@ -304,6 +308,7 @@ static void celledit_render(struct mkgui_ctx *ctx, uint32_t idx) {
 	if(!ce->active || ctx->widgets[idx].id != ce->widget_id) {
 		return;
 	}
+
 	if(!celledit_compute_rect(ctx)) {
 		celledit_cancel(ctx);
 		return;
@@ -361,6 +366,7 @@ static uint32_t celledit_key(struct mkgui_ctx *ctx, struct mkgui_event *ev, uint
 			dirty_widget_id(ctx, ce->widget_id);
 			return 1;
 		}
+
 		if(ks == 'c' || ks == 'C') {
 			if(textedit_has_selection(&ce->te)) {
 				uint32_t lo, hi;
@@ -371,6 +377,7 @@ static uint32_t celledit_key(struct mkgui_ctx *ctx, struct mkgui_event *ev, uint
 			}
 			return 1;
 		}
+
 		if(ks == 'x' || ks == 'X') {
 			if(textedit_has_selection(&ce->te)) {
 				uint32_t lo, hi;
@@ -381,6 +388,7 @@ static uint32_t celledit_key(struct mkgui_ctx *ctx, struct mkgui_event *ev, uint
 			}
 			return 1;
 		}
+
 		if(ks == 'v' || ks == 'V') {
 			char clip_buf[MKGUI_CLIP_MAX];
 			uint32_t clip_len = platform_clipboard_get(ctx, clip_buf, sizeof(clip_buf));
@@ -451,6 +459,7 @@ static char *celledit_extract_text(struct mkgui_ctx *ctx, uint32_t widget_id, in
 	if(!w) {
 		return raw;
 	}
+
 	if(w->type == MKGUI_LISTVIEW) {
 		struct mkgui_listview_data *lv = find_listv_data(ctx, widget_id);
 		if(lv && col >= 0 && (uint32_t)col < lv->col_count && lv->columns[col].cell_type == MKGUI_CELL_ICON_TEXT) {

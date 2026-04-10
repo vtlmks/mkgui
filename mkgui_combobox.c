@@ -22,17 +22,21 @@ static void combobox_filter(struct mkgui_combobox_data *cb) {
 				if(a >= 'A' && a <= 'Z') {
 					a += 32;
 				}
+
 				if(b >= 'A' && b <= 'Z') {
 					b += 32;
 				}
+
 				if(a != b) {
 					match = 0;
 				}
 			}
+
 			if(match) {
 				found = 1;
 			}
 		}
+
 		if(found && cb->filter_count < MKGUI_MAX_DROPDOWN) {
 			cb->filter_map[cb->filter_count++] = i;
 		}
@@ -118,8 +122,7 @@ static void render_combobox(struct mkgui_ctx *ctx, uint32_t idx) {
 	int32_t as = sc(ctx, 4);
 	int32_t acx = rx + text_w + btn_w / 2;
 	int32_t acy = ry + rh / 2;
-	draw_triangle_aa(ctx->pixels, ctx->win_w, ctx->win_h,
-		acx - as, acy - as / 2, acx + as, acy - as / 2, acx, acy + as / 2, tc);
+	draw_triangle_aa(ctx->pixels, ctx->win_w, ctx->win_h, acx - as, acy - as / 2, acx + as, acy - as / 2, acx, acy + as / 2, tc);
 
 	struct mkgui_combobox_data *cb = find_combobox_data(ctx, w->id);
 	if(!cb) {
@@ -187,6 +190,7 @@ static void combobox_open_popup(struct mkgui_ctx *ctx, uint32_t widget_id, uint3
 			cb->filter_map[cb->filter_count++] = i;
 		}
 	}
+
 	if(cb->filter_count == 0) {
 		popup_destroy_all(ctx);
 		return;
@@ -315,6 +319,7 @@ static uint32_t handle_combobox_key(struct mkgui_ctx *ctx, struct mkgui_event *e
 			dirty_all(ctx);
 			return 1;
 		}
+
 		if(cb->selected > 0) {
 			--cb->selected;
 			{ size_t _l = strlen(cb->items[cb->selected]); if(_l >= MKGUI_MAX_TEXT) { _l = MKGUI_MAX_TEXT - 1; } memcpy(cb->text, cb->items[cb->selected], _l); cb->text[_l] = '\0'; }
@@ -339,6 +344,7 @@ static uint32_t handle_combobox_key(struct mkgui_ctx *ctx, struct mkgui_event *e
 			dirty_all(ctx);
 			return 1;
 		}
+
 		if(cb->selected < (int32_t)cb->item_count - 1) {
 			++cb->selected;
 			{ size_t _l = strlen(cb->items[cb->selected]); if(_l >= MKGUI_MAX_TEXT) { _l = MKGUI_MAX_TEXT - 1; } memcpy(cb->text, cb->items[cb->selected], _l); cb->text[_l] = '\0'; }
@@ -500,6 +506,7 @@ MKGUI_API void mkgui_combobox_set(struct mkgui_ctx *ctx, uint32_t id, int32_t in
 	if(!cb) {
 		return;
 	}
+
 	if(index < 0 || (uint32_t)index >= cb->item_count) {
 		cb->selected = -1;
 		cb->text[0] = '\0';

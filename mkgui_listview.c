@@ -149,12 +149,15 @@ static void render_cell(struct mkgui_ctx *ctx, struct mkgui_listview_data *lv, u
 			} else {
 				val = (int32_t)strtol(cell_buf, NULL, 10);
 			}
+
 			if(max <= 0) {
 				max = 100;
 			}
+
 			if(val < 0) {
 				val = 0;
 			}
+
 			if(val > max) {
 				val = max;
 			}
@@ -294,6 +297,7 @@ static void listview_autosize_col(struct mkgui_ctx *ctx, struct mkgui_listview_d
 				cell_w = text_width(ctx, buf);
 			} break;
 		}
+
 		if(cell_w > max_w) {
 			max_w = cell_w;
 		}
@@ -319,9 +323,11 @@ static void listview_clamp_scroll_y(struct mkgui_ctx *ctx, struct mkgui_listview
 	if(max_scroll < 0) {
 		max_scroll = 0;
 	}
+
 	if(lv->scroll_y < 0) {
 		lv->scroll_y = 0;
 	}
+
 	if(lv->scroll_y > max_scroll) {
 		lv->scroll_y = max_scroll;
 	}
@@ -334,9 +340,11 @@ static void listview_clamp_scroll_x(struct mkgui_listview_data *lv, int32_t cont
 	if(max_scroll < 0) {
 		max_scroll = 0;
 	}
+
 	if(lv->scroll_x < 0) {
 		lv->scroll_x = 0;
 	}
+
 	if(lv->scroll_x > max_scroll) {
 		lv->scroll_x = max_scroll;
 	}
@@ -391,9 +399,11 @@ static void render_listview(struct mkgui_ctx *ctx, uint32_t idx) {
 		if(col_left < clip_left) {
 			col_left = clip_left;
 		}
+
 		if(col_right > clip_right) {
 			col_right = clip_right;
 		}
+
 		if(col_left < col_right) {
 			int32_t ty = ry + (hh - ctx->font_height) / 2;
 			push_text_clip(cx + hdr_pad, ty, lv->columns[c].label, ctx->theme.text, col_left, ry, col_right, ry + hh);
@@ -403,11 +413,9 @@ static void render_listview(struct mkgui_ctx *ctx, uint32_t idx) {
 				int32_t say = ry + hh / 2;
 				if(sacx - sort_arr_w / 2 >= clip_left && sacx + sort_arr_w / 2 <= clip_right) {
 					if(lv->sort_dir > 0) {
-						draw_triangle_aa(ctx->pixels, ctx->win_w, ctx->win_h,
-							sacx, say - sort_arr_h / 2, sacx - sort_arr_w / 2, say + sort_arr_h / 2, sacx + sort_arr_w / 2, say + sort_arr_h / 2, ctx->theme.text);
+						draw_triangle_aa(ctx->pixels, ctx->win_w, ctx->win_h, sacx, say - sort_arr_h / 2, sacx - sort_arr_w / 2, say + sort_arr_h / 2, sacx + sort_arr_w / 2, say + sort_arr_h / 2, ctx->theme.text);
 					} else {
-						draw_triangle_aa(ctx->pixels, ctx->win_w, ctx->win_h,
-							sacx - sort_arr_w / 2, say - sort_arr_h / 2, sacx + sort_arr_w / 2, say - sort_arr_h / 2, sacx, say + sort_arr_h / 2, ctx->theme.text);
+						draw_triangle_aa(ctx->pixels, ctx->win_w, ctx->win_h, sacx - sort_arr_w / 2, say - sort_arr_h / 2, sacx + sort_arr_w / 2, say - sort_arr_h / 2, sacx, say + sort_arr_h / 2, ctx->theme.text);
 					}
 				}
 			}
@@ -427,6 +435,7 @@ static void render_listview(struct mkgui_ctx *ctx, uint32_t idx) {
 			for(uint32_t d = 0; d < (uint32_t)insert_d; ++d) {
 				ix += lv->columns[lv->col_order[d]].width;
 			}
+
 			if(ix >= clip_left && ix <= clip_right) {
 				int32_t ind_w = sc(ctx, 3);
 				draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, ix - 1, ry + 1, ind_w, hh, ctx->theme.highlight);
@@ -477,6 +486,7 @@ static void render_listview(struct mkgui_ctx *ctx, uint32_t idx) {
 				cx += col_w;
 				continue;
 			}
+
 			if(cx >= clip_right) {
 				break;
 			}
@@ -490,9 +500,11 @@ static void render_listview(struct mkgui_ctx *ctx, uint32_t idx) {
 			if(cell_cl < clip_left) {
 				cell_cl = clip_left;
 			}
+
 			if(cell_cr > clip_right) {
 				cell_cr = clip_right;
 			}
+
 			if(!(ctx->cell_edit.active && ctx->cell_edit.widget_id == w->id && ctx->cell_edit.row == row_idx && ctx->cell_edit.col == (int32_t)c)) {
 				render_cell(ctx, lv, c, cell_buf, cx, ty, col_w, cell_cl, cell_cr, clip_top, clip_bottom, tc, row_y);
 			}
@@ -548,6 +560,7 @@ static void render_listview(struct mkgui_ctx *ctx, uint32_t idx) {
 		} else {
 			tgt_y = dcy + lv->drag_target * ctx->row_height - lv->scroll_y;
 		}
+
 		if(tgt_y >= dcy && tgt_y <= ry + rh) {
 			draw_hline(ctx->pixels, ctx->win_w, ctx->win_h, rx + 1, tgt_y - 1, content_w, ctx->theme.accent);
 			draw_hline(ctx->pixels, ctx->win_w, ctx->win_h, rx + 1, tgt_y, content_w, ctx->theme.accent);
@@ -580,6 +593,7 @@ static int32_t listview_row_hit(struct mkgui_ctx *ctx, uint32_t idx, int32_t mx,
 	if(listview_total_col_w(lv) > tcw) {
 		content_h_bottom -= ctx->scrollbar_w;
 	}
+
 	if(my < content_y || my >= content_h_bottom) {
 		return -1;
 	}
@@ -652,6 +666,7 @@ static uint32_t listview_scrollbar_hit(struct mkgui_ctx *ctx, uint32_t idx, int3
 	if(my < thumb_y) {
 		return 2;
 	}
+
 	if(my >= thumb_y + thumb_h) {
 		return 3;
 	}
@@ -718,6 +733,7 @@ static void listview_page_scroll(struct mkgui_ctx *ctx, uint32_t idx, int32_t di
 	if(lv->scroll_y < 0) {
 		lv->scroll_y = 0;
 	}
+
 	if(lv->scroll_y > max_scroll) {
 		lv->scroll_y = max_scroll;
 	}
@@ -752,6 +768,7 @@ static void listview_scroll_to_y(struct mkgui_ctx *ctx, uint32_t widget_id, int3
 	if(max_scroll < 0) {
 		max_scroll = 0;
 	}
+
 	if(content_h <= 0) {
 		return;
 	}
@@ -769,6 +786,7 @@ static void listview_scroll_to_y(struct mkgui_ctx *ctx, uint32_t widget_id, int3
 	if(frac < 0.0f) {
 		frac = 0.0f;
 	}
+
 	if(frac > 1.0f) {
 		frac = 1.0f;
 	}
@@ -817,6 +835,7 @@ static uint32_t listview_hscrollbar_hit(struct mkgui_ctx *ctx, uint32_t idx, int
 	if(mx < thumb_x) {
 		return 2;
 	}
+
 	if(mx >= thumb_x + thumb_w) {
 		return 3;
 	}
@@ -886,6 +905,7 @@ static void listview_scroll_to_x(struct mkgui_ctx *ctx, uint32_t widget_id, int3
 	if(frac < 0.0f) {
 		frac = 0.0f;
 	}
+
 	if(frac > 1.0f) {
 		frac = 1.0f;
 	}
@@ -981,6 +1001,7 @@ static uint32_t handle_listview_key(struct mkgui_ctx *ctx, struct mkgui_event *e
 		if(row_bottom > lv->scroll_y + content_h) {
 			lv->scroll_y = row_bottom - content_h;
 		}
+
 		if(lv->scroll_y > max_scroll) {
 			lv->scroll_y = max_scroll;
 		}
@@ -1024,6 +1045,7 @@ MKGUI_API void mkgui_listview_setup(struct mkgui_ctx *ctx, uint32_t id, uint32_t
 	if(!columns) {
 		return;
 	}
+
 	if(!cb) {
 		return;
 	}
@@ -1037,6 +1059,7 @@ MKGUI_API void mkgui_listview_setup(struct mkgui_ctx *ctx, uint32_t id, uint32_t
 		memset(lv, 0, sizeof(*lv));
 		lv->widget_id = id;
 	}
+
 	if(!lv) {
 		return;
 	}
@@ -1087,6 +1110,7 @@ MKGUI_API uint32_t mkgui_listview_get_multi_sel(struct mkgui_ctx *ctx, uint32_t 
 		}
 		return 0;
 	}
+
 	if(out) {
 		*out = lv->multi_sel;
 	}
@@ -1128,6 +1152,7 @@ MKGUI_API void mkgui_listview_set_col_order(struct mkgui_ctx *ctx, uint32_t id, 
 	if(!lv) {
 		return;
 	}
+
 	if(count > lv->col_count) {
 		count = lv->col_count;
 	}
@@ -1230,9 +1255,11 @@ MKGUI_API void mkgui_listview_scroll_to(struct mkgui_ctx *ctx, uint32_t id, int3
 	if(row_y < lv->scroll_y) {
 		lv->scroll_y = row_y;
 	}
+
 	if(row_y + ctx->row_height > lv->scroll_y + content_h) {
 		lv->scroll_y = row_y + ctx->row_height - content_h;
 	}
+
 	if(lv->scroll_y < 0) {
 		lv->scroll_y = 0;
 	}
@@ -1248,6 +1275,7 @@ MKGUI_API void mkgui_listview_get_sort(struct mkgui_ctx *ctx, uint32_t id, int32
 		if(dir) { *dir = 0; }
 		return;
 	}
+
 	if(col) { *col = lv->sort_col; }
 	if(dir) { *dir = lv->sort_dir; }
 }

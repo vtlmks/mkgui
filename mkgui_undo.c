@@ -33,10 +33,12 @@ static uint32_t input_undo(struct mkgui_input_data *inp) {
 	if(inp->undo_pos == 0) {
 		return 0;
 	}
+
 	if(inp->undo_pos == inp->undo_saved) {
 		input_undo_push_force(inp);
 		--inp->undo_pos;
 	}
+
 	if(inp->undo_pos == 0) {
 		return 0;
 	}
@@ -101,10 +103,12 @@ static uint32_t textarea_undo(struct mkgui_textarea_data *ta) {
 	if(ta->undo_pos == 0) {
 		return 0;
 	}
+
 	if(ta->undo_pos == ta->undo_saved) {
 		textarea_undo_push_force(ta);
 		--ta->undo_pos;
 	}
+
 	if(ta->undo_pos == 0) {
 		return 0;
 	}

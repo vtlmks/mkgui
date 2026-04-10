@@ -10,9 +10,11 @@ static void richlist_clamp_scroll(struct mkgui_richlist_data *rl, int32_t conten
 	if(max_scroll < 0) {
 		max_scroll = 0;
 	}
+
 	if(rl->scroll_y < 0) {
 		rl->scroll_y = 0;
 	}
+
 	if(rl->scroll_y > max_scroll) {
 		rl->scroll_y = max_scroll;
 	}
@@ -115,6 +117,7 @@ static void richlist_scroll_to_y(struct mkgui_ctx *ctx, uint32_t id, int32_t my)
 	if(frac < 0.0f) {
 		frac = 0.0f;
 	}
+
 	if(frac > 1.0f) {
 		frac = 1.0f;
 	}
@@ -186,12 +189,15 @@ static void render_richlist(struct mkgui_ctx *ctx, uint32_t idx) {
 	if(clip_left > render_clip_x1) {
 		render_clip_x1 = clip_left;
 	}
+
 	if(clip_top > render_clip_y1) {
 		render_clip_y1 = clip_top;
 	}
+
 	if(clip_right < render_clip_x2) {
 		render_clip_x2 = clip_right;
 	}
+
 	if(clip_bottom < render_clip_y2) {
 		render_clip_y2 = clip_bottom;
 	}
@@ -418,6 +424,7 @@ static uint32_t handle_richlist_key(struct mkgui_ctx *ctx, struct mkgui_event *e
 	if(row_y < rl->scroll_y) {
 		rl->scroll_y = row_y;
 	}
+
 	if(row_y + rl->row_height > rl->scroll_y + content_h) {
 		rl->scroll_y = row_y + rl->row_height - content_h;
 	}
@@ -499,9 +506,11 @@ MKGUI_API void mkgui_richlist_scroll_to(struct mkgui_ctx *ctx, uint32_t id, int3
 	if(row_y < rl->scroll_y) {
 		rl->scroll_y = row_y;
 	}
+
 	if(row_y + rl->row_height > rl->scroll_y + content_h) {
 		rl->scroll_y = row_y + rl->row_height - content_h;
 	}
+
 	if(rl->scroll_y < 0) {
 		rl->scroll_y = 0;
 	}

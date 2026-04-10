@@ -557,6 +557,7 @@ static int32_t icon_hash_lookup(const char *name) {
 		if(idx == UINT32_MAX) {
 			return -1;
 		}
+
 		if(strcmp(icons[idx].name, name) == 0) {
 			return (int32_t)idx;
 		}
@@ -815,6 +816,7 @@ static uint32_t vm_arena_ensure(struct vm_arena *a, size_t needed) {
 	if(needed <= a->committed) {
 		return 1;
 	}
+
 	if(needed > a->reserved) {
 		return 0;
 	}
@@ -823,6 +825,7 @@ static uint32_t vm_arena_ensure(struct vm_arena *a, size_t needed) {
 	if(new_commit > a->reserved) {
 		new_commit = a->reserved;
 	}
+
 	if(!VirtualAlloc(a->base, new_commit, MEM_COMMIT, PAGE_READWRITE)) {
 		return 0;
 	}
@@ -861,6 +864,7 @@ static uint32_t vm_arena_ensure(struct vm_arena *a, size_t needed) {
 	if(needed <= a->committed) {
 		return 1;
 	}
+
 	if(needed > a->reserved) {
 		return 0;
 	}
@@ -869,6 +873,7 @@ static uint32_t vm_arena_ensure(struct vm_arena *a, size_t needed) {
 	if(new_commit > a->reserved) {
 		new_commit = a->reserved;
 	}
+
 	if(mprotect(a->base, new_commit, PROT_READ | PROT_WRITE) != 0) {
 		return 0;
 	}
@@ -975,6 +980,7 @@ static uint32_t theme_prefers_dark(void) {
 		if(strcmp(override, "light") == 0) {
 			return 0;
 		}
+
 		if(strcmp(override, "dark") == 0) {
 			return 1;
 		}
@@ -997,11 +1003,7 @@ static uint32_t theme_prefers_dark(void) {
 #ifdef _WIN32
 	DWORD value = 1;
 	DWORD size = sizeof(value);
-	LONG res = RegGetValueA(HKEY_CURRENT_USER,
-		"Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize",
-		"AppsUseLightTheme",
-		RRF_RT_REG_DWORD,
-		NULL, &value, &size);
+	LONG res = RegGetValueA(HKEY_CURRENT_USER, "Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize", "AppsUseLightTheme", RRF_RT_REG_DWORD, NULL, &value, &size);
 	if(res == ERROR_SUCCESS) {
 		return value == 0;
 	}
@@ -1197,9 +1199,11 @@ static uint32_t widget_visible(struct mkgui_ctx *ctx, uint32_t idx) {
 	if(w->flags & MKGUI_HIDDEN) {
 		return 0;
 	}
+
 	if(w->type == MKGUI_WINDOW) {
 		return 1;
 	}
+
 	if(layout_arr_cap > 0 && idx < layout_arr_cap) {
 		uint32_t pidx = layout_parent[idx];
 		while(pidx < ctx->widget_count) {
@@ -1207,6 +1211,7 @@ static uint32_t widget_visible(struct mkgui_ctx *ctx, uint32_t idx) {
 			if(parent->flags & MKGUI_HIDDEN) {
 				return 0;
 			}
+
 			if(parent->type == MKGUI_TAB) {
 				uint32_t tabs_idx = layout_parent[pidx];
 				if(tabs_idx < ctx->widget_count && ctx->widgets[tabs_idx].type == MKGUI_TABS) {
@@ -1216,9 +1221,11 @@ static uint32_t widget_visible(struct mkgui_ctx *ctx, uint32_t idx) {
 					}
 				}
 			}
+
 			if(parent->type == MKGUI_GROUP && (parent->style & MKGUI_GROUP_COLLAPSED)) {
 				return 0;
 			}
+
 			if(parent->type == MKGUI_WINDOW) {
 				break;
 			}
@@ -1231,9 +1238,11 @@ static uint32_t widget_visible(struct mkgui_ctx *ctx, uint32_t idx) {
 			if(!parent) {
 				break;
 			}
+
 			if(parent->flags & MKGUI_HIDDEN) {
 				return 0;
 			}
+
 			if(parent->type == MKGUI_TAB) {
 				struct mkgui_widget *tabs_container = find_widget(ctx, parent->parent_id);
 				if(tabs_container && tabs_container->type == MKGUI_TABS) {
@@ -1243,6 +1252,7 @@ static uint32_t widget_visible(struct mkgui_ctx *ctx, uint32_t idx) {
 					}
 				}
 			}
+
 			if(parent->type == MKGUI_GROUP && (parent->style & MKGUI_GROUP_COLLAPSED)) {
 				return 0;
 			}
@@ -1308,6 +1318,7 @@ static void dirty_add(struct mkgui_ctx *ctx, int32_t x, int32_t y, int32_t w, in
 	if(ctx->dirty_full) {
 		return;
 	}
+
 	if(w <= 0 || h <= 0) {
 		return;
 	}
@@ -1393,6 +1404,7 @@ static uint32_t layout_find_idx(uint32_t id) {
 		if(layout_id_map[h].idx == UINT32_MAX) {
 			return UINT32_MAX;
 		}
+
 		if(layout_id_map[h].id == id) {
 			return layout_id_map[h].idx;
 		}
@@ -1409,10 +1421,12 @@ static uint32_t layout_arena_init(void) {
 	if(!vm_arena_create(&layout_parent_arena, per_reserve)) {
 		return 0;
 	}
+
 	if(!vm_arena_create(&layout_child_arena, per_reserve)) {
 		vm_arena_destroy(&layout_parent_arena);
 		return 0;
 	}
+
 	if(!vm_arena_create(&layout_sibling_arena, per_reserve)) {
 		vm_arena_destroy(&layout_parent_arena);
 		vm_arena_destroy(&layout_child_arena);
@@ -1487,6 +1501,7 @@ static uint32_t lc_find_idx(struct layout_ctx *lc, uint32_t id) {
 		if(lc->id_map[h].idx == UINT32_MAX) {
 			return UINT32_MAX;
 		}
+
 		if(lc->id_map[h].id == id) {
 			return lc->id_map[h].idx;
 		}
@@ -1531,9 +1546,7 @@ static void layout_build_index(struct mkgui_ctx *ctx) {
 			return;
 		}
 		size_t needed = (size_t)nc * sizeof(uint32_t);
-		if(!vm_arena_ensure(&layout_parent_arena, needed) ||
-		   !vm_arena_ensure(&layout_child_arena, needed) ||
-		   !vm_arena_ensure(&layout_sibling_arena, needed)) {
+		if(!vm_arena_ensure(&layout_parent_arena, needed) || !vm_arena_ensure(&layout_child_arena, needed) || !vm_arena_ensure(&layout_sibling_arena, needed)) {
 			return;
 		}
 		layout_arr_cap = nc;
@@ -1546,10 +1559,12 @@ static void layout_build_index(struct mkgui_ctx *ctx) {
 	while(hs < need) {
 		hs <<= 1;
 	}
+
 	if(hs > layout_hash_size) {
 		if(hs > MKGUI_VM_MAX_HASH_SLOTS) {
 			return;
 		}
+
 		if(!vm_arena_ensure(&layout_hash_arena, (size_t)hs * sizeof(struct mkgui_layout_hash_entry))) {
 			return;
 		}
@@ -1740,9 +1755,11 @@ static int32_t lc_measure_container(struct mkgui_ctx *ctx, struct layout_ctx *lc
 			child_main = lw_sw(ctx, jw->w);
 			child_cross = lw_sw(ctx, jw->h);
 		}
+
 		if(child_main == 0 && (ct == MKGUI_VBOX || ct == MKGUI_HBOX || ct == MKGUI_FORM || ct == MKGUI_GROUP || ct == MKGUI_PANEL)) {
 			child_main = lc_measure_container(ctx, lc, j, is_vbox ? 1 : 0);
 		}
+
 		if(child_main == 0) {
 			if(is_vbox) {
 				child_main = natural_height(ctx, ct);
@@ -1750,9 +1767,11 @@ static int32_t lc_measure_container(struct mkgui_ctx *ctx, struct layout_ctx *lc
 				child_main = natural_width(ctx, jw);
 			}
 		}
+
 		if(child_cross == 0 && (ct == MKGUI_VBOX || ct == MKGUI_HBOX || ct == MKGUI_FORM || ct == MKGUI_GROUP || ct == MKGUI_PANEL)) {
 			child_cross = lc_measure_container(ctx, lc, j, is_vbox ? 0 : 1);
 		}
+
 		if(child_cross == 0) {
 			if(is_vbox) {
 				child_cross = natural_width(ctx, jw);
@@ -1780,10 +1799,12 @@ static int32_t lc_measure_container(struct mkgui_ctx *ctx, struct layout_ctx *lc
 				nested = 1;
 			}
 		}
+
 		if(!nested || (w->style & STYLE_BORDER_BIT)) {
 			has_pad = 1;
 		}
 	}
+
 	if(has_pad) {
 		main_total += ctx->box_pad * 2;
 		cross_max += ctx->box_pad * 2;
@@ -1855,6 +1876,7 @@ static void lc_layout_node(struct mkgui_ctx *ctx, struct layout_ctx *lc, uint32_
 							break;
 						}
 					}
+
 					if(tb_has_icons && ctx->icon_size > 0) {
 						int32_t ih = ctx->icon_size;
 						th = (tb_mode == MKGUI_TOOLBAR_ICONS_ONLY) ? ih + 10 : ((ih > ctx->font_height ? ih : ctx->font_height) + 10);
@@ -1900,6 +1922,7 @@ static void lc_layout_node(struct mkgui_ctx *ctx, struct layout_ctx *lc, uint32_
 		pw -= 4;
 		ph -= ctx->tab_height + 4;
 	}
+
 	if(w->type == MKGUI_GROUP) {
 		if(w->style & MKGUI_GROUP_COLLAPSED) {
 			return;
@@ -1926,6 +1949,7 @@ static void lc_layout_node(struct mkgui_ctx *ctx, struct layout_ctx *lc, uint32_
 					nested = 1;
 				}
 			}
+
 			if(!nested || (w->style & STYLE_BORDER_BIT)) {
 				px += ctx->box_pad;
 				py += ctx->box_pad;
@@ -1960,6 +1984,7 @@ static void lc_layout_node(struct mkgui_ctx *ctx, struct layout_ctx *lc, uint32_
 					if(fh == 0 && (ct == MKGUI_VBOX || ct == MKGUI_HBOX || ct == MKGUI_FORM || ct == MKGUI_GROUP || ct == MKGUI_PANEL)) {
 						fh = lc_measure_container(ctx, lc, j, 1);
 					}
+
 					if(fh == 0) {
 						fh = natural_height(ctx, ct);
 					}
@@ -1973,6 +1998,7 @@ static void lc_layout_node(struct mkgui_ctx *ctx, struct layout_ctx *lc, uint32_
 						if(ct == MKGUI_VBOX || ct == MKGUI_HBOX || ct == MKGUI_FORM || ct == MKGUI_GROUP || ct == MKGUI_PANEL) {
 							minh = lc_measure_container(ctx, lc, j, 1);
 						}
+
 						if(minh == 0) {
 							minh = natural_height(ctx, jw->type);
 						}
@@ -1988,6 +2014,7 @@ static void lc_layout_node(struct mkgui_ctx *ctx, struct layout_ctx *lc, uint32_
 			if(needs_scroll) {
 				pw -= ctx->scrollbar_w;
 			}
+
 			if(bs) {
 				bs->content_h = content_h;
 				if(box_has_pad) {
@@ -2020,6 +2047,7 @@ static void lc_layout_node(struct mkgui_ctx *ctx, struct layout_ctx *lc, uint32_
 						if(ct == MKGUI_VBOX || ct == MKGUI_HBOX || ct == MKGUI_FORM || ct == MKGUI_GROUP || ct == MKGUI_PANEL) {
 							base_h = lc_measure_container(ctx, lc, j, 1);
 						}
+
 						if(base_h == 0) {
 							base_h = natural_height(ctx, jw->type);
 						}
@@ -2037,8 +2065,13 @@ static void lc_layout_node(struct mkgui_ctx *ctx, struct layout_ctx *lc, uint32_
 					} else {
 						min_ch = natural_height(ctx, ct);
 					}
-					if(min_ch < 1) { min_ch = 1; }
-					if(ch < min_ch) { ch = min_ch; }
+
+					if(min_ch < 1) {
+						min_ch = 1;
+					}
+					if(ch < min_ch) {
+						ch = min_ch;
+					}
 				}
 				int32_t cx_child = px;
 				int32_t cw_child = pw;
@@ -2080,6 +2113,7 @@ static void lc_layout_node(struct mkgui_ctx *ctx, struct layout_ctx *lc, uint32_
 					if(fw == 0 && (ct == MKGUI_VBOX || ct == MKGUI_HBOX || ct == MKGUI_FORM || ct == MKGUI_GROUP || ct == MKGUI_PANEL)) {
 						fw = lc_measure_container(ctx, lc, j, 0);
 					}
+
 					if(fw == 0) {
 						fw = natural_width(ctx, jw);
 					}
@@ -2093,6 +2127,7 @@ static void lc_layout_node(struct mkgui_ctx *ctx, struct layout_ctx *lc, uint32_
 						if(ct == MKGUI_VBOX || ct == MKGUI_HBOX || ct == MKGUI_FORM || ct == MKGUI_GROUP || ct == MKGUI_PANEL) {
 							minw = lc_measure_container(ctx, lc, j, 0);
 						}
+
 						if(minw == 0) {
 							minw = natural_width(ctx, jw);
 						}
@@ -2107,6 +2142,7 @@ static void lc_layout_node(struct mkgui_ctx *ctx, struct layout_ctx *lc, uint32_
 			if(needs_scroll) {
 				ph -= ctx->scrollbar_w;
 			}
+
 			if(bs) {
 				bs->content_w = content_w;
 			}
@@ -2134,12 +2170,14 @@ static void lc_layout_node(struct mkgui_ctx *ctx, struct layout_ctx *lc, uint32_
 						if(ct == MKGUI_VBOX || ct == MKGUI_HBOX || ct == MKGUI_FORM || ct == MKGUI_GROUP || ct == MKGUI_PANEL) {
 							base_w = lc_measure_container(ctx, lc, j, 0);
 						}
+
 						if(base_w == 0) {
 							base_w = natural_width(ctx, jw);
 						}
 					}
 					cw = base_w + (weight_total > 0 ? (int32_t)((int64_t)remaining * (int32_t)wt / (int32_t)weight_total) : 0);
 				}
+
 				if(!(jw->flags & MKGUI_FIXED)) {
 					uint32_t ct = jw->type;
 					int32_t min_cw;
@@ -2148,8 +2186,13 @@ static void lc_layout_node(struct mkgui_ctx *ctx, struct layout_ctx *lc, uint32_
 					} else {
 						min_cw = natural_width(ctx, jw);
 					}
-					if(min_cw < 1) { min_cw = 1; }
-					if(cw < min_cw) { cw = min_cw; }
+
+					if(min_cw < 1) {
+						min_cw = 1;
+					}
+					if(cw < min_cw) {
+						cw = min_cw;
+					}
 				}
 				int32_t cy_child = py;
 				int32_t ch_child = ph;
@@ -2217,6 +2260,7 @@ static void lc_layout_node(struct mkgui_ctx *ctx, struct layout_ctx *lc, uint32_
 					if(cw->flags & MKGUI_HIDDEN) {
 						continue;
 					}
+
 					if(cw->flags & MKGUI_REGION_TOP) {
 						lc->rects[c].x = px;
 						lc->rects[c].y = py;
@@ -2236,6 +2280,7 @@ static void lc_layout_node(struct mkgui_ctx *ctx, struct layout_ctx *lc, uint32_
 					if(cw->flags & MKGUI_HIDDEN) {
 						continue;
 					}
+
 					if(cw->flags & MKGUI_REGION_LEFT) {
 						lc->rects[c].x = px;
 						lc->rects[c].y = py;
@@ -2256,9 +2301,11 @@ static void lc_layout_node(struct mkgui_ctx *ctx, struct layout_ctx *lc, uint32_
 				if(ct == MKGUI_MENUITEM || (cw->flags & MKGUI_HIDDEN)) {
 					continue;
 				}
+
 				if(w->type == MKGUI_WINDOW && (ct == MKGUI_MENU || ct == MKGUI_TOOLBAR || ct == MKGUI_STATUSBAR)) {
 					continue;
 				}
+
 				if(w->type == MKGUI_WINDOW && ct == MKGUI_PATHBAR && lw_sw(ctx, cw->h) == 0) {
 					continue;
 				}
@@ -2276,6 +2323,7 @@ static void lc_layout_node(struct mkgui_ctx *ctx, struct layout_ctx *lc, uint32_
 						if(ct == MKGUI_VBOX || ct == MKGUI_HBOX || ct == MKGUI_FORM || ct == MKGUI_GROUP || ct == MKGUI_PANEL) {
 							fw = lc_measure_container(ctx, lc, c, 0);
 						}
+
 						if(fw == 0) {
 							fw = natural_width(ctx, cw);
 						}
@@ -2286,6 +2334,7 @@ static void lc_layout_node(struct mkgui_ctx *ctx, struct layout_ctx *lc, uint32_
 						if(ct == MKGUI_VBOX || ct == MKGUI_HBOX || ct == MKGUI_FORM || ct == MKGUI_GROUP || ct == MKGUI_PANEL) {
 							fh = lc_measure_container(ctx, lc, c, 1);
 						}
+
 						if(fh == 0) {
 							fh = natural_height(ctx, ct);
 						}
@@ -2356,9 +2405,11 @@ static void layout_min_size(struct mkgui_ctx *ctx, uint32_t idx, int32_t *out_w,
 					}
 					th += ch;
 				}
+
 				if(tw > max_tw) {
 					max_tw = tw;
 				}
+
 				if(th > max_th) {
 					max_th = th;
 				}
@@ -2430,9 +2481,11 @@ static void layout_compute_min_size(struct mkgui_ctx *ctx, uint32_t win_idx) {
 			}
 		}
 	}
+
 	if(min_h < 100) {
 		min_h = 100;
 	}
+
 	if(min_w < 200) {
 		min_w = 200;
 	}
@@ -2472,6 +2525,7 @@ static int32_t hit_test(struct mkgui_ctx *ctx, int32_t mx, int32_t my) {
 		if(w->type == MKGUI_WINDOW || w->type == MKGUI_TAB || w->type == MKGUI_PANEL || w->type == MKGUI_SPINNER || w->type == MKGUI_GLVIEW || w->type == MKGUI_VBOX || w->type == MKGUI_HBOX || w->type == MKGUI_FORM || w->type == MKGUI_DIVIDER || w->type == MKGUI_TOOLBAR) {
 			continue;
 		}
+
 		if(w->type == MKGUI_GROUP) {
 			int32_t rx = ctx->rects[i].x;
 			int32_t ry = ctx->rects[i].y;
@@ -2482,9 +2536,11 @@ static int32_t hit_test(struct mkgui_ctx *ctx, int32_t mx, int32_t my) {
 			}
 			continue;
 		}
+
 		if(w->type == MKGUI_LABEL && !(w->style & MKGUI_LABEL_LINK)) {
 			continue;
 		}
+
 		if(w->type == MKGUI_HSPLIT || w->type == MKGUI_VSPLIT) {
 			int32_t rx = ctx->rects[i].x;
 			int32_t ry = ctx->rects[i].y;
@@ -2641,24 +2697,31 @@ static void draw_icon(uint32_t *buf, int32_t bw, int32_t bh, struct mkgui_icon *
 	if(y + row0 < cy1) {
 		row0 = cy1 - y;
 	}
+
 	if(y + row0 < 0) {
 		row0 = -y;
 	}
+
 	if(y + row1 > cy2) {
 		row1 = cy2 - y;
 	}
+
 	if(y + row1 > bh) {
 		row1 = bh - y;
 	}
+
 	if(x + col0 < cx1) {
 		col0 = cx1 - x;
 	}
+
 	if(x + col0 < 0) {
 		col0 = -x;
 	}
+
 	if(x + col1 > cx2) {
 		col1 = cx2 - x;
 	}
+
 	if(x + col1 > bw) {
 		col1 = bw - x;
 	}
@@ -2916,6 +2979,7 @@ static void render_widget(struct mkgui_ctx *ctx, uint32_t idx) {
 			if(ctx->widgets[idx].style & STYLE_BORDER_BIT) {
 				render_panel(ctx, idx);
 			}
+
 			if((ctx->widgets[idx].flags & MKGUI_SCROLL)) {
 				struct mkgui_box_scroll *bs = find_box_scroll(ctx, ctx->widgets[idx].id);
 				int32_t rx = ctx->rects[idx].x;
@@ -2935,6 +2999,7 @@ static void render_widget(struct mkgui_ctx *ctx, uint32_t idx) {
 					if(thumb < sc(ctx, 20)) {
 						thumb = sc(ctx, 20);
 					}
+
 					if(thumb > track) {
 						thumb = track;
 					}
@@ -2946,11 +3011,13 @@ static void render_widget(struct mkgui_ctx *ctx, uint32_t idx) {
 					if(pos < 0) {
 						pos = 0;
 					}
+
 					if(pos > track - thumb) {
 						pos = track - thumb;
 					}
 					draw_rounded_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, sx + 2, ry + pos, ctx->scrollbar_w - 4, thumb, ctx->theme.scrollbar_thumb, r);
 				}
+
 				if(bs && bs->content_w > rw) {
 					int32_t sy = ry + rh - ctx->scrollbar_w;
 					draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, rx, sy, rw, ctx->scrollbar_w, ctx->theme.scrollbar_bg);
@@ -2963,6 +3030,7 @@ static void render_widget(struct mkgui_ctx *ctx, uint32_t idx) {
 					if(thumb < sc(ctx, 20)) {
 						thumb = sc(ctx, 20);
 					}
+
 					if(thumb > track) {
 						thumb = track;
 					}
@@ -2974,6 +3042,7 @@ static void render_widget(struct mkgui_ctx *ctx, uint32_t idx) {
 					if(pos < 0) {
 						pos = 0;
 					}
+
 					if(pos > track - thumb) {
 						pos = track - thumb;
 					}
@@ -3002,12 +3071,15 @@ static void set_parent_clip(struct mkgui_ctx *ctx, uint32_t idx) {
 		if(px > render_clip_x1) {
 			render_clip_x1 = px;
 		}
+
 		if(py > render_clip_y1) {
 			render_clip_y1 = py;
 		}
+
 		if(px2 < render_clip_x2) {
 			render_clip_x2 = px2;
 		}
+
 		if(py2 < render_clip_y2) {
 			render_clip_y2 = py2;
 		}
@@ -3321,9 +3393,11 @@ static uint32_t mkgui_grow_widgets(struct mkgui_ctx *ctx) {
 		if(nw) {
 			ctx->widgets = nw;
 		}
+
 		if(nr) {
 			ctx->rects = nr;
 		}
+
 		if(nt) {
 			ctx->tooltip_texts = nt;
 		}
@@ -3668,6 +3742,7 @@ static void mkgui_remove_aux_(struct mkgui_ctx *ctx, uint32_t id, uint32_t type)
 					if(ctx->glviews[i].created) {
 						platform_glview_destroy(ctx, &ctx->glviews[i]);
 					}
+
 					if(i < ctx->glview_count - 1) {
 						ctx->glviews[i] = ctx->glviews[ctx->glview_count - 1];
 					}
@@ -3713,6 +3788,7 @@ MKGUI_API uint32_t mkgui_remove_widget(struct mkgui_ctx *ctx, uint32_t id) {
 	if(idx < 0) {
 		return 0;
 	}
+
 	if(ctx->widgets[idx].type == MKGUI_WINDOW) {
 		return 0;
 	}
@@ -3742,39 +3818,51 @@ MKGUI_API uint32_t mkgui_remove_widget(struct mkgui_ctx *ctx, uint32_t id) {
 			if(ctx->hover_id == wid) {
 				ctx->hover_id = 0;
 			}
+
 			if(ctx->prev_hover_id == wid) {
 				ctx->prev_hover_id = 0;
 			}
+
 			if(ctx->press_id == wid) {
 				ctx->press_id = 0;
 			}
+
 			if(ctx->focus_id == wid) {
 				ctx->focus_id = 0;
 			}
+
 			if(ctx->prev_focus_id == wid) {
 				ctx->prev_focus_id = 0;
 			}
+
 			if(ctx->drag_scrollbar_id == wid) {
 				ctx->drag_scrollbar_id = 0;
 			}
+
 			if(ctx->drag_col_id == wid) {
 				ctx->drag_col_id = 0;
 			}
+
 			if(ctx->drag_col_resize_id == wid) {
 				ctx->drag_col_resize_id = 0;
 			}
+
 			if(ctx->drag_select_id == wid) {
 				ctx->drag_select_id = 0;
 			}
+
 			if(ctx->drag_text_id == wid) {
 				ctx->drag_text_id = 0;
 			}
+
 			if(ctx->dblclick_id == wid) {
 				ctx->dblclick_id = 0;
 			}
+
 			if(ctx->divider_dblclick_id == wid) {
 				ctx->divider_dblclick_id = 0;
 			}
+
 			if(ctx->tooltip_id == wid) {
 				ctx->tooltip_id = 0;
 			}
@@ -3928,6 +4016,7 @@ MKGUI_API struct mkgui_ctx *mkgui_create(struct mkgui_widget *widgets, uint32_t 
 	if(cap < MKGUI_GROW_WIDGETS) {
 		cap = MKGUI_GROW_WIDGETS;
 	}
+
 	if(!mkgui_alloc_arrays(ctx, cap)) {
 		free(ctx);
 		return NULL;
@@ -3942,9 +4031,11 @@ MKGUI_API struct mkgui_ctx *mkgui_create(struct mkgui_widget *widgets, uint32_t 
 			if(widgets[i].w > 0) {
 				init_w = widgets[i].w;
 			}
+
 			if(widgets[i].h > 0) {
 				init_h = widgets[i].h;
 			}
+
 			if(widgets[i].label[0]) {
 				title = ctx->widgets[i].label;
 			}
@@ -3983,6 +4074,7 @@ MKGUI_API struct mkgui_ctx *mkgui_create(struct mkgui_widget *widgets, uint32_t 
 			return NULL;
 		}
 	}
+
 	if(!layout_arena_init()) {
 		mkgui_free_arrays(ctx);
 		platform_destroy(ctx);
@@ -4065,8 +4157,12 @@ MKGUI_API void mkgui_set_theme(struct mkgui_ctx *ctx, struct mkgui_theme theme) 
 // [=]===^=[ mkgui_set_scale ]=====================================[=]
 MKGUI_API void mkgui_set_scale(struct mkgui_ctx *ctx, float scale) {
 	MKGUI_CHECK(ctx);
-	if(scale < 0.5f) { scale = 0.5f; }
-	if(scale > 4.0f) { scale = 4.0f; }
+	if(scale < 0.5f) {
+		scale = 0.5f;
+	}
+	if(scale > 4.0f) {
+		scale = 4.0f;
+	}
 	ctx->scale = scale;
 	mkgui_recompute_metrics(ctx);
 	platform_font_set_size(ctx, (int32_t)(13.0f * scale + 0.5f));
@@ -4107,6 +4203,7 @@ MKGUI_API void mkgui_set_enabled(struct mkgui_ctx *ctx, uint32_t id, uint32_t en
 	if(!w) {
 		return;
 	}
+
 	if(enabled) {
 		w->flags &= ~MKGUI_DISABLED;
 
@@ -4136,6 +4233,7 @@ MKGUI_API void mkgui_set_visible(struct mkgui_ctx *ctx, uint32_t id, uint32_t vi
 	if(!w) {
 		return;
 	}
+
 	if(visible) {
 		w->flags &= ~MKGUI_HIDDEN;
 
@@ -4196,6 +4294,7 @@ MKGUI_API void mkgui_get_geometry(struct mkgui_ctx *ctx, uint32_t id, int32_t *x
 		if(h) { *h = 0; }
 		return;
 	}
+
 	if(x) { *x = ctx->rects[idx].x; }
 	if(y) { *y = ctx->rects[idx].y; }
 	if(w) { *w = ctx->rects[idx].w; }
@@ -4320,6 +4419,7 @@ MKGUI_API struct mkgui_ctx *mkgui_create_child(struct mkgui_ctx *parent, struct 
 	if(cap < MKGUI_GROW_WIDGETS) {
 		cap = MKGUI_GROW_WIDGETS;
 	}
+
 	if(!mkgui_alloc_arrays(ctx, cap)) {
 		free(ctx);
 		return NULL;
@@ -4516,9 +4616,11 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 		if(!widget_visible(ctx, i)) {
 			continue;
 		}
+
 		if(w->type == MKGUI_SPINNER || w->type == MKGUI_GLVIEW) {
 			ctx->anim_active = 1;
 		}
+
 		if(w->type == MKGUI_PROGRESS && (w->style & MKGUI_PROGRESS_SHIMMER)) {
 			struct mkgui_progress_data *pd = find_progress_data(ctx, w->id);
 			if(pd && pd->value > 0 && pd->value < pd->max_val) {
@@ -4589,6 +4691,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 									already_open = 1;
 								}
 							}
+
 							if(!already_open) {
 								menu_open_submenu(ctx, (uint32_t)popup_idx, hovered->id);
 							}
@@ -4755,6 +4858,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 								if(thumb < sc(ctx, 20)) {
 									thumb = sc(ctx, 20);
 								}
+
 								if(thumb > track) {
 									thumb = track;
 								}
@@ -4771,6 +4875,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 								if(bs->scroll_x < 0) {
 									bs->scroll_x = 0;
 								}
+
 								if(bs->scroll_x > max_scroll) {
 									bs->scroll_x = max_scroll;
 								}
@@ -4786,6 +4891,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 								if(thumb < sc(ctx, 20)) {
 									thumb = sc(ctx, 20);
 								}
+
 								if(thumb > track) {
 									thumb = track;
 								}
@@ -4802,6 +4908,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 								if(bs->scroll_y < 0) {
 									bs->scroll_y = 0;
 								}
+
 								if(bs->scroll_y > max_scroll) {
 									bs->scroll_y = max_scroll;
 								}
@@ -4884,12 +4991,15 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 										if(min_ratio > 0.45f) {
 											min_ratio = 0.45f;
 										}
+
 										if(max_ratio < 0.55f) {
 											max_ratio = 0.55f;
 										}
+
 										if(sd->ratio < min_ratio) {
 											sd->ratio = min_ratio;
 										}
+
 										if(sd->ratio > max_ratio) {
 											sd->ratio = max_ratio;
 										}
@@ -4904,12 +5014,15 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 										if(min_ratio > 0.45f) {
 											min_ratio = 0.45f;
 										}
+
 										if(max_ratio < 0.55f) {
 											max_ratio = 0.55f;
 										}
+
 										if(sd->ratio < min_ratio) {
 											sd->ratio = min_ratio;
 										}
+
 										if(sd->ratio > max_ratio) {
 											sd->ratio = max_ratio;
 										}
@@ -4940,12 +5053,15 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 								int32_t pos = (ctx->mouse_x - ctx->drag_slider_offset) - rx - thumb_sz / 2;
 								new_val = sd->min_val + (track > 0 ? (int32_t)((int64_t)pos * range / track) : 0);
 							}
+
 							if(new_val < sd->min_val) {
 								new_val = sd->min_val;
 							}
+
 							if(new_val > sd->max_val) {
 								new_val = sd->max_val;
 							}
+
 							if(new_val != sd->value) {
 								sd->value = new_val;
 								dirty_widget(ctx, (uint32_t)pi);
@@ -4969,6 +5085,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 						dirty_widget_id(ctx, ctx->hover_id);
 					}
 				}
+
 				if(hi >= 0 && ctx->widgets[hi].type == MKGUI_TABS) {
 					struct mkgui_tabs_data *td = find_tabs_data(ctx, ctx->widgets[hi].id);
 					if(td) {
@@ -4979,6 +5096,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 						}
 					}
 				}
+
 				if(hi >= 0 && ctx->widgets[hi].type == MKGUI_PATHBAR) {
 					struct mkgui_pathbar_data *pb = find_pathbar_data(ctx, ctx->widgets[hi].id);
 					if(pb && !pb->editing) {
@@ -4996,6 +5114,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 						if(dy < 0) {
 							dy = -dy;
 						}
+
 						if(!tv->drag_active && dy > sc(ctx, 4)) {
 							tv->drag_active = 1;
 							ev->type = MKGUI_EVENT_DRAG_START;
@@ -5004,6 +5123,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 							dirty_widget_id(ctx, tv->widget_id);
 							return 1;
 						}
+
 						if(tv->drag_active) {
 							int32_t tidx = find_widget_idx(ctx, tv->widget_id);
 							if(tidx >= 0) {
@@ -5036,6 +5156,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 						if(dy < 0) {
 							dy = -dy;
 						}
+
 						if(!lv->drag_active && dy > sc(ctx, 4)) {
 							lv->drag_active = 1;
 							ev->type = MKGUI_EVENT_DRAG_START;
@@ -5044,6 +5165,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 							dirty_widget_id(ctx, lv->widget_id);
 							return 1;
 						}
+
 						if(lv->drag_active) {
 							int32_t lidx = find_widget_idx(ctx, lv->widget_id);
 							if(lidx >= 0) {
@@ -5065,6 +5187,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 						if(dy < 0) {
 							dy = -dy;
 						}
+
 						if(!gv->drag_active && dy > sc(ctx, 4)) {
 							gv->drag_active = 1;
 							ev->type = MKGUI_EVENT_DRAG_START;
@@ -5073,6 +5196,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 							dirty_widget_id(ctx, gv->widget_id);
 							return 1;
 						}
+
 						if(gv->drag_active) {
 							int32_t gidx = find_widget_idx(ctx, gv->widget_id);
 							if(gidx >= 0) {
@@ -5110,6 +5234,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 						}
 					}
 				}
+
 				if(cursor_type == MKGUI_CURSOR_DEFAULT && hi >= 0) {
 					uint32_t htype = ctx->widgets[hi].type;
 					if(htype == MKGUI_HSPLIT) {
@@ -5160,6 +5285,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 						break;
 					}
 				}
+
 				if(popup_idx >= 0) {
 					struct mkgui_popup *p = &ctx->popups[popup_idx];
 					struct mkgui_widget *pw = find_widget(ctx, p->widget_id);
@@ -5370,6 +5496,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 						if(pw && pw->type == MKGUI_DROPDOWN) {
 							closed_dropdown_id = ctx->popups[pi].widget_id;
 						}
+
 						if(pw && pw->type == MKGUI_COMBOBOX) {
 							closed_combobox_id = ctx->popups[pi].widget_id;
 							struct mkgui_combobox_data *cb = find_combobox_data(ctx, pw->id);
@@ -5417,6 +5544,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 									}
 									cx += lv->columns[c].width;
 								}
+
 								if(row < 0 || row >= (int32_t)lv->row_count) {
 									row = -1;
 								} else {
@@ -5497,12 +5625,14 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 									if(!treeview_node_visible(tv, n)) {
 										continue;
 									}
+
 									if(vis == vis_row) {
 										node_id = (int32_t)tv->nodes[n].id;
 										break;
 									}
 									++vis;
 								}
+
 								if(node_id >= 0 && tv->selected_node != node_id) {
 									tv->selected_node = node_id;
 									dirty_widget(ctx, (uint32_t)hi);
@@ -5563,9 +5693,11 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 								if(max_scroll < 0) {
 									max_scroll = 0;
 								}
+
 								if(lv->scroll_y < 0) {
 									lv->scroll_y = 0;
 								}
+
 								if(lv->scroll_y > max_scroll) {
 									lv->scroll_y = max_scroll;
 								}
@@ -5618,9 +5750,11 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 							if(sel < 0) {
 								sel = 0;
 							}
+
 							if(sel >= (int32_t)dd->item_count) {
 								sel = (int32_t)dd->item_count - 1;
 							}
+
 							if(sel != dd->selected) {
 								dd->selected = sel;
 								dirty_widget(ctx, (uint32_t)hi);
@@ -5644,6 +5778,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 							if(sd->value < sd->min_val) {
 								sd->value = sd->min_val;
 							}
+
 							if(sd->value > sd->max_val) {
 								sd->value = sd->max_val;
 							}
@@ -5664,9 +5799,11 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 							if(max_scroll < 0) {
 								max_scroll = 0;
 							}
+
 							if(ta->scroll_y < 0) {
 								ta->scroll_y = 0;
 							}
+
 							if(ta->scroll_y > max_scroll) {
 								ta->scroll_y = max_scroll;
 							}
@@ -5713,6 +5850,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 							if(si < 0) {
 								break;
 							}
+
 							if((ctx->widgets[si].type == MKGUI_VBOX || ctx->widgets[si].type == MKGUI_HBOX) && (ctx->widgets[si].flags & MKGUI_SCROLL)) {
 								struct mkgui_box_scroll *bs = find_box_scroll(ctx, sid);
 								if(bs) {
@@ -5726,12 +5864,14 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 										if(bs->scroll_x < 0) {
 											bs->scroll_x = 0;
 										}
+
 										if(bs->scroll_x > max_scroll) {
 											bs->scroll_x = max_scroll;
 										}
 										dirty_widget(ctx, (uint32_t)si);
 										break;
 									}
+
 									if(bs->content_h > ctx->rects[si].h) {
 										int32_t view_h = ctx->rects[si].h;
 										int32_t max_scroll = bs->content_h - view_h;
@@ -5742,6 +5882,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 										if(bs->scroll_y < 0) {
 											bs->scroll_y = 0;
 										}
+
 										if(bs->scroll_y > max_scroll) {
 											bs->scroll_y = max_scroll;
 										}
@@ -5775,6 +5916,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 							if(si < 0) {
 								break;
 							}
+
 							if((ctx->widgets[si].type == MKGUI_VBOX || ctx->widgets[si].type == MKGUI_HBOX) && (ctx->widgets[si].flags & MKGUI_SCROLL)) {
 								struct mkgui_box_scroll *bs = find_box_scroll(ctx, sid);
 								if(bs && bs->content_w > ctx->rects[si].w) {
@@ -5786,6 +5928,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 									if(bs->scroll_x < 0) {
 										bs->scroll_x = 0;
 									}
+
 									if(bs->scroll_x > max_scroll) {
 										bs->scroll_x = max_scroll;
 									}
@@ -5806,6 +5949,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 						if(!bs) {
 							continue;
 						}
+
 						if(bw->type == MKGUI_HBOX && bs->content_w > ctx->rects[bi].w) {
 							int32_t sy = ctx->rects[bi].y + ctx->rects[bi].h - ctx->scrollbar_w;
 							int32_t sx = ctx->rects[bi].x;
@@ -5820,6 +5964,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 								if(thumb < sc(ctx, 20)) {
 									thumb = sc(ctx, 20);
 								}
+
 								if(thumb > track) {
 									thumb = track;
 								}
@@ -5835,6 +5980,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 								break;
 							}
 						}
+
 						if(bs->content_h <= ctx->rects[bi].h) {
 							continue;
 						}
@@ -5851,6 +5997,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 							if(thumb < sc(ctx, 20)) {
 								thumb = sc(ctx, 20);
 							}
+
 							if(thumb > track) {
 								thumb = track;
 							}
@@ -5862,6 +6009,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 							if(pos < 0) {
 								pos = 0;
 							}
+
 							if(pos > track - thumb) {
 								pos = track - thumb;
 							}
@@ -5876,6 +6024,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 								if(bs->scroll_y < 0) {
 									bs->scroll_y = 0;
 								}
+
 								if(bs->scroll_y > max_scroll) {
 									bs->scroll_y = max_scroll;
 								}
@@ -5885,6 +6034,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 						}
 					}
 				}
+
 				if(ctx->drag_scrollbar_id) {
 					break;
 				}
@@ -5981,6 +6131,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 								break;
 							}
 						}
+
 						if(ta) {
 							uint32_t hit = textarea_hit_pos(ctx, ta, ctx->rects[hi].x, ctx->rects[hi].y, ctx->rects[hi].h, ctx->mouse_x, ctx->mouse_y);
 							if(textarea_has_selection(ta) && !(hw->style & MKGUI_TEXTAREA_READONLY)) {
@@ -6105,6 +6256,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 												dirty_widget(ctx, (uint32_t)hi);
 												return 1;
 											}
+
 											if(was_selected && slow_click && (hw->style & MKGUI_LISTVIEW_EDITABLE)) {
 												char cell_buf[MKGUI_MAX_TEXT] = {0};
 												if(lv->row_cb) {
@@ -6356,9 +6508,11 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 									new_val = sd->min_val + (track > 0 ? (int32_t)((int64_t)pos * range / track) : 0);
 								}
 							}
+
 							if(new_val < sd->min_val) {
 								new_val = sd->min_val;
 							}
+
 							if(new_val > sd->max_val) {
 								new_val = sd->max_val;
 							}
@@ -6483,6 +6637,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 						ev->keysym = (uint32_t)pos;
 						return 1;
 					}
+
 					if(tv->drag_active) {
 						ev->type = MKGUI_EVENT_DRAG_END;
 						ev->id = tv->widget_id;
@@ -6507,6 +6662,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 						ev->col = tgt;
 						return 1;
 					}
+
 					if(lv->drag_active) {
 						ev->type = MKGUI_EVENT_DRAG_END;
 						ev->id = lv->widget_id;
@@ -6531,6 +6687,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 						ev->col = tgt;
 						return 1;
 					}
+
 					if(gv->drag_active) {
 						ev->type = MKGUI_EVENT_DRAG_END;
 						ev->id = gv->widget_id;
@@ -6670,6 +6827,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 							ev->value = sd ? sd->value : 0;
 							return 1;
 						}
+
 						if(pt == MKGUI_HSPLIT || pt == MKGUI_VSPLIT) {
 							ev->type = MKGUI_EVENT_SPLIT_MOVED;
 							ev->id = was_press;
@@ -6731,6 +6889,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 						dirty_all(ctx);
 						break;
 					}
+
 					if(ks == MKGUI_KEY_UP) {
 						int32_t next = ctxmenu_next_item(ctx, cp->hover_item >= 0 ? cp->hover_item : (int32_t)ctx->ctxmenu_count, -1);
 						if(next != cp->hover_item) {
@@ -6740,6 +6899,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 						}
 						break;
 					}
+
 					if(ks == MKGUI_KEY_DOWN) {
 						int32_t next = ctxmenu_next_item(ctx, cp->hover_item, 1);
 						if(next != cp->hover_item) {
@@ -6749,6 +6909,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 						}
 						break;
 					}
+
 					if(ks == MKGUI_KEY_RETURN || ks == MKGUI_KEY_SPACE) {
 						if(cp->hover_item >= 0) {
 							struct mkgui_ctxmenu_item *it = ctxmenu_item_at(ctx, cp->hover_item);
@@ -6805,6 +6966,7 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 						} else {
 							idx = (start_idx + i) % ctx->widget_count;
 						}
+
 						if(widget_visible(ctx, idx) && is_focusable(&ctx->widgets[idx])) {
 							spinbox_focus_lost(ctx);
 					pathbar_focus_lost(ctx);
@@ -7386,9 +7548,11 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 			if(!widget_visible(ctx, i)) {
 				continue;
 			}
+
 			if(w->type == MKGUI_SPINNER || w->type == MKGUI_GLVIEW) {
 				dirty_widget(ctx, i);
 			}
+
 			if(w->type == MKGUI_PROGRESS && (w->style & MKGUI_PROGRESS_SHIMMER)) {
 				struct mkgui_progress_data *pd = find_progress_data(ctx, w->id);
 				if(pd && pd->value > 0 && pd->value < pd->max_val) {
@@ -7432,9 +7596,7 @@ static void mkgui_flush(struct mkgui_ctx *ctx) {
 			platform_blit(ctx);
 		} else {
 			for(uint32_t d = 0; d < ctx->dirty_count; ++d) {
-				platform_blit_region(ctx,
-					ctx->dirty_rects[d].x, ctx->dirty_rects[d].y,
-					ctx->dirty_rects[d].w, ctx->dirty_rects[d].h);
+				platform_blit_region(ctx, ctx->dirty_rects[d].x, ctx->dirty_rects[d].y, ctx->dirty_rects[d].w, ctx->dirty_rects[d].h);
 			}
 		}
 		double t3 = mkgui_time_us();
@@ -7447,6 +7609,7 @@ static void mkgui_flush(struct mkgui_ctx *ctx) {
 			if(!p->active || !p->dirty) {
 				continue;
 			}
+
 			if(p->widget_id == MKGUI_CTXMENU_POPUP_ID) {
 				render_ctxmenu_popup(ctx, p, p->hover_item);
 				flush_text_popup(ctx, p);
@@ -7514,10 +7677,12 @@ static void mkgui_flush(struct mkgui_ctx *ctx) {
 			if(!widget_visible(p, i)) {
 				continue;
 			}
+
 			if(w->type == MKGUI_SPINNER || w->type == MKGUI_GLVIEW) {
 				p->anim_active = 1;
 				dirty_widget(p, i);
 			}
+
 			if(w->type == MKGUI_PROGRESS && (w->style & MKGUI_PROGRESS_SHIMMER)) {
 				struct mkgui_progress_data *pd = find_progress_data(p, w->id);
 				if(pd && pd->value > 0 && pd->value < pd->max_val) {
@@ -7526,9 +7691,11 @@ static void mkgui_flush(struct mkgui_ctx *ctx) {
 				}
 			}
 		}
+
 		if(p->anim_active && !ctx->anim_active) {
 			ctx->anim_active = 1;
 		}
+
 		if(p->dirty) {
 			layout_widgets(p);
 			glview_sync_all(p);
@@ -7588,6 +7755,7 @@ MKGUI_API uint32_t mkgui_add_timer(struct mkgui_ctx *ctx, uint64_t interval_ns, 
 	if(!cb) {
 		return 0;
 	}
+
 	if(ctx->timer_count >= MKGUI_MAX_TIMERS) {
 		return 0;
 	}

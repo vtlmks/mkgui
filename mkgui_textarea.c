@@ -358,6 +358,7 @@ static void textarea_scroll_drag(struct mkgui_ctx *ctx, uint32_t idx, struct mkg
 	if(ta->scroll_y < 0) {
 		ta->scroll_y = 0;
 	}
+
 	if(ta->scroll_y > max_scroll) {
 		ta->scroll_y = max_scroll;
 	}
@@ -382,9 +383,11 @@ static void textarea_scroll_to_cursor(struct mkgui_ctx *ctx, uint32_t widget_id)
 	if(cursor_y < ta->scroll_y) {
 		ta->scroll_y = cursor_y;
 	}
+
 	if(cursor_y + ctx->row_height > ta->scroll_y + view_h) {
 		ta->scroll_y = cursor_y + ctx->row_height - view_h;
 	}
+
 	if(ta->scroll_y < 0) {
 		ta->scroll_y = 0;
 	}
@@ -432,6 +435,7 @@ static uint32_t handle_textarea_key(struct mkgui_ctx *ctx, struct mkgui_event *e
 				ev->id = ctx->focus_id;
 				return 1;
 			}
+
 			if(ta->cursor > 0) {
 				uint32_t prev = utf8_prev(ta->text, ta->cursor);
 				memmove(&ta->text[prev], &ta->text[ta->cursor], ta->text_len - ta->cursor + 1);
@@ -460,6 +464,7 @@ static uint32_t handle_textarea_key(struct mkgui_ctx *ctx, struct mkgui_event *e
 				ev->id = ctx->focus_id;
 				return 1;
 			}
+
 			if(ta->cursor < ta->text_len) {
 				uint32_t next = utf8_next(ta->text, ta->cursor);
 				memmove(&ta->text[ta->cursor], &ta->text[next], ta->text_len - next + 1);
@@ -476,6 +481,7 @@ static uint32_t handle_textarea_key(struct mkgui_ctx *ctx, struct mkgui_event *e
 			if(ta->cursor > 0) {
 				ta->cursor = utf8_prev(ta->text, ta->cursor);
 			}
+
 			if(shift) {
 				ta->sel_end = ta->cursor;
 			} else {
@@ -493,6 +499,7 @@ static uint32_t handle_textarea_key(struct mkgui_ctx *ctx, struct mkgui_event *e
 			if(ta->cursor < ta->text_len) {
 				ta->cursor = utf8_next(ta->text, ta->cursor);
 			}
+
 			if(shift) {
 				ta->sel_end = ta->cursor;
 			} else {
@@ -514,6 +521,7 @@ static uint32_t handle_textarea_key(struct mkgui_ctx *ctx, struct mkgui_event *e
 				uint32_t prev_len = ls - 1 - prev_ls;
 				ta->cursor = prev_ls + (col < prev_len ? col : prev_len);
 			}
+
 			if(shift) {
 				ta->sel_end = ta->cursor;
 			} else {
@@ -537,6 +545,7 @@ static uint32_t handle_textarea_key(struct mkgui_ctx *ctx, struct mkgui_event *e
 				uint32_t next_len = next_le - next_ls;
 				ta->cursor = next_ls + (col < next_len ? col : next_len);
 			}
+
 			if(shift) {
 				ta->sel_end = ta->cursor;
 			} else {
@@ -642,6 +651,7 @@ MKGUI_API void mkgui_textarea_set_readonly(struct mkgui_ctx *ctx, uint32_t id, u
 	if(!w) {
 		return;
 	}
+
 	if(readonly) {
 		w->style |= MKGUI_TEXTAREA_READONLY;
 
@@ -667,6 +677,7 @@ MKGUI_API void mkgui_textarea_get_cursor(struct mkgui_ctx *ctx, uint32_t id, uin
 		if(col) { *col = 0; }
 		return;
 	}
+
 	if(line) { *line = textarea_cursor_line(ta); }
 	if(col) { *col = ta->cursor - textarea_line_start(ta, ta->cursor); }
 }
@@ -728,6 +739,7 @@ MKGUI_API void mkgui_textarea_insert(struct mkgui_ctx *ctx, uint32_t id, const c
 	if(!ta) {
 		return;
 	}
+
 	if(textarea_has_selection(ta)) {
 		textarea_delete_selection(ta);
 	}

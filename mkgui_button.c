@@ -33,6 +33,7 @@ static void render_button(struct mkgui_ctx *ctx, uint32_t idx) {
 		draw_icon(ctx->pixels, ctx->win_w, ctx->win_h, &icons[ii], cx, iy, rx + 1, ry + 1, rx + rw - 1, ry + rh - 1);
 		cx += icons[ii].w + sc(ctx, 4);
 	}
+
 	if(w->label[0]) {
 		int32_t ty = ry + (rh - ctx->font_height) / 2;
 		push_text_clip(cx, ty, w->label, tc, rx, ry, rx + rw, ry + rh);
@@ -46,6 +47,7 @@ MKGUI_API void mkgui_button_set_text(struct mkgui_ctx *ctx, uint32_t id, const c
 	if(!w) {
 		return;
 	}
+
 	if(!text) {
 		text = "";
 	}

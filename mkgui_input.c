@@ -210,6 +210,7 @@ static uint32_t handle_input_key(struct mkgui_ctx *ctx, struct mkgui_event *ev, 
 			if(readonly) {
 				return 0;
 			}
+
 			if(w && (w->style & MKGUI_INPUT_NUMERIC)) {
 				for(int32_t ci = 0; ci < len; ++ci) {
 					char ch = buf[ci];
@@ -286,6 +287,7 @@ MKGUI_API void mkgui_input_set_readonly(struct mkgui_ctx *ctx, uint32_t id, uint
 	if(!w) {
 		return;
 	}
+
 	if(readonly) {
 		w->style |= MKGUI_INPUT_READONLY;
 
@@ -363,8 +365,12 @@ MKGUI_API void mkgui_input_set_selection(struct mkgui_ctx *ctx, uint32_t id, uin
 		return;
 	}
 	uint32_t len = (uint32_t)strlen(inp->text);
-	if(start > len) { start = len; }
-	if(end > len) { end = len; }
+	if(start > len) {
+		start = len;
+	}
+	if(end > len) {
+		end = len;
+	}
 	inp->sel_start = start;
 	inp->sel_end = end;
 	inp->cursor = end;

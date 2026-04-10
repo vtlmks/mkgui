@@ -27,6 +27,7 @@ static struct mkgui_widget *menu_popup_nth_item(struct mkgui_ctx *ctx, uint32_t 
 		if(mi->type != MKGUI_MENUITEM) {
 			continue;
 		}
+
 		if(count == n) {
 			return mi;
 		}
@@ -98,6 +99,7 @@ static int32_t menu_popup_child_metrics(struct mkgui_ctx *ctx, uint32_t parent_i
 				accel_format_text(acl->keymod, acl->keysym, accel_buf, sizeof(accel_buf));
 				tw += text_width(ctx, accel_buf) + sc(ctx, 16);
 			}
+
 			if(tw > *max_w) {
 				*max_w = tw;
 			}
@@ -120,6 +122,7 @@ static int32_t menu_popup_item_y(struct mkgui_ctx *ctx, uint32_t parent_id, int3
 		if(mi->type != MKGUI_MENUITEM) {
 			continue;
 		}
+
 		if(idx == target_idx) {
 			return iy;
 		}
@@ -291,6 +294,7 @@ static void menu_open_popup(struct mkgui_ctx *ctx, uint32_t menuitem_id) {
 	if(abs_x + max_w > scr_w) {
 		abs_x = scr_w - max_w;
 	}
+
 	if(abs_y + ph > scr_h) {
 		abs_y = scr_h - ph;
 	}
@@ -329,9 +333,11 @@ static void menu_open_submenu(struct mkgui_ctx *ctx, uint32_t popup_idx, uint32_
 	if(sub_x + max_w > scr_w) {
 		sub_x = parent->x - max_w + 2;
 	}
+
 	if(sub_y + ph > scr_h) {
 		sub_y = scr_h - ph;
 	}
+
 	if(sub_y < 0) {
 		sub_y = 0;
 	}

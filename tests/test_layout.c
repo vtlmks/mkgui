@@ -76,9 +76,7 @@ static void check_no_overlap_siblings(struct mkgui_ctx *ctx, uint32_t parent_id,
 			uint32_t overlap_x = (ra.x < rb.x + rb.w) && (ra.x + ra.w > rb.x);
 			uint32_t overlap_y = (ra.y < rb.y + rb.h) && (ra.y + ra.h > rb.y);
 			if(overlap_x && overlap_y && ra.w > 0 && ra.h > 0 && rb.w > 0 && rb.h > 0) {
-				fprintf(stderr, "  overlap: widget[%u] id=%u (%d,%d %dx%d) vs widget[%u] id=%u (%d,%d %dx%d)\n",
-					children[a], ctx->widgets[children[a]].id, ra.x, ra.y, ra.w, ra.h,
-					children[b], ctx->widgets[children[b]].id, rb.x, rb.y, rb.w, rb.h);
+				fprintf(stderr, "  overlap: widget[%u] id=%u (%d,%d %dx%d) vs widget[%u] id=%u (%d,%d %dx%d)\n", children[a], ctx->widgets[children[a]].id, ra.x, ra.y, ra.w, ra.h, children[b], ctx->widgets[children[b]].id, rb.x, rb.y, rb.w, rb.h);
 				*fail = 1;
 			}
 		}
@@ -97,10 +95,9 @@ static void check_children_inside_parent(struct mkgui_ctx *ctx, uint32_t parent_
 			if(cr.w <= 0 || cr.h <= 0) {
 				continue;
 			}
+
 			if(cr.x < pr.x || cr.y < pr.y || cr.x + cr.w > pr.x + pr.w || cr.y + cr.h > pr.y + pr.h) {
-				fprintf(stderr, "  outside parent: widget[%u] id=%u (%d,%d %dx%d) parent id=%u (%d,%d %dx%d)\n",
-					i, ctx->widgets[i].id, cr.x, cr.y, cr.w, cr.h,
-					parent_id, pr.x, pr.y, pr.w, pr.h);
+				fprintf(stderr, "  outside parent: widget[%u] id=%u (%d,%d %dx%d) parent id=%u (%d,%d %dx%d)\n", i, ctx->widgets[i].id, cr.x, cr.y, cr.w, cr.h, parent_id, pr.x, pr.y, pr.w, pr.h);
 				*fail = 1;
 			}
 		}
@@ -186,8 +183,7 @@ static void test_weights(void) {
 		int32_t extra2 = r2.h - nh;
 		CHECK(extra1 > 0 && extra2 > 0, "both should get extra space: e1=%d e2=%d", extra1, extra2);
 		int32_t tolerance = 3;
-		CHECK(extra2 >= extra1 * 2 - tolerance && extra2 <= extra1 * 2 + tolerance,
-			"weight=2 extra=%d, expected ~%d (2x of %d)", extra2, extra1 * 2, extra1);
+		CHECK(extra2 >= extra1 * 2 - tolerance && extra2 <= extra1 * 2 + tolerance, "weight=2 extra=%d, expected ~%d (2x of %d)", extra2, extra1 * 2, extra1);
 		mkgui_destroy(ctx);
 	}
 	TEST_END();
@@ -269,12 +265,9 @@ static void test_chrome_no_overlap(void) {
 		CHECK(sb_r.h > 0, "statusbar h=%d", sb_r.h);
 		CHECK(vbox_r.h > 0, "content vbox h=%d", vbox_r.h);
 
-		CHECK(tb_r.y >= menu_r.y + menu_r.h,
-			"toolbar y=%d should be below menu bottom=%d", tb_r.y, menu_r.y + menu_r.h);
-		CHECK(vbox_r.y >= tb_r.y + tb_r.h,
-			"content y=%d should be below toolbar bottom=%d", vbox_r.y, tb_r.y + tb_r.h);
-		CHECK(vbox_r.y + vbox_r.h <= sb_r.y,
-			"content bottom=%d should be above statusbar y=%d", vbox_r.y + vbox_r.h, sb_r.y);
+		CHECK(tb_r.y >= menu_r.y + menu_r.h, "toolbar y=%d should be below menu bottom=%d", tb_r.y, menu_r.y + menu_r.h);
+		CHECK(vbox_r.y >= tb_r.y + tb_r.h, "content y=%d should be below toolbar bottom=%d", vbox_r.y, tb_r.y + tb_r.h);
+		CHECK(vbox_r.y + vbox_r.h <= sb_r.y, "content bottom=%d should be above statusbar y=%d", vbox_r.y + vbox_r.h, sb_r.y);
 		mkgui_destroy(ctx);
 	}
 	TEST_END();
@@ -534,12 +527,7 @@ static void test_tabs_content_inside(void) {
 		struct mkgui_rect btn1_r = get_rect(ctx, BTN1);
 		CHECK(tabs_r.w > 0 && tabs_r.h > 0, "tabs has size");
 		CHECK(btn1_r.w > 0 && btn1_r.h > 0, "tab1 btn has size");
-		CHECK(btn1_r.x >= tabs_r.x && btn1_r.y >= tabs_r.y &&
-			btn1_r.x + btn1_r.w <= tabs_r.x + tabs_r.w &&
-			btn1_r.y + btn1_r.h <= tabs_r.y + tabs_r.h,
-			"btn (%d,%d %dx%d) outside tabs (%d,%d %dx%d)",
-			btn1_r.x, btn1_r.y, btn1_r.w, btn1_r.h,
-			tabs_r.x, tabs_r.y, tabs_r.w, tabs_r.h);
+		CHECK(btn1_r.x >= tabs_r.x && btn1_r.y >= tabs_r.y && btn1_r.x + btn1_r.w <= tabs_r.x + tabs_r.w && btn1_r.y + btn1_r.h <= tabs_r.y + tabs_r.h, "btn (%d,%d %dx%d) outside tabs (%d,%d %dx%d)", btn1_r.x, btn1_r.y, btn1_r.w, btn1_r.h, tabs_r.x, tabs_r.y, tabs_r.w, tabs_r.h);
 		mkgui_destroy(ctx);
 	}
 	TEST_END();
@@ -678,6 +666,7 @@ static void test_no_widget_zero_size(void) {
 			if(ctx->widgets[i].flags & MKGUI_HIDDEN) {
 				continue;
 			}
+
 			if(ctx->widgets[i].type == MKGUI_WINDOW) {
 				continue;
 			}
@@ -832,12 +821,9 @@ static void test_hbox_label_progress_spinner(void) {
 		struct mkgui_rect pg_r = get_rect(ctx, PG);
 		struct mkgui_rect sp_r = get_rect(ctx, SP);
 		CHECK(sp_r.w == 28, "spinner w=%d, expected 28", sp_r.w);
-		CHECK(sp_r.x + sp_r.w <= hbox_r.x + hbox_r.w,
-			"spinner right=%d overflows hbox right=%d", sp_r.x + sp_r.w, hbox_r.x + hbox_r.w);
-		CHECK(lbl_r.x + lbl_r.w <= pg_r.x,
-			"label right=%d overlaps progress x=%d", lbl_r.x + lbl_r.w, pg_r.x);
-		CHECK(pg_r.x + pg_r.w <= sp_r.x,
-			"progress right=%d overlaps spinner x=%d", pg_r.x + pg_r.w, sp_r.x);
+		CHECK(sp_r.x + sp_r.w <= hbox_r.x + hbox_r.w, "spinner right=%d overflows hbox right=%d", sp_r.x + sp_r.w, hbox_r.x + hbox_r.w);
+		CHECK(lbl_r.x + lbl_r.w <= pg_r.x, "label right=%d overlaps progress x=%d", lbl_r.x + lbl_r.w, pg_r.x);
+		CHECK(pg_r.x + pg_r.w <= sp_r.x, "progress right=%d overlaps spinner x=%d", pg_r.x + pg_r.w, sp_r.x);
 		CHECK(pg_r.w > 0, "progress w=%d should be positive", pg_r.w);
 		mkgui_destroy(ctx);
 	}
@@ -893,10 +879,8 @@ static void test_hbox_shrink_stays_inside(void) {
 		struct mkgui_rect cb_r = get_rect(ctx, CB);
 		CHECK(inp_r.w > 0, "input w=%d", inp_r.w);
 		CHECK(cb_r.w > 0, "combobox w=%d", cb_r.w);
-		CHECK(inp_r.x >= lbl_r.x + lbl_r.w,
-			"input x=%d should be after label right=%d", inp_r.x, lbl_r.x + lbl_r.w);
-		CHECK(cb_r.x >= inp_r.x + inp_r.w,
-			"combobox x=%d should be after input right=%d", cb_r.x, inp_r.x + inp_r.w);
+		CHECK(inp_r.x >= lbl_r.x + lbl_r.w, "input x=%d should be after label right=%d", inp_r.x, lbl_r.x + lbl_r.w);
+		CHECK(cb_r.x >= inp_r.x + inp_r.w, "combobox x=%d should be after input right=%d", cb_r.x, inp_r.x + inp_r.w);
 		mkgui_destroy(ctx);
 	}
 	TEST_END();
@@ -921,12 +905,10 @@ static void test_form_shrink_no_overlap(void) {
 	if(ctx) {
 		struct mkgui_rect l1 = get_rect(ctx, LBL1);
 		struct mkgui_rect i1 = get_rect(ctx, INP1);
-		CHECK(l1.x + l1.w <= i1.x,
-			"label1 right=%d should not overlap input1 x=%d", l1.x + l1.w, i1.x);
+		CHECK(l1.x + l1.w <= i1.x, "label1 right=%d should not overlap input1 x=%d", l1.x + l1.w, i1.x);
 		struct mkgui_rect l3 = get_rect(ctx, LBL3);
 		struct mkgui_rect cb_r = get_rect(ctx, CB);
-		CHECK(l3.x + l3.w <= cb_r.x,
-			"label3 right=%d should not overlap combobox x=%d", l3.x + l3.w, cb_r.x);
+		CHECK(l3.x + l3.w <= cb_r.x, "label3 right=%d should not overlap combobox x=%d", l3.x + l3.w, cb_r.x);
 		mkgui_destroy(ctx);
 	}
 	TEST_END();

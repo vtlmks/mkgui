@@ -48,6 +48,7 @@ static char *svg_read_file(const char *path, uint32_t *out_len) {
 		fclose(fp);
 		return NULL;
 	}
+
 	if(fread(buf, 1, (size_t)sz, fp) != (size_t)sz) {
 		free(buf);
 		fclose(fp);
@@ -215,6 +216,7 @@ static void icon_detect_theme_name(char *out, uint32_t out_size) {
 				}
 			}
 		}
+
 		if(path[0]) {
 			FILE *fp = fopen(path, "r");
 			if(fp) {
@@ -243,6 +245,7 @@ static void icon_detect_theme_name(char *out, uint32_t out_size) {
 				fclose(fp);
 			}
 		}
+
 		if(out[0]) {
 			return;
 		}
@@ -268,6 +271,7 @@ static void icon_detect_theme_name(char *out, uint32_t out_size) {
 				config_dir[0] = '\0';
 			}
 		}
+
 		if(config_dir[0]) {
 			for(const char **gf = gtk_files; *gf && !out[0]; ++gf) {
 				snprintf(path, sizeof(path), *gf, config_dir);
@@ -278,21 +282,28 @@ static void icon_detect_theme_name(char *out, uint32_t out_size) {
 				char line[512];
 				while(fgets(line, sizeof(line), fp)) {
 					char *p = line;
-					while(*p == ' ' || *p == '\t') { ++p; }
+					while(*p == ' ' || *p == '\t') {
+						++p;
+					}
 					if(strncmp(p, "gtk-icon-theme-name", 19) != 0) {
 						continue;
 					}
 					p += 19;
-					while(*p == ' ' || *p == '\t') { ++p; }
+					while(*p == ' ' || *p == '\t') {
+						++p;
+					}
 					if(*p != '=') {
 						continue;
 					}
 					++p;
-					while(*p == ' ' || *p == '\t') { ++p; }
+					while(*p == ' ' || *p == '\t') {
+						++p;
+					}
 					uint32_t len = (uint32_t)strlen(p);
 					while(len > 0 && (p[len - 1] == '\n' || p[len - 1] == '\r' || p[len - 1] == ' ')) {
 						--len;
 					}
+
 					if(len > 0 && len < out_size) {
 						memcpy(out, p, len);
 						out[len] = '\0';
@@ -302,6 +313,7 @@ static void icon_detect_theme_name(char *out, uint32_t out_size) {
 				fclose(fp);
 			}
 		}
+
 		if(out[0]) {
 			return;
 		}
@@ -321,6 +333,7 @@ static void icon_detect_theme_name(char *out, uint32_t out_size) {
 				path[0] = '\0';
 			}
 		}
+
 		if(path[0]) {
 			FILE *fp = fopen(path, "r");
 			if(fp) {
@@ -328,28 +341,37 @@ static void icon_detect_theme_name(char *out, uint32_t out_size) {
 				char line[512];
 				while(fgets(line, sizeof(line), fp)) {
 					char *p = line;
-					while(*p == ' ' || *p == '\t') { ++p; }
+					while(*p == ' ' || *p == '\t') {
+						++p;
+					}
 					if(p[0] == '[') {
 						in_icons = (strncmp(p, "[Icons]", 7) == 0);
 						continue;
 					}
+
 					if(!in_icons) {
 						continue;
 					}
+
 					if(strncmp(p, "Theme", 5) != 0) {
 						continue;
 					}
 					p += 5;
-					while(*p == ' ' || *p == '\t') { ++p; }
+					while(*p == ' ' || *p == '\t') {
+						++p;
+					}
 					if(*p != '=') {
 						continue;
 					}
 					++p;
-					while(*p == ' ' || *p == '\t') { ++p; }
+					while(*p == ' ' || *p == '\t') {
+						++p;
+					}
 					uint32_t len = (uint32_t)strlen(p);
 					while(len > 0 && (p[len - 1] == '\n' || p[len - 1] == '\r' || p[len - 1] == ' ')) {
 						--len;
 					}
+
 					if(len > 0 && len < out_size) {
 						memcpy(out, p, len);
 						out[len] = '\0';
@@ -389,6 +411,7 @@ static uint32_t icon_resolve_theme_dirs(const char *theme_name, char (*out)[4096
 				snprintf(home_icons, sizeof(home_icons), "%s/.local/share/icons/%s", home, theme_name);
 			}
 		}
+
 		if(home_icons[0] && icon_dir_exists(home_icons)) {
 			snprintf(out[count++], 4096, "%s", home_icons);
 		}
@@ -437,21 +460,28 @@ static void icon_read_inherits(const char *theme_dir, char *out, uint32_t out_si
 	char line[1024];
 	while(fgets(line, sizeof(line), fp)) {
 		char *p = line;
-		while(*p == ' ' || *p == '\t') { ++p; }
+		while(*p == ' ' || *p == '\t') {
+			++p;
+		}
 		if(strncmp(p, "Inherits", 8) != 0) {
 			continue;
 		}
 		p += 8;
-		while(*p == ' ' || *p == '\t') { ++p; }
+		while(*p == ' ' || *p == '\t') {
+			++p;
+		}
 		if(*p != '=') {
 			continue;
 		}
 		++p;
-		while(*p == ' ' || *p == '\t') { ++p; }
+		while(*p == ' ' || *p == '\t') {
+			++p;
+		}
 		uint32_t len = (uint32_t)strlen(p);
 		while(len > 0 && (p[len - 1] == '\n' || p[len - 1] == '\r' || p[len - 1] == ' ')) {
 			--len;
 		}
+
 		if(len > 0 && len < out_size) {
 			memcpy(out, p, len);
 			out[len] = '\0';
@@ -516,15 +546,18 @@ static void icon_build_theme_chain(struct mkgui_ctx *ctx, const char *theme_name
 					break;
 				}
 			}
+
 			if(dup) {
 				continue;
 			}
+
 			if(first_added == UINT32_MAX) {
 				first_added = ctx->system_theme_count;
 			}
 			snprintf(ctx->system_theme_dirs[ctx->system_theme_count], sizeof(ctx->system_theme_dirs[0]), "%s", resolved[r]);
 			++ctx->system_theme_count;
 		}
+
 		if(first_added == UINT32_MAX) {
 			continue;
 		}
@@ -547,6 +580,7 @@ static void icon_build_theme_chain(struct mkgui_ctx *ctx, const char *theme_name
 					++p;
 					--seg_len;
 				}
+
 				if(seg_len > 0 && seg_len < sizeof(queue[0])) {
 					memcpy(queue[qtail], p, seg_len);
 					queue[qtail][seg_len] = '\0';
@@ -656,6 +690,7 @@ static int32_t icon_lazy_load_system(struct mkgui_ctx *ctx, const char *name) {
 			break;
 		}
 	}
+
 	if(!found) {
 		icon_neg_cache_add(name);
 		return -1;
@@ -729,8 +764,12 @@ static void icon_generate_missing(void) {
 		for(uint32_t x = 0; x < sz; ++x) {
 			int32_t dx = (int32_t)x - cx;
 			int32_t dy = (int32_t)y - cy;
-			if(dx < 0) { dx = -dx; }
-			if(dy < 0) { dy = -dy; }
+			if(dx < 0) {
+				dx = -dx;
+			}
+			if(dy < 0) {
+				dy = -dy;
+			}
 			if(dx + dy <= r) {
 				pixels[y * sz + x] = color;
 			}
@@ -761,6 +800,7 @@ MKGUI_API int32_t mkgui_icon_add(const char *name, uint32_t *pixels, int32_t w, 
 	if(icon_count >= MKGUI_MAX_ICONS) {
 		return -1;
 	}
+
 	if(!name || name[0] == '\0' || !pixels || w <= 0 || h <= 0) {
 		return -1;
 	}
@@ -811,6 +851,7 @@ MKGUI_API void mkgui_set_icon(struct mkgui_ctx *ctx, uint32_t widget_id, const c
 	if(!w) {
 		return;
 	}
+
 	if(!icon_name) {
 		w->icon[0] = '\0';
 		dirty_all(ctx);
@@ -1059,6 +1100,7 @@ static uint32_t icon_resolve_dir(const char *app_name, char *out, uint32_t out_s
 				out[0] = '\0';
 			}
 		}
+
 		if(out[0] && icon_dir_exists(out)) {
 			return 1;
 		}

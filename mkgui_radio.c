@@ -49,12 +49,15 @@ static void draw_aa_circle_fill(uint32_t *buf, int32_t bw, int32_t bh, int32_t c
 	if(cy + dy0 < 0) {
 		dy0 = -cy;
 	}
+
 	if(cy + dy1 >= bh) {
 		dy1 = bh - 1 - cy;
 	}
+
 	if(cx + dx0 < 0) {
 		dx0 = -cx;
 	}
+
 	if(cx + dx1 >= bw) {
 		dx1 = bw - 1 - cx;
 	}
@@ -85,12 +88,15 @@ static void draw_aa_circle_ring(uint32_t *buf, int32_t bw, int32_t bh, int32_t c
 	if(cy + dy0 < 0) {
 		dy0 = -cy;
 	}
+
 	if(cy + dy1 >= bh) {
 		dy1 = bh - 1 - cy;
 	}
+
 	if(cx + dx0 < 0) {
 		dx0 = -cx;
 	}
+
 	if(cx + dx1 >= bw) {
 		dx1 = bw - 1 - cx;
 	}
@@ -115,6 +121,7 @@ static void draw_aa_circle_ring(uint32_t *buf, int32_t bw, int32_t bh, int32_t c
 					uint8_t fill_a = (uint8_t)(inner_cov * 255 / 16);
 					bg = blend_pixel(bg, fill, fill_a);
 				}
+
 				if(border_cov > 0) {
 					uint8_t border_a = (uint8_t)(border_cov * 255 / 16);
 					bg = blend_pixel(bg, border, border_a);
@@ -196,6 +203,7 @@ MKGUI_API void mkgui_radio_set(struct mkgui_ctx *ctx, uint32_t id, uint32_t chec
 	if(!w || w->type != MKGUI_RADIO) {
 		return;
 	}
+
 	if(checked) {
 		for(uint32_t i = 0; i < ctx->widget_count; ++i) {
 			struct mkgui_widget *s = &ctx->widgets[i];

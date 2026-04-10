@@ -74,6 +74,7 @@ static void render_toolbar(struct mkgui_ctx *ctx, uint32_t idx) {
 			draw_icon(ctx->pixels, ctx->win_w, ctx->win_h, &icons[ii], cx, iy, bx, by, bx + bw, by + bh);
 			cx += icons[ii].w + 4;
 		}
+
 		if(show_text && btn->label[0]) {
 			int32_t ty = by + (bh - ctx->font_height) / 2;
 			push_text_clip(cx, ty, btn->label, ctx->theme.text, bx, by, bx + bw, by + bh);

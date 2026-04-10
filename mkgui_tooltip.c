@@ -33,6 +33,7 @@ static void render_tooltip(struct mkgui_ctx *ctx) {
 	if(tx + tw > ctx->win_w) {
 		tx = ctx->win_w - tw;
 	}
+
 	if(ty + th > ctx->win_h) {
 		ty = ctx->tooltip_y - th - sc(ctx, 4);
 	}
@@ -63,6 +64,7 @@ MKGUI_API void mkgui_set_tooltip(struct mkgui_ctx *ctx, uint32_t id, const char 
 	if(idx < 0) {
 		return;
 	}
+
 	if(text) {
 		snprintf(ctx->tooltip_texts[idx], sizeof(ctx->tooltip_texts[idx]), "%s", text);
 	} else {

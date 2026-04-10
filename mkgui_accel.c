@@ -8,12 +8,15 @@ static void accel_format_text(uint32_t keymod, uint32_t keysym, char *buf, uint3
 	if(keymod & MKGUI_MOD_CONTROL) {
 		off += (uint32_t)snprintf(buf + off, buf_size - off, "Ctrl+");
 	}
+
 	if(keymod & MKGUI_MOD_ALT) {
 		off += (uint32_t)snprintf(buf + off, buf_size - off, "Alt+");
 	}
+
 	if(keymod & MKGUI_MOD_SHIFT) {
 		off += (uint32_t)snprintf(buf + off, buf_size - off, "Shift+");
 	}
+
 	if(keysym >= 'a' && keysym <= 'z') {
 		snprintf(buf + off, buf_size - off, "%c", (char)(keysym - 32));
 	} else if(keysym >= 'A' && keysym <= 'Z') {
@@ -94,6 +97,7 @@ MKGUI_API void mkgui_accel_add(struct mkgui_ctx *ctx, uint32_t id, uint32_t keym
 	if(ctx->accel_count >= MKGUI_MAX_ACCELS) {
 		return;
 	}
+
 	if(keysym >= 'A' && keysym <= 'Z') {
 		keysym = keysym + 32;
 	}

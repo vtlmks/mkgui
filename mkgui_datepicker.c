@@ -41,6 +41,7 @@ static uint32_t datepicker_parse(char *text, int32_t *year, int32_t *month, int3
 	if(sscanf(text, "%d-%d-%d", &y, &m, &d) != 3) {
 		return 0;
 	}
+
 	if(m < 1 || m > 12 || d < 1 || d > (int32_t)datepicker_days_in_month(y, m)) {
 		return 0;
 	}
@@ -196,8 +197,7 @@ static void render_datepicker_popup(struct mkgui_ctx *ctx, struct mkgui_popup *p
 	push_text_clip(p->x + inner_x + text_pad, hdr_y + p->y, mname, ctx->theme.text, p->x + inner_x, p->y, p->x + inner_x + month_w - drop_icon_w, p->y + p->h);
 	int32_t drop_acx = inner_x + month_w - drop_icon_w + arr_half;
 	int32_t drop_acy = acy - gap2 + arr_half / 2;
-	draw_triangle_aa(p->pixels, p->w, p->h,
-		drop_acx - arr_half, drop_acy - arr_half / 2, drop_acx + arr_half, drop_acy - arr_half / 2, drop_acx, drop_acy + arr_half / 2, ctx->theme.text);
+	draw_triangle_aa(p->pixels, p->w, p->h, drop_acx - arr_half, drop_acy - arr_half / 2, drop_acx + arr_half, drop_acy - arr_half / 2, drop_acx, drop_acy + arr_half / 2, ctx->theme.text);
 	(void)mname_tw;
 
 	int32_t yr = ctx->theme.corner_radius;
@@ -214,14 +214,12 @@ static void render_datepicker_popup(struct mkgui_ctx *ctx, struct mkgui_popup *p
 	draw_rounded_rect(p->pixels, p->w, p->h, sbx, btn_y, year_btn_w, year_half, up_bg, ctx->theme.widget_border, yr);
 	int32_t sacx = sbx + year_btn_w / 2;
 	int32_t sacy_up = btn_y + year_half / 2 - gap2;
-	draw_triangle_aa(p->pixels, p->w, p->h,
-		sacx, sacy_up, sacx - arr_half, sacy_up + arr_half, sacx + arr_half, sacy_up + arr_half, ctx->theme.text);
+	draw_triangle_aa(p->pixels, p->w, p->h, sacx, sacy_up, sacx - arr_half, sacy_up + arr_half, sacx + arr_half, sacy_up + arr_half, ctx->theme.text);
 
 	uint32_t dn_bg = year_dn_hover ? ctx->theme.widget_hover : ctx->theme.widget_bg;
 	draw_rounded_rect(p->pixels, p->w, p->h, sbx, btn_y + year_half, year_btn_w, btn_h - year_half, dn_bg, ctx->theme.widget_border, yr);
 	int32_t sacy_dn = btn_y + year_half + (btn_h - year_half) / 2 - gap2;
-	draw_triangle_aa(p->pixels, p->w, p->h,
-		sacx - arr_half, sacy_dn, sacx + arr_half, sacy_dn, sacx, sacy_dn + arr_half, ctx->theme.text);
+	draw_triangle_aa(p->pixels, p->w, p->h, sacx - arr_half, sacy_dn, sacx + arr_half, sacy_dn, sacx, sacy_dn + arr_half, ctx->theme.text);
 
 	cy += hdr_h;
 
@@ -375,6 +373,7 @@ static int32_t datepicker_cal_hit(struct mkgui_ctx *ctx, struct mkgui_datepicker
 		if(mx >= left_x && mx < left_x + arrow_w) {
 			return -2;
 		}
+
 		if(mx >= right_x && mx < right_x + arrow_w) {
 			return -3;
 		}
@@ -387,6 +386,7 @@ static int32_t datepicker_cal_hit(struct mkgui_ctx *ctx, struct mkgui_datepicker
 		if(mx >= inner_x && mx < inner_x + month_w) {
 			return -4;
 		}
+
 		if(mx >= year_x && mx < year_x + year_spin_w) {
 			int32_t sb_x = year_x + year_spin_w - year_btn_w;
 			if(mx >= sb_x) {
@@ -585,6 +585,7 @@ MKGUI_API void mkgui_datepicker_set_readonly(struct mkgui_ctx *ctx, uint32_t id,
 	if(!w) {
 		return;
 	}
+
 	if(readonly) {
 		w->style |= MKGUI_DATEPICKER_READONLY;
 

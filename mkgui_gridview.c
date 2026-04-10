@@ -16,6 +16,7 @@ static void gridview_set_bit(struct mkgui_gridview_data *gv, uint32_t row, uint3
 	if(bit >= gv->checks_cap) {
 		return;
 	}
+
 	if(val) {
 		gv->checks[bit / 8] |= (uint8_t)(1u << (bit % 8));
 	} else {
@@ -51,17 +52,18 @@ static void gridview_clamp_scroll(struct mkgui_ctx *ctx, struct mkgui_gridview_d
 	if(max_scroll < 0) {
 		max_scroll = 0;
 	}
+
 	if(gv->scroll_y < 0) {
 		gv->scroll_y = 0;
 	}
+
 	if(gv->scroll_y > max_scroll) {
 		gv->scroll_y = max_scroll;
 	}
 }
 
 // [=]===^=[ gridview_draw_checkbox ]=============================[=]
-static void gridview_draw_checkbox(struct mkgui_ctx *ctx, int32_t bx, int32_t by, uint32_t checked,
-	int32_t clip_left, int32_t clip_top, int32_t clip_right, int32_t clip_bottom) {
+static void gridview_draw_checkbox(struct mkgui_ctx *ctx, int32_t bx, int32_t by, uint32_t checked, int32_t clip_left, int32_t clip_top, int32_t clip_right, int32_t clip_bottom) {
 	int32_t box_size = sc(ctx, 14);
 	if(bx + box_size <= clip_left || bx >= clip_right || by + box_size <= clip_top || by >= clip_bottom) {
 		return;
@@ -118,9 +120,11 @@ static void render_gridview(struct mkgui_ctx *ctx, uint32_t idx) {
 		if(col_left < clip_left) {
 			col_left = clip_left;
 		}
+
 		if(col_right > clip_right) {
 			col_right = clip_right;
 		}
+
 		if(col_left < col_right) {
 			int32_t ty = ry + (hh - ctx->font_height) / 2;
 			push_text_clip(cx + cell_pad, ty, gv->columns[c].label, ctx->theme.text, col_left, ry, col_right, ry + hh);
@@ -145,12 +149,15 @@ static void render_gridview(struct mkgui_ctx *ctx, uint32_t idx) {
 	if(clip_left > render_clip_x1) {
 		render_clip_x1 = clip_left;
 	}
+
 	if(clip_top > render_clip_y1) {
 		render_clip_y1 = clip_top;
 	}
+
 	if(clip_right < render_clip_x2) {
 		render_clip_x2 = clip_right;
 	}
+
 	if(clip_bottom < render_clip_y2) {
 		render_clip_y2 = clip_bottom;
 	}
@@ -186,6 +193,7 @@ static void render_gridview(struct mkgui_ctx *ctx, uint32_t idx) {
 				cx += col_w;
 				continue;
 			}
+
 			if(cx >= clip_right) {
 				break;
 			}
@@ -195,6 +203,7 @@ static void render_gridview(struct mkgui_ctx *ctx, uint32_t idx) {
 			if(cell_cl < clip_left) {
 				cell_cl = clip_left;
 			}
+
 			if(cell_cr > clip_right) {
 				cell_cr = clip_right;
 			}
@@ -283,6 +292,7 @@ static void render_gridview(struct mkgui_ctx *ctx, uint32_t idx) {
 		} else {
 			tgt_y = dcy + gv->drag_target * ctx->row_height - gv->scroll_y;
 		}
+
 		if(tgt_y >= dcy && tgt_y <= ry + rh) {
 			draw_hline(ctx->pixels, ctx->win_w, ctx->win_h, rx + 1, tgt_y - 1, content_w, ctx->theme.accent);
 			draw_hline(ctx->pixels, ctx->win_w, ctx->win_h, rx + 1, tgt_y, content_w, ctx->theme.accent);
@@ -349,6 +359,7 @@ static void gridview_autosize_col(struct mkgui_ctx *ctx, struct mkgui_gridview_d
 				cell_w = text_width(ctx, buf);
 			} break;
 		}
+
 		if(cell_w > max_w) {
 			max_w = cell_w;
 		}
@@ -484,6 +495,7 @@ static void gridview_scroll_to_y(struct mkgui_ctx *ctx, uint32_t id, int32_t my)
 	if(frac < 0.0f) {
 		frac = 0.0f;
 	}
+
 	if(frac > 1.0f) {
 		frac = 1.0f;
 	}
@@ -596,6 +608,7 @@ static uint32_t handle_gridview_key(struct mkgui_ctx *ctx, struct mkgui_event *e
 	if(row_y < gv->scroll_y) {
 		gv->scroll_y = row_y;
 	}
+
 	if(row_y + ctx->row_height > gv->scroll_y + content_h) {
 		gv->scroll_y = row_y + ctx->row_height - content_h;
 	}
@@ -609,12 +622,12 @@ static uint32_t handle_gridview_key(struct mkgui_ctx *ctx, struct mkgui_event *e
 }
 
 // [=]===^=[ mkgui_gridview_setup ]===============================[=]
-MKGUI_API void mkgui_gridview_setup(struct mkgui_ctx *ctx, uint32_t id, uint32_t row_count, uint32_t col_count,
-	struct mkgui_grid_column *columns, mkgui_grid_cell_cb cell_cb, void *userdata) {
+MKGUI_API void mkgui_gridview_setup(struct mkgui_ctx *ctx, uint32_t id, uint32_t row_count, uint32_t col_count, struct mkgui_grid_column *columns, mkgui_grid_cell_cb cell_cb, void *userdata) {
 	MKGUI_CHECK(ctx);
 	if(!columns) {
 		return;
 	}
+
 	if(!cell_cb) {
 		return;
 	}
@@ -754,9 +767,11 @@ MKGUI_API void mkgui_gridview_scroll_to(struct mkgui_ctx *ctx, uint32_t id, int3
 	if(row_y < gv->scroll_y) {
 		gv->scroll_y = row_y;
 	}
+
 	if(row_y + ctx->row_height > gv->scroll_y + content_h) {
 		gv->scroll_y = row_y + ctx->row_height - content_h;
 	}
+
 	if(gv->scroll_y < 0) {
 		gv->scroll_y = 0;
 	}

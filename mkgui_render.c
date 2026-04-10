@@ -411,12 +411,15 @@ static void draw_rect_fill(uint32_t *buf, int32_t bw, int32_t bh, int32_t x, int
 	if(x0 < render_clip_x1) {
 		x0 = render_clip_x1;
 	}
+
 	if(y0 < render_clip_y1) {
 		y0 = render_clip_y1;
 	}
+
 	if(x1 > render_clip_x2) {
 		x1 = render_clip_x2;
 	}
+
 	if(y1 > render_clip_y2) {
 		y1 = render_clip_y2;
 	}
@@ -495,15 +498,19 @@ static void fill_span_clipped(uint32_t *buf, int32_t bw, int32_t py, int32_t lef
 	if(left < 0) {
 		left = 0;
 	}
+
 	if(left < render_clip_x1) {
 		left = render_clip_x1;
 	}
+
 	if(right > bw) {
 		right = bw;
 	}
+
 	if(right > render_clip_x2) {
 		right = render_clip_x2;
 	}
+
 	if(left < right) {
 		fill_pixels(&buf[py * bw + left], (uint32_t)(right - left), color);
 	}
@@ -514,12 +521,15 @@ static void draw_rounded_rect_fill(uint32_t *buf, int32_t bw, int32_t bh, int32_
 	if(w <= 0 || h <= 0) {
 		return;
 	}
+
 	if(radius > w / 2) {
 		radius = w / 2;
 	}
+
 	if(radius > h / 2) {
 		radius = h / 2;
 	}
+
 	if(radius > MKGUI_MAX_CORNER_RADIUS) {
 		radius = MKGUI_MAX_CORNER_RADIUS;
 	}
@@ -550,6 +560,7 @@ static void draw_rounded_rect_fill(uint32_t *buf, int32_t bw, int32_t bh, int32_
 					if(pl >= 0 && pl < bw && pl >= render_clip_x1 && pl < render_clip_x2) {
 						rowp[pl] = color;
 					}
+
 					if(pr >= 0 && pr < bw && pr != pl && pr >= render_clip_x1 && pr < render_clip_x2) {
 						rowp[pr] = color;
 					}
@@ -558,6 +569,7 @@ static void draw_rounded_rect_fill(uint32_t *buf, int32_t bw, int32_t bh, int32_
 					if(pl >= 0 && pl < bw && pl >= render_clip_x1 && pl < render_clip_x2) {
 						rowp[pl] = blend_pixel(rowp[pl], color, alpha);
 					}
+
 					if(pr >= 0 && pr < bw && pr != pl && pr >= render_clip_x1 && pr < render_clip_x2) {
 						rowp[pr] = blend_pixel(rowp[pr], color, alpha);
 					}
@@ -593,12 +605,14 @@ static inline uint32_t shade_color(uint32_t color, int32_t amount) {
 	} else if(r > 255) {
 		r = 255;
 	}
+
 	if(g < 0) {
 		g = 0;
 
 	} else if(g > 255) {
 		g = 255;
 	}
+
 	if(b < 0) {
 		b = 0;
 
@@ -618,6 +632,7 @@ static inline void draw_hline(uint32_t *buf, int32_t bw, int32_t bh, int32_t x, 
 	if(x0 < render_clip_x1) {
 		x0 = render_clip_x1;
 	}
+
 	if(x1 > render_clip_x2) {
 		x1 = render_clip_x2;
 	}
@@ -637,6 +652,7 @@ static inline void draw_vline(uint32_t *buf, int32_t bw, int32_t bh, int32_t x, 
 	if(y0 < render_clip_y1) {
 		y0 = render_clip_y1;
 	}
+
 	if(y1 > render_clip_y2) {
 		y1 = render_clip_y2;
 	}
@@ -646,25 +662,55 @@ static inline void draw_vline(uint32_t *buf, int32_t bw, int32_t bh, int32_t x, 
 }
 
 // [=]===^=[ draw_triangle_aa ]====================================[=]
-static void draw_triangle_aa(uint32_t *buf, int32_t bw, int32_t bh,
-	int32_t x0, int32_t y0, int32_t x1, int32_t y1, int32_t x2, int32_t y2, uint32_t color) {
+static void draw_triangle_aa(uint32_t *buf, int32_t bw, int32_t bh, int32_t x0, int32_t y0, int32_t x1, int32_t y1, int32_t x2, int32_t y2, uint32_t color) {
 	int32_t tmp;
-	if(y0 > y1) { tmp = x0; x0 = x1; x1 = tmp; tmp = y0; y0 = y1; y1 = tmp; }
-	if(y0 > y2) { tmp = x0; x0 = x2; x2 = tmp; tmp = y0; y0 = y2; y2 = tmp; }
-	if(y1 > y2) { tmp = x1; x1 = x2; x2 = tmp; tmp = y1; y1 = y2; y2 = tmp; }
+	if(y0 > y1) {
+		tmp = x0;
+		x0 = x1;
+		x1 = tmp;
+		tmp = y0;
+		y0 = y1;
+		y1 = tmp;
+	}
+	if(y0 > y2) {
+		tmp = x0;
+		x0 = x2;
+		x2 = tmp;
+		tmp = y0;
+		y0 = y2;
+		y2 = tmp;
+	}
+	if(y1 > y2) {
+		tmp = x1;
+		x1 = x2;
+		x2 = tmp;
+		tmp = y1;
+		y1 = y2;
+		y2 = tmp;
+	}
 	if(y0 == y2) {
 		return;
 	}
 	int32_t min_x = x0 < x1 ? x0 : x1;
-	if(x2 < min_x) { min_x = x2; }
+	if(x2 < min_x) {
+		min_x = x2;
+	}
 	int32_t max_x = x0 > x1 ? x0 : x1;
-	if(x2 > max_x) { max_x = x2; }
+	if(x2 > max_x) {
+		max_x = x2;
+	}
 	int32_t span = max_x - min_x + 2;
-	if(span > 256) { span = 256; }
+	if(span > 256) {
+		span = 256;
+	}
 	int32_t min_y = y0 < render_clip_y1 ? render_clip_y1 : y0;
 	int32_t max_y = (y2 + 1) > render_clip_y2 ? render_clip_y2 : (y2 + 1);
-	if(min_y < 0) { min_y = 0; }
-	if(max_y > bh) { max_y = bh; }
+	if(min_y < 0) {
+		min_y = 0;
+	}
+	if(max_y > bh) {
+		max_y = bh;
+	}
 	// 4x supersampling in Y (4 subrows per pixel), 8x in X (subpixel edge
 	// precision). coverage per pixel accumulates over all 4 subrows; max
 	// coverage is 32 (4 rows * 8 subpixel units width)
@@ -685,21 +731,43 @@ static void draw_triangle_aa(uint32_t *buf, int32_t bw, int32_t bh,
 			int32_t el, er;
 			int32_t la = (x2_8 - x0_8) * (sy4 - y0_4) / (y2_4 - y0_4) + x0_8;
 			if(sy4 < y1_4) {
-				if(y1_4 == y0_4) { continue; }
+				if(y1_4 == y0_4) {
+					continue;
+				}
 				int32_t s = (x1_8 - x0_8) * (sy4 - y0_4) / (y1_4 - y0_4) + x0_8;
-				if(s < la) { el = s; er = la; } else { el = la; er = s; }
+				if(s < la) {
+					el = s;
+					er = la;
+				} else {
+					el = la;
+					er = s;
+				}
 			} else {
-				if(y2_4 == y1_4) { continue; }
+				if(y2_4 == y1_4) {
+					continue;
+				}
 				int32_t s = (x2_8 - x1_8) * (sy4 - y1_4) / (y2_4 - y1_4) + x1_8;
-				if(s < la) { el = s; er = la; } else { el = la; er = s; }
+				if(s < la) {
+					el = s;
+					er = la;
+				} else {
+					el = la;
+					er = s;
+				}
 			}
 			int32_t px_l = el / 8;
 			int32_t px_r = (er + 7) / 8;
-			if(px_l < min_x) { px_l = min_x; }
-			if(px_r > max_x + 2) { px_r = max_x + 2; }
+			if(px_l < min_x) {
+				px_l = min_x;
+			}
+			if(px_r > max_x + 2) {
+				px_r = max_x + 2;
+			}
 			for(int32_t px = px_l; px < px_r; ++px) {
 				int32_t ci = px - min_x;
-				if(ci < 0 || ci >= span) { continue; }
+				if(ci < 0 || ci >= span) {
+					continue;
+				}
 				int32_t pl = px * 8;
 				int32_t pr = pl + 8;
 				int32_t cl = el > pl ? el : pl;
@@ -710,9 +778,13 @@ static void draw_triangle_aa(uint32_t *buf, int32_t bw, int32_t bh,
 			}
 		}
 		for(int32_t ci = 0; ci < span; ++ci) {
-			if(cov[ci] <= 0) { continue; }
+			if(cov[ci] <= 0) {
+				continue;
+			}
 			int32_t px = min_x + ci;
-			if(px < 0 || px >= bw || px < render_clip_x1 || px >= render_clip_x2) { continue; }
+			if(px < 0 || px >= bw || px < render_clip_x1 || px >= render_clip_x2) {
+				continue;
+			}
 			uint32_t idx = (uint32_t)(sy * bw + px);
 			int32_t alpha = cov[ci] * 255 / 32;
 			if(alpha >= 255) {
@@ -808,14 +880,17 @@ static uint32_t utf8_decode(char *p, uint32_t *out_cp) {
 		*out_cp = b;
 		return 1;
 	}
+
 	if((b & 0xe0) == 0xc0 && (p[1] & 0xc0) == 0x80) {
 		*out_cp = ((uint32_t)(b & 0x1f) << 6) | (uint32_t)(p[1] & 0x3f);
 		return 2;
 	}
+
 	if((b & 0xf0) == 0xe0 && (p[1] & 0xc0) == 0x80 && (p[2] & 0xc0) == 0x80) {
 		*out_cp = ((uint32_t)(b & 0x0f) << 12) | ((uint32_t)(p[1] & 0x3f) << 6) | (uint32_t)(p[2] & 0x3f);
 		return 3;
 	}
+
 	if((b & 0xf8) == 0xf0 && (p[1] & 0xc0) == 0x80 && (p[2] & 0xc0) == 0x80 && (p[3] & 0xc0) == 0x80) {
 		*out_cp = ((uint32_t)(b & 0x07) << 18) | ((uint32_t)(p[1] & 0x3f) << 12) | ((uint32_t)(p[2] & 0x3f) << 6) | (uint32_t)(p[3] & 0x3f);
 		return 4;
@@ -841,6 +916,7 @@ static void draw_text_sw(struct mkgui_ctx *ctx, uint32_t *buf, int32_t bw, int32
 		if(gx >= cx2) {
 			break;
 		}
+
 		if(gx + g->width <= cx1) {
 			cx += g->advance;
 			continue;
@@ -852,6 +928,7 @@ static void draw_text_sw(struct mkgui_ctx *ctx, uint32_t *buf, int32_t bw, int32
 		if(col0 < 0) {
 			col0 = 0;
 		}
+
 		if(col1 > g->width) {
 			col1 = g->width;
 		}
@@ -860,6 +937,7 @@ static void draw_text_sw(struct mkgui_ctx *ctx, uint32_t *buf, int32_t bw, int32
 		if(row0 < 0) {
 			row0 = 0;
 		}
+
 		if(row1 > g->height) {
 			row1 = g->height;
 		}
@@ -911,18 +989,23 @@ static void push_text_clip(int32_t x, int32_t y, char *text, uint32_t color, int
 	if(text_cmd_count >= MKGUI_VM_MAX_TEXT_CMDS) {
 		return;
 	}
+
 	if(!vm_arena_ensure(&text_cmd_arena, (size_t)(text_cmd_count + 1) * sizeof(struct mkgui_text_cmd))) {
 		return;
 	}
+
 	if(cx1 < render_clip_x1) {
 		cx1 = render_clip_x1;
 	}
+
 	if(cy1 < render_clip_y1) {
 		cy1 = render_clip_y1;
 	}
+
 	if(cx2 > render_clip_x2) {
 		cx2 = render_clip_x2;
 	}
+
 	if(cy2 > render_clip_y2) {
 		cy2 = render_clip_y2;
 	}
@@ -952,12 +1035,15 @@ static void clip_intersect(int32_t *x1, int32_t *y1, int32_t *x2, int32_t *y2, i
 	if(*x1 < bx1) {
 		*x1 = bx1;
 	}
+
 	if(*y1 < by1) {
 		*y1 = by1;
 	}
+
 	if(*x2 > bx2) {
 		*x2 = bx2;
 	}
+
 	if(*y2 > by2) {
 		*y2 = by2;
 	}
@@ -1043,6 +1129,7 @@ static char *text_truncate(struct mkgui_ctx *ctx, char *text, int32_t max_w) {
 		} else {
 			adv = ctx->char_width;
 		}
+
 		if(w + adv > budget) {
 			break;
 		}

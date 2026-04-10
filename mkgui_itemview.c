@@ -106,12 +106,15 @@ static void itemview_clamp_scroll(struct mkgui_ctx *ctx, struct mkgui_itemview_d
 	} else {
 		max_scroll = itemview_total_height(ctx, iv, content_w) - content_h;
 	}
+
 	if(max_scroll < 0) {
 		max_scroll = 0;
 	}
+
 	if(iv->scroll_y < 0) {
 		iv->scroll_y = 0;
 	}
+
 	if(iv->scroll_y > max_scroll) {
 		iv->scroll_y = max_scroll;
 	}
@@ -549,12 +552,15 @@ static void render_itemview(struct mkgui_ctx *ctx, uint32_t idx) {
 	if(ca_x > render_clip_x1) {
 		render_clip_x1 = ca_x;
 	}
+
 	if(ca_y > render_clip_y1) {
 		render_clip_y1 = ca_y;
 	}
+
 	if(ca_x + ca_w < render_clip_x2) {
 		render_clip_x2 = ca_x + ca_w;
 	}
+
 	if(ca_y + ca_h < render_clip_y2) {
 		render_clip_y2 = ca_y + ca_h;
 	}
@@ -622,6 +628,7 @@ static uint32_t itemview_scrollbar_hit(struct mkgui_ctx *ctx, uint32_t idx, int3
 		if(mx < thumb_x) {
 			return 2;
 		}
+
 		if(mx >= thumb_x + thumb_w) {
 			return 3;
 		}
@@ -644,6 +651,7 @@ static uint32_t itemview_scrollbar_hit(struct mkgui_ctx *ctx, uint32_t idx, int3
 		if(my < thumb_y) {
 			return 2;
 		}
+
 		if(my >= thumb_y + thumb_h) {
 			return 3;
 		}
@@ -756,6 +764,7 @@ static void itemview_scroll_to_mouse(struct mkgui_ctx *ctx, uint32_t widget_id, 
 		if(frac < 0.0f) {
 			frac = 0.0f;
 		}
+
 		if(frac > 1.0f) {
 			frac = 1.0f;
 		}
@@ -778,6 +787,7 @@ static void itemview_scroll_to_mouse(struct mkgui_ctx *ctx, uint32_t widget_id, 
 		if(frac < 0.0f) {
 			frac = 0.0f;
 		}
+
 		if(frac > 1.0f) {
 			frac = 1.0f;
 		}
@@ -876,29 +886,25 @@ static uint32_t handle_itemview_key(struct mkgui_ctx *ctx, struct mkgui_itemview
 			if(iv->selected > 0) {
 				--iv->selected;
 			}
-			break;
-		}
+		} break;
 
 		case MKGUI_KEY_DOWN: {
 			if(iv->selected < (int32_t)iv->item_count - 1) {
 				++iv->selected;
 			}
-			break;
-		}
+		} break;
 
 		case MKGUI_KEY_LEFT: {
 			if(iv->selected >= rows_per_col) {
 				iv->selected -= rows_per_col;
 			}
-			break;
-		}
+		} break;
 
 		case MKGUI_KEY_RIGHT: {
 			if(iv->selected + rows_per_col < (int32_t)iv->item_count) {
 				iv->selected += rows_per_col;
 			}
-			break;
-		}
+		} break;
 
 		case MKGUI_KEY_PAGE_UP: {
 			int32_t page = ca_h / ch;
@@ -906,8 +912,7 @@ static uint32_t handle_itemview_key(struct mkgui_ctx *ctx, struct mkgui_itemview
 			if(iv->selected < 0) {
 				iv->selected = 0;
 			}
-			break;
-		}
+		} break;
 
 		case MKGUI_KEY_PAGE_DOWN: {
 			int32_t page = ca_h / ch;
@@ -915,22 +920,18 @@ static uint32_t handle_itemview_key(struct mkgui_ctx *ctx, struct mkgui_itemview
 			if(iv->selected >= (int32_t)iv->item_count) {
 				iv->selected = (int32_t)iv->item_count - 1;
 			}
-			break;
-		}
+		} break;
 
 		case MKGUI_KEY_HOME: {
 			iv->selected = 0;
-			break;
-		}
+		} break;
 
 		case MKGUI_KEY_END: {
 			iv->selected = (int32_t)iv->item_count - 1;
-			break;
-		}
+		} break;
 
 		default: {
-			break;
-		}
+		} break;
 		}
 
 	} else if(iv->view_mode == MKGUI_VIEW_DETAIL) {
@@ -939,15 +940,13 @@ static uint32_t handle_itemview_key(struct mkgui_ctx *ctx, struct mkgui_itemview
 			if(iv->selected > 0) {
 				--iv->selected;
 			}
-			break;
-		}
+		} break;
 
 		case MKGUI_KEY_DOWN: {
 			if(iv->selected < (int32_t)iv->item_count - 1) {
 				++iv->selected;
 			}
-			break;
-		}
+		} break;
 
 		case MKGUI_KEY_PAGE_UP: {
 			int32_t page = ca_h / ch;
@@ -955,8 +954,7 @@ static uint32_t handle_itemview_key(struct mkgui_ctx *ctx, struct mkgui_itemview
 			if(iv->selected < 0) {
 				iv->selected = 0;
 			}
-			break;
-		}
+		} break;
 
 		case MKGUI_KEY_PAGE_DOWN: {
 			int32_t page = ca_h / ch;
@@ -964,22 +962,18 @@ static uint32_t handle_itemview_key(struct mkgui_ctx *ctx, struct mkgui_itemview
 			if(iv->selected >= (int32_t)iv->item_count) {
 				iv->selected = (int32_t)iv->item_count - 1;
 			}
-			break;
-		}
+		} break;
 
 		case MKGUI_KEY_HOME: {
 			iv->selected = 0;
-			break;
-		}
+		} break;
 
 		case MKGUI_KEY_END: {
 			iv->selected = (int32_t)iv->item_count - 1;
-			break;
-		}
+		} break;
 
 		default: {
-			break;
-		}
+		} break;
 		}
 
 	} else {
@@ -989,29 +983,25 @@ static uint32_t handle_itemview_key(struct mkgui_ctx *ctx, struct mkgui_itemview
 			if(iv->selected > 0) {
 				--iv->selected;
 			}
-			break;
-		}
+		} break;
 
 		case MKGUI_KEY_RIGHT: {
 			if(iv->selected < (int32_t)iv->item_count - 1) {
 				++iv->selected;
 			}
-			break;
-		}
+		} break;
 
 		case MKGUI_KEY_UP: {
 			if(iv->selected >= cols) {
 				iv->selected -= cols;
 			}
-			break;
-		}
+		} break;
 
 		case MKGUI_KEY_DOWN: {
 			if(iv->selected + cols < (int32_t)iv->item_count) {
 				iv->selected += cols;
 			}
-			break;
-		}
+		} break;
 
 		case MKGUI_KEY_PAGE_UP: {
 			int32_t page_rows = ca_h / ch;
@@ -1022,8 +1012,7 @@ static uint32_t handle_itemview_key(struct mkgui_ctx *ctx, struct mkgui_itemview
 			if(iv->selected < 0) {
 				iv->selected = 0;
 			}
-			break;
-		}
+		} break;
 
 		case MKGUI_KEY_PAGE_DOWN: {
 			int32_t page_rows = ca_h / ch;
@@ -1034,22 +1023,18 @@ static uint32_t handle_itemview_key(struct mkgui_ctx *ctx, struct mkgui_itemview
 			if(iv->selected >= (int32_t)iv->item_count) {
 				iv->selected = (int32_t)iv->item_count - 1;
 			}
-			break;
-		}
+		} break;
 
 		case MKGUI_KEY_HOME: {
 			iv->selected = 0;
-			break;
-		}
+		} break;
 
 		case MKGUI_KEY_END: {
 			iv->selected = (int32_t)iv->item_count - 1;
-			break;
-		}
+		} break;
 
 		default: {
-			break;
-		}
+		} break;
 		}
 	}
 
@@ -1066,6 +1051,7 @@ static uint32_t handle_itemview_key(struct mkgui_ctx *ctx, struct mkgui_itemview
 			if(item_x < iv->scroll_y) {
 				iv->scroll_y = item_x;
 			}
+
 			if(item_x + col_w > iv->scroll_y + ca_w) {
 				iv->scroll_y = item_x + col_w - ca_w;
 			}
@@ -1078,9 +1064,11 @@ static uint32_t handle_itemview_key(struct mkgui_ctx *ctx, struct mkgui_itemview
 				int32_t row = iv->selected / cols;
 				item_y = row * ch;
 			}
+
 			if(item_y < iv->scroll_y) {
 				iv->scroll_y = item_y;
 			}
+
 			if(item_y + ch > iv->scroll_y + ca_h) {
 				iv->scroll_y = item_y + ch - ca_h;
 			}
@@ -1110,6 +1098,7 @@ MKGUI_API void mkgui_itemview_setup(struct mkgui_ctx *ctx, uint32_t id, uint32_t
 		memset(iv, 0, sizeof(*iv));
 		iv->widget_id = id;
 	}
+
 	if(!iv) {
 		return;
 	}
@@ -1242,6 +1231,7 @@ MKGUI_API void mkgui_itemview_scroll_to(struct mkgui_ctx *ctx, uint32_t id, int3
 		if(row_y < iv->scroll_y) {
 			iv->scroll_y = row_y;
 		}
+
 		if(row_y + cell_h > iv->scroll_y + ch) {
 			iv->scroll_y = row_y + cell_h - ch;
 		}
@@ -1256,10 +1246,12 @@ MKGUI_API void mkgui_itemview_scroll_to(struct mkgui_ctx *ctx, uint32_t id, int3
 		if(row_y < iv->scroll_y) {
 			iv->scroll_y = row_y;
 		}
+
 		if(row_y + cell_h > iv->scroll_y + ch) {
 			iv->scroll_y = row_y + cell_h - ch;
 		}
 	}
+
 	if(iv->scroll_y < 0) {
 		iv->scroll_y = 0;
 	}

@@ -30,8 +30,7 @@ static void verify_integrity(struct mkgui_ctx *ctx, const char *tag) {
 	}
 	for(uint32_t i = 0; i < ctx->widget_count; ++i) {
 		for(uint32_t j = i + 1; j < ctx->widget_count; ++j) {
-			CHECK(ctx->widgets[i].id != ctx->widgets[j].id,
-				"%s: duplicate id %u at [%u] and [%u]", tag, ctx->widgets[i].id, i, j);
+			CHECK(ctx->widgets[i].id != ctx->widgets[j].id, "%s: duplicate id %u at [%u] and [%u]", tag, ctx->widgets[i].id, i, j);
 		}
 	}
 }
@@ -41,8 +40,7 @@ static void verify_order(struct mkgui_ctx *ctx, uint32_t *expected_ids, uint32_t
 	CHECK(ctx->widget_count == count, "%s: count %u, expected %u", tag, ctx->widget_count, count);
 	uint32_t n = ctx->widget_count < count ? ctx->widget_count : count;
 	for(uint32_t i = 0; i < n; ++i) {
-		CHECK(ctx->widgets[i].id == expected_ids[i],
-			"%s: widgets[%u].id = %u, expected %u", tag, i, ctx->widgets[i].id, expected_ids[i]);
+		CHECK(ctx->widgets[i].id == expected_ids[i], "%s: widgets[%u].id = %u, expected %u", tag, i, ctx->widgets[i].id, expected_ids[i]);
 	}
 }
 
@@ -219,9 +217,7 @@ static void test_insert_stress(struct mkgui_ctx *ctx) {
 	if(ai >= 0) {
 		for(uint32_t i = 0; i < count; ++i) {
 			uint32_t expected_id = anchor_id + count - i;
-			CHECK(ctx->widgets[ai + 1 + (int32_t)i].id == expected_id,
-				"insert_stress: widgets[%d].id = %u, expected %u",
-				ai + 1 + (int32_t)i, ctx->widgets[ai + 1 + (int32_t)i].id, expected_id);
+			CHECK(ctx->widgets[ai + 1 + (int32_t)i].id == expected_id, "insert_stress: widgets[%d].id = %u, expected %u", ai + 1 + (int32_t)i, ctx->widgets[ai + 1 + (int32_t)i].id, expected_id);
 		}
 	}
 	verify_integrity(ctx, "insert_stress");

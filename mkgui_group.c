@@ -33,6 +33,7 @@ static void render_group(struct mkgui_ctx *ctx, uint32_t idx) {
 			if(left < 0) {
 				left = 0;
 			}
+
 			if(right > ctx->win_w) {
 				right = ctx->win_w;
 			}
@@ -54,11 +55,9 @@ static void render_group(struct mkgui_ctx *ctx, uint32_t idx) {
 	int32_t ax = rx + group_pad - sc(ctx, 3);
 	int32_t ay = label_y + ctx->font_height / 2;
 	if(collapsed) {
-		draw_triangle_aa(ctx->pixels, ctx->win_w, ctx->win_h,
-			ax, ay - as, ax + as, ay, ax, ay + as, ac);
+		draw_triangle_aa(ctx->pixels, ctx->win_w, ctx->win_h, ax, ay - as, ax + as, ay, ax, ay + as, ac);
 	} else {
-		draw_triangle_aa(ctx->pixels, ctx->win_w, ctx->win_h,
-			ax - as, ay - as / 2, ax + as, ay - as / 2, ax, ay + as / 2, ac);
+		draw_triangle_aa(ctx->pixels, ctx->win_w, ctx->win_h, ax - as, ay - as / 2, ax + as, ay - as / 2, ax, ay + as / 2, ac);
 	}
 }
 
@@ -69,6 +68,7 @@ MKGUI_API void mkgui_group_set_collapsed(struct mkgui_ctx *ctx, uint32_t id, uin
 	if(!w) {
 		return;
 	}
+
 	if(collapsed) {
 		w->style |= MKGUI_GROUP_COLLAPSED;
 	} else {

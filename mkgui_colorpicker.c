@@ -44,8 +44,12 @@ static struct {
 // [=]===^=[ cp_hsv_to_rgb ]========================================[=]
 static uint32_t cp_hsv_to_rgb(float h, float s, float v) {
 	int32_t hi = (int32_t)(h * (256.0f / 60.0f));
-	if(hi < 0) { hi = 0; }
-	if(hi >= 1536) { hi -= 1536; }
+	if(hi < 0) {
+		hi = 0;
+	}
+	if(hi >= 1536) {
+		hi -= 1536;
+	}
 	int32_t sector = hi >> 8;
 	int32_t frac = hi & 0xff;
 	int32_t vi = (int32_t)(v * 255.0f + 0.5f);
@@ -138,7 +142,9 @@ static uint32_t *cp_cache_realloc(uint32_t *buf, int32_t *old_w, int32_t *old_h,
 static void cp_cache_blit(uint32_t *dst, int32_t dw, int32_t dh, int32_t rx, int32_t ry, uint32_t *src, int32_t sw, int32_t sh) {
 	for(int32_t y = 0; y < sh; ++y) {
 		int32_t py = ry + y;
-		if(py < 0 || py >= dh) { continue; }
+		if(py < 0 || py >= dh) {
+			continue;
+		}
 		int32_t x0 = rx < 0 ? -rx : 0;
 		int32_t x1 = rx + sw > dw ? dw - rx : sw;
 		if(x1 > x0) {
@@ -150,8 +156,12 @@ static void cp_cache_blit(uint32_t *dst, int32_t dw, int32_t dh, int32_t rx, int
 // [=]===^=[ cp_render_sv_base ]====================================[=]
 static void cp_render_sv_base(uint32_t *buf, int32_t rw, int32_t rh) {
 	int32_t hi = (int32_t)(cp_state.h * (256.0f / 60.0f));
-	if(hi < 0) { hi = 0; }
-	if(hi >= 1536) { hi -= 1536; }
+	if(hi < 0) {
+		hi = 0;
+	}
+	if(hi >= 1536) {
+		hi -= 1536;
+	}
 	int32_t sector = hi >> 8;
 	int32_t frac = hi & 0xff;
 	int32_t x_scale = (sector & 1) ? (255 - frac) : frac;
@@ -185,8 +195,12 @@ static void cp_render_sv_cursor(uint32_t *pixels, int32_t bw, int32_t bh, int32_
 	int32_t cy = ry + (int32_t)((1.0f - cp_state.v) * (float)(rh - 1));
 	uint32_t mc = (cp_state.v > 0.5f) ? 0xff000000 : 0xffffffff;
 	for(int32_t d = -4; d <= 4; ++d) {
-		if(cy >= 0 && cy < bh && cx + d >= 0 && cx + d < bw) { pixels[cy * bw + cx + d] = mc; }
-		if(cx >= 0 && cx < bw && cy + d >= 0 && cy + d < bh) { pixels[(cy + d) * bw + cx] = mc; }
+		if(cy >= 0 && cy < bh && cx + d >= 0 && cx + d < bw) {
+			pixels[cy * bw + cx + d] = mc;
+		}
+		if(cx >= 0 && cx < bw && cy + d >= 0 && cy + d < bh) {
+			pixels[(cy + d) * bw + cx] = mc;
+		}
 	}
 }
 
@@ -211,7 +225,9 @@ static void cp_render_hue_cursor(uint32_t *pixels, int32_t bw, int32_t bh, int32
 			uint32_t lc = (dy == 0) ? 0xffffffff : 0xff000000;
 			for(int32_t x = 0; x < rw; ++x) {
 				int32_t px = rx + x;
-				if(px >= 0 && px < bw) { pixels[py * bw + px] = lc; }
+				if(px >= 0 && px < bw) {
+					pixels[py * bw + px] = lc;
+				}
 			}
 		}
 	}
@@ -265,15 +281,23 @@ static void cp_render_wheel_cursor(uint32_t *pixels, int32_t bw, int32_t bh, int
 	int32_t hx = (int32_t)((float)icx + cosf(sel_angle) * ring_mid);
 	int32_t hy = (int32_t)((float)icy + sinf(sel_angle) * ring_mid);
 	for(int32_t d = -3; d <= 3; ++d) {
-		if(hy >= 0 && hy < bh && hx + d >= 0 && hx + d < bw) { pixels[hy * bw + hx + d] = 0xffffffff; }
-		if(hx >= 0 && hx < bw && hy + d >= 0 && hy + d < bh) { pixels[(hy + d) * bw + hx] = 0xffffffff; }
+		if(hy >= 0 && hy < bh && hx + d >= 0 && hx + d < bw) {
+			pixels[hy * bw + hx + d] = 0xffffffff;
+		}
+		if(hx >= 0 && hx < bw && hy + d >= 0 && hy + d < bh) {
+			pixels[(hy + d) * bw + hx] = 0xffffffff;
+		}
 	}
 	int32_t sv_cx = icx + (int32_t)((cp_state.s * 2.0f - 1.0f) * (float)isq_half);
 	int32_t sv_cy = icy + (int32_t)((1.0f - cp_state.v * 2.0f) * (float)(isq_half - 1));
 	uint32_t mc = (cp_state.v > 0.5f) ? 0xff000000 : 0xffffffff;
 	for(int32_t d = -3; d <= 3; ++d) {
-		if(sv_cy >= 0 && sv_cy < bh && sv_cx + d >= 0 && sv_cx + d < bw) { pixels[sv_cy * bw + sv_cx + d] = mc; }
-		if(sv_cx >= 0 && sv_cx < bw && sv_cy + d >= 0 && sv_cy + d < bh) { pixels[(sv_cy + d) * bw + sv_cx] = mc; }
+		if(sv_cy >= 0 && sv_cy < bh && sv_cx + d >= 0 && sv_cx + d < bw) {
+			pixels[sv_cy * bw + sv_cx + d] = mc;
+		}
+		if(sv_cx >= 0 && sv_cx < bw && sv_cy + d >= 0 && sv_cy + d < bh) {
+			pixels[(sv_cy + d) * bw + sv_cx] = mc;
+		}
 	}
 }
 
@@ -288,13 +312,19 @@ static void cp_render_rgb_bars(uint32_t *pixels, int32_t bw, int32_t bh, int32_t
 		int32_t by = y0 + (int32_t)ci * (bar_h + gap);
 		for(int32_t y = 0; y < bar_h; ++y) {
 			int32_t py = by + y;
-			if(py < 0 || py >= bh) { continue; }
+			if(py < 0 || py >= bh) {
+				continue;
+			}
 			for(int32_t x = 0; x < rw; ++x) {
 				int32_t px = rx + x;
-				if(px < 0 || px >= bw) { continue; }
+				if(px < 0 || px >= bw) {
+					continue;
+				}
 				uint32_t v = (uint32_t)((float)x / (float)(rw - 1) * 255.0f);
 				uint32_t c;
-				if(ci == 0)      { c = 0xff000000 | (v << 16); }
+				if(ci == 0) {
+					c = 0xff000000 | (v << 16);
+				}
 				else if(ci == 1) { c = 0xff000000 | (v << 8); }
 				else             { c = 0xff000000 | v; }
 				pixels[py * bw + px] = c;
@@ -303,7 +333,9 @@ static void cp_render_rgb_bars(uint32_t *pixels, int32_t bw, int32_t bh, int32_t
 		int32_t mx = rx + (int32_t)((float)vals[ci] / 255.0f * (float)(rw - 1));
 		for(int32_t y = 0; y < bar_h; ++y) {
 			int32_t py = by + y;
-			if(py >= 0 && py < bh && mx >= 0 && mx < bw) { pixels[py * bw + mx] = 0xffffffff; }
+			if(py >= 0 && py < bh && mx >= 0 && mx < bw) {
+				pixels[py * bw + mx] = 0xffffffff;
+			}
 		}
 	}
 }
@@ -326,11 +358,13 @@ static void cp_render_cb(struct mkgui_ctx *ctx, void *userdata) {
 				cp_render_sv_base(cp_state.sv_cache, r->w, r->h);
 				cp_state.sv_hue = cp_state.h;
 			}
+
 			if(cp_state.sv_cache) {
 				cp_cache_blit(ctx->pixels, ctx->win_w, ctx->win_h, r->x, r->y, cp_state.sv_cache, r->w, r->h);
 			}
 			cp_render_sv_cursor(ctx->pixels, ctx->win_w, ctx->win_h, r->x, r->y, r->w, r->h);
 		}
+
 		if(hi >= 0) {
 			struct mkgui_rect *r = &ctx->rects[hi];
 			int32_t prev_hw = cp_state.hue_w;
@@ -339,6 +373,7 @@ static void cp_render_cb(struct mkgui_ctx *ctx, void *userdata) {
 			if(cp_state.hue_cache && (prev_hw != r->w || prev_hh != r->h)) {
 				cp_render_hue_base(cp_state.hue_cache, r->w, r->h);
 			}
+
 			if(cp_state.hue_cache) {
 				cp_cache_blit(ctx->pixels, ctx->win_w, ctx->win_h, r->x, r->y, cp_state.hue_cache, r->w, r->h);
 			}
@@ -357,6 +392,7 @@ static void cp_render_cb(struct mkgui_ctx *ctx, void *userdata) {
 				cp_render_wheel_base(cp_state.wheel_cache, ww, wh, ctx->theme.bg);
 				cp_state.wheel_hue = cp_state.h;
 			}
+
 			if(cp_state.wheel_cache) {
 				cp_cache_blit(ctx->pixels, ctx->win_w, ctx->win_h, r->x + 1, r->y + 1, cp_state.wheel_cache, ww, wh);
 			}
@@ -376,7 +412,9 @@ static void cp_render_cb(struct mkgui_ctx *ctx, void *userdata) {
 		uint32_t c = cp_current_rgb();
 		for(int32_t y = r->y + 1; y < r->y + r->h - 1 && y < ctx->win_h; ++y) {
 			for(int32_t x = r->x + 1; x < r->x + r->w - 1 && x < ctx->win_w; ++x) {
-				if(x >= 0 && y >= 0) { ctx->pixels[y * ctx->win_w + x] = c; }
+				if(x >= 0 && y >= 0) {
+					ctx->pixels[y * ctx->win_w + x] = c;
+				}
 			}
 		}
 	}
@@ -427,7 +465,9 @@ static void cp_handle_mouse(struct mkgui_ctx *ctx) {
 			float dist = sqrtf(dx * dx + dy * dy);
 			if(dist >= inner * 0.7f) {
 				float angle = atan2f(dy, dx) * 180.0f / 3.14159265f;
-				if(angle < 0.0f) { angle += 360.0f; }
+				if(angle < 0.0f) {
+					angle += 360.0f;
+				}
 				cp_state.h = angle;
 			} else {
 				float s = (dx + sq_half) / (2.0f * sq_half);
@@ -452,7 +492,9 @@ static void cp_handle_mouse(struct mkgui_ctx *ctx) {
 			uint32_t val = (uint32_t)(frac * 255.0f + 0.5f);
 			uint32_t rgb = cp_current_rgb();
 			uint32_t cr = (rgb >> 16) & 0xff, cg = (rgb >> 8) & 0xff, cb = rgb & 0xff;
-			if(my < y0 + bar_h + gap / 2) { cr = val; }
+			if(my < y0 + bar_h + gap / 2) {
+				cr = val;
+			}
 			else if(my < y0 + bar_h * 2 + gap + gap / 2) { cg = val; }
 			else { cb = val; }
 			cp_rgb_to_hsv((cr << 16) | (cg << 8) | cb, &cp_state.h, &cp_state.s, &cp_state.v);
@@ -578,9 +620,11 @@ MKGUI_API uint32_t mkgui_color_dialog(struct mkgui_ctx *ctx, uint32_t initial_co
 		if(dlg->press_id != 0 && !was_press) {
 			cp_begin_drag(dlg);
 		}
+
 		if(dlg->press_id != 0 && cp_state.drag_target) {
 			cp_handle_mouse(dlg);
 		}
+
 		if(dlg->press_id == 0) {
 			cp_state.drag_target = 0;
 		}

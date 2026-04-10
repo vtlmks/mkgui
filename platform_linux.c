@@ -75,8 +75,7 @@ static void platform_set_window_icon(struct mkgui_platform *plat, struct mkgui_i
 			buf[off++] = (unsigned long)sizes[s].pixels[i];
 		}
 	}
-	XChangeProperty(plat->dpy, plat->win, net_wm_icon, XA_CARDINAL, 32,
-		PropModeReplace, (unsigned char *)buf, (int)total);
+	XChangeProperty(plat->dpy, plat->win, net_wm_icon, XA_CARDINAL, 32, PropModeReplace, (unsigned char *)buf, (int)total);
 	XFlush(plat->dpy);
 	free(buf);
 }
@@ -113,8 +112,7 @@ static uint32_t platform_init(struct mkgui_ctx *ctx, const char *title, int32_t 
 	wa.bit_gravity = NorthWestGravity;
 	wa.colormap = plat->colormap;
 	wa.border_pixel = 0;
-	plat->win = XCreateWindow(plat->dpy, plat->root, 0, 0, (uint32_t)w, (uint32_t)h, 0,
-		(int)plat->depth, InputOutput, plat->visual, CWBackPixmap | CWBitGravity | CWColormap | CWBorderPixel, &wa);
+	plat->win = XCreateWindow(plat->dpy, plat->root, 0, 0, (uint32_t)w, (uint32_t)h, 0, (int)plat->depth, InputOutput, plat->visual, CWBackPixmap | CWBitGravity | CWColormap | CWBorderPixel, &wa);
 	XStoreName(plat->dpy, plat->win, title);
 	platform_set_class_hint(plat, "main", ctx->app_class[0] ? ctx->app_class : "mkgui");
 
@@ -137,17 +135,10 @@ static uint32_t platform_init(struct mkgui_ctx *ctx, const char *title, int32_t 
 	XSetWMProtocols(plat->dpy, plat->win, &plat->wm_delete, 1);
 
 	pid_t pid = getpid();
-	XChangeProperty(plat->dpy, plat->win, plat->net_wm_pid, XA_CARDINAL, 32,
-		PropModeReplace, (unsigned char *)&pid, 1);
-	XSetWMClientMachine(plat->dpy, plat->win, &(XTextProperty){
-		.value = (unsigned char *)"localhost", .encoding = XA_STRING,
-		.format = 8, .nitems = 9
-	});
+	XChangeProperty(plat->dpy, plat->win, plat->net_wm_pid, XA_CARDINAL, 32, PropModeReplace, (unsigned char *)&pid, 1);
+	XSetWMClientMachine(plat->dpy, plat->win, &(XTextProperty){ .value = (unsigned char *)"localhost", .encoding = XA_STRING, .format = 8, .nitems = 9 });
 
-	XSelectInput(plat->dpy, plat->win,
-		ExposureMask | StructureNotifyMask |
-		ButtonPressMask | ButtonReleaseMask | PointerMotionMask |
-		KeyPressMask | KeyReleaseMask | FocusChangeMask);
+	XSelectInput(plat->dpy, plat->win, ExposureMask | StructureNotifyMask | ButtonPressMask | ButtonReleaseMask | PointerMotionMask | KeyPressMask | KeyReleaseMask | FocusChangeMask);
 
 	plat->gc = XCreateGC(plat->dpy, plat->win, 0, NULL);
 
@@ -169,8 +160,7 @@ static uint32_t platform_init(struct mkgui_ctx *ctx, const char *title, int32_t 
 
 	plat->xim = XOpenIM(plat->dpy, NULL, NULL, NULL);
 	if(plat->xim) {
-		plat->xic = XCreateIC(plat->xim, XNInputStyle, XIMPreeditNothing | XIMStatusNothing,
-			XNClientWindow, plat->win, XNFocusWindow, plat->win, NULL);
+		plat->xic = XCreateIC(plat->xim, XNInputStyle, XIMPreeditNothing | XIMStatusNothing, XNClientWindow, plat->win, XNFocusWindow, plat->win, NULL);
 	}
 
 	XMapWindow(plat->dpy, plat->win);
@@ -202,8 +192,7 @@ static uint32_t platform_init_child(struct mkgui_ctx *ctx, struct mkgui_ctx *par
 	wa.bit_gravity = NorthWestGravity;
 	wa.colormap = plat->colormap;
 	wa.border_pixel = 0;
-	plat->win = XCreateWindow(plat->dpy, plat->root, 0, 0, (uint32_t)w, (uint32_t)h, 0,
-		(int)plat->depth, InputOutput, plat->visual, CWBackPixmap | CWBitGravity | CWColormap | CWBorderPixel, &wa);
+	plat->win = XCreateWindow(plat->dpy, plat->root, 0, 0, (uint32_t)w, (uint32_t)h, 0, (int)plat->depth, InputOutput, plat->visual, CWBackPixmap | CWBitGravity | CWColormap | CWBorderPixel, &wa);
 	XStoreName(plat->dpy, plat->win, title);
 	platform_set_class_hint(plat, "dialog", parent->app_class[0] ? parent->app_class : "mkgui");
 
@@ -213,17 +202,10 @@ static uint32_t platform_init_child(struct mkgui_ctx *ctx, struct mkgui_ctx *par
 	XSetWMProtocols(plat->dpy, plat->win, &plat->wm_delete, 1);
 
 	pid_t pid = getpid();
-	XChangeProperty(plat->dpy, plat->win, plat->net_wm_pid, XA_CARDINAL, 32,
-		PropModeReplace, (unsigned char *)&pid, 1);
-	XSetWMClientMachine(plat->dpy, plat->win, &(XTextProperty){
-		.value = (unsigned char *)"localhost", .encoding = XA_STRING,
-		.format = 8, .nitems = 9
-	});
+	XChangeProperty(plat->dpy, plat->win, plat->net_wm_pid, XA_CARDINAL, 32, PropModeReplace, (unsigned char *)&pid, 1);
+	XSetWMClientMachine(plat->dpy, plat->win, &(XTextProperty){ .value = (unsigned char *)"localhost", .encoding = XA_STRING, .format = 8, .nitems = 9 });
 
-	XSelectInput(plat->dpy, plat->win,
-		ExposureMask | StructureNotifyMask |
-		ButtonPressMask | ButtonReleaseMask | PointerMotionMask |
-		KeyPressMask | KeyReleaseMask | FocusChangeMask);
+	XSelectInput(plat->dpy, plat->win, ExposureMask | StructureNotifyMask | ButtonPressMask | ButtonReleaseMask | PointerMotionMask | KeyPressMask | KeyReleaseMask | FocusChangeMask);
 
 	plat->gc = XCreateGC(plat->dpy, plat->win, 0, NULL);
 
@@ -240,8 +222,7 @@ static uint32_t platform_init_child(struct mkgui_ctx *ctx, struct mkgui_ctx *par
 	plat->xim = pplat->xim;
 	plat->xic = NULL;
 	if(plat->xim) {
-		plat->xic = XCreateIC(plat->xim, XNInputStyle, XIMPreeditNothing | XIMStatusNothing,
-			XNClientWindow, plat->win, XNFocusWindow, plat->win, NULL);
+		plat->xic = XCreateIC(plat->xim, XNInputStyle, XIMPreeditNothing | XIMStatusNothing, XNClientWindow, plat->win, XNFocusWindow, plat->win, NULL);
 	}
 
 	XMapWindow(plat->dpy, plat->win);
@@ -261,6 +242,7 @@ static void platform_destroy(struct mkgui_ctx *ctx) {
 	if(plat->xic) {
 		XDestroyIC(plat->xic);
 	}
+
 	if(plat->xim && !plat->is_child) {
 		XCloseIM(plat->xim);
 	}
@@ -324,6 +306,7 @@ static float platform_detect_scale(struct mkgui_ctx *ctx) {
 			} else if((end[0] == 'd' || end[0] == 'D') && (end[1] == 'p' || end[1] == 'P') && (end[2] == 'i' || end[2] == 'I')) {
 				val /= 96.0;
 			}
+
 			if(val >= 0.5 && val <= 4.0) {
 				return (float)val;
 			}
@@ -388,10 +371,20 @@ static void platform_blit(struct mkgui_ctx *ctx) {
 
 // [=]===^=[ platform_blit_region ]================================[=]
 static void platform_blit_region(struct mkgui_ctx *ctx, int32_t x, int32_t y, int32_t w, int32_t h) {
-	if(x < 0) { w += x; x = 0; }
-	if(y < 0) { h += y; y = 0; }
-	if(x + w > ctx->win_w) { w = ctx->win_w - x; }
-	if(y + h > ctx->win_h) { h = ctx->win_h - y; }
+	if(x < 0) {
+		w += x;
+		x = 0;
+	}
+	if(y < 0) {
+		h += y;
+		y = 0;
+	}
+	if(x + w > ctx->win_w) {
+		w = ctx->win_w - x;
+	}
+	if(y + h > ctx->win_h) {
+		h = ctx->win_h - y;
+	}
 	if(w <= 0 || h <= 0) {
 		return;
 	}
@@ -427,9 +420,7 @@ static uint32_t platform_popup_init(struct mkgui_ctx *ctx, struct mkgui_popup *p
 	attrs.colormap = plat->colormap;
 	attrs.border_pixel = 0;
 
-	p->plat.xwin = XCreateWindow(plat->dpy, plat->root, x, y, (uint32_t)w, (uint32_t)h, 0,
-		(int)plat->depth, InputOutput, plat->visual,
-		CWOverrideRedirect | CWSaveUnder | CWEventMask | CWColormap | CWBorderPixel, &attrs);
+	p->plat.xwin = XCreateWindow(plat->dpy, plat->root, x, y, (uint32_t)w, (uint32_t)h, 0, (int)plat->depth, InputOutput, plat->visual, CWOverrideRedirect | CWSaveUnder | CWEventMask | CWColormap | CWBorderPixel, &attrs);
 
 	if(!p->plat.xwin) {
 		return 0;
@@ -450,6 +441,7 @@ static void platform_popup_fini(struct mkgui_ctx *ctx, struct mkgui_popup *p) {
 		platform_fb_destroy(plat, &p->plat.shm, p->plat.img);
 		p->plat.img = NULL;
 	}
+
 	if(p->plat.xwin) {
 		XDestroyWindow(plat->dpy, p->plat.xwin);
 		p->plat.xwin = 0;
@@ -494,6 +486,7 @@ static void platform_wait_event(struct mkgui_ctx *ctx, int32_t timeout_ms) {
 	if(timeout_ms == 0) {
 		return;
 	}
+
 	if(XEventsQueued(ctx->plat.dpy, QueuedAlready) > 0) {
 		return;
 	}
@@ -541,6 +534,7 @@ static uint32_t platform_pending(struct mkgui_ctx *ctx) {
 	if(ctx->plat.deferred_head != ctx->plat.deferred_tail) {
 		return 1;
 	}
+
 	if(XEventsQueued(ctx->plat.dpy, QueuedAlready) > 0) {
 		return 1;
 	}
@@ -574,8 +568,7 @@ static uint32_t platform_translate_keysym(KeySym ks) {
 static void platform_drop_enable(struct mkgui_ctx *ctx) {
 	struct mkgui_platform *plat = &ctx->plat;
 	Atom version = 5;
-	XChangeProperty(plat->dpy, plat->win, plat->xdnd_aware, XA_ATOM, 32,
-		PropModeReplace, (unsigned char *)&version, 1);
+	XChangeProperty(plat->dpy, plat->win, plat->xdnd_aware, XA_ATOM, 32, PropModeReplace, (unsigned char *)&version, 1);
 }
 
 // [=]===^=[ platform_xdnd_handle ]================================[=]
@@ -591,13 +584,12 @@ static uint32_t platform_xdnd_handle(struct mkgui_ctx *ctx, XClientMessageEvent 
 			int32_t format;
 			unsigned long count, remaining;
 			unsigned char *data = NULL;
-			XGetWindowProperty(plat->dpy, plat->xdnd_source, plat->text_uri_list,
-				0, 256, False, XA_ATOM, &type_ret, &format, &count, &remaining, &data);
+			XGetWindowProperty(plat->dpy, plat->xdnd_source, plat->text_uri_list, 0, 256, False, XA_ATOM, &type_ret, &format, &count, &remaining, &data);
 			if(!data) {
 				Atom type_list_atom = XInternAtom(plat->dpy, "XdndTypeList", False);
-				XGetWindowProperty(plat->dpy, plat->xdnd_source, type_list_atom,
-					0, 256, False, XA_ATOM, &type_ret, &format, &count, &remaining, &data);
+				XGetWindowProperty(plat->dpy, plat->xdnd_source, type_list_atom, 0, 256, False, XA_ATOM, &type_ret, &format, &count, &remaining, &data);
 			}
+
 			if(data) {
 				Atom *types = (Atom *)data;
 				for(unsigned long i = 0; i < count; ++i) {
@@ -638,8 +630,7 @@ static uint32_t platform_xdnd_handle(struct mkgui_ctx *ctx, XClientMessageEvent 
 
 	if(cm->message_type == plat->xdnd_drop) {
 		if(plat->xdnd_uri_ok && ctx->drop_enabled) {
-			XConvertSelection(plat->dpy, plat->xdnd_selection, plat->text_uri_list,
-				plat->mkgui_clip_prop, plat->win, (Time)cm->data.l[2]);
+			XConvertSelection(plat->dpy, plat->xdnd_selection, plat->text_uri_list, plat->mkgui_clip_prop, plat->win, (Time)cm->data.l[2]);
 		} else {
 			XClientMessageEvent fin;
 			memset(&fin, 0, sizeof(fin));
@@ -678,12 +669,12 @@ static uint32_t platform_xdnd_selection(struct mkgui_ctx *ctx, XSelectionEvent *
 		int32_t format;
 		unsigned long count, remaining;
 		unsigned char *data = NULL;
-		XGetWindowProperty(plat->dpy, plat->win, se->property,
-			0, 65536, True, AnyPropertyType, &type_ret, &format, &count, &remaining, &data);
+		XGetWindowProperty(plat->dpy, plat->win, se->property, 0, 65536, True, AnyPropertyType, &type_ret, &format, &count, &remaining, &data);
 		if(data && count > 0) {
 			drop_parse_uri_list(ctx, (char *)data, (uint32_t)count);
 			got_data = (ctx->drop_count > 0);
 		}
+
 		if(data) {
 			XFree(data);
 		}
@@ -813,12 +804,10 @@ static void platform_translate_xevent(struct mkgui_ctx *owner, XEvent *xev, stru
 
 			if(req->target == owner->plat.targets) {
 				Atom supported[] = { owner->plat.utf8_string, XA_STRING };
-				XChangeProperty(owner->plat.dpy, req->requestor, req->property, XA_ATOM, 32,
-					PropModeReplace, (unsigned char *)supported, 2);
+				XChangeProperty(owner->plat.dpy, req->requestor, req->property, XA_ATOM, 32, PropModeReplace, (unsigned char *)supported, 2);
 				resp.property = req->property;
 			} else if(req->target == owner->plat.utf8_string || req->target == XA_STRING) {
-				XChangeProperty(owner->plat.dpy, req->requestor, req->property, req->target, 8,
-					PropModeReplace, (unsigned char *)owner->clip_text, (int)owner->clip_len);
+				XChangeProperty(owner->plat.dpy, req->requestor, req->property, req->target, 8, PropModeReplace, (unsigned char *)owner->clip_text, (int)owner->clip_len);
 				resp.property = req->property;
 			}
 
@@ -1037,6 +1026,7 @@ static void platform_font_fini(struct mkgui_ctx *ctx) {
 		FT_Done_Face(plat_ft_face);
 		plat_ft_face = NULL;
 	}
+
 	if(plat_ft_lib) {
 		FT_Done_FreeType(plat_ft_lib);
 		plat_ft_lib = NULL;
@@ -1086,8 +1076,7 @@ static uint32_t platform_clipboard_get(struct mkgui_ctx *ctx, char *buf, uint32_
 			int format;
 			unsigned long nitems, bytes_after;
 			unsigned char *data = NULL;
-			XGetWindowProperty(plat->dpy, plat->win, plat->mkgui_clip_prop, 0, 1024 * 1024, True,
-				AnyPropertyType, &type, &format, &nitems, &bytes_after, &data);
+			XGetWindowProperty(plat->dpy, plat->win, plat->mkgui_clip_prop, 0, 1024 * 1024, True, AnyPropertyType, &type, &format, &nitems, &bytes_after, &data);
 			if(data && nitems > 0) {
 				uint32_t len = (uint32_t)nitems;
 				if(len >= buf_size) {
@@ -1098,6 +1087,7 @@ static uint32_t platform_clipboard_get(struct mkgui_ctx *ctx, char *buf, uint32_
 				XFree(data);
 				return len;
 			}
+
 			if(data) {
 				XFree(data);
 			}
@@ -1139,8 +1129,7 @@ static char *platform_clipboard_get_alloc(struct mkgui_ctx *ctx, uint32_t *out_l
 			int format;
 			unsigned long nitems, bytes_after;
 			unsigned char *data = NULL;
-			XGetWindowProperty(plat->dpy, plat->win, plat->mkgui_clip_prop, 0, 1024 * 1024, True,
-				AnyPropertyType, &type, &format, &nitems, &bytes_after, &data);
+			XGetWindowProperty(plat->dpy, plat->win, plat->mkgui_clip_prop, 0, 1024 * 1024, True, AnyPropertyType, &type, &format, &nitems, &bytes_after, &data);
 			if(data && nitems > 0) {
 				uint32_t len = (uint32_t)nitems;
 				char *buf = (char *)malloc(len + 1);
@@ -1154,6 +1143,7 @@ static char *platform_clipboard_get_alloc(struct mkgui_ctx *ctx, uint32_t *out_l
 				*out_len = len;
 				return buf;
 			}
+
 			if(data) {
 				XFree(data);
 			}
@@ -1176,8 +1166,7 @@ static uint32_t platform_glview_create(struct mkgui_ctx *ctx, struct mkgui_glvie
 	XSetWindowAttributes wa;
 	wa.background_pixmap = None;
 	wa.event_mask = 0;
-	gv->plat.xwin = XCreateWindow(plat->dpy, plat->win, x, y, (uint32_t)w, (uint32_t)h, 0,
-		CopyFromParent, InputOutput, CopyFromParent, CWBackPixmap | CWEventMask, &wa);
+	gv->plat.xwin = XCreateWindow(plat->dpy, plat->win, x, y, (uint32_t)w, (uint32_t)h, 0, CopyFromParent, InputOutput, CopyFromParent, CWBackPixmap | CWEventMask, &wa);
 
 	XMapWindow(plat->dpy, gv->plat.xwin);
 	XFlush(plat->dpy);
@@ -1206,6 +1195,7 @@ static void platform_glview_show(struct mkgui_ctx *ctx, struct mkgui_glview_data
 	if(!gv->plat.xwin) {
 		return;
 	}
+
 	if(visible) {
 		XMapWindow(ctx->plat.dpy, gv->plat.xwin);
 	} else {

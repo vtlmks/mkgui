@@ -27,6 +27,7 @@ static void render_label_wrap(struct mkgui_ctx *ctx, uint32_t idx, uint32_t tc) 
 			if(text_width(ctx, tmp) > rw && best > 0) {
 				break;
 			}
+
 			if(p[i] == ' ' || p[i] == '\n') {
 				best = i + 1;
 				if(p[i] == '\n') {
@@ -35,9 +36,11 @@ static void render_label_wrap(struct mkgui_ctx *ctx, uint32_t idx, uint32_t tc) 
 			}
 			++i;
 		}
+
 		if(!p[i]) {
 			best = i;
 		}
+
 		if(best == 0) {
 			best = i > 0 ? i : 1;
 		}
@@ -70,6 +73,7 @@ static void render_label(struct mkgui_ctx *ctx, uint32_t idx) {
 	} else {
 		tc = ctx->theme.text;
 	}
+
 	if(w->style & MKGUI_LABEL_WRAP) {
 		render_label_wrap(ctx, idx, tc);
 		return;
@@ -96,6 +100,7 @@ static void render_label(struct mkgui_ctx *ctx, uint32_t idx) {
 		if(ux2 > rx + rw) {
 			ux2 = rx + rw;
 		}
+
 		if(ux2 > tx) {
 			draw_hline(ctx->pixels, ctx->win_w, ctx->win_h, tx, uy, ux2 - tx, tc);
 		}
@@ -109,6 +114,7 @@ MKGUI_API void mkgui_label_set(struct mkgui_ctx *ctx, uint32_t id, const char *t
 	if(!w) {
 		return;
 	}
+
 	if(!text) {
 		text = "";
 	}

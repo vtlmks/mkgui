@@ -366,9 +366,11 @@ static char *ed_type_name(uint32_t type) {
 			return ed_containers[i].name;
 		}
 	}
+
 	if(type == MKGUI_TAB) {
 		return "Tab";
 	}
+
 	if(type == MKGUI_MENUITEM) {
 		return "MenuItem";
 	}
@@ -554,6 +556,7 @@ static void ed_config_load(void) {
 		while(len > 0 && (line[len - 1] == '\n' || line[len - 1] == '\r')) {
 			line[--len] = '\0';
 		}
+
 		if(len == 0) {
 			continue;
 		}
@@ -593,6 +596,7 @@ static void ed_config_save(void) {
 	if(ed_cfg.last_dir[0]) {
 		fprintf(f, "last_dir %s\n", ed_cfg.last_dir);
 	}
+
 	if(ed_cfg.window_w > 0 && ed_cfg.window_h > 0) {
 		fprintf(f, "window_size %d %d\n", ed_cfg.window_w, ed_cfg.window_h);
 	}
@@ -646,6 +650,7 @@ static void ed_sync_recent_menu(struct mkgui_ctx *ctx) {
 		if(!w) {
 			continue;
 		}
+
 		if(i < ed_cfg.recent_count) {
 			w->flags &= ~MKGUI_HIDDEN;
 			char *path = ed_cfg.recent[i];
@@ -761,18 +766,22 @@ static void ed_render_help_popup(struct mkgui_ctx *ctx, void *userdata) {
 				}
 				break;
 			}
+
 			if(*src == ' ') {
 				last_break = src;
 			}
 			line_w += cw;
 			++src;
 		}
+
 		if(*src == '\n') {
 			++src;
 		}
+
 		if(src == line_start && *src) {
 			++src;
 		}
+
 		if(line_w > actual_w) {
 			actual_w = line_w;
 		}
@@ -785,12 +794,15 @@ static void ed_render_help_popup(struct mkgui_ctx *ctx, void *userdata) {
 	if(bx + pw > ctx->win_w) {
 		bx = ctx->win_w - pw;
 	}
+
 	if(by + ph > ctx->win_h) {
 		by = ctx->rects[widx].y - ph - 4;
 	}
+
 	if(bx < 0) {
 		bx = 0;
 	}
+
 	if(by < 0) {
 		by = 0;
 	}
@@ -816,6 +828,7 @@ static void ed_render_help_popup(struct mkgui_ctx *ctx, void *userdata) {
 				}
 				break;
 			}
+
 			if(*src == ' ') {
 				last_break = src;
 			}
@@ -823,9 +836,11 @@ static void ed_render_help_popup(struct mkgui_ctx *ctx, void *userdata) {
 			++src;
 			line_end = src;
 		}
+
 		if(*src == '\n') {
 			++src;
 		}
+
 		if(src == line_start && *src) {
 			++src;
 			line_end = src;
@@ -977,54 +992,71 @@ static uint32_t ed_compute_vis_mask(struct ed_widget *w) {
 	if(w->type == MKGUI_CHECKBOX || w->type == MKGUI_RADIO) {
 		mask |= ED_VIS_HAS_CHECK;
 	}
+
 	if(w->type == MKGUI_MENUITEM) {
 		mask |= ED_VIS_MENUITEM;
 	}
+
 	if(w->type == MKGUI_TABS) {
 		mask |= ED_VIS_TABS;
 	}
+
 	if(w->type == MKGUI_TOOLBAR) {
 		mask |= ED_VIS_TOOLBAR;
 	}
+
 	if(w->type == MKGUI_VBOX || w->type == MKGUI_HBOX) {
 		mask |= ED_VIS_BOX;
 	}
+
 	if(w->type == MKGUI_VBOX || w->type == MKGUI_HBOX || w->type == MKGUI_FORM || w->type == MKGUI_PANEL || w->type == MKGUI_IMAGE || w->type == MKGUI_GLVIEW || w->type == MKGUI_CANVAS) {
 		mask |= ED_VIS_BORDERABLE;
 	}
+
 	if(w->type == MKGUI_INPUT || w->type == MKGUI_TEXTAREA) {
 		mask |= ED_VIS_INPUT;
 	}
+
 	if(w->type == MKGUI_INPUT) {
 		mask |= ED_VIS_INPUT_ONLY;
 	}
+
 	if(w->type == MKGUI_LISTVIEW || w->type == MKGUI_GRIDVIEW || w->type == MKGUI_TREEVIEW) {
 		mask |= ED_VIS_HAS_MULTI;
 	}
+
 	if(w->type == MKGUI_IMAGE) {
 		mask |= ED_VIS_IMAGE;
 	}
+
 	if(w->type == MKGUI_PROGRESS) {
 		mask |= ED_VIS_PROGRESS;
 	}
+
 	if(w->type == MKGUI_SLIDER || w->type == MKGUI_SCROLLBAR || w->type == MKGUI_METER) {
 		mask |= ED_VIS_SLIDER;
 	}
+
 	if(w->type == MKGUI_SLIDER) {
 		mask |= ED_VIS_SLIDER_ONLY;
 	}
+
 	if(w->type == MKGUI_METER) {
 		mask |= ED_VIS_METER;
 	}
+
 	if(w->type == MKGUI_LABEL) {
 		mask |= ED_VIS_LABEL;
 	}
+
 	if(w->type == MKGUI_GROUP) {
 		mask |= ED_VIS_GROUP;
 	}
+
 	if(w->type == MKGUI_BUTTON || w->type == MKGUI_MENUITEM) {
 		mask |= ED_VIS_ACCELABLE;
 	}
+
 	if(w->type == MKGUI_MENU || w->type == MKGUI_MENUITEM) {
 		mask |= ED_VIS_MENU;
 	}
@@ -1034,12 +1066,15 @@ static uint32_t ed_compute_vis_mask(struct ed_widget *w) {
 			if(pt == MKGUI_HSPLIT || pt == MKGUI_VSPLIT) {
 				mask |= ED_VIS_IN_SPLIT;
 			}
+
 			if(pt == MKGUI_VBOX || pt == MKGUI_HBOX) {
 				mask |= ED_VIS_IN_BOX;
 			}
+
 			if(pt == MKGUI_TOOLBAR) {
 				mask |= ED_VIS_IN_TOOLBAR;
 			}
+
 			if(pt == MKGUI_TABS) {
 				mask |= ED_VIS_TAB_CHILD;
 			}
@@ -1233,6 +1268,7 @@ static void ed_set_active_tab(uint32_t tabs_id, uint32_t tab_id) {
 			return;
 		}
 	}
+
 	if(ed.tab_state_count < 32) {
 		ed.tab_states[ed.tab_state_count].tabs_id = tabs_id;
 		ed.tab_states[ed.tab_state_count].active_id = tab_id;
@@ -1274,6 +1310,7 @@ static struct ed_widget_data *ed_get_or_create_widget_data(uint32_t widget_id) {
 	if(d) {
 		return d;
 	}
+
 	if(ed.widget_data_count >= ED_MAX_DATA_WIDGETS) {
 		return NULL;
 	}
@@ -1675,6 +1712,7 @@ static uint32_t ed_is_descendant(uint32_t widget_idx, uint32_t ancestor_id) {
 		if(pid == ancestor_id) {
 			return 1;
 		}
+
 		if(pid == 0) {
 			return 0;
 		}
@@ -1686,6 +1724,7 @@ static uint32_t ed_is_descendant(uint32_t widget_idx, uint32_t ancestor_id) {
 				break;
 			}
 		}
+
 		if(!found) {
 			return 0;
 		}
@@ -1737,6 +1776,7 @@ static void ed_delete_selected(void) {
 	if(ed.selected < 0 || (uint32_t)ed.selected >= ed.widget_count) {
 		return;
 	}
+
 	if(ed.widgets[ed.selected].type == MKGUI_WINDOW) {
 		return;
 	}
@@ -1750,6 +1790,7 @@ static void ed_delete_selected(void) {
 			break;
 		}
 	}
+
 	if(next_sel < 0) {
 		for(int32_t i = ed.selected - 1; i >= 0; --i) {
 			if(ed.widgets[i].parent_id == del_parent && ed.widgets[i].id != del_id) {
@@ -1758,6 +1799,7 @@ static void ed_delete_selected(void) {
 			}
 		}
 	}
+
 	if(next_sel < 0) {
 		next_sel = (int32_t)del_parent;
 	}
@@ -1782,6 +1824,7 @@ static uint32_t ed_insert_child_after(uint32_t parent_id) {
 			break;
 		}
 	}
+
 	if(insert_at < ed.widget_count) {
 		memmove(&ed.widgets[insert_at + 1], &ed.widgets[insert_at], (ed.widget_count - insert_at) * sizeof(struct ed_widget));
 	}
@@ -1813,9 +1856,7 @@ static void ed_convert_to_layout(uint32_t idx, int32_t *lx, int32_t *ly, int32_t
 	*ly = 0;
 
 	uint32_t t = ew->type;
-	if(t == MKGUI_MENU || t == MKGUI_TOOLBAR || t == MKGUI_STATUSBAR || t == MKGUI_PATHBAR ||
-	   t == MKGUI_VBOX || t == MKGUI_HBOX || t == MKGUI_FORM || t == MKGUI_TAB ||
-	   t == MKGUI_PANEL || t == MKGUI_GROUP || t == MKGUI_TABS) {
+	if(t == MKGUI_MENU || t == MKGUI_TOOLBAR || t == MKGUI_STATUSBAR || t == MKGUI_PATHBAR || t == MKGUI_VBOX || t == MKGUI_HBOX || t == MKGUI_FORM || t == MKGUI_TAB || t == MKGUI_PANEL || t == MKGUI_GROUP || t == MKGUI_TABS) {
 		*lw = 0;
 		*lh = 0;
 		return;
@@ -1877,12 +1918,15 @@ static int32_t ed_canvas_hit(int32_t lx, int32_t ly) {
 		if(w->type == MKGUI_WINDOW || w->type == MKGUI_TAB || w->type == MKGUI_MENUITEM) {
 			continue;
 		}
+
 		if(!ed_is_tab_child_visible((uint32_t)i)) {
 			continue;
 		}
+
 		if(ed_rects[i].w <= 0 || ed_rects[i].h <= 0) {
 			continue;
 		}
+
 		if(sx >= ed_rects[i].x && sx < ed_rects[i].x + ed_rects[i].w && sy >= ed_rects[i].y && sy < ed_rects[i].y + ed_rects[i].h) {
 			return i;
 		}
@@ -1928,12 +1972,15 @@ static uint32_t ed_canvas_edge_hit(int32_t lx, int32_t ly) {
 	if(lx >= -t && lx <= t && ly >= -t && ly <= ch + t) {
 		edges |= ED_EDGE_LEFT;
 	}
+
 	if(lx >= cw - t && lx <= cw + t && ly >= -t && ly <= ch + t) {
 		edges |= ED_EDGE_RIGHT;
 	}
+
 	if(ly >= -t && ly <= t && lx >= -t && lx <= cw + t) {
 		edges |= ED_EDGE_TOP;
 	}
+
 	if(ly >= ch - t && ly <= ch + t && lx >= -t && lx <= cw + t) {
 		edges |= ED_EDGE_BOTTOM;
 	}
@@ -1993,8 +2040,7 @@ static void ed_draw_widget_fallback(struct mkgui_ctx *ctx, uint32_t idx) {
 			int32_t as = 4;
 			int32_t acx = rx + text_w + 10;
 			int32_t acy = ry + rh / 2;
-			draw_triangle_aa(ctx->pixels, ctx->win_w, ctx->win_h,
-				acx - as, acy - as / 2, acx + as, acy - as / 2, acx, acy + as / 2, ctx->theme.text);
+			draw_triangle_aa(ctx->pixels, ctx->win_w, ctx->win_h, acx - as, acy - as / 2, acx + as, acy - as / 2, acx, acy + as / 2, ctx->theme.text);
 			if(ew->label[0]) {
 				int32_t cty = ry + (rh - ctx->font_height) / 2;
 				push_text_clip(rx + 4, cty, ew->label, ctx->theme.text_disabled, rx + 1, ry + 1, rx + text_w - 1, ry + rh - 1);
@@ -2037,8 +2083,7 @@ static void ed_draw_widget_fallback(struct mkgui_ctx *ctx, uint32_t idx) {
 			int32_t as2 = 4;
 			int32_t acx2 = rx + rw - 10;
 			int32_t acy2 = ry + rh / 2;
-			draw_triangle_aa(buf, bw, bh,
-				acx2 - as2, acy2 - as2 / 2, acx2 + as2, acy2 - as2 / 2, acx2, acy2 + as2 / 2, ctx->theme.text);
+			draw_triangle_aa(buf, bw, bh, acx2 - as2, acy2 - as2 / 2, acx2 + as2, acy2 - as2 / 2, acx2, acy2 + as2 / 2, ctx->theme.text);
 		} break;
 
 		case MKGUI_SPINBOX: {
@@ -2053,10 +2098,8 @@ static void ed_draw_widget_fallback(struct mkgui_ctx *ctx, uint32_t idx) {
 			draw_patch(ctx, MKGUI_STYLE_RAISED, bx, ry + half, 20, rh - half, ctx->theme.widget_bg, ctx->theme.widget_border);
 			int32_t ac = bx + 10;
 			int32_t sas = 3;
-			draw_triangle_aa(buf, bw, bh,
-				ac, ry + half / 2 - sas, ac - sas, ry + half / 2 + sas / 2, ac + sas, ry + half / 2 + sas / 2, ctx->theme.text);
-			draw_triangle_aa(buf, bw, bh,
-				ac - sas, ry + half + (rh - half) / 2 - sas / 2, ac + sas, ry + half + (rh - half) / 2 - sas / 2, ac, ry + half + (rh - half) / 2 + sas, ctx->theme.text);
+			draw_triangle_aa(buf, bw, bh, ac, ry + half / 2 - sas, ac - sas, ry + half / 2 + sas / 2, ac + sas, ry + half / 2 + sas / 2, ctx->theme.text);
+			draw_triangle_aa(buf, bw, bh, ac - sas, ry + half + (rh - half) / 2 - sas / 2, ac + sas, ry + half + (rh - half) / 2 - sas / 2, ac, ry + half + (rh - half) / 2 + sas, ctx->theme.text);
 		} break;
 
 		case MKGUI_PROGRESS: {
@@ -2154,10 +2197,18 @@ static void ed_draw_widget_fallback(struct mkgui_ctx *ctx, uint32_t idx) {
 			int32_t prev_cy1 = render_clip_y1;
 			int32_t prev_cx2 = render_clip_x2;
 			int32_t prev_cy2 = render_clip_y2;
-			if(rl_cx1 > render_clip_x1) { render_clip_x1 = rl_cx1; }
-			if(rl_cy1 > render_clip_y1) { render_clip_y1 = rl_cy1; }
-			if(rl_cx2 < render_clip_x2) { render_clip_x2 = rl_cx2; }
-			if(rl_cy2 < render_clip_y2) { render_clip_y2 = rl_cy2; }
+			if(rl_cx1 > render_clip_x1) {
+				render_clip_x1 = rl_cx1;
+			}
+			if(rl_cy1 > render_clip_y1) {
+				render_clip_y1 = rl_cy1;
+			}
+			if(rl_cx2 < render_clip_x2) {
+				render_clip_x2 = rl_cx2;
+			}
+			if(rl_cy2 < render_clip_y2) {
+				render_clip_y2 = rl_cy2;
+			}
 			for(int32_t row_y = ry + 1; row_y < ry + rh - 2; row_y += rl_rh) {
 				int32_t thumb_sz = rl_rh - 8;
 				draw_rect_fill(buf, bw, bh, rx + 5, row_y + 4, thumb_sz, thumb_sz, ctx->theme.listview_alt);
@@ -2208,6 +2259,7 @@ static void ed_draw_widget_fallback(struct mkgui_ctx *ctx, uint32_t idx) {
 				if(btn->type != MKGUI_BUTTON || btn->parent_id != ew->id) {
 					continue;
 				}
+
 				if(btn->style & MKGUI_BUTTON_SEPARATOR) {
 					int32_t sx = bx + ctx->toolbar_sep_w / 2;
 					draw_vline(buf, bw, bh, sx, ry + 4, rh - 8, ctx->theme.widget_border);
@@ -2230,6 +2282,7 @@ static void ed_draw_widget_fallback(struct mkgui_ctx *ctx, uint32_t idx) {
 					draw_icon(buf, bw, bh, &icons[icon_idx], ccx, iy, bx, btn_y, bx + btn_w, btn_y + btn_h);
 					ccx += icons[icon_idx].w + 4;
 				}
+
 				if(ed_show_text && btn->label[0]) {
 					int32_t ty = btn_y + (btn_h - ctx->font_height) / 2;
 					push_text_clip(ccx, ty, btn->label, ctx->theme.text, bx, btn_y, bx + btn_w, btn_y + btn_h);
@@ -2444,12 +2497,15 @@ static void ed_render_canvas(struct mkgui_ctx *ctx, uint32_t id, uint32_t *pixel
 		if(ed.widgets[i].type == MKGUI_WINDOW || ed.widgets[i].type == MKGUI_TAB || ed.widgets[i].type == MKGUI_MENUITEM) {
 			continue;
 		}
+
 		if(ed.widgets[i].type == MKGUI_BUTTON && ed_layout_parent[i] < ed.widget_count && ed.widgets[ed_layout_parent[i]].type == MKGUI_TOOLBAR) {
 			continue;
 		}
+
 		if(!ed_is_tab_child_visible(i)) {
 			continue;
 		}
+
 		if(ed_rects[i].w <= 0 || ed_rects[i].h <= 0) {
 			continue;
 		}
@@ -2490,6 +2546,7 @@ static void ed_render_canvas(struct mkgui_ctx *ctx, uint32_t id, uint32_t *pixel
 				needs_outline = 1;
 			}
 		}
+
 		if(needs_outline) {
 			draw_rect_dashed(ctx->pixels, ctx->win_w, ctx->win_h, ed_rects[i].x, ed_rects[i].y, ed_rects[i].w, ed_rects[i].h, 0xFF666666, 4);
 		}
@@ -2561,6 +2618,7 @@ static void ed_sync_tree(struct mkgui_ctx *ctx) {
 		for(uint32_t j = 0; j < tv->node_count; ++j) {
 			tv->nodes[j].expanded = 1;
 		}
+
 		if(ed.selected >= 0 && (uint32_t)ed.selected < ed.widget_count) {
 			tv->selected_node = (int32_t)ed.widgets[ed.selected].id;
 		}
@@ -2581,6 +2639,7 @@ static uint32_t ed_find_menu_root(uint32_t widget_idx) {
 		if(idx < 0) {
 			break;
 		}
+
 		if(ed.widgets[idx].type == MKGUI_MENU) {
 			return ed.widgets[idx].id;
 		}
@@ -2892,6 +2951,7 @@ static void ed_read_props(struct mkgui_ctx *ctx) {
 	for(uint32_t i = 0; i < ED_PROP_COUNT; ++i) {
 		ed_read_prop_value(ctx, &ed_props[i], w);
 	}
+
 	if((w->type == MKGUI_SLIDER || w->type == MKGUI_SCROLLBAR) && ((old_flags ^ w->flags) & MKGUI_VERTICAL)) {
 		int32_t tmp = w->w;
 		w->w = w->h;
@@ -2960,6 +3020,7 @@ static void ed_remove_tab_from_tabs(struct mkgui_ctx *ctx) {
 			++tab_count;
 		}
 	}
+
 	if(tab_count <= 1) {
 		return;
 	}
@@ -3035,6 +3096,7 @@ static void ed_remove_menu_item(struct mkgui_ctx *ctx) {
 			last_item = (int32_t)i;
 		}
 	}
+
 	if(last_item < 0) {
 		return;
 	}
@@ -3099,6 +3161,7 @@ static void ed_remove_toolbar_btn(struct mkgui_ctx *ctx) {
 			last_btn = (int32_t)i;
 		}
 	}
+
 	if(last_btn < 0) {
 		return;
 	}
@@ -3167,6 +3230,7 @@ static void ed_save_project(struct mkgui_ctx *ctx, uint32_t save_as) {
 		if(w->margin_l || w->margin_t || w->margin_r || w->margin_b) {
 			fprintf(f, "margins %d %d %d %d\n", w->margin_l, w->margin_t, w->margin_r, w->margin_b);
 		}
+
 		if(w->accel_keysym) {
 			fprintf(f, "accel_mod 0x%08x\n", w->accel_keymod);
 			fprintf(f, "accel_key 0x%08x\n", w->accel_keysym);
@@ -3234,6 +3298,7 @@ static void ed_load_file(struct mkgui_ctx *ctx, char *path) {
 		while(len > 0 && (line[len - 1] == '\n' || line[len - 1] == '\r')) {
 			line[--len] = '\0';
 		}
+
 		if(len == 0) {
 			continue;
 		}
@@ -3500,7 +3565,9 @@ static char *ed_flags_to_str(uint32_t flags, char *buf, uint32_t buf_size) {
 	uint32_t align = flags & MKGUI_ALIGN_MASK;
 	if(align) {
 		char *name = NULL;
-		if(align == MKGUI_ALIGN_START)       { name = "MKGUI_ALIGN_START"; }
+		if(align == MKGUI_ALIGN_START) {
+			name = "MKGUI_ALIGN_START";
+		}
 		else if(align == MKGUI_ALIGN_CENTER) { name = "MKGUI_ALIGN_CENTER"; }
 		else if(align == MKGUI_ALIGN_END)    { name = "MKGUI_ALIGN_END"; }
 		if(name) {
@@ -3668,7 +3735,9 @@ static char *ed_style_to_str(uint32_t style, uint32_t widget_type, char *buf, ui
 	uint32_t tbmode = style & MKGUI_TOOLBAR_MODE_MASK;
 	if(tbmode) {
 		char *name = NULL;
-		if(tbmode == MKGUI_TOOLBAR_ICONS_ONLY)      { name = "MKGUI_TOOLBAR_ICONS_ONLY"; }
+		if(tbmode == MKGUI_TOOLBAR_ICONS_ONLY) {
+			name = "MKGUI_TOOLBAR_ICONS_ONLY";
+		}
 		else if(tbmode == MKGUI_TOOLBAR_TEXT_ONLY)   { name = "MKGUI_TOOLBAR_TEXT_ONLY"; }
 		if(name) {
 			if(pos > 0) {
@@ -3728,6 +3797,7 @@ static void ed_generate_code(struct mkgui_ctx *ctx) {
 			fprintf(f, "\tbuf[0] = '\\0';\n");
 			fprintf(f, "}\n\n");
 		}
+
 		if(ed.widgets[i].type == MKGUI_ITEMVIEW) {
 			fprintf(f, "// [=]===^=[ %s_label_cb ]===\n", ed.widgets[i].id_name);
 			fprintf(f, "static void %s_label_cb(uint32_t item, char *buf, uint32_t buf_size, void *userdata) {\n", ed.widgets[i].id_name);
@@ -3740,6 +3810,7 @@ static void ed_generate_code(struct mkgui_ctx *ctx) {
 			fprintf(f, "\tbuf[0] = '\\0';\n");
 			fprintf(f, "}\n\n");
 		}
+
 		if(ed.widgets[i].type == MKGUI_GRIDVIEW) {
 			fprintf(f, "// [=]===^=[ %s_cell_cb ]===\n", ed.widgets[i].id_name);
 			fprintf(f, "static void %s_cell_cb(uint32_t row, uint32_t col, char *buf, uint32_t buf_size, void *userdata) {\n", ed.widgets[i].id_name);
@@ -3747,6 +3818,7 @@ static void ed_generate_code(struct mkgui_ctx *ctx) {
 			fprintf(f, "\tbuf[0] = '\\0';\n");
 			fprintf(f, "}\n\n");
 		}
+
 		if(ed.widgets[i].type == MKGUI_RICHLIST) {
 			fprintf(f, "// [=]===^=[ %s_row_cb ]===\n", ed.widgets[i].id_name);
 			fprintf(f, "static void %s_row_cb(uint32_t row, struct mkgui_richlist_row *out, void *userdata) {\n", ed.widgets[i].id_name);
@@ -3775,6 +3847,7 @@ static void ed_generate_code(struct mkgui_ctx *ctx) {
 					break;
 				}
 			}
+
 			if(!found && events_used_count < 64) {
 				events_used[events_used_count++] = bit;
 			}
@@ -3812,6 +3885,7 @@ static void ed_generate_code(struct mkgui_ctx *ctx) {
 			break;
 		}
 	}
+
 	if(!has_close) {
 		fprintf(f, "\t\tcase MKGUI_EVENT_CLOSE: {\n");
 		fprintf(f, "\t\t\tmkgui_quit(ctx);\n");
@@ -3840,18 +3914,14 @@ static void ed_generate_code(struct mkgui_ctx *ctx) {
 		char style_buf[512];
 		uint32_t out_flags = w->flags & ~0xfu;
 		uint32_t out_style = w->style;
-		fprintf(f, "\t\tMKGUI_W(%s, %s, \"%s\", \"%s\", %s, %d, %d, %s, %s, %u),\n",
-			ed_type_name_upper(w->type), w->id_name, w->label, w->icon,
-			parent_name, lw, lh, ed_flags_to_str(out_flags, flag_buf, sizeof(flag_buf)),
-			ed_style_to_str(out_style, w->type, style_buf, sizeof(style_buf)), w->weight);
+		fprintf(f, "\t\tMKGUI_W(%s, %s, \"%s\", \"%s\", %s, %d, %d, %s, %s, %u),\n", ed_type_name_upper(w->type), w->id_name, w->label, w->icon, parent_name, lw, lh, ed_flags_to_str(out_flags, flag_buf, sizeof(flag_buf)), ed_style_to_str(out_style, w->type, style_buf, sizeof(style_buf)), w->weight);
 	}
 	fprintf(f, "\t};\n\n");
 
 	for(uint32_t i = 0; i < ed.widget_count; ++i) {
 		struct ed_widget *w = &ed.widgets[i];
 		if(w->margin_l || w->margin_t || w->margin_r || w->margin_b) {
-			fprintf(f, "\twidgets[%u].margin_l = %d; widgets[%u].margin_r = %d; widgets[%u].margin_t = %d; widgets[%u].margin_b = %d;\n",
-				i, w->margin_l, i, w->margin_r, i, w->margin_t, i, w->margin_b);
+			fprintf(f, "\twidgets[%u].margin_l = %d; widgets[%u].margin_r = %d; widgets[%u].margin_t = %d; widgets[%u].margin_b = %d;\n", i, w->margin_l, i, w->margin_r, i, w->margin_t, i, w->margin_b);
 		}
 	}
 
@@ -3993,6 +4063,7 @@ static void ed_generate_code(struct mkgui_ctx *ctx) {
 				break;
 			}
 		}
+
 		if(!dup && seen_count < 256) {
 			snprintf(ed_scratch.seen_icons[seen_count].name, MKGUI_ICON_NAME_LEN, "%s", w->icon);
 			snprintf(ed_scratch.seen_icons[seen_count].source, sizeof(ed_scratch.seen_icons[seen_count].source), "%s", w->icon_source);
@@ -4073,18 +4144,14 @@ static void ed_generate_snippet(struct mkgui_ctx *ctx) {
 		char style_buf[512];
 		uint32_t out_flags = w->flags & ~0xfu;
 		uint32_t out_style = w->style;
-		fprintf(f, "\tMKGUI_W(%s, %s, \"%s\", \"%s\", %s, %d, %d, %s, %s, %u),\n",
-			ed_type_name_upper(w->type), w->id_name, w->label, w->icon,
-			parent_name, lw, lh, ed_flags_to_str(out_flags, flag_buf, sizeof(flag_buf)),
-			ed_style_to_str(out_style, w->type, style_buf, sizeof(style_buf)), w->weight);
+		fprintf(f, "\tMKGUI_W(%s, %s, \"%s\", \"%s\", %s, %d, %d, %s, %s, %u),\n", ed_type_name_upper(w->type), w->id_name, w->label, w->icon, parent_name, lw, lh, ed_flags_to_str(out_flags, flag_buf, sizeof(flag_buf)), ed_style_to_str(out_style, w->type, style_buf, sizeof(style_buf)), w->weight);
 	}
 	fprintf(f, "};\n");
 
 	for(uint32_t i = 0; i < ed.widget_count; ++i) {
 		struct ed_widget *w = &ed.widgets[i];
 		if(w->margin_l || w->margin_t || w->margin_r || w->margin_b) {
-			fprintf(f, "widgets[%u].margin_l = %d; widgets[%u].margin_r = %d; widgets[%u].margin_t = %d; widgets[%u].margin_b = %d;\n",
-				i, w->margin_l, i, w->margin_r, i, w->margin_t, i, w->margin_b);
+			fprintf(f, "widgets[%u].margin_l = %d; widgets[%u].margin_r = %d; widgets[%u].margin_t = %d; widgets[%u].margin_b = %d;\n", i, w->margin_l, i, w->margin_r, i, w->margin_t, i, w->margin_b);
 		}
 	}
 
@@ -4173,9 +4240,11 @@ static void ed_test_gui(struct mkgui_ctx *editor_ctx) {
 			if(test_widgets[i].w > 0) {
 				test_w = test_widgets[i].w;
 			}
+
 			if(test_widgets[i].h > 0) {
 				test_h = test_widgets[i].h;
 			}
+
 			if(test_widgets[i].label[0]) {
 				test_title = test_widgets[i].label;
 			}
@@ -4713,6 +4782,7 @@ int main(void) {
 							if(ed_props[pi].widget_id != ev.id && ed_props[pi].widget_id2 != ev.id) {
 								continue;
 							}
+
 							if(ed_props[pi].kind == ED_PK_ACTION || ed_props[pi].kind == ED_PK_STRING_BROWSE) {
 								switch(ed_props[pi].action) {
 									case ED_ACT_ICON_BROWSE: {
@@ -4758,6 +4828,7 @@ int main(void) {
 								handled = 1;
 							}
 						}
+
 						if(!handled) {
 						if(ev.id == ED_DATA_ADD_BTN) {
 							struct ed_widget_data *d = ed_find_widget_data(ed_data_widget_id);
@@ -4822,6 +4893,7 @@ int main(void) {
 							handled = 1;
 						}
 						}
+
 						if(!handled) {
 						for(uint32_t pi = 0; pi < widget_pal_count; ++pi) {
 							if(ev.id == ED_PAL_FIRST + pi) {
@@ -4925,9 +4997,11 @@ int main(void) {
 						if(src_idx < 0 || tgt_idx < 0) {
 							break;
 						}
+
 						if(ed.widgets[src_idx].type == MKGUI_WINDOW) {
 							break;
 						}
+
 						if(ed_is_descendant((uint32_t)tgt_idx, ed.widgets[src_idx].id)) {
 							break;
 						}
@@ -4968,9 +5042,11 @@ int main(void) {
 								}
 							}
 						}
+
 						if(insert_at > ed.widget_count) {
 							insert_at = ed.widget_count;
 						}
+
 						if(ed.widget_count + block_count <= ED_MAX_WIDGETS) {
 							memmove(&ed.widgets[insert_at + block_count], &ed.widgets[insert_at], (ed.widget_count - insert_at) * sizeof(struct ed_widget));
 							memcpy(&ed.widgets[insert_at], block, block_count * sizeof(struct ed_widget));
@@ -5084,6 +5160,7 @@ int main(void) {
 						}
 						break;
 					}
+
 					if(ev.keysym == MKGUI_KEY_F1) {
 						uint32_t hover = ctx->hover_id;
 						uint32_t help_type = 0;
@@ -5099,6 +5176,7 @@ int main(void) {
 								break;
 							}
 						}
+
 						if(help_type) {
 							ed_help_text = ed_find_help(help_type);
 							ed_help_widget_id = hover;
@@ -5144,6 +5222,7 @@ int main(void) {
 							case 'i': { focus_id = ED_PROP_ID_INP; } break;
 							default: break;
 						}
+
 						if(focus_id) {
 							ctx->focus_id = focus_id;
 							dirty_all(ctx);
@@ -5208,6 +5287,7 @@ int main(void) {
 								}
 							}
 						}
+
 						if(!new_parent && is_chrome) {
 							for(uint32_t j = 0; j < ed.widget_count; ++j) {
 								if(ed.widgets[j].type == MKGUI_WINDOW) {
@@ -5216,6 +5296,7 @@ int main(void) {
 								}
 							}
 						}
+
 						if(!new_parent) for(int32_t j = (int32_t)ed.widget_count - 2; j >= 0; --j) {
 							struct ed_widget *c = &ed.widgets[j];
 							if(c->type == MKGUI_TABS) {
@@ -5246,6 +5327,7 @@ int main(void) {
 								}
 							}
 						}
+
 						if(new_parent) {
 							struct ed_widget tmp = ed.widgets[new_idx];
 							tmp.parent_id = new_parent;
@@ -5280,6 +5362,7 @@ int main(void) {
 							ed.widgets[pos] = tmp;
 							new_idx = (int32_t)pos;
 						}
+
 						if(ctrl_target) {
 							ed.selected = ed_find_widget(ctrl_target);
 						} else {
@@ -5431,9 +5514,11 @@ int main(void) {
 
 						default: break;
 					}
+
 					if(w->w < 4) {
 						w->w = 4;
 					}
+
 					if(w->h < 4) {
 						w->h = 4;
 					}
@@ -5461,18 +5546,23 @@ int main(void) {
 					if(ed.canvas_resize_edge & ED_EDGE_RIGHT) {
 						ed.canvas_w += adx;
 					}
+
 					if(ed.canvas_resize_edge & ED_EDGE_BOTTOM) {
 						ed.canvas_h += ady;
 					}
+
 					if(ed.canvas_resize_edge & ED_EDGE_LEFT) {
 						ed.canvas_w -= adx;
 					}
+
 					if(ed.canvas_resize_edge & ED_EDGE_TOP) {
 						ed.canvas_h -= ady;
 					}
+
 					if(ed.canvas_w < ED_CANVAS_MIN) {
 						ed.canvas_w = ED_CANVAS_MIN;
 					}
+
 					if(ed.canvas_h < ED_CANVAS_MIN) {
 						ed.canvas_h = ED_CANVAS_MIN;
 					}
@@ -5492,6 +5582,7 @@ int main(void) {
 							if(!(af & MKGUI_ANCHOR_LEFT) && (af & MKGUI_ANCHOR_RIGHT)) {
 								aw->x += dx;
 							}
+
 							if(!(af & MKGUI_ANCHOR_TOP) && (af & MKGUI_ANCHOR_BOTTOM)) {
 								aw->y += dy;
 							}

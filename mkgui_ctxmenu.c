@@ -33,6 +33,7 @@ static void ctxmenu_metrics(struct mkgui_ctx *ctx, int32_t *out_w, int32_t *out_
 			if(tw > max_w) {
 				max_w = tw;
 			}
+
 			if(it->icon[0]) {
 				has_icon = 1;
 			}
@@ -190,6 +191,7 @@ MKGUI_API void mkgui_context_menu_add(struct mkgui_ctx *ctx, uint32_t id, const 
 	if(!label && !(flags & MKGUI_MENUITEM_SEPARATOR)) {
 		return;
 	}
+
 	if(ctx->ctxmenu_count >= MKGUI_MAX_CTXMENU) {
 		return;
 	}
@@ -200,6 +202,7 @@ MKGUI_API void mkgui_context_menu_add(struct mkgui_ctx *ctx, uint32_t id, const 
 	if(label) {
 		snprintf(it->label, MKGUI_MAX_TEXT, "%s", label);
 	}
+
 	if(icon) {
 		snprintf(it->icon, MKGUI_ICON_NAME_LEN, "%s", icon);
 	}
@@ -234,12 +237,15 @@ MKGUI_API void mkgui_context_menu_show(struct mkgui_ctx *ctx) {
 	if(abs_x + pw > scr_w) {
 		abs_x = scr_w - pw;
 	}
+
 	if(abs_y + ph > scr_h) {
 		abs_y = abs_y - ph;
 	}
+
 	if(abs_x < 0) {
 		abs_x = 0;
 	}
+
 	if(abs_y < 0) {
 		abs_y = 0;
 	}
@@ -273,12 +279,15 @@ MKGUI_API void mkgui_context_menu_show_at(struct mkgui_ctx *ctx, int32_t x, int3
 	if(abs_x + pw > scr_w) {
 		abs_x = scr_w - pw;
 	}
+
 	if(abs_y + ph > scr_h) {
 		abs_y = abs_y - ph;
 	}
+
 	if(abs_x < 0) {
 		abs_x = 0;
 	}
+
 	if(abs_y < 0) {
 		abs_y = 0;
 	}

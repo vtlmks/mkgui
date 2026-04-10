@@ -17,15 +17,19 @@ static int32_t iatan2_deg10(int32_t y, int32_t x) {
 	if(ay > ax) {
 		a = 900 - a;
 	}
+
 	if(x < 0) {
 		a = 1800 - a;
 	}
+
 	if(y > 0) {
 		a = 3600 - a;
 	}
+
 	if(a < 0) {
 		a += 3600;
 	}
+
 	if(a >= 3600) {
 		a -= 3600;
 	}
@@ -76,6 +80,7 @@ static void render_spinner(struct mkgui_ctx *ctx, uint32_t idx) {
 	if(outer_aa < 1) {
 		outer_aa = 1;
 	}
+
 	if(inner_aa < 1) {
 		inner_aa = 1;
 	}
@@ -87,24 +92,31 @@ static void render_spinner(struct mkgui_ctx *ctx, uint32_t idx) {
 	if(cy + dy0 < 0) {
 		dy0 = -cy;
 	}
+
 	if(cy + dy1 >= ctx->win_h) {
 		dy1 = ctx->win_h - 1 - cy;
 	}
+
 	if(cx + dx0 < 0) {
 		dx0 = -cx;
 	}
+
 	if(cx + dx1 >= ctx->win_w) {
 		dx1 = ctx->win_w - 1 - cx;
 	}
+
 	if(cy + dy0 < render_clip_y1) {
 		dy0 = render_clip_y1 - cy;
 	}
+
 	if(cy + dy1 >= render_clip_y2) {
 		dy1 = render_clip_y2 - 1 - cy;
 	}
+
 	if(cx + dx0 < render_clip_x1) {
 		dx0 = render_clip_x1 - cx;
 	}
+
 	if(cx + dx1 >= render_clip_x2) {
 		dx1 = render_clip_x2 - 1 - cx;
 	}
@@ -132,15 +144,19 @@ static void render_spinner(struct mkgui_ctx *ctx, uint32_t idx) {
 			rb0 = x_in;
 			rb1 = x_out;
 		}
+
 		if(ra0 < dx0) {
 			ra0 = dx0;
 		}
+
 		if(ra1 > dx1) {
 			ra1 = dx1;
 		}
+
 		if(rb0 < dx0) {
 			rb0 = dx0;
 		}
+
 		if(rb1 > dx1) {
 			rb1 = dx1;
 		}
@@ -159,6 +175,7 @@ static void render_spinner(struct mkgui_ctx *ctx, uint32_t idx) {
 				if(diff < 0) {
 					diff += 3600;
 				}
+
 				if(diff < arc_len) {
 					uint32_t alpha = 255;
 					if(d2 > or_inner_sq) {
