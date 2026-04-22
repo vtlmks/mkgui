@@ -601,3 +601,12 @@ MKGUI_API uint32_t mkgui_datepicker_get_readonly(struct mkgui_ctx *ctx, uint32_t
 	struct mkgui_widget *w = find_widget(ctx, id);
 	return (w && (w->style & MKGUI_DATEPICKER_READONLY)) ? 1 : 0;
 }
+
+// [=]===^=[ mkgui_today ]============================================[=]
+MKGUI_API void mkgui_today(int32_t *year, int32_t *month, int32_t *day) {
+	int32_t y, m, d;
+	datepicker_today(&y, &m, &d);
+	if(year) { *year = y; }
+	if(month) { *month = m; }
+	if(day) { *day = d; }
+}

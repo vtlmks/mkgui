@@ -22,6 +22,8 @@ enum {
 	IB_TH_THEME_DROP,
 	IB_TH_SEARCH,
 	IB_TH_TABS,
+	IB_TH_GRID,
+	IB_TH_HSCROLL,
 	IB_TH_TAB_ALL,
 	IB_TH_TAB_FIRST,
 };
@@ -42,9 +44,18 @@ struct ib_theme_state {
 	uint32_t confirmed;
 	char result_name[IB_ICON_NAME];
 	char result_path[1024];
-	int32_t prev_selected;
-	uint32_t saved_icon_count;
-	uint32_t saved_svg_source_count;
+
+	// Browser's own thumbnail storage: one ARGB pixel buffer per theme icon,
+	// sized size*size. NULL until rasterized. Indexed by theme icon index
+	// (the index into names[]/paths[]), not by filtered index, so narrowing
+	// the filter and widening it again doesn't force re-rasterization.
+	uint32_t *thumb[IB_THEME_MAX_ICONS];
+
+	// Grid state
+	int32_t scroll_x;
+	int32_t selected;
+	int32_t last_click_item;
+	uint32_t last_click_time;
 
 	char theme_dirs[IB_MAX_THEMES][1024];
 	char theme_names[IB_MAX_THEMES][260];
@@ -560,32 +571,249 @@ static void ibt_filter(const char *search) {
 	}
 }
 
-// [=]===^=[ ibt_label_cb ]===========================================[=]
-static void ibt_label_cb(uint32_t item, char *buf, uint32_t buf_size, void *userdata) {
-	(void)userdata;
-	if(item < ibt->filtered_count) {
-		strncpy(buf, ibt->names[ibt->filtered_idx[item]], buf_size - 1);
-		buf[buf_size - 1] = '\0';
-	} else {
-		buf[0] = '\0';
+// Rasterize one SVG into a freshly-malloc'd ARGB buffer of size*size pixels.
+// Caller owns the returned buffer. Never touches the main icon system.
+
+// [=]===^=[ ibt_rasterize ]==========================================[=]
+static uint32_t *ibt_rasterize(struct mkgui_ctx *ctx, const char *path, int32_t size) {
+	uint32_t svg_len = 0;
+	char *svg_data = svg_read_file(path, &svg_len);
+	if(!svg_data) {
+		return NULL;
+	}
+	svg_strip_style_blocks(svg_data, svg_len);
+
+	plutosvg_document_t *doc = plutosvg_document_load_from_data(svg_data, (int)svg_len, -1, -1, NULL, NULL);
+	if(!doc) {
+		free(svg_data);
+		return NULL;
+	}
+
+	plutovg_color_t color;
+	uint32_t text = ctx->theme.text & 0x00ffffff;
+	color.r = (float)((text >> 16) & 0xff) / 255.0f;
+	color.g = (float)((text >> 8) & 0xff) / 255.0f;
+	color.b = (float)(text & 0xff) / 255.0f;
+	color.a = 1.0f;
+
+	plutovg_surface_t *surface = plutosvg_document_render_to_surface(doc, NULL, size, size, &color, NULL, NULL);
+	plutosvg_document_destroy(doc);
+	free(svg_data);
+	if(!surface) {
+		return NULL;
+	}
+
+	uint32_t pixel_count = (uint32_t)(size * size);
+	uint32_t *argb = (uint32_t *)malloc(pixel_count * sizeof(uint32_t));
+	if(!argb) {
+		plutovg_surface_destroy(surface);
+		return NULL;
+	}
+	unsigned char *src = plutovg_surface_get_data(surface);
+	int stride = plutovg_surface_get_stride(surface);
+	for(int32_t row = 0; row < size; ++row) {
+		uint32_t *src_row = (uint32_t *)(src + row * stride);
+		uint32_t *dst_row = argb + row * size;
+		memcpy(dst_row, src_row, (size_t)size * sizeof(uint32_t));
+	}
+	plutovg_surface_destroy(surface);
+	return argb;
+}
+
+// Rasterize every icon in the current filtered set that doesn't already have
+// a thumbnail cached. All storage is local to the browser; the main icon
+// system is never touched.
+
+// [=]===^=[ ibt_preload_filtered ]===================================[=]
+static void ibt_preload_filtered(struct mkgui_ctx *ctx) {
+	for(uint32_t i = 0; i < ibt->filtered_count; ++i) {
+		uint32_t idx = ibt->filtered_idx[i];
+		if(ibt->thumb[idx]) {
+			continue;
+		}
+		ibt->thumb[idx] = ibt_rasterize(ctx, ibt->paths[idx], ibt->size);
 	}
 }
 
-// [=]===^=[ ibt_icon_cb ]============================================[=]
-static void ibt_icon_cb(uint32_t item, char *buf, uint32_t buf_size, void *userdata) {
-	struct mkgui_ctx *ctx = (struct mkgui_ctx *)userdata;
-	if(item < ibt->filtered_count) {
-		uint32_t idx = ibt->filtered_idx[item];
-		char *name = ibt->names[idx];
-		strncpy(buf, name, buf_size - 1);
-		buf[buf_size - 1] = '\0';
+// Grid layout: items flow top-to-bottom in columns, columns flow left-to-right,
+// horizontally scrollable. Each column has rows_per_col items stacked vertically.
 
-		if(icon_find_idx(name) < 0) {
-			mkgui_icon_load_svg(ctx, name, ibt->paths[idx]);
-		}
-	} else {
-		buf[0] = '\0';
+#define IB_GRID_ROW_H_PX 22
+#define IB_GRID_COL_W_PX 180
+#define IB_GRID_PAD_PX   4
+
+// [=]===^=[ ibt_grid_metrics ]=======================================[=]
+static void ibt_grid_metrics(struct mkgui_ctx *ctx, int32_t ca_w, int32_t ca_h, int32_t *out_row_h, int32_t *out_col_w, int32_t *out_rows_per_col, int32_t *out_total_cols, int32_t *out_total_w) {
+	int32_t row_h = sc(ctx, IB_GRID_ROW_H_PX);
+	int32_t col_w = sc(ctx, IB_GRID_COL_W_PX);
+	int32_t rows_per_col = ca_h / row_h;
+	if(rows_per_col < 1) {
+		rows_per_col = 1;
 	}
+	int32_t total_cols = ((int32_t)ibt->filtered_count + rows_per_col - 1) / rows_per_col;
+	int32_t total_w = total_cols * col_w;
+	if(total_w < ca_w) {
+		total_w = ca_w;
+	}
+	*out_row_h = row_h;
+	*out_col_w = col_w;
+	*out_rows_per_col = rows_per_col;
+	*out_total_cols = total_cols;
+	*out_total_w = total_w;
+}
+
+// [=]===^=[ ibt_canvas_cb ]==========================================[=]
+static void ibt_canvas_cb(struct mkgui_ctx *ctx, uint32_t id, uint32_t *pixels, int32_t x, int32_t y, int32_t w, int32_t h, void *userdata) {
+	(void)id;
+	(void)pixels;
+	(void)userdata;
+
+	int32_t row_h, col_w, rows_per_col, total_cols, total_w;
+	ibt_grid_metrics(ctx, w, h, &row_h, &col_w, &rows_per_col, &total_cols, &total_w);
+	(void)total_cols;
+	(void)total_w;
+
+	int32_t pad = sc(ctx, IB_GRID_PAD_PX);
+	int32_t clip_x2 = x + w;
+	int32_t clip_y2 = y + h;
+
+	int32_t first_col = ibt->scroll_x / col_w;
+	int32_t visible_cols = w / col_w + 2;
+	int32_t ts = ibt->size;
+
+	for(int32_t vc = 0; vc < visible_cols; ++vc) {
+		int32_t c = first_col + vc;
+		if(c < 0) {
+			continue;
+		}
+		int32_t col_x = x + c * col_w - ibt->scroll_x;
+		if(col_x >= clip_x2) {
+			break;
+		}
+
+		if(col_x + col_w <= x) {
+			continue;
+		}
+
+		for(int32_t r = 0; r < rows_per_col; ++r) {
+			int32_t item = c * rows_per_col + r;
+			if(item < 0 || item >= (int32_t)ibt->filtered_count) {
+				break;
+			}
+			int32_t cy = y + r * row_h;
+
+			if(item == ibt->selected) {
+				draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, col_x, cy, col_w, row_h, ctx->theme.selection);
+			}
+
+			uint32_t theme_idx = ibt->filtered_idx[item];
+			uint32_t *src = ibt->thumb[theme_idx];
+			int32_t ix = col_x + pad;
+			int32_t iy = cy + (row_h - ts) / 2;
+			if(src) {
+				for(int32_t py = 0; py < ts; ++py) {
+					int32_t dy = iy + py;
+					if(dy < y || dy >= clip_y2 || dy < 0 || dy >= ctx->win_h) {
+						continue;
+					}
+					for(int32_t px = 0; px < ts; ++px) {
+						int32_t dx = ix + px;
+						if(dx < x || dx >= clip_x2 || dx < 0 || dx >= ctx->win_w) {
+							continue;
+						}
+						uint32_t spx = src[py * ts + px];
+						uint32_t alpha = (spx >> 24) & 0xff;
+						if(alpha == 255) {
+							ctx->pixels[(uint32_t)dy * (uint32_t)ctx->win_w + (uint32_t)dx] = spx;
+						} else if(alpha > 0) {
+							ctx->pixels[(uint32_t)dy * (uint32_t)ctx->win_w + (uint32_t)dx] = blend_pixel(ctx->pixels[(uint32_t)dy * (uint32_t)ctx->win_w + (uint32_t)dx], spx, (uint8_t)alpha);
+						}
+					}
+				}
+			}
+
+			int32_t tx = ix + ts + pad;
+			int32_t ty = cy + (row_h - ctx->font_height) / 2;
+			uint32_t tc = (item == ibt->selected) ? ctx->theme.sel_text : ctx->theme.text;
+			int32_t col_clip_r = col_x + col_w < clip_x2 ? col_x + col_w : clip_x2;
+			int32_t col_clip_l = col_x > x ? col_x : x;
+			push_text_clip(tx, ty, ibt->names[theme_idx], tc, col_clip_l, y, col_clip_r, clip_y2);
+		}
+	}
+}
+
+// [=]===^=[ ibt_hit_test ]===========================================[=]
+static int32_t ibt_hit_test(struct mkgui_ctx *dlg, int32_t mx, int32_t my, uint32_t grid_id) {
+	int32_t gi = find_widget_idx(dlg, grid_id);
+	if(gi < 0) {
+		return -1;
+	}
+	int32_t rx = dlg->rects[gi].x;
+	int32_t ry = dlg->rects[gi].y;
+	int32_t rw = dlg->rects[gi].w;
+	int32_t rh = dlg->rects[gi].h;
+	if(mx < rx || mx >= rx + rw || my < ry || my >= ry + rh) {
+		return -1;
+	}
+
+	int32_t row_h, col_w, rows_per_col, total_cols, total_w;
+	ibt_grid_metrics(dlg, rw, rh, &row_h, &col_w, &rows_per_col, &total_cols, &total_w);
+	(void)total_cols;
+	(void)total_w;
+
+	int32_t local_x = (mx - rx) + ibt->scroll_x;
+	int32_t local_y = my - ry;
+	int32_t c = local_x / col_w;
+	int32_t r = local_y / row_h;
+	if(c < 0 || r < 0 || r >= rows_per_col) {
+		return -1;
+	}
+	int32_t item = c * rows_per_col + r;
+	if(item < 0 || item >= (int32_t)ibt->filtered_count) {
+		return -1;
+	}
+	return item;
+}
+
+// Sync the scrollbar's range and value to the current layout state. Writes
+// directly to the scrollbar's fields to preserve the current value across
+// calls (mkgui_scrollbar_setup would reset it to 0 every time). Safe to call
+// every frame and no-op before layout has produced a valid canvas rect.
+// The scrollbar API treats max_value as total content size and page_size as
+// visible portion; max scroll position is max_value - page_size.
+
+// [=]===^=[ ibt_update_scroll_range ]================================[=]
+static void ibt_update_scroll_range(struct mkgui_ctx *dlg, uint32_t grid_id, uint32_t scroll_id) {
+	int32_t gi = find_widget_idx(dlg, grid_id);
+	if(gi < 0) {
+		return;
+	}
+	int32_t rw = dlg->rects[gi].w;
+	int32_t rh = dlg->rects[gi].h;
+	if(rw <= 0 || rh <= 0) {
+		return;
+	}
+
+	struct mkgui_scrollbar_data *sb = find_scrollbar_data(dlg, scroll_id);
+	if(!sb) {
+		return;
+	}
+
+	int32_t row_h, col_w, rows_per_col, total_cols, total_w;
+	ibt_grid_metrics(dlg, rw, rh, &row_h, &col_w, &rows_per_col, &total_cols, &total_w);
+
+	sb->max_value = total_w;
+	sb->page_size = rw;
+
+	int32_t max_scroll = total_w > rw ? total_w - rw : 0;
+	if(ibt->scroll_x > max_scroll) {
+		ibt->scroll_x = max_scroll;
+	}
+
+	if(ibt->scroll_x < 0) {
+		ibt->scroll_x = 0;
+	}
+	sb->value = ibt->scroll_x;
 }
 
 // [=]===^=[ ibt_confirm_selection ]==================================[=]
@@ -601,26 +829,22 @@ static void ibt_confirm_selection(uint32_t filtered_item) {
 	ibt->confirmed = 1;
 }
 
-// [=]===^=[ ibt_reset_icons ]========================================[=]
-// Reset icon array back to pre-browser state, freeing any icons loaded
-// during browsing. Called on theme switch and browser close.
-static void ibt_reset_icons(void) {
-	for(uint32_t i = ibt->saved_svg_source_count; i < svg_source_count; ++i) {
-		free(svg_sources[i].svg_data);
-		svg_sources[i].svg_data = NULL;
+// Free every thumbnail buffer the browser rasterized. Called on theme switch
+// (all thumbs are invalid) and on browser close.
+
+// [=]===^=[ ibt_free_thumbs ]========================================[=]
+static void ibt_free_thumbs(void) {
+	for(uint32_t i = 0; i < ibt->total_count; ++i) {
+		if(ibt->thumb[i]) {
+			free(ibt->thumb[i]);
+			ibt->thumb[i] = NULL;
+		}
 	}
-	icon_count = ibt->saved_icon_count;
-	svg_source_count = ibt->saved_svg_source_count;
-	icon_hash_clear();
-	for(uint32_t i = 0; i < icon_count; ++i) {
-		icon_hash_insert(i);
-	}
-	icon_atlas_rebuild();
 }
 
 // [=]===^=[ ibt_cleanup ]============================================[=]
 static void ibt_cleanup(struct mkgui_ctx *ctx) {
-	ibt_reset_icons();
+	ibt_free_thumbs();
 	free(ibt);
 	ibt = NULL;
 	dirty_all(ctx);
@@ -648,9 +872,8 @@ MKGUI_API uint32_t mkgui_icon_browser(struct mkgui_ctx *ctx, int32_t size, char 
 	if(!ibt) {
 		return 0;
 	}
-	ibt->prev_selected = -1;
-	ibt->saved_icon_count = icon_count;
-	ibt->saved_svg_source_count = svg_source_count;
+	ibt->selected = -1;
+	ibt->last_click_item = -1;
 	ibt->size = size > 0 ? size : 16;
 
 	ibt_scan_local_themes();
@@ -665,16 +888,17 @@ MKGUI_API uint32_t mkgui_icon_browser(struct mkgui_ctx *ctx, int32_t size, char 
 
 	popup_destroy_all(ctx);
 
-	uint32_t iv_id = IB_TH_TAB_ALL + 100;
-	uint32_t wcount = 7;
-	struct mkgui_widget widgets[7] = {
-		MKGUI_W(MKGUI_WINDOW, IB_TH_WINDOW, "Icon Browser", "", 0, IB_WIN_W, IB_WIN_H, 0, 0, 0),
-		MKGUI_W(MKGUI_VBOX, IB_TH_VBOX, "", "", IB_TH_WINDOW, 0, 0, 0, 0, 0),
-		MKGUI_W(MKGUI_HBOX, IB_TH_HBOX_TOP, "", "", IB_TH_VBOX, 0, 24, MKGUI_FIXED, 0, 0),
-		MKGUI_W(MKGUI_DROPDOWN, IB_TH_THEME_DROP, "", "", IB_TH_HBOX_TOP, 180, 0, MKGUI_FIXED, 0, 0),
-		MKGUI_W(MKGUI_INPUT, IB_TH_SEARCH, "", "edit-find", IB_TH_HBOX_TOP, 0, 0, 0, 0, 1),
-		MKGUI_W(MKGUI_TABS, IB_TH_TABS, "", "", IB_TH_VBOX, 0, 28, MKGUI_FIXED, 0, 0),
-		MKGUI_W(MKGUI_TAB, IB_TH_TAB_ALL, "All", "", IB_TH_TABS, 0, 0, 0, 0, 0),
+	uint32_t wcount = 9;
+	struct mkgui_widget widgets[9] = {
+		MKGUI_W(MKGUI_WINDOW,    IB_TH_WINDOW,     "Icon Browser", "",          0,              IB_WIN_W, IB_WIN_H, 0,           0, 0),
+		MKGUI_W(MKGUI_VBOX,      IB_TH_VBOX,       "",             "",          IB_TH_WINDOW,   0,        0,        0,           0, 0),
+		MKGUI_W(MKGUI_HBOX,      IB_TH_HBOX_TOP,   "",             "",          IB_TH_VBOX,     0,        24,       MKGUI_FIXED, 0, 0),
+		MKGUI_W(MKGUI_DROPDOWN,  IB_TH_THEME_DROP, "",             "",          IB_TH_HBOX_TOP, 180,      0,        MKGUI_FIXED, 0, 0),
+		MKGUI_W(MKGUI_INPUT,     IB_TH_SEARCH,     "",             "edit-find", IB_TH_HBOX_TOP, 0,        0,        0,           0, 1),
+		MKGUI_W(MKGUI_TABS,      IB_TH_TABS,       "",             "",          IB_TH_VBOX,     0,        28,       MKGUI_FIXED, 0, 0),
+		MKGUI_W(MKGUI_TAB,       IB_TH_TAB_ALL,    "All",          "",          IB_TH_TABS,     0,        0,        0,           0, 0),
+		MKGUI_W(MKGUI_CANVAS,    IB_TH_GRID,       "",             "",          IB_TH_VBOX,     0,        0,        0,           0, 1),
+		MKGUI_W(MKGUI_SCROLLBAR, IB_TH_HSCROLL,    "",             "",          IB_TH_VBOX,     0,        14,       MKGUI_FIXED, 0, 0),
 	};
 
 	struct mkgui_ctx *dlg = mkgui_create_child(ctx, widgets, wcount, "Icon Browser", IB_WIN_W, IB_WIN_H);
@@ -682,10 +906,7 @@ MKGUI_API uint32_t mkgui_icon_browser(struct mkgui_ctx *ctx, int32_t size, char 
 		return 0;
 	}
 	mkgui_set_window_instance(dlg, "iconbrowser");
-
-	// add itemview after tabs so it appears below
-	struct mkgui_widget ivw = MKGUI_W(MKGUI_ITEMVIEW, iv_id, "", "", IB_TH_VBOX, 0, 0, 0, 0, 1);
-	mkgui_add_widget(dlg, ivw, 0);
+	mkgui_canvas_set_callback(dlg, IB_TH_GRID, ibt_canvas_cb, NULL);
 
 	for(uint32_t i = 0; i < ibt->theme_count; ++i) {
 		mkgui_dropdown_add(dlg, IB_TH_THEME_DROP, ibt->theme_names[i]);
@@ -696,11 +917,18 @@ MKGUI_API uint32_t mkgui_icon_browser(struct mkgui_ctx *ctx, int32_t size, char 
 
 	ibt->active_cat = 0;
 	ibt_filter(NULL);
-	mkgui_itemview_setup(dlg, iv_id, ibt->filtered_count, MKGUI_VIEW_COMPACT, ibt_label_cb, ibt_icon_cb, dlg);
+	ibt_preload_filtered(dlg);
+
+	// Bootstrap the scrollbar's aux data so find_scrollbar_data returns
+	// non-NULL. Values are placeholders - the per-frame update installs the
+	// real range once layout has produced a valid canvas rect.
+	mkgui_scrollbar_setup(dlg, IB_TH_HSCROLL, 1, 1);
 
 	mkgui_set_focus(dlg, IB_TH_SEARCH);
 
 	uint32_t running = 1;
+	int32_t last_sb_value = 0;
+	uint32_t was_press = 0;
 	struct mkgui_event ev;
 	while(running) {
 		while(mkgui_poll(dlg, &ev)) {
@@ -713,9 +941,8 @@ MKGUI_API uint32_t mkgui_icon_browser(struct mkgui_ctx *ctx, int32_t size, char 
 					if(ev.keysym == MKGUI_KEY_ESCAPE) {
 						running = 0;
 					} else if(ev.keysym == MKGUI_KEY_RETURN) {
-						struct mkgui_itemview_data *iv = find_itemview_data(dlg, iv_id);
-						if(iv && iv->selected >= 0 && iv->selected < (int32_t)ibt->filtered_count) {
-							ibt_confirm_selection((uint32_t)iv->selected);
+						if(ibt->selected >= 0 && ibt->selected < (int32_t)ibt->filtered_count) {
+							ibt_confirm_selection((uint32_t)ibt->selected);
 							running = 0;
 						}
 					}
@@ -723,15 +950,17 @@ MKGUI_API uint32_t mkgui_icon_browser(struct mkgui_ctx *ctx, int32_t size, char 
 
 				case MKGUI_EVENT_DROPDOWN_CHANGED: {
 					if(ev.id == IB_TH_THEME_DROP && ev.value >= 0 && ev.value < (int32_t)ibt->theme_count) {
-						ibt_reset_icons();
+						ibt_free_thumbs();
 						ibt_load_theme((uint32_t)ev.value);
 						ibt_rebuild_tabs(dlg);
 						ibt->active_cat = 0;
 						mkgui_tabs_set_current(dlg, IB_TH_TABS, IB_TH_TAB_ALL);
 						const char *filter = mkgui_input_get(dlg, IB_TH_SEARCH);
 						ibt_filter(filter);
-						mkgui_itemview_set_items(dlg, iv_id, ibt->filtered_count);
-						mkgui_itemview_set_selected(dlg, iv_id, -1);
+						ibt_preload_filtered(dlg);
+						ibt->selected = -1;
+						ibt->scroll_x = 0;
+						dirty_widget_id(dlg, IB_TH_GRID);
 					}
 				} break;
 
@@ -739,8 +968,10 @@ MKGUI_API uint32_t mkgui_icon_browser(struct mkgui_ctx *ctx, int32_t size, char 
 					if(ev.id == IB_TH_SEARCH) {
 						const char *filter = mkgui_input_get(dlg, IB_TH_SEARCH);
 						ibt_filter(filter);
-						mkgui_itemview_set_items(dlg, iv_id, ibt->filtered_count);
-						mkgui_itemview_set_selected(dlg, iv_id, -1);
+						ibt_preload_filtered(dlg);
+						ibt->selected = -1;
+						ibt->scroll_x = 0;
+						dirty_widget_id(dlg, IB_TH_GRID);
 					}
 				} break;
 
@@ -754,25 +985,60 @@ MKGUI_API uint32_t mkgui_icon_browser(struct mkgui_ctx *ctx, int32_t size, char 
 						}
 						const char *filter = mkgui_input_get(dlg, IB_TH_SEARCH);
 						ibt_filter(filter);
-						mkgui_itemview_set_items(dlg, iv_id, ibt->filtered_count);
-						mkgui_itemview_set_selected(dlg, iv_id, -1);
+						ibt_preload_filtered(dlg);
+						ibt->selected = -1;
+						ibt->scroll_x = 0;
+						dirty_widget_id(dlg, IB_TH_GRID);
 					}
-				} break;
-
-				case MKGUI_EVENT_ITEMVIEW_DBLCLICK: {
-					if(ev.id == iv_id && ev.value >= 0 && ev.value < (int32_t)ibt->filtered_count) {
-						ibt_confirm_selection((uint32_t)ev.value);
-						running = 0;
-					}
-				} break;
-
-				case MKGUI_EVENT_ITEMVIEW_SELECT: {
-					ibt->prev_selected = ev.value;
 				} break;
 
 				default: break;
 			}
 		}
+
+		// Detect press on the grid canvas: select on first click, confirm on
+		// double-click. ctx->press_id is set by mkgui_poll; we only act on
+		// the rising edge (new press this frame).
+		if(dlg->press_id == IB_TH_GRID && !was_press) {
+			int32_t item = ibt_hit_test(dlg, dlg->mouse_x, dlg->mouse_y, IB_TH_GRID);
+			if(item >= 0) {
+				uint32_t now = mkgui_time_ms();
+				if(ibt->last_click_item == item && (now - ibt->last_click_time) < 400) {
+					ibt_confirm_selection((uint32_t)item);
+					running = 0;
+				} else {
+					ibt->selected = item;
+					ibt->last_click_item = item;
+					ibt->last_click_time = now;
+					dirty_widget_id(dlg, IB_TH_GRID);
+				}
+			}
+		}
+		was_press = (dlg->press_id != 0);
+
+		// Reconcile scrollbar and our scroll_x each frame. This is where
+		// layout-driven updates happen (initial size, resize, filter change
+		// all manifest as changes to the canvas rect).
+		//
+		// 1. Read the scrollbar. If it changed since we last wrote to it,
+		//    the user moved it (drag, wheel, click) - copy into scroll_x.
+		// 2. Re-run the range update: reads current canvas rect, rewrites
+		//    max_value/page_size from current filtered_count, clamps
+		//    scroll_x, writes scroll_x back to the scrollbar.
+		// 3. Remember what we wrote so the next frame can detect user input.
+		int32_t cur_sb = mkgui_scrollbar_get(dlg, IB_TH_HSCROLL);
+		if(cur_sb != last_sb_value) {
+			ibt->scroll_x = cur_sb;
+			dirty_widget_id(dlg, IB_TH_GRID);
+		}
+
+		int32_t prev_scroll_x = ibt->scroll_x;
+		ibt_update_scroll_range(dlg, IB_TH_GRID, IB_TH_HSCROLL);
+		if(ibt->scroll_x != prev_scroll_x) {
+			dirty_widget_id(dlg, IB_TH_GRID);
+		}
+		last_sb_value = ibt->scroll_x;
+
 		mkgui_wait(dlg);
 	}
 

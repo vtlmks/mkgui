@@ -1,118 +1,172 @@
-
 #!/bin/bash
 
 CC=gcc
 WINCC=x86_64-w64-mingw32-gcc
+WINAR=x86_64-w64-mingw32-ar
 
-CFLAGS="-std=c99 "
-CFLAGS+="-O2 "
-# CFLAGS+="-fno-inline -Wframe-larger-than=100000 "
-CFLAGS+="-march=x86-64-v2 "
-CFLAGS+="-fwrapv "
-CFLAGS+="-Wall "
-CFLAGS+="-Wextra "
-CFLAGS+="-Wno-missing-field-initializers "
-CFLAGS+="-Wno-unused-function "
-CFLAGS+="-Wno-unused-parameter "
-CFLAGS+="-Wformat-truncation "
-CFLAGS+="-Wno-stringop-truncation "
-CFLAGS+="-Wsign-conversion "
+COMMON_CFLAGS="-std=c99 "
+COMMON_CFLAGS+="-O2 "
+# COMMON_CFLAGS+="-fno-inline -Wframe-larger-than=100000 "
+COMMON_CFLAGS+="-march=x86-64-v2 "
+COMMON_CFLAGS+="-fwrapv "
+COMMON_CFLAGS+="-Wall "
+COMMON_CFLAGS+="-Wextra "
+COMMON_CFLAGS+="-Wno-missing-field-initializers "
+COMMON_CFLAGS+="-Wno-unused-function "
+COMMON_CFLAGS+="-Wno-unused-parameter "
+COMMON_CFLAGS+="-Wformat-truncation "
+COMMON_CFLAGS+="-Wno-stringop-truncation "
+COMMON_CFLAGS+="-Wsign-conversion "
+
+# Baked into libmkgui.a so consumers get the same icon capacity the
+# unity-built tools used to get via their own #define.
+LIB_DEFINES="-DMKGUI_LIBRARY -DMKGUI_MAX_ICONS=32768"
 
 LINUX_LIBS="$(pkg-config --cflags freetype2 fontconfig) -lX11 -lXext $(pkg-config --libs freetype2 fontconfig) -lm "
-LINUX_DEMO_LIBS="$LINUX_LIBS -lGL "
+LINUX_DEMO_LIBS="-lGL "
 WINDOWS_LIBS="-lgdi32 -mwindows "
-WINDOWS_DEMO_LIBS="$WINDOWS_LIBS -lopengl32 "
+WINDOWS_DEMO_LIBS="-lopengl32 "
 
-BUILD_TYPE=$1
-if [ -z "$BUILD_TYPE" ]; then
-	BUILD_TYPE="normal"
-fi
+# Each argument is either a build mode or a build target. Defaults: normal mode,
+# core target (library + demo + tests + extract_icons; no editor).
+MODE="normal"
+TARGET="core"
 
-case "$BUILD_TYPE" in
+for arg in "$@"; do
+	case "$arg" in
+		normal|release|debug|size|asan)
+			MODE="$arg"
+			;;
+		editor|all)
+			TARGET="$arg"
+			;;
+		clean)
+			rm -rf out
+			exit 0
+			;;
+		*)
+			echo "Unknown argument: $arg"
+			echo "Usage: $0 [mode] [target]"
+			echo "  modes:   normal (default) | release | debug | size | asan | clean"
+			echo "  targets: core (default)   | editor | all"
+			exit 1
+			;;
+	esac
+done
+
+MODE_FLAGS=""
+SKIP_WINDOWS=""
+case "$MODE" in
 	"normal")
-		CFLAGS+="-ggdb -fno-omit-frame-pointer "
+		MODE_FLAGS="-ggdb -fno-omit-frame-pointer "
 		;;
 	"release")
-		CFLAGS+="-s -Wl,--strip-all "
+		MODE_FLAGS="-s -Wl,--strip-all "
 		;;
 	"debug")
-		CFLAGS+="-g -O0 "
+		MODE_FLAGS="-g -O0 "
 		;;
 	"size")
-		# -Os overrides the earlier -O2. Different inlining heuristics expose
-		# format-truncation and other VRP-driven warnings that -O2 misses.
-		CFLAGS+="-Os -s -Wl,--strip-all "
+		MODE_FLAGS="-Os -s -Wl,--strip-all "
 		;;
 	"asan")
-		CFLAGS+="-g -O0 -fsanitize=address,undefined -fno-omit-frame-pointer "
+		MODE_FLAGS="-g -O0 -fsanitize=address,undefined -fno-omit-frame-pointer "
 		SKIP_WINDOWS=1
-		;;
-	"clean")
-		rm -rf out
-		exit 0
-		;;
-	*)
-		echo "Unknown build type: $BUILD_TYPE"
-		exit 1
 		;;
 esac
 
-set -e
+CFLAGS="$COMMON_CFLAGS $MODE_FLAGS"
 
+set -e
 mkdir -p out
 
-# Build Linux demo
-(
-	$CC $CFLAGS demo.c -o out/demo $LINUX_DEMO_LIBS
-) &
-
-# Build Linux editor
-(
-	$CC $CFLAGS editor.c -o out/editor $LINUX_LIBS
-) &
-
-# Build Windows demo
+WIN_ENABLED=0
 if [ -z "$SKIP_WINDOWS" ] && command -v $WINCC &>/dev/null; then
+	WIN_ENABLED=1
+fi
+
+# -----------------------------------------------------------------------------
+# Phase 1: static libraries (sequential - this is the heavy compile).
+# Building once and linking everyone else against it avoids saturating a
+# low-core laptop with many simultaneous mkgui.c compilations.
+# Editor is special (unity build, uses internals) and does not depend on the
+# library, so we skip this phase when target=editor.
+# -----------------------------------------------------------------------------
+
+if [ "$TARGET" != "editor" ]; then
+	echo "[lib] libmkgui.a"
+	$CC $CFLAGS $LIB_DEFINES -c mkgui.c -o out/mkgui.o $LINUX_LIBS
+	ar rcs out/libmkgui.a out/mkgui.o
+	rm -f out/mkgui.o
+
+	if [ "$WIN_ENABLED" -eq 1 ]; then
+		echo "[lib] libmkgui_win.a"
+		$WINCC $CFLAGS $LIB_DEFINES -c mkgui.c -o out/mkgui_win.o $WINDOWS_LIBS
+		$WINAR rcs out/libmkgui_win.a out/mkgui_win.o
+		rm -f out/mkgui_win.o
+	fi
+fi
+
+# -----------------------------------------------------------------------------
+# Phase 2: consumers (parallel). Demo and tests are tiny; editor is the only
+# heavy compile left and only builds when explicitly asked for.
+# -----------------------------------------------------------------------------
+
+if [ "$TARGET" != "editor" ]; then
+	# Demo: small app, links libmkgui.a
 	(
-		$WINCC $CFLAGS demo.c -o out/demo.exe $WINDOWS_DEMO_LIBS
+		$CC $CFLAGS demo.c out/libmkgui.a -o out/demo $LINUX_LIBS $LINUX_DEMO_LIBS
 	) &
 
-	# Build Windows editor
+	if [ "$WIN_ENABLED" -eq 1 ]; then
+		(
+			$WINCC $CFLAGS demo.c out/libmkgui_win.a -o out/demo.exe $WINDOWS_LIBS $WINDOWS_DEMO_LIBS
+		) &
+	fi
+
+	# Tests: unity builds (they poke mkgui internals on purpose). Kept unity
+	# rather than polluting the public library with test-only exports.
 	(
-		$WINCC $CFLAGS editor.c -o out/editor.exe $WINDOWS_LIBS
+		$CC $CFLAGS tests/test_layout.c -o out/test_layout $LINUX_LIBS
+	) &
+
+	(
+		$CC $CFLAGS tests/test_widgets.c -o out/test_widgets $LINUX_LIBS
+	) &
+
+	(
+		$CC $CFLAGS tests/test_events.c -o out/test_events $LINUX_LIBS
+	) &
+
+	(
+		$CC $CFLAGS tests/test_events_ext.c -o out/test_events_ext $LINUX_LIBS
+	) &
+
+	# extract_icons is independent (doesn't use mkgui)
+	(
+		$CC -std=gnu99 -O2 -Wall -Wextra -Wno-stringop-truncation -Wno-format-truncation tools/extract_icons.c -o out/extract_icons
 	) &
 fi
 
-# Build static library (unity-built, but with exported symbols)
-(
-	$CC $CFLAGS -DMKGUI_LIBRARY -c mkgui.c -o out/mkgui.o $LINUX_LIBS
-	ar rcs out/libmkgui.a out/mkgui.o
-	rm -f out/mkgui.o
-) &
+if [ "$TARGET" = "editor" ] || [ "$TARGET" = "all" ]; then
+	# Editor: unity build (shares mkgui's rendering/layout internals)
+	(
+		$CC $CFLAGS editor.c -o out/editor $LINUX_LIBS
+	) &
 
-# Build extract_icons tool
-(
-	$CC -std=gnu99 -O2 -Wall -Wextra -Wno-stringop-truncation -Wno-format-truncation tools/extract_icons.c -o out/extract_icons
-) &
+	if [ "$WIN_ENABLED" -eq 1 ]; then
+		(
+			$WINCC $CFLAGS editor.c -o out/editor.exe $WINDOWS_LIBS
+		) &
+	fi
+fi
 
-# Build layout tests
-(
-	$CC $CFLAGS tests/test_layout.c -o out/test_layout $LINUX_LIBS
-) &
-
-# Build widget behavior tests
-(
-	$CC $CFLAGS tests/test_widgets.c -o out/test_widgets $LINUX_LIBS
-) &
-
-# Build event tests
-(
-	$CC $CFLAGS tests/test_events.c -o out/test_events $LINUX_LIBS
-) &
-
-# Build extended event tests
-(
-	$CC $CFLAGS tests/test_events_ext.c -o out/test_events_ext $LINUX_LIBS
-) &
-
-wait
+# Collect any parallel-job failure. `set -e` does not propagate from &
+# subshells, so walk the job table explicitly.
+FAIL=0
+for job in $(jobs -p); do
+	if ! wait "$job"; then
+		FAIL=1
+	fi
+done
+exit $FAIL

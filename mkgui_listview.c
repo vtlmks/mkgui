@@ -1175,6 +1175,23 @@ MKGUI_API int32_t mkgui_listview_get_col_width(struct mkgui_ctx *ctx, uint32_t i
 	return lv->columns[col].width;
 }
 
+// [=]===^=[ mkgui_listview_get_col_count ]======================[=]
+MKGUI_API uint32_t mkgui_listview_get_col_count(struct mkgui_ctx *ctx, uint32_t id) {
+	MKGUI_CHECK_VAL(ctx, 0);
+	struct mkgui_listview_data *lv = find_listv_data(ctx, id);
+	return lv ? lv->col_count : 0;
+}
+
+// [=]===^=[ mkgui_listview_get_col_label ]======================[=]
+MKGUI_API const char *mkgui_listview_get_col_label(struct mkgui_ctx *ctx, uint32_t id, uint32_t col) {
+	MKGUI_CHECK_VAL(ctx, "");
+	struct mkgui_listview_data *lv = find_listv_data(ctx, id);
+	if(!lv || col >= lv->col_count) {
+		return "";
+	}
+	return lv->columns[col].label;
+}
+
 // [=]===^=[ mkgui_listview_set_col_width ]======================[=]
 MKGUI_API void mkgui_listview_set_col_width(struct mkgui_ctx *ctx, uint32_t id, uint32_t col, int32_t width) {
 	MKGUI_CHECK(ctx);

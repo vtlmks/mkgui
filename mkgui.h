@@ -51,6 +51,7 @@
 #define MKGUI_MAX_TIMERS           8
 #define MKGUI_MAX_ACCELS           64
 #define MKGUI_DROP_MAX             256
+#define MKGUI_PATH_MAX             4096
 
 // ---------------------------------------------------------------------------
 // Key constants
@@ -496,10 +497,13 @@ MKGUI_API void mkgui_set_enabled(struct mkgui_ctx *ctx, uint32_t id, uint32_t en
 MKGUI_API uint32_t mkgui_get_enabled(struct mkgui_ctx *ctx, uint32_t id);
 MKGUI_API void mkgui_set_visible(struct mkgui_ctx *ctx, uint32_t id, uint32_t visible);
 MKGUI_API uint32_t mkgui_get_visible(struct mkgui_ctx *ctx, uint32_t id);
+MKGUI_API uint32_t mkgui_is_shown(struct mkgui_ctx *ctx, uint32_t id);
 MKGUI_API void mkgui_set_focus(struct mkgui_ctx *ctx, uint32_t id);
 MKGUI_API uint32_t mkgui_has_focus(struct mkgui_ctx *ctx, uint32_t id);
 MKGUI_API void mkgui_get_geometry(struct mkgui_ctx *ctx, uint32_t id, int32_t *x, int32_t *y, int32_t *w, int32_t *h);
 MKGUI_API void mkgui_get_min_size(struct mkgui_ctx *ctx, int32_t *out_w, int32_t *out_h);
+MKGUI_API void mkgui_get_window_size(struct mkgui_ctx *ctx, int32_t *out_w, int32_t *out_h);
+MKGUI_API double mkgui_get_anim_time(struct mkgui_ctx *ctx);
 MKGUI_API void mkgui_set_flags(struct mkgui_ctx *ctx, uint32_t id, uint32_t flags);
 MKGUI_API uint32_t mkgui_get_flags(struct mkgui_ctx *ctx, uint32_t id);
 
@@ -691,6 +695,7 @@ MKGUI_API void mkgui_textarea_scroll_to_end(struct mkgui_ctx *ctx, uint32_t id);
 // ---------------------------------------------------------------------------
 
 MKGUI_API void mkgui_datepicker_set(struct mkgui_ctx *ctx, uint32_t id, int32_t year, int32_t month, int32_t day);
+MKGUI_API void mkgui_today(int32_t *year, int32_t *month, int32_t *day);
 MKGUI_API void mkgui_datepicker_get(struct mkgui_ctx *ctx, uint32_t id, int32_t *year, int32_t *month, int32_t *day);
 MKGUI_API const char *mkgui_datepicker_get_text(struct mkgui_ctx *ctx, uint32_t id);
 MKGUI_API void mkgui_datepicker_set_readonly(struct mkgui_ctx *ctx, uint32_t id, uint32_t readonly);
@@ -735,6 +740,8 @@ MKGUI_API void mkgui_listview_clear_selection(struct mkgui_ctx *ctx, uint32_t id
 MKGUI_API const uint32_t *mkgui_listview_get_col_order(struct mkgui_ctx *ctx, uint32_t id);
 MKGUI_API void mkgui_listview_set_col_order(struct mkgui_ctx *ctx, uint32_t id, const uint32_t *order, uint32_t count);
 MKGUI_API int32_t mkgui_listview_get_col_width(struct mkgui_ctx *ctx, uint32_t id, uint32_t col);
+MKGUI_API uint32_t mkgui_listview_get_col_count(struct mkgui_ctx *ctx, uint32_t id);
+MKGUI_API const char *mkgui_listview_get_col_label(struct mkgui_ctx *ctx, uint32_t id, uint32_t col);
 MKGUI_API void mkgui_listview_set_col_width(struct mkgui_ctx *ctx, uint32_t id, uint32_t col, int32_t width);
 MKGUI_API void mkgui_listview_set_cell_type(struct mkgui_ctx *ctx, uint32_t id, uint32_t col, uint32_t cell_type);
 MKGUI_API void mkgui_listview_visible_range(struct mkgui_ctx *ctx, uint32_t id, int32_t *first, int32_t *last);
@@ -753,6 +760,8 @@ MKGUI_API void mkgui_gridview_set_selected(struct mkgui_ctx *ctx, uint32_t id, i
 MKGUI_API uint32_t mkgui_gridview_get_check(struct mkgui_ctx *ctx, uint32_t id, uint32_t row, uint32_t col);
 MKGUI_API void mkgui_gridview_set_check(struct mkgui_ctx *ctx, uint32_t id, uint32_t row, uint32_t col, uint32_t checked);
 MKGUI_API int32_t mkgui_gridview_get_col_width(struct mkgui_ctx *ctx, uint32_t id, uint32_t col);
+MKGUI_API uint32_t mkgui_gridview_get_col_count(struct mkgui_ctx *ctx, uint32_t id);
+MKGUI_API const char *mkgui_gridview_get_col_label(struct mkgui_ctx *ctx, uint32_t id, uint32_t col);
 MKGUI_API void mkgui_gridview_set_col_width(struct mkgui_ctx *ctx, uint32_t id, uint32_t col, int32_t width);
 MKGUI_API void mkgui_gridview_scroll_to(struct mkgui_ctx *ctx, uint32_t id, int32_t row);
 

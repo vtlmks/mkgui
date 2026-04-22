@@ -14,7 +14,7 @@
 // ---------------------------------------------------------------------------
 
 #define FD_MAX_FILES        4096
-#define FD_PATH_SIZE        4096
+#define FD_PATH_SIZE        MKGUI_PATH_MAX
 #define FD_MAX_BOOKMARKS    32
 #define FD_MAX_RESULTS      64
 #define FD_MAX_FILTERS      32

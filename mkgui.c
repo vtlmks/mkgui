@@ -4256,6 +4256,21 @@ MKGUI_API uint32_t mkgui_get_visible(struct mkgui_ctx *ctx, uint32_t id) {
 	return (w->flags & MKGUI_HIDDEN) ? 0 : 1;
 }
 
+// Effective-visibility check: walks the parent chain, accounts for hidden
+// ancestors and non-active tabs. Use this to gate expensive per-frame work
+// (GL rendering, etc.) that only needs to happen when the widget is actually
+// on screen. mkgui_get_visible only reports the widget's own HIDDEN flag.
+
+// [=]===^=[ mkgui_is_shown ]========================================[=]
+MKGUI_API uint32_t mkgui_is_shown(struct mkgui_ctx *ctx, uint32_t id) {
+	MKGUI_CHECK_VAL(ctx, 0);
+	int32_t idx = find_widget_idx(ctx, id);
+	if(idx < 0) {
+		return 0;
+	}
+	return widget_visible(ctx, (uint32_t)idx);
+}
+
 // [=]===^=[ mkgui_set_focus ]======================================[=]
 MKGUI_API void mkgui_set_focus(struct mkgui_ctx *ctx, uint32_t id) {
 	MKGUI_CHECK(ctx);
@@ -4338,6 +4353,19 @@ MKGUI_API void mkgui_get_min_size(struct mkgui_ctx *ctx, int32_t *out_w, int32_t
 	min_h += ctx->box_pad * 2;
 	if(out_w) { *out_w = min_w; }
 	if(out_h) { *out_h = min_h; }
+}
+
+// [=]===^=[ mkgui_get_window_size ]==================================[=]
+MKGUI_API void mkgui_get_window_size(struct mkgui_ctx *ctx, int32_t *out_w, int32_t *out_h) {
+	MKGUI_CHECK(ctx);
+	if(out_w) { *out_w = ctx->win_w; }
+	if(out_h) { *out_h = ctx->win_h; }
+}
+
+// [=]===^=[ mkgui_get_anim_time ]===================================[=]
+MKGUI_API double mkgui_get_anim_time(struct mkgui_ctx *ctx) {
+	MKGUI_CHECK_VAL(ctx, 0.0);
+	return ctx->anim_time;
 }
 
 // [=]===^=[ mkgui_set_flags ]======================================[=]

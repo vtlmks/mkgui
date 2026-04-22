@@ -738,6 +738,23 @@ MKGUI_API int32_t mkgui_gridview_get_col_width(struct mkgui_ctx *ctx, uint32_t i
 	return gv->columns[col].width;
 }
 
+// [=]===^=[ mkgui_gridview_get_col_count ]=========================[=]
+MKGUI_API uint32_t mkgui_gridview_get_col_count(struct mkgui_ctx *ctx, uint32_t id) {
+	MKGUI_CHECK_VAL(ctx, 0);
+	struct mkgui_gridview_data *gv = find_gridv_data(ctx, id);
+	return gv ? gv->col_count : 0;
+}
+
+// [=]===^=[ mkgui_gridview_get_col_label ]=========================[=]
+MKGUI_API const char *mkgui_gridview_get_col_label(struct mkgui_ctx *ctx, uint32_t id, uint32_t col) {
+	MKGUI_CHECK_VAL(ctx, "");
+	struct mkgui_gridview_data *gv = find_gridv_data(ctx, id);
+	if(!gv || col >= gv->col_count) {
+		return "";
+	}
+	return gv->columns[col].label;
+}
+
 // [=]===^=[ mkgui_gridview_set_col_width ]==========================[=]
 MKGUI_API void mkgui_gridview_set_col_width(struct mkgui_ctx *ctx, uint32_t id, uint32_t col, int32_t width) {
 	MKGUI_CHECK(ctx);

@@ -1,15 +1,20 @@
 // Copyright (c) 2026, Peter Fors
 // SPDX-License-Identifier: MIT
 
-#define MKGUI_MAX_ICONS         32768
-#include "mkgui.c"
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+#include "mkgui.h"
 
 #ifdef _WIN32
+#include <windows.h>
 #include <GL/gl.h>
 #else
 #include <GL/gl.h>
 #include <GL/glx.h>
 #endif
+
+#include "mkgui_glview.h"
 
 enum {
 	ID_WINDOW = 0,
@@ -267,10 +272,12 @@ static void demo_itemview_icon(uint32_t item, char *buf, uint32_t buf_size, void
 
 // [=]===^=[ demo_canvas_cb ]=====================================[=]
 static void demo_canvas_cb(struct mkgui_ctx *ctx, uint32_t id, uint32_t *pixels, int32_t x, int32_t y, int32_t w, int32_t h, void *userdata) {
-	(void)ctx; (void)id; (void)userdata;
+	(void)id; (void)userdata;
 	if(w <= 0 || h <= 0) {
 		return;
 	}
+	int32_t win_w, win_h;
+	mkgui_get_window_size(ctx, &win_w, &win_h);
 	uint32_t uw = (uint32_t)w;
 	uint32_t uh = (uint32_t)h;
 	for(uint32_t iy = 0; iy < uh; ++iy) {
@@ -280,7 +287,7 @@ static void demo_canvas_cb(struct mkgui_ctx *ctx, uint32_t id, uint32_t *pixels,
 			uint32_t r = ix * 255 / (uw > 1 ? uw - 1 : 1);
 			uint32_t g = iy * 255 / (uh > 1 ? uh - 1 : 1);
 			uint32_t b = (ix + iy) * 128 / (uw + uh > 2 ? uw + uh - 2 : 1);
-			pixels[py * (uint32_t)ctx->win_w + px] = 0xff000000 | (r << 16) | (g << 8) | b;
+			pixels[py * (uint32_t)win_w + px] = 0xff000000 | (r << 16) | (g << 8) | b;
 		}
 	}
 }
@@ -315,7 +322,7 @@ static void demo_handle_file_action(struct mkgui_ctx *ctx, uint32_t id) {
 		open_opts.multi_select = 1;
 		uint32_t count = mkgui_open_dialog(ctx, &open_opts);
 		if(count > 0) {
-			char buf[FD_PATH_SIZE + 320];
+			char buf[MKGUI_PATH_MAX + 320];
 			if(count == 1) {
 				snprintf(buf, sizeof(buf), "Opened: %s", mkgui_dialog_path(ctx, 0));
 			} else {
@@ -328,7 +335,7 @@ static void demo_handle_file_action(struct mkgui_ctx *ctx, uint32_t id) {
 		struct mkgui_file_dialog_opts save_opts = {0};
 		save_opts.default_name = "untitled.txt";
 		if(mkgui_save_dialog(ctx, &save_opts)) {
-			char buf[FD_PATH_SIZE + 320];
+			char buf[MKGUI_PATH_MAX + 320];
 			snprintf(buf, sizeof(buf), "Save to: %s", mkgui_dialog_path(ctx, 0));
 			mkgui_statusbar_set(ctx, ID_STATUSBAR, 0, buf);
 		}
@@ -340,7 +347,7 @@ static void demo_handle_file_action(struct mkgui_ctx *ctx, uint32_t id) {
 
 // [=]===^=[ demo_gl_render ]======================================[=]
 static void demo_gl_render(struct mkgui_ctx *ctx, struct demo_state *state) {
-	if(!state->gl_ctx || !widget_visible(ctx, (uint32_t)find_widget_idx(ctx, ID_GLVIEW1))) {
+	if(!state->gl_ctx || !mkgui_is_shown(ctx, ID_GLVIEW1)) {
 		return;
 	}
 	int32_t glw = 0, glh = 0;
@@ -365,7 +372,7 @@ static void demo_gl_render(struct mkgui_ctx *ctx, struct demo_state *state) {
 	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
 	glTranslatef(0.0f, 0.0f, -3.0f);
-	glRotatef((float)ctx->anim_time * 30.0f, 0.4f, 1.0f, 0.2f);
+	glRotatef((float)mkgui_get_anim_time(ctx) * 30.0f, 0.4f, 1.0f, 0.2f);
 
 	glEnable(GL_DEPTH_TEST);
 	glBegin(GL_QUADS);
@@ -453,18 +460,9 @@ static void demo_event(struct mkgui_ctx *ctx, struct mkgui_event *ev, void *user
 		case MKGUI_EVENT_TOGGLE_CHANGED: {
 			snprintf(buf, sizeof(buf), "Power: %s", ev->value ? "ON" : "OFF");
 			mkgui_statusbar_set(ctx, ID_STATUSBAR, 0, buf);
-			uint32_t ids[] = { ID_DATEPICKER1, ID_IPINPUT1 };
-			for(uint32_t i = 0; i < 2; ++i) {
-				int32_t wi = find_widget_idx(ctx, ids[i]);
-				if(wi >= 0) {
-					if(ev->value) {
-						ctx->widgets[wi].flags &= ~MKGUI_HIDDEN;
-					} else {
-						ctx->widgets[wi].flags |= MKGUI_HIDDEN;
-					}
-				}
-			}
-			dirty_all(ctx);
+			uint32_t vis = ev->value ? 1 : 0;
+			mkgui_set_visible(ctx, ID_DATEPICKER1, vis);
+			mkgui_set_visible(ctx, ID_IPINPUT1, vis);
 		} break;
 
 		case MKGUI_EVENT_DATEPICKER_CHANGED: {
@@ -540,11 +538,11 @@ static void demo_event(struct mkgui_ctx *ctx, struct mkgui_event *ev, void *user
 
 		case MKGUI_EVENT_CONTEXT_HEADER: {
 			if(ev->id == ID_LISTVIEW1) {
-				struct mkgui_listview_data *lv = find_listv_data(ctx, ID_LISTVIEW1);
-				if(lv) {
+				uint32_t cols = mkgui_listview_get_col_count(ctx, ID_LISTVIEW1);
+				if(cols > 0) {
 					mkgui_context_menu_clear(ctx);
-					for(uint32_t c = 0; c < lv->col_count; ++c) {
-						mkgui_context_menu_add(ctx, ID_CTX_COL_NAME + c, lv->columns[c].label, NULL, MKGUI_MENUITEM_CHECK | MKGUI_MENUITEM_CHECKED);
+					for(uint32_t c = 0; c < cols; ++c) {
+						mkgui_context_menu_add(ctx, ID_CTX_COL_NAME + c, mkgui_listview_get_col_label(ctx, ID_LISTVIEW1, c), NULL, MKGUI_MENUITEM_CHECK | MKGUI_MENUITEM_CHECKED);
 					}
 					mkgui_context_menu_add_separator(ctx);
 					mkgui_context_menu_add(ctx, ID_CTX_COL_AUTOSIZE, "Auto-size Column", "arrow-expand-horizontal", 0);
@@ -552,11 +550,11 @@ static void demo_event(struct mkgui_ctx *ctx, struct mkgui_event *ev, void *user
 				}
 
 			} else if(ev->id == ID_GRIDVIEW1) {
-				struct mkgui_gridview_data *gv = find_gridv_data(ctx, ID_GRIDVIEW1);
-				if(gv) {
+				uint32_t cols = mkgui_gridview_get_col_count(ctx, ID_GRIDVIEW1);
+				if(cols > 0) {
 					mkgui_context_menu_clear(ctx);
-					for(uint32_t c = 0; c < gv->col_count; ++c) {
-						mkgui_context_menu_add(ctx, ID_CTX_COL_NAME + c, gv->columns[c].label, NULL, MKGUI_MENUITEM_CHECK | MKGUI_MENUITEM_CHECKED);
+					for(uint32_t c = 0; c < cols; ++c) {
+						mkgui_context_menu_add(ctx, ID_CTX_COL_NAME + c, mkgui_gridview_get_col_label(ctx, ID_GRIDVIEW1, c), NULL, MKGUI_MENUITEM_CHECK | MKGUI_MENUITEM_CHECKED);
 					}
 					mkgui_context_menu_add_separator(ctx);
 					mkgui_context_menu_add(ctx, ID_CTX_COL_AUTOSIZE, "Auto-size Column", "arrow-expand-horizontal", 0);
@@ -802,7 +800,7 @@ int main(void) {
 
 	mkgui_toggle_set(ctx, ID_TOGGLE1, 1);
 	int32_t today_y, today_m, today_d;
-	datepicker_today(&today_y, &today_m, &today_d);
+	mkgui_today(&today_y, &today_m, &today_d);
 	mkgui_datepicker_set(ctx, ID_DATEPICKER1, today_y, today_m, today_d);
 	mkgui_ipinput_set(ctx, ID_IPINPUT1, "192.168.1.100");
 
@@ -838,10 +836,7 @@ int main(void) {
 
 	mkgui_itemview_setup(ctx, ID_ITEMVIEW1, 200, MKGUI_VIEW_ICON, demo_itemview_label, demo_itemview_icon, NULL);
 
-	struct mkgui_split_data *ds = find_split_data(ctx, ID_DATA_SPLIT);
-	if(ds) {
-		ds->ratio = 0.50f;
-	}
+	mkgui_split_set_ratio(ctx, ID_DATA_SPLIT, 0.50f);
 
 	/* Tree / Text tab setup */
 	mkgui_treeview_setup(ctx, ID_TREEVIEW1);
