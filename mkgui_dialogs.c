@@ -565,7 +565,7 @@ MKGUI_API uint32_t mkgui_input_dialog(struct mkgui_ctx *ctx, const char *title, 
 	}
 
 	if(result) {
-		char *val = mkgui_input_get(dlg, MKGUI_DLG_INPUT);
+		const char *val = mkgui_input_get(dlg, MKGUI_DLG_INPUT);
 		if(val && out && out_size > 0) {
 			strncpy(out, val, out_size - 1);
 			out[out_size - 1] = '\0';

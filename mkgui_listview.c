@@ -1045,7 +1045,7 @@ static uint32_t handle_listview_key(struct mkgui_ctx *ctx, struct mkgui_event *e
 }
 
 // [=]===^=[ mkgui_listview_setup ]==============================[=]
-MKGUI_API void mkgui_listview_setup(struct mkgui_ctx *ctx, uint32_t id, uint32_t row_count, uint32_t col_count, struct mkgui_column *columns, mkgui_row_cb cb, void *userdata) {
+MKGUI_API void mkgui_listview_setup(struct mkgui_ctx *ctx, uint32_t id, uint32_t row_count, uint32_t col_count, const struct mkgui_column *columns, mkgui_row_cb cb, void *userdata) {
 	MKGUI_CHECK(ctx);
 	if(!columns) {
 		return;
@@ -1143,14 +1143,14 @@ MKGUI_API void mkgui_listview_clear_selection(struct mkgui_ctx *ctx, uint32_t id
 }
 
 // [=]===^=[ mkgui_listview_get_col_order ]======================[=]
-MKGUI_API uint32_t *mkgui_listview_get_col_order(struct mkgui_ctx *ctx, uint32_t id) {
+MKGUI_API const uint32_t *mkgui_listview_get_col_order(struct mkgui_ctx *ctx, uint32_t id) {
 	MKGUI_CHECK_VAL(ctx, NULL);
 	struct mkgui_listview_data *lv = find_listv_data(ctx, id);
 	return lv ? lv->col_order : NULL;
 }
 
 // [=]===^=[ mkgui_listview_set_col_order ]======================[=]
-MKGUI_API void mkgui_listview_set_col_order(struct mkgui_ctx *ctx, uint32_t id, uint32_t *order, uint32_t count) {
+MKGUI_API void mkgui_listview_set_col_order(struct mkgui_ctx *ctx, uint32_t id, const uint32_t *order, uint32_t count) {
 	MKGUI_CHECK(ctx);
 	MKGUI_CHECK(order);
 	struct mkgui_listview_data *lv = find_listv_data(ctx, id);
@@ -1204,6 +1204,8 @@ MKGUI_API void mkgui_listview_set_cell_type(struct mkgui_ctx *ctx, uint32_t id, 
 // [=]===^=[ mkgui_listview_visible_range ]======================[=]
 MKGUI_API void mkgui_listview_visible_range(struct mkgui_ctx *ctx, uint32_t id, int32_t *first, int32_t *last) {
 	MKGUI_CHECK(ctx);
+	MKGUI_CHECK(first);
+	MKGUI_CHECK(last);
 	struct mkgui_listview_data *lv = find_listv_data(ctx, id);
 	if(!lv) {
 		*first = -1;

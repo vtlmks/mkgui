@@ -622,7 +622,7 @@ static uint32_t handle_gridview_key(struct mkgui_ctx *ctx, struct mkgui_event *e
 }
 
 // [=]===^=[ mkgui_gridview_setup ]===============================[=]
-MKGUI_API void mkgui_gridview_setup(struct mkgui_ctx *ctx, uint32_t id, uint32_t row_count, uint32_t col_count, struct mkgui_grid_column *columns, mkgui_grid_cell_cb cell_cb, void *userdata) {
+MKGUI_API void mkgui_gridview_setup(struct mkgui_ctx *ctx, uint32_t id, uint32_t row_count, uint32_t col_count, const struct mkgui_grid_column *columns, mkgui_grid_cell_cb cell_cb, void *userdata) {
 	MKGUI_CHECK(ctx);
 	if(!columns) {
 		return;

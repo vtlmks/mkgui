@@ -12,7 +12,7 @@ static struct mkgui_image_data *find_image_data(struct mkgui_ctx *ctx, uint32_t 
 }
 
 // [=]===^=[ mkgui_image_set ]====================================[=]
-MKGUI_API void mkgui_image_set(struct mkgui_ctx *ctx, uint32_t id, uint32_t *pixels, int32_t w, int32_t h) {
+MKGUI_API void mkgui_image_set(struct mkgui_ctx *ctx, uint32_t id, const uint32_t *pixels, int32_t w, int32_t h) {
 	MKGUI_CHECK(ctx);
 	if(!pixels) {
 		return;

@@ -714,7 +714,7 @@ static void test_combobox_changed(void) {
 	struct mkgui_ctx *ctx = mkgui_create(widgets, 3);
 	CHECK(ctx, "create failed");
 	if(ctx) {
-		char *items[] = { "Alpha", "Beta", "Gamma" };
+		const char *items[] = { "Alpha", "Beta", "Gamma" };
 		mkgui_combobox_setup(ctx, CB, items, 3);
 		run_layout(ctx);
 		inject_click(ctx, CB);
@@ -738,7 +738,7 @@ static void test_combobox_submit(void) {
 	struct mkgui_ctx *ctx = mkgui_create(widgets, 3);
 	CHECK(ctx, "create failed");
 	if(ctx) {
-		char *items[] = { "Alpha", "Beta" };
+		const char *items[] = { "Alpha", "Beta" };
 		mkgui_combobox_setup(ctx, CB, items, 2);
 		run_layout(ctx);
 		inject_click(ctx, CB);

@@ -455,7 +455,7 @@ static void test_dropdown_select_event(void) {
 	CHECK(ctx, "create failed");
 	if(ctx) {
 		run_layout(ctx);
-		char *items[] = { "One", "Two", "Three" };
+		const char *items[] = { "One", "Two", "Three" };
 		mkgui_dropdown_setup(ctx, DRP, items, 3);
 		ctx->focus_id = DRP;
 		inject_key(ctx, MKGUI_KEY_DOWN, 0);

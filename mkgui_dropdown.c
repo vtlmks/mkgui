@@ -204,7 +204,7 @@ static uint32_t handle_dropdown_key(struct mkgui_ctx *ctx, struct mkgui_event *e
 }
 
 // [=]===^=[ mkgui_dropdown_setup ]==============================[=]
-MKGUI_API void mkgui_dropdown_setup(struct mkgui_ctx *ctx, uint32_t id, char **items, uint32_t count) {
+MKGUI_API void mkgui_dropdown_setup(struct mkgui_ctx *ctx, uint32_t id, const char *const *items, uint32_t count) {
 	MKGUI_CHECK(ctx);
 	if(!items && count > 0) {
 		return;
@@ -248,7 +248,7 @@ MKGUI_API void mkgui_dropdown_set(struct mkgui_ctx *ctx, uint32_t id, int32_t in
 }
 
 // [=]===^=[ mkgui_dropdown_get_text ]==============================[=]
-MKGUI_API char *mkgui_dropdown_get_text(struct mkgui_ctx *ctx, uint32_t id) {
+MKGUI_API const char *mkgui_dropdown_get_text(struct mkgui_ctx *ctx, uint32_t id) {
 	MKGUI_CHECK_VAL(ctx, "");
 	struct mkgui_dropdown_data *dd = find_dropdown_data(ctx, id);
 	if(!dd || dd->selected < 0 || (uint32_t)dd->selected >= dd->item_count) {
@@ -265,7 +265,7 @@ MKGUI_API uint32_t mkgui_dropdown_get_count(struct mkgui_ctx *ctx, uint32_t id) 
 }
 
 // [=]===^=[ mkgui_dropdown_get_item_text ]=========================[=]
-MKGUI_API char *mkgui_dropdown_get_item_text(struct mkgui_ctx *ctx, uint32_t id, uint32_t index) {
+MKGUI_API const char *mkgui_dropdown_get_item_text(struct mkgui_ctx *ctx, uint32_t id, uint32_t index) {
 	MKGUI_CHECK_VAL(ctx, "");
 	struct mkgui_dropdown_data *dd = find_dropdown_data(ctx, id);
 	if(!dd || index >= dd->item_count) {

@@ -93,7 +93,7 @@ struct fd_state {
 	int32_t sort_col;
 	int32_t sort_dir;
 
-	struct mkgui_file_filter *filters;
+	const struct mkgui_file_filter *filters;
 	uint32_t filter_count;
 	uint32_t active_filter;
 
@@ -112,7 +112,7 @@ static uint32_t fd_result_count;
 // ---------------------------------------------------------------------------
 
 // [=]===^=[ fd_strcasecmp ]======================================[=]
-static int32_t fd_strcasecmp(char *a, char *b) {
+static int32_t fd_strcasecmp(const char *a, const char *b) {
 	while(*a && *b) {
 		int32_t ca = (*a >= 'A' && *a <= 'Z') ? *a + 32 : *a;
 		int32_t cb = (*b >= 'A' && *b <= 'Z') ? *b + 32 : *b;
@@ -238,7 +238,7 @@ static char *fd_get_home(void) {
 // ---------------------------------------------------------------------------
 
 // [=]===^=[ fd_match_pattern ]====================================[=]
-static uint32_t fd_match_pattern(char *name, char *pattern) {
+static uint32_t fd_match_pattern(const char *name, const char *pattern) {
 	if(!pattern || pattern[0] == '\0' || strcmp(pattern, "*") == 0 || strcmp(pattern, "*.*") == 0) {
 		return 1;
 	}
@@ -266,7 +266,7 @@ static uint32_t fd_match_pattern(char *name, char *pattern) {
 		char *pat = tok;
 		if(pat[0] == '*' && pat[1] == '.') {
 			char *ext = pat + 1;
-			char *dot = strrchr(name, '.');
+			const char *dot = strrchr(name, '.');
 			if(dot && fd_strcasecmp(dot, ext) == 0) {
 				return 1;
 			}
@@ -344,7 +344,7 @@ static int fd_compare_entries(const void *a, const void *b) {
 static void fd_scan_dir(void) {
 	fd->entry_count = 0;
 
-	char *filter_pat = NULL;
+	const char *filter_pat = NULL;
 	if(fd->filters && fd->active_filter < fd->filter_count) {
 		filter_pat = fd->filters[fd->active_filter].pattern;
 	}
@@ -709,7 +709,7 @@ static void fd_clear_filter(struct mkgui_ctx *dlg) {
 // ---------------------------------------------------------------------------
 
 // [=]===^=[ fd_navigate ]========================================[=]
-static void fd_navigate(struct mkgui_ctx *dlg, char *newpath) {
+static void fd_navigate(struct mkgui_ctx *dlg, const char *newpath) {
 #ifdef _WIN32
 	DWORD attr = GetFileAttributesA(newpath);
 	if(attr == INVALID_FILE_ATTRIBUTES || !(attr & FILE_ATTRIBUTE_DIRECTORY)) {
@@ -858,7 +858,7 @@ static void fd_append_filter_ext(char *name, uint32_t name_size) {
 	if(strchr(name, '.')) {
 		return;
 	}
-	char *pat = fd->filters[fd->active_filter].pattern;
+	const char *pat = fd->filters[fd->active_filter].pattern;
 	if(!pat) {
 		return;
 	}
@@ -869,7 +869,7 @@ static void fd_append_filter_ext(char *name, uint32_t name_size) {
 
 	if(pat[0] == '*' && pat[1] == '.') {
 		uint32_t nlen = (uint32_t)strlen(name);
-		char *ext = pat + 1;
+		const char *ext = pat + 1;
 		uint32_t elen = 0;
 		while(ext[elen] && ext[elen] != ';' && ext[elen] != ' ') {
 			++elen;
@@ -899,7 +899,7 @@ static void fd_build_results(struct mkgui_ctx *dlg) {
 	fd_result_count = 0;
 
 	if(fd->mode == 1) {
-		char *name = mkgui_input_get(dlg, FD_ID_NAME_INPUT);
+		const char *name = mkgui_input_get(dlg, FD_ID_NAME_INPUT);
 		if(name && name[0] != '\0') {
 			char fname[260];
 			snprintf(fname, sizeof(fname), "%s", name);
@@ -1113,7 +1113,7 @@ static void fd_new_folder(struct mkgui_ctx *dlg) {
 // ---------------------------------------------------------------------------
 
 // [=]===^=[ fd_run_dialog ]=======================================[=]
-static uint32_t fd_run_dialog(struct mkgui_ctx *ctx, uint32_t mode, struct mkgui_file_dialog_opts *opts) {
+static uint32_t fd_run_dialog(struct mkgui_ctx *ctx, uint32_t mode, const struct mkgui_file_dialog_opts *opts) {
 	fd = (struct fd_state *)calloc(1, sizeof(struct fd_state));
 	if(!fd) {
 		return 0;
@@ -1228,7 +1228,7 @@ static uint32_t fd_run_dialog(struct mkgui_ctx *ctx, uint32_t mode, struct mkgui
 	}
 
 	if(fd->filter_count > 0) {
-		char *filter_labels[FD_MAX_FILTERS];
+		const char *filter_labels[FD_MAX_FILTERS];
 		uint32_t fc = fd->filter_count < FD_MAX_FILTERS ? fd->filter_count : FD_MAX_FILTERS;
 		for(uint32_t i = 0; i < fc; ++i) {
 			filter_labels[i] = fd->filters[i].label;
@@ -1301,7 +1301,7 @@ static uint32_t fd_run_dialog(struct mkgui_ctx *ctx, uint32_t mode, struct mkgui
 
 				case MKGUI_EVENT_PATHBAR_SUBMIT: {
 					if(ev.id == FD_ID_PATHBAR) {
-						char *new_path = mkgui_pathbar_get(dlg, FD_ID_PATHBAR);
+						const char *new_path = mkgui_pathbar_get(dlg, FD_ID_PATHBAR);
 						fd_navigate(dlg, new_path);
 					}
 				} break;
@@ -1428,7 +1428,7 @@ static uint32_t fd_run_dialog(struct mkgui_ctx *ctx, uint32_t mode, struct mkgui
 				case MKGUI_EVENT_CELL_EDIT_COMMIT: {
 					if(ev.id == FD_ID_FILES && ev.value >= 0) {
 						struct fd_entry *e = fd_filtered_entry((uint32_t)ev.value);
-						char *new_name = mkgui_cell_edit_get_text(dlg);
+						const char *new_name = mkgui_cell_edit_get_text(dlg);
 						if(e && new_name && new_name[0] && strcmp(e->name, new_name) != 0) {
 							char old_path[FD_PATH_SIZE + 260];
 							char new_path[FD_PATH_SIZE + 260];
@@ -1471,19 +1471,19 @@ static uint32_t fd_run_dialog(struct mkgui_ctx *ctx, uint32_t mode, struct mkgui
 // ---------------------------------------------------------------------------
 
 // [=]===^=[ mkgui_open_dialog ]==================================[=]
-MKGUI_API uint32_t mkgui_open_dialog(struct mkgui_ctx *ctx, struct mkgui_file_dialog_opts *opts) {
+MKGUI_API uint32_t mkgui_open_dialog(struct mkgui_ctx *ctx, const struct mkgui_file_dialog_opts *opts) {
 	MKGUI_CHECK_VAL(ctx, 0);
 	return fd_run_dialog(ctx, 0, opts);
 }
 
 // [=]===^=[ mkgui_save_dialog ]==================================[=]
-MKGUI_API uint32_t mkgui_save_dialog(struct mkgui_ctx *ctx, struct mkgui_file_dialog_opts *opts) {
+MKGUI_API uint32_t mkgui_save_dialog(struct mkgui_ctx *ctx, const struct mkgui_file_dialog_opts *opts) {
 	MKGUI_CHECK_VAL(ctx, 0);
 	return fd_run_dialog(ctx, 1, opts);
 }
 
 // [=]===^=[ mkgui_dialog_path ]==================================[=]
-MKGUI_API char *mkgui_dialog_path(struct mkgui_ctx *ctx, uint32_t index) {
+MKGUI_API const char *mkgui_dialog_path(struct mkgui_ctx *ctx, uint32_t index) {
 	MKGUI_CHECK_VAL(ctx, "");
 	(void)ctx;
 	if(index >= fd_result_count) {

@@ -512,7 +512,7 @@ static void ibt_rebuild_tabs(struct mkgui_ctx *dlg) {
 }
 
 // [=]===^=[ ibt_filter ]=============================================[=]
-static void ibt_filter(char *search) {
+static void ibt_filter(const char *search) {
 	ibt->filtered_count = 0;
 	uint32_t search_len = search ? (uint32_t)strlen(search) : 0;
 
@@ -728,7 +728,7 @@ MKGUI_API uint32_t mkgui_icon_browser(struct mkgui_ctx *ctx, int32_t size, char 
 						ibt_rebuild_tabs(dlg);
 						ibt->active_cat = 0;
 						mkgui_tabs_set_current(dlg, IB_TH_TABS, IB_TH_TAB_ALL);
-						char *filter = mkgui_input_get(dlg, IB_TH_SEARCH);
+						const char *filter = mkgui_input_get(dlg, IB_TH_SEARCH);
 						ibt_filter(filter);
 						mkgui_itemview_set_items(dlg, iv_id, ibt->filtered_count);
 						mkgui_itemview_set_selected(dlg, iv_id, -1);
@@ -737,7 +737,7 @@ MKGUI_API uint32_t mkgui_icon_browser(struct mkgui_ctx *ctx, int32_t size, char 
 
 				case MKGUI_EVENT_INPUT_CHANGED: {
 					if(ev.id == IB_TH_SEARCH) {
-						char *filter = mkgui_input_get(dlg, IB_TH_SEARCH);
+						const char *filter = mkgui_input_get(dlg, IB_TH_SEARCH);
 						ibt_filter(filter);
 						mkgui_itemview_set_items(dlg, iv_id, ibt->filtered_count);
 						mkgui_itemview_set_selected(dlg, iv_id, -1);
@@ -752,7 +752,7 @@ MKGUI_API uint32_t mkgui_icon_browser(struct mkgui_ctx *ctx, int32_t size, char 
 						} else if(tab_id >= IB_TH_TAB_FIRST && tab_id < IB_TH_TAB_FIRST + ibt->cat_count) {
 							ibt->active_cat = tab_id - IB_TH_TAB_FIRST + 1;
 						}
-						char *filter = mkgui_input_get(dlg, IB_TH_SEARCH);
+						const char *filter = mkgui_input_get(dlg, IB_TH_SEARCH);
 						ibt_filter(filter);
 						mkgui_itemview_set_items(dlg, iv_id, ibt->filtered_count);
 						mkgui_itemview_set_selected(dlg, iv_id, -1);

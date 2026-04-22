@@ -605,7 +605,7 @@ static void ed_config_save(void) {
 }
 
 // [=]===^=[ ed_config_add_recent ]================================[=]
-static void ed_config_add_recent(char *filepath) {
+static void ed_config_add_recent(const char *filepath) {
 	for(uint32_t i = 0; i < ed_cfg.recent_count; ++i) {
 		if(strcmp(ed_cfg.recent[i], filepath) == 0) {
 			for(uint32_t j = i; j > 0; --j) {
@@ -629,7 +629,7 @@ static void ed_config_add_recent(char *filepath) {
 		++ed_cfg.recent_count;
 	}
 
-	char *slash = strrchr(filepath, '/');
+	const char *slash = strrchr(filepath, '/');
 	if(slash) {
 		size_t dir_len = (size_t)(slash - filepath);
 		if(dir_len >= ED_CONFIG_PATH_LEN) {
@@ -1178,7 +1178,7 @@ static void ed_read_prop_value(struct mkgui_ctx *ctx, struct ed_prop_desc *p, st
 	switch(p->kind) {
 		case ED_PK_STRING:
 		case ED_PK_STRING_BROWSE: {
-			char *val = mkgui_input_get(ctx, p->widget_id);
+			const char *val = mkgui_input_get(ctx, p->widget_id);
 			if(val) {
 				char *dst = (char *)w + p->offset;
 				size_t cap;
@@ -2717,7 +2717,7 @@ static uint32_t ed_is_container_type(uint32_t type) {
 
 // [=]===^=[ ed_sync_parent_dropdown ]=============================[=]
 static void ed_sync_parent_dropdown(struct mkgui_ctx *ctx) {
-	char *items[ED_MAX_WIDGETS];
+	const char *items[ED_MAX_WIDGETS];
 	static char item_bufs[ED_MAX_WIDGETS][MKGUI_MAX_TEXT + 80];
 	uint32_t count = 0;
 
@@ -3194,7 +3194,7 @@ static void ed_save_project(struct mkgui_ctx *ctx, uint32_t save_as) {
 		if(!mkgui_save_dialog(ctx, &save_opts)) {
 			return;
 		}
-		char *path = mkgui_dialog_path(ctx, 0);
+		const char *path = mkgui_dialog_path(ctx, 0);
 		snprintf(ed.project_path, sizeof(ed.project_path), "%s", path);
 	}
 
@@ -3269,7 +3269,7 @@ static void ed_save_project(struct mkgui_ctx *ctx, uint32_t save_as) {
 }
 
 // [=]===^=[ ed_load_file ]========================================[=]
-static void ed_load_file(struct mkgui_ctx *ctx, char *path) {
+static void ed_load_file(struct mkgui_ctx *ctx, const char *path) {
 	FILE *f = fopen(path, "r");
 	if(!f) {
 		return;
@@ -3443,7 +3443,7 @@ static void ed_load_file(struct mkgui_ctx *ctx, char *path) {
 	ed_sync_recent_menu(ctx);
 
 	char buf[256];
-	char *fname = strrchr(path, '/');
+	const char *fname = strrchr(path, '/');
 	if(!fname) {
 		fname = path;
 	} else {
@@ -3772,7 +3772,7 @@ static void ed_generate_code(struct mkgui_ctx *ctx) {
 	if(!mkgui_save_dialog(ctx, &gen_opts)) {
 		return;
 	}
-	char *out_path = mkgui_dialog_path(ctx, 0);
+	const char *out_path = mkgui_dialog_path(ctx, 0);
 	FILE *f = fopen(out_path, "w");
 	if(!f) {
 		return;
@@ -4089,7 +4089,7 @@ static void ed_generate_code(struct mkgui_ctx *ctx) {
 	}
 
 	char buf[FD_PATH_SIZE + 320];
-	char *fname = strrchr(out_path, '/');
+	const char *fname = strrchr(out_path, '/');
 	if(!fname) {
 		fname = out_path;
 	} else {
@@ -4113,7 +4113,7 @@ static void ed_generate_snippet(struct mkgui_ctx *ctx) {
 	if(!mkgui_save_dialog(ctx, &gen_opts)) {
 		return;
 	}
-	char *out_path = mkgui_dialog_path(ctx, 0);
+	const char *out_path = mkgui_dialog_path(ctx, 0);
 	FILE *f = fopen(out_path, "w");
 	if(!f) {
 		return;
@@ -4158,7 +4158,7 @@ static void ed_generate_snippet(struct mkgui_ctx *ctx) {
 	fclose(f);
 
 	char buf[FD_PATH_SIZE + 320];
-	char *fname = strrchr(out_path, '/');
+	const char *fname = strrchr(out_path, '/');
 	if(!fname) {
 		fname = out_path;
 	} else {
@@ -4263,7 +4263,7 @@ static void ed_test_gui(struct mkgui_ctx *editor_ctx) {
 		switch(ew->type) {
 			case MKGUI_DROPDOWN: {
 				if(d && d->item_count > 0) {
-					char *items[ED_MAX_DATA_ITEMS];
+					const char *items[ED_MAX_DATA_ITEMS];
 					for(uint32_t j = 0; j < d->item_count; ++j) {
 						items[j] = d->items[j];
 					}
@@ -4273,7 +4273,7 @@ static void ed_test_gui(struct mkgui_ctx *editor_ctx) {
 
 			case MKGUI_COMBOBOX: {
 				if(d && d->item_count > 0) {
-					char *items[ED_MAX_DATA_ITEMS];
+					const char *items[ED_MAX_DATA_ITEMS];
 					for(uint32_t j = 0; j < d->item_count; ++j) {
 						items[j] = d->items[j];
 					}
@@ -4670,12 +4670,12 @@ int main(void) {
 	}
 
 	{
-		char *align_items[] = { "Stretch", "Start", "Center", "End" };
+		const char *align_items[] = { "Stretch", "Start", "Center", "End" };
 		mkgui_dropdown_setup(ctx, ED_PROP_ALIGN_DRP, align_items, 4);
 	}
 
 	{
-		char *tb_mode_items[] = { "Icons + Text", "Icons Only", "Text Only" };
+		const char *tb_mode_items[] = { "Icons + Text", "Icons Only", "Text Only" };
 		mkgui_dropdown_setup(ctx, ED_PROP_TB_MODE_DRP, tb_mode_items, 3);
 	}
 
@@ -5078,7 +5078,7 @@ int main(void) {
 						struct ed_widget_data *d = ed_find_widget_data(ed_data_widget_id);
 						int32_t dsel = mkgui_listview_get_selected(ctx, ED_DATA_LIST);
 						if(d && dsel >= 0 && (uint32_t)dsel < d->item_count) {
-							char *val = mkgui_input_get(ctx, ED_DATA_ITEM_INP);
+							const char *val = mkgui_input_get(ctx, ED_DATA_ITEM_INP);
 							if(val) {
 								snprintf(d->items[dsel], MKGUI_MAX_TEXT, "%s", val);
 								dirty_all(ctx);

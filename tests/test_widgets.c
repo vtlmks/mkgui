@@ -179,7 +179,7 @@ static void test_input_get_set(void) {
 	CHECK(ctx, "create failed");
 	if(ctx) {
 		mkgui_input_set(ctx, INP, "hello");
-		char *txt = mkgui_input_get(ctx, INP);
+		const char *txt = mkgui_input_get(ctx, INP);
 		CHECK(txt && strcmp(txt, "hello") == 0, "text should be 'hello', got '%s'", txt ? txt : "(null)");
 		mkgui_input_set(ctx, INP, "");
 		txt = mkgui_input_get(ctx, INP);
@@ -267,7 +267,7 @@ static void test_textarea_get_set(void) {
 	CHECK(ctx, "create failed");
 	if(ctx) {
 		mkgui_textarea_set(ctx, TA, "line one\nline two");
-		char *txt = mkgui_textarea_get(ctx, TA);
+		const char *txt = mkgui_textarea_get(ctx, TA);
 		CHECK(txt && strcmp(txt, "line one\nline two") == 0, "text mismatch");
 		CHECK(mkgui_textarea_get_line_count(ctx, TA) == 2, "should have 2 lines");
 		mkgui_destroy(ctx);
@@ -312,7 +312,7 @@ static void test_label_get_set(void) {
 	struct mkgui_ctx *ctx = make_ctx(widgets, 3);
 	CHECK(ctx, "create failed");
 	if(ctx) {
-		char *txt = mkgui_label_get(ctx, LBL);
+		const char *txt = mkgui_label_get(ctx, LBL);
 		CHECK(txt && strcmp(txt, "init") == 0, "initial text should be 'init'");
 		mkgui_label_set(ctx, LBL, "changed");
 		txt = mkgui_label_get(ctx, LBL);
@@ -491,12 +491,12 @@ static void test_dropdown_get_set(void) {
 	struct mkgui_ctx *ctx = make_ctx(widgets, 3);
 	CHECK(ctx, "create failed");
 	if(ctx) {
-		char *items[] = { "Alpha", "Beta", "Gamma" };
+		const char *items[] = { "Alpha", "Beta", "Gamma" };
 		mkgui_dropdown_setup(ctx, DD, items, 3);
 		CHECK(mkgui_dropdown_get_count(ctx, DD) == 3, "should have 3 items");
 		mkgui_dropdown_set(ctx, DD, 1);
 		CHECK(mkgui_dropdown_get(ctx, DD) == 1, "selected index should be 1");
-		char *txt = mkgui_dropdown_get_text(ctx, DD);
+		const char *txt = mkgui_dropdown_get_text(ctx, DD);
 		CHECK(txt && strcmp(txt, "Beta") == 0, "selected text should be 'Beta'");
 		mkgui_destroy(ctx);
 	}

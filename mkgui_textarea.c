@@ -638,7 +638,7 @@ MKGUI_API void mkgui_textarea_set(struct mkgui_ctx *ctx, uint32_t id, const char
 }
 
 // [=]===^=[ mkgui_textarea_get ]=================================[=]
-MKGUI_API char *mkgui_textarea_get(struct mkgui_ctx *ctx, uint32_t id) {
+MKGUI_API const char *mkgui_textarea_get(struct mkgui_ctx *ctx, uint32_t id) {
 	MKGUI_CHECK_VAL(ctx, "");
 	struct mkgui_textarea_data *ta = find_textarea_data(ctx, id);
 	return ta ? ta->text : "";

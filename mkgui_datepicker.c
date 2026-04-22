@@ -566,7 +566,7 @@ MKGUI_API void mkgui_datepicker_get(struct mkgui_ctx *ctx, uint32_t id, int32_t 
 }
 
 // [=]===^=[ mkgui_datepicker_get_text ]===========================[=]
-MKGUI_API char *mkgui_datepicker_get_text(struct mkgui_ctx *ctx, uint32_t id) {
+MKGUI_API const char *mkgui_datepicker_get_text(struct mkgui_ctx *ctx, uint32_t id) {
 	MKGUI_CHECK_VAL(ctx, "");
 	static char datepicker_buf[16];
 	struct mkgui_datepicker_data *dp = find_datepicker_data(ctx, id);

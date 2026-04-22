@@ -257,7 +257,7 @@ MKGUI_API void mkgui_input_set(struct mkgui_ctx *ctx, uint32_t id, const char *t
 }
 
 // [=]===^=[ mkgui_input_get ]=======================================[=]
-MKGUI_API char *mkgui_input_get(struct mkgui_ctx *ctx, uint32_t id) {
+MKGUI_API const char *mkgui_input_get(struct mkgui_ctx *ctx, uint32_t id) {
 	MKGUI_CHECK_VAL(ctx, "");
 	struct mkgui_input_data *inp = find_input_data(ctx, id);
 	if(!inp) {

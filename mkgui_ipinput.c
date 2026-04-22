@@ -321,7 +321,7 @@ MKGUI_API void mkgui_ipinput_set(struct mkgui_ctx *ctx, uint32_t id, const char 
 }
 
 // [=]===^=[ mkgui_ipinput_get ]===================================[=]
-MKGUI_API char *mkgui_ipinput_get(struct mkgui_ctx *ctx, uint32_t id) {
+MKGUI_API const char *mkgui_ipinput_get(struct mkgui_ctx *ctx, uint32_t id) {
 	MKGUI_CHECK_VAL(ctx, "");
 	static char ipinput_buf[16];
 	struct mkgui_ipinput_data *ip = find_ipinput_data(ctx, id);

@@ -451,7 +451,7 @@ static uint32_t celledit_key(struct mkgui_ctx *ctx, struct mkgui_event *ev, uint
 
 // [=]===^=[ celledit_extract_text ]=================================[=]
 // strips icon prefix from MKGUI_CELL_ICON_TEXT format ("icon\tText" -> "Text")
-static char *celledit_extract_text(struct mkgui_ctx *ctx, uint32_t widget_id, int32_t col, char *raw) {
+static const char *celledit_extract_text(struct mkgui_ctx *ctx, uint32_t widget_id, int32_t col, const char *raw) {
 	if(!raw) {
 		return raw;
 	}
@@ -463,7 +463,7 @@ static char *celledit_extract_text(struct mkgui_ctx *ctx, uint32_t widget_id, in
 	if(w->type == MKGUI_LISTVIEW) {
 		struct mkgui_listview_data *lv = find_listv_data(ctx, widget_id);
 		if(lv && col >= 0 && (uint32_t)col < lv->col_count && lv->columns[col].cell_type == MKGUI_CELL_ICON_TEXT) {
-			char *tab = strchr(raw, '\t');
+			const char *tab = strchr(raw, '\t');
 			if(tab) {
 				return tab + 1;
 			}
@@ -471,7 +471,7 @@ static char *celledit_extract_text(struct mkgui_ctx *ctx, uint32_t widget_id, in
 	} else if(w->type == MKGUI_GRIDVIEW) {
 		struct mkgui_gridview_data *gv = find_gridv_data(ctx, widget_id);
 		if(gv && col >= 0 && (uint32_t)col < gv->col_count && gv->columns[col].col_type == MKGUI_CELL_ICON_TEXT) {
-			char *tab = strchr(raw, '\t');
+			const char *tab = strchr(raw, '\t');
 			if(tab) {
 				return tab + 1;
 			}
@@ -481,7 +481,7 @@ static char *celledit_extract_text(struct mkgui_ctx *ctx, uint32_t widget_id, in
 }
 
 // [=]===^=[ celledit_begin ]=========================================[=]
-static void celledit_begin(struct mkgui_ctx *ctx, uint32_t widget_id, int32_t row, int32_t col, char *text) {
+static void celledit_begin(struct mkgui_ctx *ctx, uint32_t widget_id, int32_t row, int32_t col, const char *text) {
 	struct mkgui_cell_edit *ce = &ctx->cell_edit;
 
 	if(ce->active) {
@@ -491,7 +491,7 @@ static void celledit_begin(struct mkgui_ctx *ctx, uint32_t widget_id, int32_t ro
 	ce->widget_id = widget_id;
 	ce->row = row;
 	ce->col = col;
-	char *display = celledit_extract_text(ctx, widget_id, col, text);
+	const char *display = celledit_extract_text(ctx, widget_id, col, text);
 	strncpy(ce->text, display ? display : "", MKGUI_MAX_TEXT - 1);
 	ce->text[MKGUI_MAX_TEXT - 1] = '\0';
 
@@ -513,7 +513,7 @@ static void celledit_begin(struct mkgui_ctx *ctx, uint32_t widget_id, int32_t ro
 }
 
 // [=]===^=[ mkgui_cell_edit_begin ]==================================[=]
-MKGUI_API void mkgui_cell_edit_begin(struct mkgui_ctx *ctx, uint32_t widget_id, int32_t row, int32_t col, char *text) {
+MKGUI_API void mkgui_cell_edit_begin(struct mkgui_ctx *ctx, uint32_t widget_id, int32_t row, int32_t col, const char *text) {
 	MKGUI_CHECK(ctx);
 	celledit_begin(ctx, widget_id, row, col, text);
 }
@@ -525,11 +525,8 @@ MKGUI_API void mkgui_cell_edit_cancel(struct mkgui_ctx *ctx) {
 }
 
 // [=]===^=[ mkgui_cell_edit_get_text ]================================[=]
-MKGUI_API char *mkgui_cell_edit_get_text(struct mkgui_ctx *ctx) {
+MKGUI_API const char *mkgui_cell_edit_get_text(struct mkgui_ctx *ctx) {
 	MKGUI_CHECK_VAL(ctx, "");
-	if(!ctx->cell_edit.active) {
-		return ctx->cell_edit.text;
-	}
 	return ctx->cell_edit.text;
 }
 

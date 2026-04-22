@@ -796,7 +796,7 @@ static void icon_load_from_widgets(struct mkgui_ctx *ctx) {
 }
 
 // [=]===^=[ mkgui_icon_add ]=========================================[=]
-MKGUI_API int32_t mkgui_icon_add(const char *name, uint32_t *pixels, int32_t w, int32_t h) {
+MKGUI_API int32_t mkgui_icon_add(const char *name, const uint32_t *pixels, int32_t w, int32_t h) {
 	if(icon_count >= MKGUI_MAX_ICONS) {
 		return -1;
 	}

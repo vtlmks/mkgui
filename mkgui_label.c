@@ -125,7 +125,7 @@ MKGUI_API void mkgui_label_set(struct mkgui_ctx *ctx, uint32_t id, const char *t
 }
 
 // [=]===^=[ mkgui_label_get ]===================================[=]
-MKGUI_API char *mkgui_label_get(struct mkgui_ctx *ctx, uint32_t id) {
+MKGUI_API const char *mkgui_label_get(struct mkgui_ctx *ctx, uint32_t id) {
 	MKGUI_CHECK_VAL(ctx, "");
 	struct mkgui_widget *w = find_widget(ctx, id);
 	return w ? w->label : "";

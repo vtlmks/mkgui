@@ -387,7 +387,7 @@ MKGUI_API void mkgui_pathbar_set(struct mkgui_ctx *ctx, uint32_t id, const char 
 }
 
 // [=]===^=[ mkgui_pathbar_get ]=====================================[=]
-MKGUI_API char *mkgui_pathbar_get(struct mkgui_ctx *ctx, uint32_t id) {
+MKGUI_API const char *mkgui_pathbar_get(struct mkgui_ctx *ctx, uint32_t id) {
 	MKGUI_CHECK_VAL(ctx, "");
 	struct mkgui_pathbar_data *pb = find_pathbar_data(ctx, id);
 	if(!pb) {

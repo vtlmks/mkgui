@@ -458,7 +458,7 @@ static HICON platform_make_hicon(uint32_t *pixels, int32_t w, int32_t h) {
 }
 
 // [=]===^=[ platform_set_window_icon ]=============================[=]
-static void platform_set_window_icon(struct mkgui_platform *plat, struct mkgui_icon_size *sizes, uint32_t count) {
+static void platform_set_window_icon(struct mkgui_platform *plat, const struct mkgui_icon_size *sizes, uint32_t count) {
 	int32_t sm_big = GetSystemMetrics(SM_CXICON);
 	int32_t sm_small = GetSystemMetrics(SM_CXSMICON);
 	uint32_t best_big = 0;

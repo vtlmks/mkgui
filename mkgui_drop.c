@@ -81,7 +81,7 @@ MKGUI_API uint32_t mkgui_drop_count(struct mkgui_ctx *ctx) {
 }
 
 // [=]===^=[ mkgui_drop_file ]===================================[=]
-MKGUI_API char *mkgui_drop_file(struct mkgui_ctx *ctx, uint32_t index) {
+MKGUI_API const char *mkgui_drop_file(struct mkgui_ctx *ctx, uint32_t index) {
 	MKGUI_CHECK_VAL(ctx, NULL);
 	if(index >= ctx->drop_count) {
 		return NULL;

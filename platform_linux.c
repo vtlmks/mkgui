@@ -56,7 +56,7 @@ static void platform_set_class_hint(struct mkgui_platform *plat, const char *ins
 // ---------------------------------------------------------------------------
 
 // [=]===^=[ platform_set_window_icon ]=============================[=]
-static void platform_set_window_icon(struct mkgui_platform *plat, struct mkgui_icon_size *sizes, uint32_t count) {
+static void platform_set_window_icon(struct mkgui_platform *plat, const struct mkgui_icon_size *sizes, uint32_t count) {
 	Atom net_wm_icon = XInternAtom(plat->dpy, "_NET_WM_ICON", False);
 	size_t total = 0;
 	for(uint32_t s = 0; s < count; ++s) {

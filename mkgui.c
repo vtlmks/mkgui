@@ -4006,7 +4006,7 @@ static void mkgui_free_arrays(struct mkgui_ctx *ctx) {
 }
 
 // [=]===^=[ mkgui_create ]======================================[=]
-MKGUI_API struct mkgui_ctx *mkgui_create(struct mkgui_widget *widgets, uint32_t count) {
+MKGUI_API struct mkgui_ctx *mkgui_create(const struct mkgui_widget *widgets, uint32_t count) {
 	if(!widgets && count > 0) {
 		return NULL;
 	}
@@ -4137,7 +4137,7 @@ MKGUI_API void mkgui_set_window_instance(struct mkgui_ctx *ctx, const char *inst
 }
 
 // [=]===^=[ mkgui_set_window_icon ]================================[=]
-MKGUI_API void mkgui_set_window_icon(struct mkgui_ctx *ctx, struct mkgui_icon_size *sizes, uint32_t count) {
+MKGUI_API void mkgui_set_window_icon(struct mkgui_ctx *ctx, const struct mkgui_icon_size *sizes, uint32_t count) {
 	MKGUI_CHECK(ctx);
 	MKGUI_CHECK(sizes);
 	if(count == 0) {
@@ -4274,7 +4274,7 @@ MKGUI_API uint32_t mkgui_has_focus(struct mkgui_ctx *ctx, uint32_t id) {
 }
 
 // [=]===^=[ mkgui_get_tooltip ]====================================[=]
-MKGUI_API char *mkgui_get_tooltip(struct mkgui_ctx *ctx, uint32_t id) {
+MKGUI_API const char *mkgui_get_tooltip(struct mkgui_ctx *ctx, uint32_t id) {
 	MKGUI_CHECK_VAL(ctx, "");
 	int32_t idx = find_widget_idx(ctx, id);
 	if(idx < 0) {
@@ -4409,7 +4409,7 @@ MKGUI_API void mkgui_destroy(struct mkgui_ctx *ctx) {
 }
 
 // [=]===^=[ mkgui_create_child ]=================================[=]
-MKGUI_API struct mkgui_ctx *mkgui_create_child(struct mkgui_ctx *parent, struct mkgui_widget *widgets, uint32_t count, const char *title, int32_t w, int32_t h) {
+MKGUI_API struct mkgui_ctx *mkgui_create_child(struct mkgui_ctx *parent, const struct mkgui_widget *widgets, uint32_t count, const char *title, int32_t w, int32_t h) {
 	if(!parent || (!widgets && count > 0)) {
 		return NULL;
 	}

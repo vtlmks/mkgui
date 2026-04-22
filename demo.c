@@ -787,10 +787,10 @@ int main(void) {
 	mkgui_accel_add(ctx, ID_PASTE, MKGUI_MOD_CONTROL, 'v');
 
 	/* Controls tab setup */
-	char *modes[] = { "Auto", "Manual", "Custom", "Debug" };
+	const char *modes[] = { "Auto", "Manual", "Custom", "Debug" };
 	mkgui_dropdown_setup(ctx, ID_DROPDOWN1, modes, 4);
 
-	char *search_items[] = { "Apple", "Banana", "Cherry", "Date", "Elderberry", "Fig", "Grape", "Honeydew" };
+	const char *search_items[] = { "Apple", "Banana", "Cherry", "Date", "Elderberry", "Fig", "Grape", "Honeydew" };
 	mkgui_combobox_setup(ctx, ID_COMBOBOX1, search_items, 8);
 
 	mkgui_slider_setup(ctx, ID_SLIDER1, 0, 100, 50);
@@ -806,7 +806,7 @@ int main(void) {
 	mkgui_datepicker_set(ctx, ID_DATEPICKER1, today_y, today_m, today_d);
 	mkgui_ipinput_set(ctx, ID_IPINPUT1, "192.168.1.100");
 
-	char *tb_modes[] = { "Icons + Text", "Icons Only", "Text Only" };
+	const char *tb_modes[] = { "Icons + Text", "Icons Only", "Text Only" };
 	mkgui_dropdown_setup(ctx, ID_TBMODE_DROP, tb_modes, 3);
 
 	int32_t sb_widths[] = { -1, 150, 100 };
@@ -872,7 +872,7 @@ int main(void) {
 	mkgui_textarea_set(ctx, ID_TEXTAREA1, "Type your notes here.\nLine 2.\nLine 3.");
 
 	/* Layout tab setup */
-	char *form_cats[] = { "General", "Support", "Sales", "Billing" };
+	const char *form_cats[] = { "General", "Support", "Sales", "Billing" };
 	mkgui_dropdown_setup(ctx, ID_FORM_DRP1, form_cats, 4);
 
 	/* Media tab setup */
