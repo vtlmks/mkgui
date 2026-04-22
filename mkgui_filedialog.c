@@ -4,7 +4,6 @@
 #ifdef _WIN32
 #include <shlobj.h>
 #else
-#include <dirent.h>
 #include <sys/stat.h>
 #include <unistd.h>
 #endif
@@ -209,11 +208,7 @@ static char *fd_icon_for_name(char *name, uint32_t is_dir) {
 
 // [=]===^=[ fd_path_exists ]======================================[=]
 static uint32_t fd_path_exists(char *path) {
-#ifdef _WIN32
-	return GetFileAttributesA(path) != INVALID_FILE_ATTRIBUTES;
-#else
-	return access(path, F_OK) == 0;
-#endif
+	return mkgui_path_exists(path);
 }
 
 // [=]===^=[ fd_get_home ]=========================================[=]
@@ -350,61 +345,21 @@ static void fd_scan_dir(void) {
 	}
 
 #ifdef _WIN32
-	uint32_t plen = (uint32_t)strlen(fd->path);
-	if(plen == 0) {
-		return;
-	}
-
-	if(!(plen == 3 && fd->path[1] == ':' && fd->path[2] == '\\')) {
-		struct fd_entry *e = &fd->entries[fd->entry_count++];
-		snprintf(e->name, sizeof(e->name), "..");
-		e->is_dir = 1;
-		e->size = 0;
-		e->mtime = 0;
-	}
-
-	char pattern[FD_PATH_SIZE];
-	snprintf(pattern, sizeof(pattern), "%s\\*", fd->path);
-	WIN32_FIND_DATAA wfd;
-	HANDLE hf = FindFirstFileA(pattern, &wfd);
-	if(hf == INVALID_HANDLE_VALUE) {
-		return;
-	}
-	do {
-		if(fd->entry_count >= FD_MAX_FILES) {
-			break;
+	{
+		uint32_t plen = (uint32_t)strlen(fd->path);
+		if(plen == 0) {
+			return;
 		}
-
-		if(wfd.cFileName[0] == '.') {
-			if(!fd->show_hidden) {
-				continue;
-			}
-
-			if(strcmp(wfd.cFileName, ".") == 0 || strcmp(wfd.cFileName, "..") == 0) {
-				continue;
-			}
+		// skip ".." at a drive root (e.g. "C:\")
+		if(!(plen == 3 && fd->path[1] == ':' && fd->path[2] == '\\')) {
+			struct fd_entry *e = &fd->entries[fd->entry_count++];
+			snprintf(e->name, sizeof(e->name), "..");
+			e->is_dir = 1;
+			e->size = 0;
+			e->mtime = 0;
 		}
-		uint32_t is_dir = (wfd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) ? 1 : 0;
-		if(!is_dir && filter_pat && !fd_match_pattern(wfd.cFileName, filter_pat)) {
-			continue;
-		}
-		struct fd_entry *e = &fd->entries[fd->entry_count];
-		snprintf(e->name, sizeof(e->name), "%s", wfd.cFileName);
-		e->is_dir = is_dir;
-		e->size = ((int64_t)wfd.nFileSizeHigh << 32) | wfd.nFileSizeLow;
-		ULARGE_INTEGER ftime;
-		ftime.LowPart = wfd.ftLastWriteTime.dwLowDateTime;
-		ftime.HighPart = wfd.ftLastWriteTime.dwHighDateTime;
-		e->mtime = (int64_t)((ftime.QuadPart - 116444736000000000ULL) / 10000000ULL);
-		++fd->entry_count;
-	} while(FindNextFileA(hf, &wfd));
-	FindClose(hf);
+	}
 #else
-	DIR *dir = opendir(fd->path);
-	if(!dir) {
-		return;
-	}
-
 	if(strcmp(fd->path, "/") != 0) {
 		struct fd_entry *e = &fd->entries[fd->entry_count++];
 		snprintf(e->name, sizeof(e->name), "..");
@@ -412,45 +367,50 @@ static void fd_scan_dir(void) {
 		e->size = 0;
 		e->mtime = 0;
 	}
+#endif
 
-	struct dirent *de;
-	while((de = readdir(dir)) != NULL && fd->entry_count < FD_MAX_FILES) {
-		if(de->d_name[0] == '.') {
+	struct mkgui_dir dir;
+	if(!mkgui_dir_open(&dir, fd->path)) {
+		return;
+	}
+
+	struct mkgui_dir_entry *de;
+	while((de = mkgui_dir_next(&dir)) != NULL && fd->entry_count < FD_MAX_FILES) {
+		if(de->name[0] == '.') {
 			if(!fd->show_hidden) {
 				continue;
 			}
 
-			if(strcmp(de->d_name, ".") == 0 || strcmp(de->d_name, "..") == 0) {
+			if(strcmp(de->name, ".") == 0 || strcmp(de->name, "..") == 0) {
 				continue;
 			}
 		}
 
 		char fullpath[FD_PATH_SIZE + 260];
-		snprintf(fullpath, sizeof(fullpath), "%s/%s", fd->path, de->d_name);
+#ifdef _WIN32
+		snprintf(fullpath, sizeof(fullpath), "%s\\%s", fd->path, de->name);
+#else
+		snprintf(fullpath, sizeof(fullpath), "%s/%s", fd->path, de->name);
+#endif
 
-		struct stat st;
-		uint32_t is_dir = 0;
-		int64_t fsize = 0;
-		int64_t fmtime = 0;
-		if(stat(fullpath, &st) == 0) {
-			is_dir = S_ISDIR(st.st_mode) ? 1 : 0;
-			fsize = st.st_size;
-			fmtime = (int64_t)st.st_mtime;
-		}
+		struct mkgui_path_info info;
+		info.is_dir = 0;
+		info.size = 0;
+		info.mtime = 0;
+		mkgui_path_stat(fullpath, &info);
 
-		if(!is_dir && filter_pat && !fd_match_pattern(de->d_name, filter_pat)) {
+		if(!info.is_dir && filter_pat && !fd_match_pattern(de->name, filter_pat)) {
 			continue;
 		}
 
 		struct fd_entry *e = &fd->entries[fd->entry_count];
-		snprintf(e->name, sizeof(e->name), "%s", de->d_name);
-		e->is_dir = is_dir;
-		e->size = fsize;
-		e->mtime = fmtime;
+		snprintf(e->name, sizeof(e->name), "%s", de->name);
+		e->is_dir = info.is_dir;
+		e->size = info.size;
+		e->mtime = info.mtime;
 		++fd->entry_count;
 	}
-	closedir(dir);
-#endif
+	mkgui_dir_close(&dir);
 
 	if(fd->entry_count > 1) {
 		qsort(fd->entries, fd->entry_count, sizeof(fd->entries[0]), fd_compare_entries);
@@ -710,22 +670,16 @@ static void fd_clear_filter(struct mkgui_ctx *dlg) {
 
 // [=]===^=[ fd_navigate ]========================================[=]
 static void fd_navigate(struct mkgui_ctx *dlg, const char *newpath) {
-#ifdef _WIN32
-	DWORD attr = GetFileAttributesA(newpath);
-	if(attr == INVALID_FILE_ATTRIBUTES || !(attr & FILE_ATTRIBUTE_DIRECTORY)) {
+	if(!mkgui_path_is_dir(newpath)) {
 		return;
 	}
 	char resolved[FD_PATH_SIZE];
+#ifdef _WIN32
 	DWORD rlen = GetFullPathNameA(newpath, sizeof(resolved), resolved, NULL);
 	if(rlen == 0 || rlen >= sizeof(resolved)) {
 		return;
 	}
 #else
-	struct stat st;
-	if(stat(newpath, &st) != 0 || !S_ISDIR(st.st_mode)) {
-		return;
-	}
-	char resolved[FD_PATH_SIZE];
 	if(realpath(newpath, resolved) == NULL) {
 		return;
 	}

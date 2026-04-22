@@ -76,7 +76,7 @@ static void ibt_try_add_theme(const char *dir_path, const char *name) {
 	}
 	char idx_path[2048];
 	snprintf(idx_path, sizeof(idx_path), "%s/index.theme", dir_path);
-	if(access(idx_path, R_OK) == 0) {
+	if(mkgui_path_readable(idx_path)) {
 		uint32_t ti = ibt->theme_count;
 		snprintf(ibt->theme_dirs[ti], sizeof(ibt->theme_dirs[ti]), "%s", dir_path);
 		snprintf(ibt->theme_names[ti], sizeof(ibt->theme_names[ti]), "%s", name);
@@ -86,20 +86,20 @@ static void ibt_try_add_theme(const char *dir_path, const char *name) {
 	// source repos (e.g. breeze) may have icons/ subdir with .theme.in files
 	char icons_sub[2048];
 	snprintf(icons_sub, sizeof(icons_sub), "%s/icons", dir_path);
-	DIR *probe = opendir(icons_sub);
-	if(!probe) {
+	struct mkgui_dir probe;
+	if(!mkgui_dir_open(&probe, icons_sub)) {
 		return;
 	}
 	uint32_t has_theme_in = 0;
-	struct dirent *pe;
-	while((pe = readdir(probe)) != NULL) {
-		uint32_t plen = (uint32_t)strlen(pe->d_name);
-		if(plen > 9 && strcmp(pe->d_name + plen - 9, ".theme.in") == 0) {
+	struct mkgui_dir_entry *pe;
+	while((pe = mkgui_dir_next(&probe)) != NULL) {
+		uint32_t plen = (uint32_t)strlen(pe->name);
+		if(plen > 9 && strcmp(pe->name + plen - 9, ".theme.in") == 0) {
 			has_theme_in = 1;
 			break;
 		}
 	}
-	closedir(probe);
+	mkgui_dir_close(&probe);
 	if(!has_theme_in) {
 		return;
 	}
@@ -113,24 +113,23 @@ static void ibt_try_add_theme(const char *dir_path, const char *name) {
 // Scan a directory containing icon themes (e.g. /usr/share/icons/).
 // Each subdirectory with an index.theme is added as a browseable theme.
 static void ibt_scan_icon_dir(const char *base_dir) {
-	DIR *d = opendir(base_dir);
-	if(!d) {
+	struct mkgui_dir d;
+	if(!mkgui_dir_open(&d, base_dir)) {
 		return;
 	}
-	struct dirent *ent;
-	while((ent = readdir(d)) != NULL && ibt->theme_count < IB_MAX_THEMES) {
-		if(ent->d_name[0] == '.') {
+	struct mkgui_dir_entry *ent;
+	while((ent = mkgui_dir_next(&d)) != NULL && ibt->theme_count < IB_MAX_THEMES) {
+		if(ent->name[0] == '.') {
 			continue;
 		}
 		char sub_path[2048];
-		snprintf(sub_path, sizeof(sub_path), "%s/%s", base_dir, ent->d_name);
-		struct stat st;
-		if(stat(sub_path, &st) != 0 || !S_ISDIR(st.st_mode)) {
+		snprintf(sub_path, sizeof(sub_path), "%s/%s", base_dir, ent->name);
+		if(!mkgui_path_is_dir(sub_path)) {
 			continue;
 		}
-		ibt_try_add_theme(sub_path, ent->d_name);
+		ibt_try_add_theme(sub_path, ent->name);
 	}
-	closedir(d);
+	mkgui_dir_close(&d);
 }
 
 // [=]===^=[ ibt_scan_local_themes ]=================================[=]
@@ -175,39 +174,37 @@ static void ibt_scan_local_themes(void) {
 #endif
 
 	// also scan cwd and one level deeper (local/unpacked themes, Windows)
-	DIR *d = opendir(".");
-	if(!d) {
+	struct mkgui_dir d;
+	if(!mkgui_dir_open(&d, ".")) {
 		return;
 	}
-	struct dirent *ent;
-	while((ent = readdir(d)) != NULL && ibt->theme_count < IB_MAX_THEMES) {
-		if(ent->d_name[0] == '.') {
+	struct mkgui_dir_entry *ent;
+	while((ent = mkgui_dir_next(&d)) != NULL && ibt->theme_count < IB_MAX_THEMES) {
+		if(ent->name[0] == '.') {
 			continue;
 		}
-		struct stat st;
-		if(stat(ent->d_name, &st) != 0 || !S_ISDIR(st.st_mode)) {
+		if(!mkgui_path_is_dir(ent->name)) {
 			continue;
 		}
-		ibt_try_add_theme(ent->d_name, ent->d_name);
+		ibt_try_add_theme(ent->name, ent->name);
 		// scan one level deeper for extracted archives
-		DIR *sub = opendir(ent->d_name);
-		if(sub) {
-			struct dirent *sent;
-			while((sent = readdir(sub)) != NULL && ibt->theme_count < IB_MAX_THEMES) {
-				if(sent->d_name[0] == '.') {
+		struct mkgui_dir sub;
+		if(mkgui_dir_open(&sub, ent->name)) {
+			struct mkgui_dir_entry *sent;
+			while((sent = mkgui_dir_next(&sub)) != NULL && ibt->theme_count < IB_MAX_THEMES) {
+				if(sent->name[0] == '.') {
 					continue;
 				}
 				char sub_path[2048];
-				snprintf(sub_path, sizeof(sub_path), "%s/%s", ent->d_name, sent->d_name);
-				struct stat sst;
-				if(stat(sub_path, &sst) == 0 && S_ISDIR(sst.st_mode)) {
-					ibt_try_add_theme(sub_path, sent->d_name);
+				snprintf(sub_path, sizeof(sub_path), "%s/%s", ent->name, sent->name);
+				if(mkgui_path_is_dir(sub_path)) {
+					ibt_try_add_theme(sub_path, sent->name);
 				}
 			}
-			closedir(sub);
+			mkgui_dir_close(&sub);
 		}
 	}
-	closedir(d);
+	mkgui_dir_close(&d);
 }
 
 // ---------------------------------------------------------------------------
@@ -260,13 +257,13 @@ static int32_t ibt_find_name(const char *name) {
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wformat-truncation"
 static void ibt_scan_one_dir(const char *dir_path, uint32_t cat_idx) {
-	DIR *d = opendir(dir_path);
-	if(!d) {
+	struct mkgui_dir d;
+	if(!mkgui_dir_open(&d, dir_path)) {
 		return;
 	}
-	struct dirent *ent;
-	while((ent = readdir(d)) != NULL) {
-		char *fname = ent->d_name;
+	struct mkgui_dir_entry *ent;
+	while((ent = mkgui_dir_next(&d)) != NULL) {
+		char *fname = ent->name;
 		uint32_t len = (uint32_t)strlen(fname);
 		if(len < 5 || strcmp(fname + len - 4, ".svg") != 0) {
 			continue;
@@ -297,7 +294,7 @@ static void ibt_scan_one_dir(const char *dir_path, uint32_t cat_idx) {
 		ibt_hash_insert(idx);
 		++ibt->total_count;
 	}
-	closedir(d);
+	mkgui_dir_close(&d);
 }
 
 // [=]===^=[ ibt_scan_category ]======================================[=]
@@ -349,68 +346,65 @@ static void ibt_discover_categories(const char *theme_dir) {
 	for(const char **sd = size_dirs; *sd; ++sd) {
 		char size_path[2048];
 		snprintf(size_path, sizeof(size_path), "%s/%s", theme_dir, *sd);
-		DIR *d = opendir(size_path);
-		if(!d) {
+		struct mkgui_dir d;
+		if(!mkgui_dir_open(&d, size_path)) {
 			continue;
 		}
-		struct dirent *ent;
-		while((ent = readdir(d)) != NULL && ibt->cat_count < IB_MAX_CATS) {
-			if(ent->d_name[0] == '.') {
+		struct mkgui_dir_entry *ent;
+		while((ent = mkgui_dir_next(&d)) != NULL && ibt->cat_count < IB_MAX_CATS) {
+			if(ent->name[0] == '.') {
 				continue;
 			}
 			char sub[2048];
-			snprintf(sub, sizeof(sub), "%s/%s", size_path, ent->d_name);
-			struct stat st;
-			if(stat(sub, &st) != 0 || !S_ISDIR(st.st_mode)) {
+			snprintf(sub, sizeof(sub), "%s/%s", size_path, ent->name);
+			if(!mkgui_path_is_dir(sub)) {
 				continue;
 			}
 			uint32_t exists = 0;
 			for(uint32_t i = 0; i < ibt->cat_count; ++i) {
-				if(strcmp(ibt->cat_names[i], ent->d_name) == 0) {
+				if(strcmp(ibt->cat_names[i], ent->name) == 0) {
 					exists = 1;
 					break;
 				}
 			}
 
 			if(!exists) {
-				strncpy(ibt->cat_names[ibt->cat_count], ent->d_name, sizeof(ibt->cat_names[0]) - 1);
+				strncpy(ibt->cat_names[ibt->cat_count], ent->name, sizeof(ibt->cat_names[0]) - 1);
 				ibt->cat_names[ibt->cat_count][sizeof(ibt->cat_names[0]) - 1] = '\0';
 				++ibt->cat_count;
 			}
 		}
-		closedir(d);
+		mkgui_dir_close(&d);
 	}
 
 	// scan {category}/{size} layout (breeze)
-	DIR *root = opendir(theme_dir);
-	if(root) {
-		struct dirent *ent;
-		while((ent = readdir(root)) != NULL && ibt->cat_count < IB_MAX_CATS) {
-			if(ent->d_name[0] == '.') {
+	struct mkgui_dir root;
+	if(mkgui_dir_open(&root, theme_dir)) {
+		struct mkgui_dir_entry *ent;
+		while((ent = mkgui_dir_next(&root)) != NULL && ibt->cat_count < IB_MAX_CATS) {
+			if(ent->name[0] == '.') {
 				continue;
 			}
 			char sub[2048];
-			snprintf(sub, sizeof(sub), "%s/%s", theme_dir, ent->d_name);
-			struct stat st;
-			if(stat(sub, &st) != 0 || !S_ISDIR(st.st_mode)) {
+			snprintf(sub, sizeof(sub), "%s/%s", theme_dir, ent->name);
+			if(!mkgui_path_is_dir(sub)) {
 				continue;
 			}
 			// check if this dir contains numbered subdirs (size dirs)
 			for(uint32_t si = 0; si < 6; ++si) {
 				char probe[2048];
 				snprintf(probe, sizeof(probe), "%s/%d", sub, cat_first_sizes[si]);
-				struct stat pst;
-				if(stat(probe, &pst) == 0 && S_ISDIR(pst.st_mode)) {
+				if(mkgui_path_is_dir(probe)) {
 					uint32_t exists = 0;
 					for(uint32_t i = 0; i < ibt->cat_count; ++i) {
-						if(strcmp(ibt->cat_names[i], ent->d_name) == 0) {
+						if(strcmp(ibt->cat_names[i], ent->name) == 0) {
 							exists = 1;
 							break;
 						}
 					}
 
 					if(!exists && ibt->cat_count < IB_MAX_CATS) {
-						strncpy(ibt->cat_names[ibt->cat_count], ent->d_name, sizeof(ibt->cat_names[0]) - 1);
+						strncpy(ibt->cat_names[ibt->cat_count], ent->name, sizeof(ibt->cat_names[0]) - 1);
 						ibt->cat_names[ibt->cat_count][sizeof(ibt->cat_names[0]) - 1] = '\0';
 						++ibt->cat_count;
 					}
@@ -418,7 +412,7 @@ static void ibt_discover_categories(const char *theme_dir) {
 				}
 			}
 		}
-		closedir(root);
+		mkgui_dir_close(&root);
 	}
 
 	// sort categories alphabetically

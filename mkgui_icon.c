@@ -175,8 +175,7 @@ static struct mkgui_svg_source *svg_find_source(char *name) {
 
 // [=]===^=[ icon_dir_exists ]========================================[=]
 static uint32_t icon_dir_exists(const char *path) {
-	struct stat st;
-	return stat(path, &st) == 0 && S_ISDIR(st.st_mode);
+	return mkgui_path_is_dir(path);
 }
 
 // ---------------------------------------------------------------------------
@@ -612,7 +611,7 @@ static uint32_t icon_find_in_system_theme(const char *theme_dir, const char *nam
 	// scalable first (best for SVG)
 	for(const char **cat = categories; *cat; ++cat) {
 		snprintf(out, out_size, "%s/scalable/%s/%s.svg", theme_dir, *cat, name);
-		if(access(out, R_OK) == 0) {
+		if(mkgui_path_readable(out)) {
 			return 1;
 		}
 	}
@@ -621,7 +620,7 @@ static uint32_t icon_find_in_system_theme(const char *theme_dir, const char *nam
 	for(uint32_t si = 0; si < 6; ++si) {
 		for(const char **cat = categories; *cat; ++cat) {
 			snprintf(out, out_size, "%s/%dx%d/%s/%s.svg", theme_dir, sizes[si], sizes[si], *cat, name);
-			if(access(out, R_OK) == 0) {
+			if(mkgui_path_readable(out)) {
 				return 1;
 			}
 		}
@@ -630,12 +629,12 @@ static uint32_t icon_find_in_system_theme(const char *theme_dir, const char *nam
 	// category-first layout (breeze, elementary)
 	for(const char **cat = categories; *cat; ++cat) {
 		snprintf(out, out_size, "%s/%s/scalable/%s.svg", theme_dir, *cat, name);
-		if(access(out, R_OK) == 0) {
+		if(mkgui_path_readable(out)) {
 			return 1;
 		}
 		for(uint32_t si = 0; si < 6; ++si) {
 			snprintf(out, out_size, "%s/%s/%d/%s.svg", theme_dir, *cat, sizes[si], name);
-			if(access(out, R_OK) == 0) {
+			if(mkgui_path_readable(out)) {
 				return 1;
 			}
 		}
@@ -939,15 +938,15 @@ MKGUI_API uint32_t mkgui_icon_load_svg_dir(struct mkgui_ctx *ctx, const char *di
 		return 0;
 	}
 
-	DIR *d = opendir(dir_path);
-	if(!d) {
+	struct mkgui_dir d;
+	if(!mkgui_dir_open(&d, dir_path)) {
 		return 0;
 	}
 
 	uint32_t loaded = 0;
-	struct dirent *ent;
-	while((ent = readdir(d)) != NULL) {
-		char *fname = ent->d_name;
+	struct mkgui_dir_entry *ent;
+	while((ent = mkgui_dir_next(&d)) != NULL) {
+		char *fname = ent->name;
 		uint32_t len = (uint32_t)strlen(fname);
 		if(len < 5 || strcmp(fname + len - 4, ".svg") != 0) {
 			continue;
@@ -997,7 +996,7 @@ MKGUI_API uint32_t mkgui_icon_load_svg_dir(struct mkgui_ctx *ctx, const char *di
 			free(svg_data);
 		}
 	}
-	closedir(d);
+	mkgui_dir_close(&d);
 
 	if(loaded > 0) {
 		fprintf(stderr, "mkgui: loaded %u SVG icons from %s\n", loaded, dir_path);

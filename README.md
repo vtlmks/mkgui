@@ -146,7 +146,9 @@ The icons list is produced by the editor; dynamically-loaded icons can be added 
 
 ## Building on Windows
 
-mkgui requires GCC (C99). It does not compile with MSVC (`cl.exe`).
+mkgui targets C99 and builds with either **MinGW GCC** or **clang-cl** (LLVM's MSVC-compatible driver). Plain MSVC `cl.exe` is not tested but the source should be compatible; please report issues.
+
+### MSYS2 / MinGW (recommended)
 
 The easiest option is **MSYS2**, which gives you a native MinGW GCC on Windows:
 
@@ -163,6 +165,39 @@ The easiest option is **MSYS2**, which gives you a native MinGW GCC on Windows:
    Add `-lopengl32` only if the application uses `MKGUI_GLVIEW`. Building `demo.c` requires `-lopengl32` since the demo showcases the GL view widget.
 
 Cross-compiling from Linux also works. The included `build.sh` automatically builds Windows executables if `x86_64-w64-mingw32-gcc` is available.
+
+### clang-cl (MSVC toolchain)
+
+mkgui also compiles cleanly with `clang-cl` against the MSVC runtime. On Windows, install the **Build Tools for Visual Studio** (or the full IDE) and the **Windows SDK**, then from a Developer Command Prompt:
+
+```cmd
+clang-cl /O2 ^
+  -DMKGUI_MAX_ICONS=32768 -D_CRT_SECURE_NO_WARNINGS ^
+  myapp.c ^
+  /link /subsystem:windows /entry:mainCRTStartup ^
+  gdi32.lib user32.lib kernel32.lib shell32.lib advapi32.lib
+```
+
+Add `opengl32.lib` if the application uses `MKGUI_GLVIEW`. `/entry:mainCRTStartup` keeps `int main(void)` as the entry point under `/subsystem:windows` (equivalent to MinGW's `-mwindows`).
+
+Cross-compiling from Linux with `clang-cl` is also possible if you have a copy of the MSVC CRT headers/libraries and the Windows SDK. Point clang at them with `/imsvc` for each include directory and `/libpath:` for each library directory, and use `-fuse-ld=lld-link` so the LLVM linker handles the COFF output:
+
+```bash
+clang-cl /O2 -fuse-ld=lld-link \
+  /imsvc <msvc-crt>/include \
+  /imsvc <winsdk>/Include/ucrt \
+  /imsvc <winsdk>/Include/um \
+  /imsvc <winsdk>/Include/shared \
+  -DMKGUI_LIBRARY -DMKGUI_MAX_ICONS=32768 \
+  -D_CRT_SECURE_NO_WARNINGS \
+  mkgui.c demo.c \
+  /Fedemo.exe \
+  /link /subsystem:windows /entry:mainCRTStartup \
+  /libpath:<msvc-crt>/lib/x86_64 \
+  /libpath:<winsdk>/Lib/ucrt/x86_64 \
+  /libpath:<winsdk>/Lib/um/x86_64 \
+  gdi32.lib user32.lib kernel32.lib opengl32.lib shell32.lib advapi32.lib
+```
 
 ## Documentation
 

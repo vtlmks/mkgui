@@ -16,8 +16,6 @@
 #include <stdio.h>
 #include <time.h>
 #include <math.h>
-#include <dirent.h>
-#include <sys/stat.h>
 
 #if defined(__SSE2__)
 #include <emmintrin.h>
@@ -2788,6 +2786,12 @@ plutovg_surface_t *plutovg_surface_load_from_image_data(const void *d, int l) { 
 #include "plutosvg/plutosvg.h"
 #include "plutosvg/plutosvg.c"
 #pragma GCC diagnostic pop
+
+// ---------------------------------------------------------------------------
+// Filesystem abstraction (used by icon, iconbrowser and filedialog)
+// ---------------------------------------------------------------------------
+
+#include "mkgui_fs.c"
 
 // ---------------------------------------------------------------------------
 // Widget implementations
