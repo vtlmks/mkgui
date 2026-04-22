@@ -29,19 +29,26 @@ apt install gcc-mingw-w64-x86-64
 ```sh
 git clone <mkgui-repo-url>
 cd mkgui
-./build.sh
+./build.sh           # default: library + demo + tests + extract_icons
+./build.sh editor    # build the visual designer instead of the core targets
+./build.sh all       # build everything, including the editor
 ```
 
-This produces:
+Default (`core`) target produces:
 
 | Output | Description |
 |--------|-------------|
 | `out/libmkgui.a` | Static library for linking |
-| `out/editor` | Visual UI designer |
-| `out/extract_icons` | Icon extraction tool |
+| `out/libmkgui_win.a` | Windows static library (when MinGW is available) |
 | `out/demo` | Demo application |
+| `out/extract_icons` | Icon extraction tool |
+| `out/test_layout`, `out/test_widgets`, `out/test_events`, `out/test_events_ext`, `out/test_smoke` | Unit tests |
 
-Build variants: `./build.sh release` (stripped), `./build.sh debug` (no optimization), `./build.sh size` (`-Os`, ~26% smaller than release), `./build.sh asan` (AddressSanitizer + UBSan, Linux only), `./build.sh clean`.
+`./build.sh editor` adds `out/editor` (the visual UI designer). `./build.sh all` builds both.
+
+Build modes: `./build.sh release` (stripped), `./build.sh debug` (no optimization), `./build.sh size` (`-Os`, ~26% smaller than release), `./build.sh asan` (AddressSanitizer + UBSan, Linux only), `./build.sh clean`. Modes and targets can be combined: `./build.sh release editor`.
+
+The library is compiled with `-DMKGUI_LIBRARY -DMKGUI_MAX_ICONS=32768`, so `MKGUI_API` has external linkage and the icon capacity is large enough to host system icon themes without recompiling. Consumers link `libmkgui.a` and do not need to redefine these.
 
 ## Option A: Static library (recommended)
 
