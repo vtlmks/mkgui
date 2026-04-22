@@ -155,6 +155,10 @@ Cross-compiling from Linux also works. The included `build.sh` automatically bui
 - No right-to-left (RTL) layout support
 - No accessibility API integration (tab navigation and keyboard accelerators are supported)
 
+## Contributing
+
+Solo project with a strict C style (hard tabs, `if(` not `if (`, unity build, no `const`, no forward declarations, etc. - see the source for the full flavour). Bug reports with a minimal reproducer are very welcome; please file an issue. Pull requests are disabled by choice - any fixes will be applied in-house from a good report. Security-sensitive reports: see [SECURITY.md](SECURITY.md).
+
 ## License
 
 MIT
