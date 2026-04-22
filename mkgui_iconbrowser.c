@@ -975,6 +975,13 @@ MKGUI_API uint32_t mkgui_icon_browser(struct mkgui_ctx *ctx, int32_t size, char 
 					}
 				} break;
 
+				case MKGUI_EVENT_SCROLL: {
+					if(ev.id == IB_TH_GRID) {
+						ibt->scroll_x += ev.value;
+						dirty_widget_id(dlg, IB_TH_GRID);
+					}
+				} break;
+
 				case MKGUI_EVENT_TAB_CHANGED: {
 					if(ev.id == IB_TH_TABS) {
 						uint32_t tab_id = (uint32_t)ev.value;

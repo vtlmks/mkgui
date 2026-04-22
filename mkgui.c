@@ -5882,6 +5882,13 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 						ev->value = sbd ? sbd->value : 0;
 						return 1;
 
+					} else if(hi >= 0 && ctx->widgets[hi].type == MKGUI_CANVAS) {
+						ev->type = MKGUI_EVENT_SCROLL;
+						ev->id = ctx->widgets[hi].id;
+						ev->value = delta;
+						ev->col = 0;
+						return 1;
+
 					} else {
 						uint32_t sid = hi >= 0 ? ctx->widgets[hi].parent_id : 0;
 						if(!sid) {
@@ -5962,6 +5969,13 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 							listview_clamp_scroll_x(lv, content_w);
 							dirty_widget(ctx, (uint32_t)hi);
 						}
+
+					} else if(hi >= 0 && ctx->widgets[hi].type == MKGUI_CANVAS) {
+						ev->type = MKGUI_EVENT_SCROLL;
+						ev->id = ctx->widgets[hi].id;
+						ev->value = delta;
+						ev->col = 1;
+						return 1;
 
 					} else {
 						uint32_t sid = hi >= 0 ? ctx->widgets[hi].parent_id : 0;

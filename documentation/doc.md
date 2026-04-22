@@ -392,7 +392,7 @@ struct mkgui_event {
 | `MKGUI_EVENT_KEY` | Key pressed | keysym, keymod | -- |
 | `MKGUI_EVENT_ITEMVIEW_SELECT` | Item selected | item index | -- |
 | `MKGUI_EVENT_ITEMVIEW_DBLCLICK` | Item double-clicked | item index | -- |
-| `MKGUI_EVENT_SCROLL` | Scrollbar value changed | scroll position | -- |
+| `MKGUI_EVENT_SCROLL` | Scrollbar value changed, or wheel over canvas | scrollbar position, or wheel delta in pixels for canvas | 0 = vertical wheel, 1 = horizontal wheel (canvas only) |
 | `MKGUI_EVENT_CONTEXT` | Right-click on widget | row/node/item (-1 if empty) for views, mouse x otherwise | column for views, mouse y otherwise |
 | `MKGUI_EVENT_CONTEXT_HEADER` | Right-click on column header | mouse x | column index |
 | `MKGUI_EVENT_CONTEXT_MENU` | Context menu item selected | item id | checked state (0/1) |
@@ -1165,6 +1165,8 @@ MKGUI_W(MKGUI_CANVAS, ID_CANVAS, "", "", ID_PARENT, 0, 0, 0, MKGUI_CANVAS_BORDER
 ```
 
 The callback receives the pixel buffer and the widget's rect. All `draw_*` functions respect the clip rect, which is automatically set to the widget bounds before the callback and restored after. Use `MKGUI_CANVAS_BORDER` to draw a border before the callback runs.
+
+Mouse wheel events over a canvas emit `MKGUI_EVENT_SCROLL` with `value` set to the wheel delta in pixels (negative = up/left, positive = down/right) and `col` indicating the wheel axis (0 = vertical, 1 = horizontal). The canvas owner decides what to do with the delta - typical use is to advance an app-managed scroll offset and mark the widget dirty.
 
 ```c
 void my_draw(struct mkgui_ctx *ctx, uint32_t id, uint32_t *pixels,
