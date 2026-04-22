@@ -162,8 +162,6 @@ The easiest option is **MSYS2**, which gives you a native MinGW GCC on Windows:
    ```
    Add `-lopengl32` only if the application uses `MKGUI_GLVIEW`. Building `demo.c` requires `-lopengl32` since the demo showcases the GL view widget.
 
-Alternatively, if you already use **WSL2** on Windows, just build the Linux version -- it runs natively under WSL2 with X11 forwarding or WSLg.
-
 Cross-compiling from Linux also works. The included `build.sh` automatically builds Windows executables if `x86_64-w64-mingw32-gcc` is available.
 
 ## Documentation

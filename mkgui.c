@@ -6295,8 +6295,28 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 											ctx->dblclick_row = row;
 											ctx->dblclick_time = now;
 											if(hw->style & MKGUI_LISTVIEW_MULTI_SELECT) {
-												lv_multi_sel_toggle(lv, row);
-												lv->selected_row = row;
+												uint32_t mod_ctrl = (pev.keymod & MKGUI_MOD_CONTROL) != 0;
+												uint32_t mod_shift = (pev.keymod & MKGUI_MOD_SHIFT) != 0;
+												if(mod_ctrl) {
+													lv_multi_sel_toggle(lv, row);
+													lv->selected_row = row;
+												} else if(mod_shift) {
+													int32_t anchor = lv->selected_row;
+													if(anchor < 0) {
+														anchor = row;
+													}
+													int32_t lo = anchor < row ? anchor : row;
+													int32_t hi2 = anchor < row ? row : anchor;
+													lv->multi_sel_count = 0;
+													for(int32_t r = lo; r <= hi2 && lv->multi_sel_count < MKGUI_MAX_MULTI_SEL; ++r) {
+														lv->multi_sel[lv->multi_sel_count++] = r;
+													}
+													lv->selected_row = row;
+												} else {
+													lv->multi_sel[0] = row;
+													lv->multi_sel_count = 1;
+													lv->selected_row = row;
+												}
 											} else {
 												lv->selected_row = row;
 											}
