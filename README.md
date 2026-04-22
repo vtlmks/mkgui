@@ -6,6 +6,29 @@ This is a personal project by a single developer. It works well for what it does
 
 ![Demo application](screenshots/demo.png)
 
+## Project status
+
+mkgui is in **beta**. The author has used it to ship several working applications, so the core widget set, layout engine, and rendering pipeline are stable in practice. The public API is not frozen -- naming, flags, and signatures may still change between tags if something turns out to be a bad idea.
+
+## Versioning
+
+`master` is the development branch. It can change behaviour, break API, or introduce regressions between commits without notice -- that's what it's for.
+
+**For anything you intend to ship, pin to a release tag.** Tags are the stability anchor; master is not.
+
+```bash
+# direct clone pinned to a tag
+git clone https://github.com/<user>/mkgui.git
+cd mkgui
+git checkout v0.1.0-beta
+
+# or as a submodule
+git submodule add https://github.com/<user>/mkgui.git mkgui
+cd mkgui && git checkout v0.1.0-beta
+```
+
+If you need a fix that only exists on master, open an issue so it can be cherry-picked into the next tag rather than silently depending on a moving target.
+
 ## Features
 
 - 45+ widget types: buttons, inputs, checkboxes, dropdowns, sliders, spinboxes, treeviews, listviews, gridviews, tabs, menus, toolbars, statusbars, toggles, comboboxes, datepickers, and more
