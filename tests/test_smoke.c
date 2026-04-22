@@ -707,6 +707,191 @@ static void test_iconbrowser_grid_metrics(void) {
 }
 
 // ---------------------------------------------------------------------------
+// Toast and banner API
+// ---------------------------------------------------------------------------
+
+// [=]===^=[ test_toast_basic ]=======================================[=]
+static void test_toast_basic(void) {
+	TEST_BEGIN("toast: add one, verify state, clear");
+	enum { WIN = 1 };
+	struct mkgui_widget widgets[] = {
+		MKGUI_W(MKGUI_WINDOW, WIN, "T", "", 0, 400, 300, 0, 0, 0),
+	};
+	struct mkgui_ctx *ctx = mkgui_create(widgets, 1);
+	CHECK(ctx, "create failed");
+	if(ctx) {
+		mkgui_toast(ctx, "hello");
+		uint32_t active = 0;
+		for(uint32_t i = 0; i < MKGUI_MAX_TOASTS; ++i) {
+			if(ctx->toasts[i].active) {
+				++active;
+				CHECK(ctx->toasts[i].severity == MKGUI_SEVERITY_INFO, "default severity should be INFO");
+				CHECK(ctx->toasts[i].expire_ms != 0, "default duration should not be persistent");
+				CHECK(strcmp(ctx->toasts[i].text, "hello") == 0, "text mismatch: %s", ctx->toasts[i].text);
+			}
+		}
+
+		CHECK(active == 1, "expected 1 active toast, got %u", active);
+
+		mkgui_toast_clear(ctx);
+		active = 0;
+		for(uint32_t i = 0; i < MKGUI_MAX_TOASTS; ++i) {
+			if(ctx->toasts[i].active) {
+				++active;
+			}
+		}
+
+		CHECK(active == 0, "toast_clear should remove all toasts, got %u active", active);
+		mkgui_destroy(ctx);
+	}
+	TEST_END();
+}
+
+// [=]===^=[ test_toast_severity_and_persistent ]=====================[=]
+static void test_toast_severity_and_persistent(void) {
+	TEST_BEGIN("toast: severity + duration=0 (persistent)");
+	enum { WIN = 1 };
+	struct mkgui_widget widgets[] = {
+		MKGUI_W(MKGUI_WINDOW, WIN, "T", "", 0, 400, 300, 0, 0, 0),
+	};
+	struct mkgui_ctx *ctx = mkgui_create(widgets, 1);
+	if(ctx) {
+		mkgui_toast_ex(ctx, MKGUI_SEVERITY_ERROR, "boom", 0);
+		uint32_t found = 0;
+		for(uint32_t i = 0; i < MKGUI_MAX_TOASTS; ++i) {
+			struct mkgui_toast_slot *t = &ctx->toasts[i];
+			if(t->active) {
+				CHECK(t->severity == MKGUI_SEVERITY_ERROR, "severity should be ERROR, got %u", t->severity);
+				CHECK(t->expire_ms == 0, "duration=0 should yield persistent toast");
+				CHECK(strcmp(t->text, "boom") == 0, "text mismatch");
+				++found;
+			}
+		}
+
+		CHECK(found == 1, "expected 1 active toast, got %u", found);
+		mkgui_destroy(ctx);
+	}
+	TEST_END();
+}
+
+// [=]===^=[ test_toast_overflow_evicts_oldest ]======================[=]
+static void test_toast_overflow_evicts_oldest(void) {
+	TEST_BEGIN("toast: overflow beyond MKGUI_MAX_TOASTS evicts oldest");
+	enum { WIN = 1 };
+	struct mkgui_widget widgets[] = {
+		MKGUI_W(MKGUI_WINDOW, WIN, "T", "", 0, 400, 300, 0, 0, 0),
+	};
+	struct mkgui_ctx *ctx = mkgui_create(widgets, 1);
+	if(ctx) {
+		char buf[32];
+		for(uint32_t i = 0; i < MKGUI_MAX_TOASTS; ++i) {
+			snprintf(buf, sizeof(buf), "t%u", i);
+			mkgui_toast(ctx, buf);
+		}
+		uint32_t active = 0;
+		for(uint32_t i = 0; i < MKGUI_MAX_TOASTS; ++i) {
+			if(ctx->toasts[i].active) {
+				++active;
+			}
+		}
+
+		CHECK(active == MKGUI_MAX_TOASTS, "expected all %u slots filled, got %u", MKGUI_MAX_TOASTS, active);
+
+		// One more: oldest (t0) should be dropped, newest ("overflow") should be in last slot
+		mkgui_toast(ctx, "overflow");
+		active = 0;
+		uint32_t has_t0 = 0;
+		uint32_t has_overflow = 0;
+		for(uint32_t i = 0; i < MKGUI_MAX_TOASTS; ++i) {
+			if(ctx->toasts[i].active) {
+				++active;
+				if(strcmp(ctx->toasts[i].text, "t0") == 0) {
+					has_t0 = 1;
+				}
+				if(strcmp(ctx->toasts[i].text, "overflow") == 0) {
+					has_overflow = 1;
+				}
+			}
+		}
+
+		CHECK(active == MKGUI_MAX_TOASTS, "still expected %u active after overflow, got %u", MKGUI_MAX_TOASTS, active);
+		CHECK(!has_t0, "oldest toast t0 should have been evicted");
+		CHECK(has_overflow, "newest toast 'overflow' should be present");
+		mkgui_destroy(ctx);
+	}
+	TEST_END();
+}
+
+// [=]===^=[ test_toast_expiry ]======================================[=]
+static void test_toast_expiry(void) {
+	TEST_BEGIN("toast: toasts_expire removes timed-out toasts");
+	enum { WIN = 1 };
+	struct mkgui_widget widgets[] = {
+		MKGUI_W(MKGUI_WINDOW, WIN, "T", "", 0, 400, 300, 0, 0, 0),
+	};
+	struct mkgui_ctx *ctx = mkgui_create(widgets, 1);
+	if(ctx) {
+		// Short-lived toast: 1ms
+		mkgui_toast_ex(ctx, MKGUI_SEVERITY_INFO, "short", 1);
+		// Persistent toast: 0ms
+		mkgui_toast_ex(ctx, MKGUI_SEVERITY_INFO, "persist", 0);
+
+		// Ensure the 1ms one has already expired before calling toasts_expire
+		struct timespec ts;
+		ts.tv_sec = 0;
+		ts.tv_nsec = 5 * 1000 * 1000; // 5ms
+		nanosleep(&ts, NULL);
+		uint32_t removed = toasts_expire(ctx);
+		CHECK(removed, "toasts_expire should have removed the short-lived toast");
+
+		uint32_t active = 0;
+		uint32_t has_persist = 0;
+		for(uint32_t i = 0; i < MKGUI_MAX_TOASTS; ++i) {
+			if(ctx->toasts[i].active) {
+				++active;
+				if(strcmp(ctx->toasts[i].text, "persist") == 0) {
+					has_persist = 1;
+				}
+			}
+		}
+
+		CHECK(active == 1, "expected 1 surviving toast, got %u", active);
+		CHECK(has_persist, "persistent toast should still be active");
+		mkgui_destroy(ctx);
+	}
+	TEST_END();
+}
+
+// [=]===^=[ test_banner_set_clear ]==================================[=]
+static void test_banner_set_clear(void) {
+	TEST_BEGIN("banner: set, active, replace, clear");
+	enum { WIN = 1 };
+	struct mkgui_widget widgets[] = {
+		MKGUI_W(MKGUI_WINDOW, WIN, "T", "", 0, 400, 300, 0, 0, 0),
+	};
+	struct mkgui_ctx *ctx = mkgui_create(widgets, 1);
+	if(ctx) {
+		CHECK(!mkgui_banner_active(ctx), "banner should start inactive");
+
+		mkgui_banner_set(ctx, MKGUI_SEVERITY_WARNING, "unsaved");
+		CHECK(mkgui_banner_active(ctx), "banner should be active after set");
+		CHECK(ctx->banner.severity == MKGUI_SEVERITY_WARNING, "severity mismatch: %u", ctx->banner.severity);
+		CHECK(strcmp(ctx->banner.text, "unsaved") == 0, "text mismatch: %s", ctx->banner.text);
+
+		// Replace
+		mkgui_banner_set(ctx, MKGUI_SEVERITY_ERROR, "offline");
+		CHECK(mkgui_banner_active(ctx), "banner should still be active after replace");
+		CHECK(ctx->banner.severity == MKGUI_SEVERITY_ERROR, "severity after replace mismatch");
+		CHECK(strcmp(ctx->banner.text, "offline") == 0, "text after replace mismatch");
+
+		mkgui_banner_clear(ctx);
+		CHECK(!mkgui_banner_active(ctx), "banner should be inactive after clear");
+		mkgui_destroy(ctx);
+	}
+	TEST_END();
+}
+
+// ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
 
@@ -733,6 +918,12 @@ int main(void) {
 	test_glview_setup();
 
 	test_iconbrowser_grid_metrics();
+
+	test_toast_basic();
+	test_toast_severity_and_persistent();
+	test_toast_overflow_evicts_oldest();
+	test_toast_expiry();
+	test_banner_set_clear();
 
 	printf("\n=================================\n");
 	printf("%u tests: %u passed, %u failed\n", tests_run, tests_passed, tests_failed);

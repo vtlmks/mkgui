@@ -701,6 +701,21 @@ struct mkgui_ctx {
 		uint32_t dragging;
 	} cell_edit;
 
+	struct mkgui_toast_slot {
+		uint32_t active;
+		uint32_t severity;
+		uint32_t expire_ms;
+		int32_t x, y, w, h;
+		char text[MKGUI_MAX_TEXT];
+	} toasts[MKGUI_MAX_TOASTS];
+
+	struct mkgui_banner_state {
+		uint32_t active;
+		uint32_t severity;
+		int32_t close_x, close_y, close_w, close_h;
+		char text[MKGUI_MAX_TEXT];
+	} banner;
+
 	struct mkgui_rect dirty_rects[32];
 	uint32_t dirty_count;
 	uint32_t dirty_full;
@@ -2820,6 +2835,7 @@ plutovg_surface_t *plutovg_surface_load_from_image_data(const void *d, int l) { 
 #include "mkgui_canvas.c"
 #include "mkgui_celledit.c"
 #include "mkgui_tooltip.c"
+#include "mkgui_notify.c"
 
 // ---------------------------------------------------------------------------
 // Render dispatch
@@ -4552,6 +4568,10 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 	ev->keysym = 0;
 	ev->keymod = 0;
 
+	if(toasts_expire(ctx)) {
+		dirty_all(ctx);
+	}
+
 #ifdef _WIN32
 	int64_t now;
 	QueryPerformanceCounter((LARGE_INTEGER *)&now);
@@ -5294,6 +5314,12 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 
 			// -=[ BUTTON PRESS ]=-
 			case MKGUI_PLAT_BUTTON_PRESS: {
+				// Toast and banner clicks dismiss the notification without
+				// reaching the underlying widget. Only left-click.
+				if(pev.button == 1 && popup_idx < 0 && notify_handle_click(ctx, ctx->mouse_x, ctx->mouse_y)) {
+					break;
+				}
+
 				if(ctx->cell_edit.active && pev.button == 1) {
 					struct mkgui_cell_edit *ce = &ctx->cell_edit;
 					if(!celledit_compute_rect(ctx) || ctx->mouse_x < ce->cell_x || ctx->mouse_x >= ce->cell_x + ce->cell_w || ctx->mouse_y < ce->cell_y || ctx->mouse_y >= ce->cell_y + ce->cell_h) {
@@ -7616,6 +7642,8 @@ static void mkgui_flush(struct mkgui_ctx *ctx) {
 			ctx->render_cb(ctx, ctx->render_cb_data);
 		}
 		flush_text(ctx);
+		render_notify(ctx);
+		flush_text(ctx);
 		render_tooltip(ctx);
 		flush_text(ctx);
 		double t2 = mkgui_time_us();
@@ -7733,6 +7761,8 @@ static void mkgui_flush(struct mkgui_ctx *ctx) {
 				p->render_cb(p, p->render_cb_data);
 			}
 			flush_text(p);
+			render_notify(p);
+			flush_text(p);
 			render_tooltip(p);
 			flush_text(p);
 			platform_blit(p);
@@ -7772,6 +7802,12 @@ MKGUI_API void mkgui_wait(struct mkgui_ctx *ctx) {
 			if(timeout < 0 || remaining < timeout) {
 				timeout = remaining;
 			}
+		}
+	}
+	for(uint32_t i = 0; i < window_registry_count; ++i) {
+		int32_t next_toast = toasts_next_expiry_ms(window_registry[i]);
+		if(next_toast >= 0 && (timeout < 0 || next_toast < timeout)) {
+			timeout = next_toast;
 		}
 	}
 	platform_wait_event(ctx, timeout);

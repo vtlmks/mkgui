@@ -52,6 +52,13 @@
 #define MKGUI_MAX_ACCELS           64
 #define MKGUI_DROP_MAX             256
 #define MKGUI_PATH_MAX             4096
+#define MKGUI_MAX_TOASTS           8
+
+// Severity levels shared by toasts and banners.
+#define MKGUI_SEVERITY_INFO        0
+#define MKGUI_SEVERITY_SUCCESS     1
+#define MKGUI_SEVERITY_WARNING     2
+#define MKGUI_SEVERITY_ERROR       3
 
 // ---------------------------------------------------------------------------
 // Key constants
@@ -525,6 +532,32 @@ MKGUI_API void mkgui_toolbar_set_mode(struct mkgui_ctx *ctx, uint32_t toolbar_id
 
 MKGUI_API void mkgui_set_tooltip(struct mkgui_ctx *ctx, uint32_t id, const char *text);
 MKGUI_API const char *mkgui_get_tooltip(struct mkgui_ctx *ctx, uint32_t id);
+
+// ---------------------------------------------------------------------------
+// Toast and banner
+// ---------------------------------------------------------------------------
+
+// Toast: transient corner overlay. Multiple toasts stack at the bottom-right
+// of the window. Click anywhere on a toast to dismiss it early. Toasts auto-
+// dismiss after duration_ms; a duration of 0 means persistent until clicked.
+// The severity controls the background colour and the icon name resolved
+// against the Freedesktop icon set (dialog-information, dialog-ok,
+// dialog-warning, error). If a severity icon cannot be resolved, the
+// text is drawn without an icon. mkgui_toast is equivalent to mkgui_toast_ex
+// with severity INFO and a default duration.
+MKGUI_API void mkgui_toast(struct mkgui_ctx *ctx, const char *text);
+MKGUI_API void mkgui_toast_ex(struct mkgui_ctx *ctx, uint32_t severity, const char *text, uint32_t duration_ms);
+MKGUI_API void mkgui_toast_clear(struct mkgui_ctx *ctx);
+
+// Banner: persistent full-width overlay stripe at the top of the window.
+// Only one banner per context; setting a new one replaces any existing.
+// The user can dismiss the banner by clicking the close button on the right,
+// or your code can call mkgui_banner_clear. The banner overlays the top of
+// the window; widgets placed against the top edge will be occluded while a
+// banner is shown -- add top padding to your root container if needed.
+MKGUI_API void mkgui_banner_set(struct mkgui_ctx *ctx, uint32_t severity, const char *text);
+MKGUI_API void mkgui_banner_clear(struct mkgui_ctx *ctx);
+MKGUI_API uint32_t mkgui_banner_active(struct mkgui_ctx *ctx);
 
 // ---------------------------------------------------------------------------
 // Icon

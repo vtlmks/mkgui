@@ -1647,6 +1647,70 @@ Toolbar buttons automatically get their `label` set as tooltip text (since toolb
 
 Maximum tooltip text length is 127 characters.
 
+## Toasts and banners
+
+Transient and persistent in-window notifications. These are purely mkgui-rendered overlays -- they do not interact with the desktop notification system (libnotify, Windows ToastNotification). Nothing appears in the OS notification center, and nothing persists after the application closes.
+
+### Severity levels
+
+Both toasts and banners take a severity value that controls the background colour and resolves a Freedesktop icon:
+
+| Severity | Icon name | Typical use |
+|---|---|---|
+| `MKGUI_SEVERITY_INFO` | `dialog-information` | Neutral confirmations, informational messages |
+| `MKGUI_SEVERITY_SUCCESS` | `dialog-ok` | Successful operations ("file saved") |
+| `MKGUI_SEVERITY_WARNING` | `dialog-warning` | Cautions, soft limits, recoverable issues |
+| `MKGUI_SEVERITY_ERROR` | `error` | Failures requiring attention |
+
+If a severity icon cannot be resolved (not in bundled `icons/`, and on Linux not in the system theme either), the notification renders without an icon. No magenta placeholder is shown here.
+
+### Toast
+
+Toasts are transient corner-overlay notifications. Multiple toasts stack vertically at the bottom-right of the window. The user can click anywhere on a toast to dismiss it early; otherwise it auto-dismisses after its duration expires.
+
+```c
+void mkgui_toast(struct mkgui_ctx *ctx, const char *text);
+void mkgui_toast_ex(struct mkgui_ctx *ctx, uint32_t severity, const char *text, uint32_t duration_ms);
+void mkgui_toast_clear(struct mkgui_ctx *ctx);
+```
+
+- `mkgui_toast()` -- shortcut for an INFO toast with the default 3000 ms duration.
+- `mkgui_toast_ex()` -- explicit severity and duration. A `duration_ms` of `0` makes the toast persistent until the user clicks it.
+- `mkgui_toast_clear()` -- dismiss all currently-active toasts immediately.
+
+```c
+mkgui_toast(ctx, "Files synced with remote");
+mkgui_toast_ex(ctx, MKGUI_SEVERITY_SUCCESS, "File saved", 3000);
+mkgui_toast_ex(ctx, MKGUI_SEVERITY_WARNING, "Disk is nearly full", 4000);
+mkgui_toast_ex(ctx, MKGUI_SEVERITY_ERROR, "Connection lost", 0);   // persistent
+```
+
+Up to `MKGUI_MAX_TOASTS` (8) toasts are visible at once. When a new toast arrives while all slots are full, the oldest toast is evicted to make room. Text is truncated to fit the toast width (single line).
+
+### Banner
+
+A banner is a persistent full-width stripe at the top of the window, intended for ongoing conditions rather than transient messages ("unsaved changes", "offline mode", "trial expires in 3 days"). Only one banner per context -- setting a new one replaces any existing.
+
+```c
+void     mkgui_banner_set(struct mkgui_ctx *ctx, uint32_t severity, const char *text);
+void     mkgui_banner_clear(struct mkgui_ctx *ctx);
+uint32_t mkgui_banner_active(struct mkgui_ctx *ctx);
+```
+
+The banner has a close button on the right; clicking it calls `mkgui_banner_clear()` automatically. Your code can also clear it unconditionally, e.g. when the underlying condition no longer applies.
+
+```c
+mkgui_banner_set(ctx, MKGUI_SEVERITY_WARNING, "You have unsaved changes");
+// ...later, after a save succeeds:
+mkgui_banner_clear(ctx);
+```
+
+**Important:** the banner is an overlay. It does not participate in the layout engine, so it will occlude widgets placed against the top edge of the window while shown. If you expect to show a banner, leave top padding in your root container (e.g. a `MKGUI_SPACER` of the banner's approximate height, or start with a menubar/toolbar that is less critical if covered briefly).
+
+### OS notifications are out of scope
+
+mkgui does not integrate with libnotify, Windows ToastNotification, or any desktop notification center. These APIs are platform- and desktop-specific and would pull in external dependencies that the rest of mkgui avoids. If you need a tray notification that survives the application closing, use the platform API directly from your own code.
+
 ## Context menus
 
 Build and show context menus in response to right-click events. Context menus are Breeze-styled popup menus that support icons, separators, checkable and radio items, and keyboard navigation.

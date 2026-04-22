@@ -54,6 +54,7 @@ enum {
 	ID_LBL_IP, ID_IPINPUT1,
 	ID_LBL_TBMODE, ID_TBMODE_DROP,
 	ID_LBL_COLOR, ID_BTN_COLOR,
+	ID_LBL_NOTIFY, ID_BTN_NOTIFY_HBOX1, ID_BTN_NOTIFY_HBOX2, ID_BTN_TOAST_INFO, ID_BTN_TOAST_OK, ID_BTN_TOAST_WARN, ID_BTN_TOAST_ERR, ID_BTN_BANNER, ID_BTN_BANNER_CLEAR,
 	ID_DIVIDER1,
 	ID_GRP_COLLAPSIBLE,
 	ID_COLL_LBL,
@@ -415,6 +416,24 @@ static void demo_event(struct mkgui_ctx *ctx, struct mkgui_event *ev, void *user
 					mkgui_statusbar_set(ctx, ID_STATUSBAR, 0, buf);
 				}
 
+			} else if(ev->id == ID_BTN_TOAST_INFO) {
+				mkgui_toast(ctx, "Files synced with remote");
+
+			} else if(ev->id == ID_BTN_TOAST_OK) {
+				mkgui_toast_ex(ctx, MKGUI_SEVERITY_SUCCESS, "File saved", 3000);
+
+			} else if(ev->id == ID_BTN_TOAST_WARN) {
+				mkgui_toast_ex(ctx, MKGUI_SEVERITY_WARNING, "Disk is nearly full", 4000);
+
+			} else if(ev->id == ID_BTN_TOAST_ERR) {
+				mkgui_toast_ex(ctx, MKGUI_SEVERITY_ERROR, "Connection lost", 5000);
+
+			} else if(ev->id == ID_BTN_BANNER) {
+				mkgui_banner_set(ctx, MKGUI_SEVERITY_WARNING, "You have unsaved changes in this document");
+
+			} else if(ev->id == ID_BTN_BANNER_CLEAR) {
+				mkgui_banner_clear(ctx);
+
 			} else if(ev->id == ID_BUTTON1) {
 				mkgui_statusbar_set(ctx, ID_STATUSBAR, 0, "Applied!");
 
@@ -679,7 +698,7 @@ int main(void) {
 		MKGUI_W(MKGUI_CHECKBOX, ID_THEME_CHECK,"Light theme",      "weather-clear", ID_BTN_HBOX, 140, 0, MKGUI_FIXED, 0, 0),
 
 		/* Controls: right column */
-		MKGUI_W(MKGUI_VBOX,     ID_CTL_RVBOX, "",                  "", ID_CTL_HBOX, 280, 0, MKGUI_FIXED, 0, 0),
+		MKGUI_W(MKGUI_VBOX,     ID_CTL_RVBOX, "",                  "", ID_CTL_HBOX, 320, 0, MKGUI_FIXED, 0, 0),
 		MKGUI_W(MKGUI_GROUP,    ID_GRP_EXTRA, "Extra Controls",    "", ID_CTL_RVBOX, 0, 0, 0, MKGUI_GROUP_COLLAPSIBLE, 1),
 		MKGUI_W(MKGUI_FORM,     ID_EXTRA_FORM,"",                  "", ID_GRP_EXTRA, 0, 0, 0, 0, 0),
 		MKGUI_W(MKGUI_LABEL,    ID_LBL_POWER, "Power:",            "", ID_EXTRA_FORM, 0, 0, 0, 0, 0),
@@ -694,6 +713,16 @@ int main(void) {
 		MKGUI_W(MKGUI_INPUT,    ID_AMOUNT_INPUT,"",                "", ID_EXTRA_FORM, 0, 0, 0, MKGUI_INPUT_NUMERIC, 0),
 		MKGUI_W(MKGUI_LABEL,    ID_LBL_COLOR, "Color:",            "", ID_EXTRA_FORM, 0, 0, 0, 0, 0),
 		MKGUI_W(MKGUI_BUTTON,   ID_BTN_COLOR, "Pick Color",  "color-management", ID_EXTRA_FORM, 0, 0, 0, 0, 0),
+
+		MKGUI_W(MKGUI_LABEL,    ID_LBL_NOTIFY,       "Notifications:", "",                     ID_CTL_RVBOX,        0, 0,  MKGUI_FIXED, 0, 0),
+		MKGUI_W(MKGUI_HBOX,     ID_BTN_NOTIFY_HBOX1, "",               "",                     ID_CTL_RVBOX,        0, 28, MKGUI_FIXED, 0, 0),
+		MKGUI_W(MKGUI_BUTTON,   ID_BTN_TOAST_INFO,   "Info",           "dialog-information",   ID_BTN_NOTIFY_HBOX1, 0, 0,  0, 0, 0),
+		MKGUI_W(MKGUI_BUTTON,   ID_BTN_TOAST_OK,     "Success",        "dialog-ok",            ID_BTN_NOTIFY_HBOX1, 0, 0,  0, 0, 0),
+		MKGUI_W(MKGUI_BUTTON,   ID_BTN_TOAST_WARN,   "Warning",        "dialog-warning",       ID_BTN_NOTIFY_HBOX1, 0, 0,  0, 0, 0),
+		MKGUI_W(MKGUI_BUTTON,   ID_BTN_TOAST_ERR,    "Error",          "error",                ID_BTN_NOTIFY_HBOX1, 0, 0,  0, 0, 0),
+		MKGUI_W(MKGUI_HBOX,     ID_BTN_NOTIFY_HBOX2, "",               "",                     ID_CTL_RVBOX,        0, 28, MKGUI_FIXED, 0, 0),
+		MKGUI_W(MKGUI_BUTTON,   ID_BTN_BANNER,       "Banner on",      "dialog-warning",       ID_BTN_NOTIFY_HBOX2, 0, 0,  0, 0, 0),
+		MKGUI_W(MKGUI_BUTTON,   ID_BTN_BANNER_CLEAR, "Banner off",     "window-close",         ID_BTN_NOTIFY_HBOX2, 0, 0,  0, 0, 0),
 
 		MKGUI_W(MKGUI_DIVIDER,  ID_DIVIDER1,  "",                  "", ID_CTL_RVBOX, 0, 0, MKGUI_FIXED, 0, 0),
 
