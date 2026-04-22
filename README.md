@@ -97,13 +97,21 @@ mkgui_icon_load_svg(ctx, "my-icon", "path.svg"); // load a single icon
 
 Monochrome icons using `currentColor` automatically follow the theme text color and update on theme switch.
 
-To extract icons from an installed Freedesktop icon theme (e.g. Papirus, Breeze):
+### Platform differences (important)
+
+- **Linux:** if no bundled `icons/` directory is found, mkgui automatically falls back to the user's installed system icon theme (Papirus, Breeze, Adwaita, ...). Applications can run without shipping any icons and still display correct visuals. The editor's icon browser also scans system theme directories.
+- **Windows:** there is no system icon theme. Both end-user applications and the editor require a bundled `icons/` directory (or an unpacked Freedesktop theme next to the binary for the editor's icon browser). Without one, widgets fall back to a magenta-diamond placeholder and the icon browser appears empty.
+
+Windows users must therefore download a Freedesktop icon theme (e.g. [Papirus](https://github.com/PapirusDevelopmentTeam/papirus-icon-theme), [Breeze](https://invent.kde.org/frameworks/breeze-icons)) and either drop it next to the editor as `./Papirus/` for browsing, or run `extract_icons` to produce an `icons/` directory to ship with the application.
+
+### Extracting icons
 
 ```bash
-./tools/extract_icons /usr/share/icons/Papirus icons/ tools/subset.txt
+# extract_icons <icons_list.txt> <output_dir> [theme_dir] [size]
+./out/extract_icons myapp_icons.txt icons/ ./Papirus 16
 ```
 
-This extracts small (16/18px) and toolbar (22px) icons listed in `subset.txt` into the `icons/` directory. Toolbar-size icons go into `icons/toolbar/`.
+The icons list is produced by the editor; dynamically-loaded icons can be added to `myapp_icons_extra.txt`. See the [getting started guide](documentation/getting_started.md#icons) for the full workflow.
 
 ## Building the demo and editor
 

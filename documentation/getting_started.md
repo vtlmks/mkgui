@@ -110,6 +110,17 @@ Add `-lGL` only if your application uses `MKGUI_GLVIEW`. On Windows, the equival
 
 mkgui uses SVG icons from Freedesktop-compatible icon themes (Papirus, Breeze, Adwaita, etc.).
 
+### Platform behaviour at a glance
+
+The icon workflow differs significantly between platforms and this catches people out, so read this section before anything else:
+
+- **Linux** has a system icon theme. If `mkgui_icon_load_app_icons()` finds no bundled `icons/` directory, mkgui automatically falls back to the user's active theme (Papirus, Breeze, Adwaita, ...) detected from GTK/KDE settings. Shipping a bundled `icons/` is still recommended for reproducible visuals, but the application will work without it, and the editor's icon browser automatically scans `/usr/share/icons/`, `$XDG_DATA_HOME/icons/`, etc.
+- **Windows** has no system icon theme. There is no fallback. Both the editor and the applications you build with it require icon SVGs on disk:
+	- For the **editor's icon browser** to show anything, unpack a Freedesktop icon theme next to the editor binary (e.g. `./Papirus/` containing the theme's `index.theme`). Without at least one such directory the browser will be empty.
+	- For an **end-user application** to display its icons, the bundled `icons/` directory is mandatory. Without it, every widget icon falls back to a magenta-diamond placeholder.
+
+If you develop the UI on Linux and ship to Windows, the extraction step (below) is still required to produce the `icons/` directory for the Windows build.
+
 ### Setting up icons
 
 1. **Unpack an icon theme** next to the editor binary. Download a Freedesktop icon theme (e.g. Papirus) and extract it so the directory sits alongside the editor (e.g. `./Papirus/`). The editor detects any directory containing an `index.theme` file. You can have multiple themes side by side.
@@ -183,7 +194,12 @@ Browse all available icons in the editor's icon browser, or see the [Freedesktop
 
 ### Icons on Windows
 
-Freedesktop icon themes often use symlinks for icon aliases (e.g., `media-floppy.svg` linking to `document-save.svg`). On Linux this works transparently. On Windows, symlinks may not be preserved when extracting the theme archive. Use an extraction tool that resolves symlinks to copies (e.g., 7-Zip or tar with `--dereference`), or the aliased icons will be missing.
+Windows has no system-wide icon theme, so mkgui cannot fall back to the user's desktop like it does on Linux. In practice:
+
+- The editor's **icon browser is empty by default** on Windows. To populate it, download a Freedesktop theme (Papirus, Breeze, Adwaita, ...) and unpack the archive next to the editor binary so you have e.g. `./Papirus/index.theme`. You can drop several themes side by side.
+- An application built with mkgui **requires its bundled `icons/` directory** to be present next to the executable. There is no secondary lookup. If it's missing, every widget icon becomes a magenta-diamond placeholder.
+
+Freedesktop icon themes often use symlinks for icon aliases (e.g., `media-floppy.svg` linking to `document-save.svg`). On Linux this works transparently. On Windows, symlinks may not be preserved when extracting the theme archive. Use an extraction tool that resolves symlinks to copies (e.g., 7-Zip or `tar --dereference`), or the aliased icons will be missing.
 
 ### Theme compatibility
 
