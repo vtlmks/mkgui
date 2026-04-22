@@ -105,7 +105,6 @@ A grid of checkboxes for widget flags:
 
 | Flag     | Description |
 |----------|-------------|
-| Left, Top, Right, Bottom | Anchor edges for responsive resizing |
 | Hidden   | Widget starts hidden |
 | Disabled | Widget starts disabled |
 | Checked  | Initial checked state (checkbox, radio, menu item) |
@@ -117,8 +116,8 @@ A grid of checkboxes for widget flags:
 | Readonly | Prevent editing (input, textarea) |
 | Fixed    | Lock size in flex container |
 | RgnTop, RgnBot, RgnLeft, RgnRight | Split region assignment |
-| TbSep   | Toolbar separator (visible for toolbar button children) |
-| Separator, MChk, MRad | Menu item options |
+| Sep     | Separator (toolbar button children, menu items) |
+| MChk, MRad | Menu item check/radio style |
 | Vertical | Vertical orientation (slider, scrollbar, meter) |
 | Mixer    | Tapered volume style (slider) |
 | Truncate | Truncate with ellipsis (label) |
