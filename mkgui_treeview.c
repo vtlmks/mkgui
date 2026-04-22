@@ -3,6 +3,8 @@
 
 #define MKGUI_TREE_INDENT_PX 18
 #define MKGUI_TREE_ARROW_SIZE_PX 6
+#define MKGUI_TREE_PAD_PX 4
+#define MKGUI_TREE_ICON_GAP_PX 2
 
 #define TV_IDX_HASH_SIZE 1024
 #define TV_IDX_HASH_MASK (TV_IDX_HASH_SIZE - 1)
@@ -134,8 +136,8 @@ static void render_treeview(struct mkgui_ctx *ctx, uint32_t idx) {
 
 	int32_t tree_indent = sc(ctx, MKGUI_TREE_INDENT_PX);
 	int32_t arrow_size = sc(ctx, MKGUI_TREE_ARROW_SIZE_PX);
-	int32_t tree_pad = sc(ctx, 4);
-	int32_t icon_gap = sc(ctx, 2);
+	int32_t tree_pad = sc(ctx, MKGUI_TREE_PAD_PX);
+	int32_t icon_gap = sc(ctx, MKGUI_TREE_ICON_GAP_PX);
 
 	int32_t clip_top = ry + 1;
 	int32_t clip_bottom = ry + rh - 1;
@@ -359,7 +361,7 @@ static uint32_t treeview_arrow_hit(struct mkgui_ctx *ctx, uint32_t widget_idx, i
 	}
 	tv_idx_build(tv);
 	int32_t tree_indent = sc(ctx, MKGUI_TREE_INDENT_PX);
-	int32_t tree_pad = sc(ctx, 4);
+	int32_t tree_pad = sc(ctx, MKGUI_TREE_PAD_PX);
 	uint32_t depth = treeview_node_depth(tv, (uint32_t)node_idx);
 	int32_t rx = ctx->rects[widget_idx].x;
 	int32_t arrow_x = rx + tree_pad + (int32_t)depth * tree_indent;

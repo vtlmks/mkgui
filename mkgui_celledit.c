@@ -113,14 +113,14 @@ static uint32_t celledit_compute_rect_treeview(struct mkgui_ctx *ctx, int32_t wi
 	}
 
 	uint32_t depth = treeview_node_depth(tv, node_idx);
-	int32_t tree_indent = sc(ctx, 18);
-	int32_t tree_pad = sc(ctx, 4);
+	int32_t tree_indent = sc(ctx, MKGUI_TREE_INDENT_PX);
+	int32_t tree_pad = sc(ctx, MKGUI_TREE_PAD_PX);
 	int32_t indent = (int32_t)depth * tree_indent;
 	int32_t text_x = rx + tree_pad + indent + tree_indent;
 
 	int32_t ti = tv->nodes[node_idx].icon_idx;
 	if(ti >= 0 && (uint32_t)ti < icon_count) {
-		int32_t icon_gap = sc(ctx, 2);
+		int32_t icon_gap = sc(ctx, MKGUI_TREE_ICON_GAP_PX);
 		text_x += icons[ti].w + icon_gap;
 	}
 
@@ -193,15 +193,16 @@ static uint32_t celledit_compute_rect_itemview(struct mkgui_ctx *ctx, int32_t wi
 	int32_t item = ce->row;
 
 	if(iv->view_mode == MKGUI_VIEW_DETAIL) {
-		int32_t row_h = sc(ctx, 20);
+		int32_t row_h = sc(ctx, MKGUI_ITEMVIEW_DETAIL_ROW_H_PX);
 		int32_t cy = ca_y + item * row_h - iv->scroll_y;
 		if(cy + row_h <= ca_y || cy >= ca_y + ca_h) {
 			return 0;
 		}
-		int32_t tx = ca_x + sc(ctx, 4);
+		int32_t item_pad = sc(ctx, MKGUI_ITEMVIEW_ITEM_PAD_PX);
+		int32_t tx = ca_x + item_pad;
 		int32_t icon_idx = itemview_get_icon_idx(iv, (uint32_t)item);
 		if(icon_idx >= 0) {
-			tx += icons[icon_idx].w + sc(ctx, 4);
+			tx += icons[icon_idx].w + item_pad;
 		}
 		ce->cell_x = tx;
 		ce->cell_y = cy;
@@ -210,12 +211,12 @@ static uint32_t celledit_compute_rect_itemview(struct mkgui_ctx *ctx, int32_t wi
 		return 1;
 
 	} else if(iv->view_mode == MKGUI_VIEW_COMPACT) {
-		int32_t row_h = sc(ctx, 20);
+		int32_t row_h = sc(ctx, MKGUI_ITEMVIEW_COMPACT_ROW_H_PX);
 		int32_t rows_per_col = ca_h / row_h;
 		if(rows_per_col < 1) {
 			rows_per_col = 1;
 		}
-		int32_t col_w = iv->cell_w > 0 ? iv->cell_w : sc(ctx, 180);
+		int32_t col_w = iv->cell_w > 0 ? iv->cell_w : sc(ctx, MKGUI_ITEMVIEW_COMPACT_COL_W_PX);
 		int32_t c = item / rows_per_col;
 		int32_t r = item % rows_per_col;
 		int32_t col_x = ca_x + c * col_w - iv->scroll_y;
@@ -223,10 +224,11 @@ static uint32_t celledit_compute_rect_itemview(struct mkgui_ctx *ctx, int32_t wi
 		if(col_x + col_w <= ca_x || col_x >= ca_x + ca_w) {
 			return 0;
 		}
-		int32_t tx = col_x + sc(ctx, 4);
+		int32_t item_pad = sc(ctx, MKGUI_ITEMVIEW_ITEM_PAD_PX);
+		int32_t tx = col_x + item_pad;
 		int32_t icon_idx = itemview_get_icon_idx(iv, (uint32_t)item);
 		if(icon_idx >= 0) {
-			tx += icons[icon_idx].w + sc(ctx, 4);
+			tx += icons[icon_idx].w + item_pad;
 		}
 		ce->cell_x = tx;
 		ce->cell_y = cy;
@@ -246,15 +248,15 @@ static uint32_t celledit_compute_rect_itemview(struct mkgui_ctx *ctx, int32_t wi
 		if(cy + ch <= ca_y || cy >= ca_y + ca_h) {
 			return 0;
 		}
-		int32_t cell_pad = sc(ctx, 3);
+		int32_t cell_pad = sc(ctx, MKGUI_ITEMVIEW_CELL_PAD_PX);
 		int32_t label_y;
 		if(iv->view_mode == MKGUI_VIEW_ICON) {
 			int32_t icon_idx = itemview_get_icon_idx(iv, (uint32_t)item);
 			int32_t ic_h = (icon_idx >= 0) ? icons[icon_idx].h : 0;
-			label_y = cy + ic_h + sc(ctx, 12);
+			label_y = cy + ic_h + sc(ctx, MKGUI_ITEMVIEW_LABEL_GAP_PX);
 		} else {
-			int32_t ts = iv->thumb_size > 0 ? iv->thumb_size : sc(ctx, 64);
-			int32_t thumb_pad = sc(ctx, 4);
+			int32_t ts = iv->thumb_size > 0 ? iv->thumb_size : sc(ctx, MKGUI_ITEMVIEW_THUMB_SIZE_PX);
+			int32_t thumb_pad = sc(ctx, MKGUI_ITEMVIEW_THUMB_PAD_PX);
 			label_y = cy + ts + thumb_pad + thumb_pad;
 		}
 		ce->cell_x = cx + cell_pad;

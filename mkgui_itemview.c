@@ -10,6 +10,12 @@
 #define MKGUI_ITEMVIEW_DETAIL_ROW_H_PX  20
 #define MKGUI_ITEMVIEW_THUMB_SIZE_PX    64
 #define MKGUI_ITEMVIEW_HSCROLL_H_PX     14
+#define MKGUI_ITEMVIEW_ICON_TOP_PAD_PX  8
+#define MKGUI_ITEMVIEW_CELL_PAD_PX      3
+#define MKGUI_ITEMVIEW_LABEL_GAP_PX     12
+#define MKGUI_ITEMVIEW_THUMB_PAD_PX     4
+#define MKGUI_ITEMVIEW_ITEM_PAD_PX      4
+#define MKGUI_ITEMVIEW_COMPACT_COL_W_PX 180
 
 // [=]===^=[ itemview_cell_size ]=================================[=]
 static void itemview_cell_size(struct mkgui_ctx *ctx, struct mkgui_itemview_data *iv, int32_t *cw, int32_t *ch) {
@@ -93,7 +99,7 @@ static int32_t itemview_compact_total_w(struct mkgui_ctx *ctx, struct mkgui_item
 	if(rows_per_col < 1) {
 		rows_per_col = 1;
 	}
-	int32_t col_w = iv->cell_w > 0 ? iv->cell_w : sc(ctx, 180);
+	int32_t col_w = iv->cell_w > 0 ? iv->cell_w : sc(ctx, MKGUI_ITEMVIEW_COMPACT_COL_W_PX);
 	int32_t total_cols = ((int32_t)iv->item_count + rows_per_col - 1) / rows_per_col;
 	return total_cols * col_w;
 }
@@ -179,9 +185,9 @@ static void render_itemview_icon(struct mkgui_ctx *ctx, uint32_t idx, struct mkg
 			}
 
 			int32_t sel_inset = sc(ctx, 2);
-			int32_t icon_top_pad = sc(ctx, 8);
-			int32_t cell_pad = sc(ctx, 3);
-			int32_t label_gap = sc(ctx, 12);
+			int32_t icon_top_pad = sc(ctx, MKGUI_ITEMVIEW_ICON_TOP_PAD_PX);
+			int32_t cell_pad = sc(ctx, MKGUI_ITEMVIEW_CELL_PAD_PX);
+			int32_t label_gap = sc(ctx, MKGUI_ITEMVIEW_LABEL_GAP_PX);
 
 			if(item == iv->selected) {
 				draw_rounded_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, cx + sel_inset, cy + sel_inset, cw - sel_inset * 2, ch - sel_inset * 2, ctx->theme.selection, ctx->theme.corner_radius);
@@ -286,7 +292,7 @@ static void render_itemview_thumbnail(struct mkgui_ctx *ctx, uint32_t idx, struc
 			}
 
 			int32_t sel_inset = sc(ctx, 2);
-			int32_t thumb_pad = sc(ctx, 4);
+			int32_t thumb_pad = sc(ctx, MKGUI_ITEMVIEW_THUMB_PAD_PX);
 
 			if(item == iv->selected) {
 				draw_rounded_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, cx + sel_inset, cy + sel_inset, cw - sel_inset * 2, ch - sel_inset * 2, ctx->theme.selection, ctx->theme.corner_radius);
@@ -365,7 +371,7 @@ static void render_itemview_compact(struct mkgui_ctx *ctx, uint32_t idx, struct 
 		rows_per_col = 1;
 	}
 
-	int32_t col_w = iv->cell_w > 0 ? iv->cell_w : sc(ctx, 180);
+	int32_t col_w = iv->cell_w > 0 ? iv->cell_w : sc(ctx, MKGUI_ITEMVIEW_COMPACT_COL_W_PX);
 	int32_t visible_cols = ca_w / col_w + 2;
 	int32_t total_cols = ((int32_t)iv->item_count + rows_per_col - 1) / rows_per_col;
 	int32_t first_col_off = iv->scroll_y / col_w;
@@ -393,7 +399,7 @@ static void render_itemview_compact(struct mkgui_ctx *ctx, uint32_t idx, struct 
 				draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, col_x, cy, col_w, row_h, ctx->theme.selection);
 			}
 
-			int32_t item_pad = sc(ctx, 4);
+			int32_t item_pad = sc(ctx, MKGUI_ITEMVIEW_ITEM_PAD_PX);
 			int32_t tx = col_x + item_pad;
 			int32_t icon_idx = itemview_get_icon_idx(iv, (uint32_t)item);
 			if(icon_idx >= 0) {
@@ -430,7 +436,7 @@ static void render_itemview_detail(struct mkgui_ctx *ctx, uint32_t idx, struct m
 	int32_t row_h = sc(ctx, MKGUI_ITEMVIEW_DETAIL_ROW_H_PX);
 	int32_t first_row = iv->scroll_y / row_h;
 	int32_t visible = ca_h / row_h + 2;
-	int32_t item_pad = sc(ctx, 4);
+	int32_t item_pad = sc(ctx, MKGUI_ITEMVIEW_ITEM_PAD_PX);
 
 	char label[MKGUI_MAX_TEXT];
 
@@ -829,7 +835,7 @@ static int32_t itemview_hit_item(struct mkgui_ctx *ctx, uint32_t idx, struct mkg
 		if(rows_per_col < 1) {
 			rows_per_col = 1;
 		}
-		int32_t col_w = iv->cell_w > 0 ? iv->cell_w : sc(ctx, 180);
+		int32_t col_w = iv->cell_w > 0 ? iv->cell_w : sc(ctx, MKGUI_ITEMVIEW_COMPACT_COL_W_PX);
 		int32_t c = (mx - ca_x + iv->scroll_y) / col_w;
 		int32_t r = (my - ca_y) / row_h;
 		int32_t item = c * rows_per_col + r;
@@ -1045,7 +1051,7 @@ static uint32_t handle_itemview_key(struct mkgui_ctx *ctx, struct mkgui_itemview
 			if(rows_per_col < 1) {
 				rows_per_col = 1;
 			}
-			int32_t col_w = iv->cell_w > 0 ? iv->cell_w : sc(ctx, 180);
+			int32_t col_w = iv->cell_w > 0 ? iv->cell_w : sc(ctx, MKGUI_ITEMVIEW_COMPACT_COL_W_PX);
 			int32_t item_col = iv->selected / rows_per_col;
 			int32_t item_x = item_col * col_w;
 			if(item_x < iv->scroll_y) {
