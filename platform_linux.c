@@ -1163,10 +1163,39 @@ static char *platform_clipboard_get_alloc(struct mkgui_ctx *ctx, uint32_t *out_l
 static uint32_t platform_glview_create(struct mkgui_ctx *ctx, struct mkgui_glview_data *gv, int32_t x, int32_t y, int32_t w, int32_t h) {
 	struct mkgui_platform *plat = &ctx->plat;
 
+	// The main mkgui window is ARGB32 (for themed transparency on popups
+	// etc.), but inheriting that visual for the glview child is wrong: the
+	// GL context typically has no alpha channel, so after SwapBuffers the
+	// drawable's alpha stays zero and a compositor renders the child as
+	// see-through. Force a 24-bit RGB visual here so the compositor treats
+	// the child as fully opaque regardless of what the app's GL back buffer
+	// contains.
+	XVisualInfo vinfo;
+	Visual *gl_visual;
+	int32_t gl_depth;
+	Colormap gl_colormap;
+	if(XMatchVisualInfo(plat->dpy, plat->screen, 24, TrueColor, &vinfo)) {
+		gl_visual = vinfo.visual;
+		gl_depth = 24;
+		gl_colormap = XCreateColormap(plat->dpy, plat->root, gl_visual, AllocNone);
+	} else {
+		// fall back to parent's visual -- the alpha bug may show up, but
+		// without a 24-bit TrueColor this is all we can do
+		gl_visual = CopyFromParent;
+		gl_depth = CopyFromParent;
+		gl_colormap = plat->colormap;
+	}
+
 	XSetWindowAttributes wa;
 	wa.background_pixmap = None;
 	wa.event_mask = 0;
-	gv->plat.xwin = XCreateWindow(plat->dpy, plat->win, x, y, (uint32_t)w, (uint32_t)h, 0, CopyFromParent, InputOutput, CopyFromParent, CWBackPixmap | CWEventMask, &wa);
+	wa.colormap = gl_colormap;
+	wa.border_pixel = 0;
+	unsigned long mask = CWBackPixmap | CWEventMask;
+	if(gl_visual != CopyFromParent) {
+		mask |= CWColormap | CWBorderPixel;
+	}
+	gv->plat.xwin = XCreateWindow(plat->dpy, plat->win, x, y, (uint32_t)w, (uint32_t)h, 0, gl_depth, InputOutput, gl_visual, mask, &wa);
 
 	XMapWindow(plat->dpy, gv->plat.xwin);
 	XFlush(plat->dpy);
