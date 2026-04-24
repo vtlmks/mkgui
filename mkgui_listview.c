@@ -204,7 +204,7 @@ static void render_cell(struct mkgui_ctx *ctx, struct mkgui_listview_data *lv, u
 				}
 				memcpy(icon_name, cell_buf, len);
 				icon_name[len] = '\0';
-				int32_t ii = icon_resolve(icon_name);
+				int32_t ii = icon_resolve(ctx, icon_name);
 				if(ii >= 0) {
 					int32_t icon_y = row_y + (ctx->row_height - icons[ii].h) / 2;
 					draw_icon(ctx->pixels, ctx->win_w, ctx->win_h, &icons[ii], cx + cell_pad, icon_y, clip_left, clip_top, clip_right, clip_bottom);

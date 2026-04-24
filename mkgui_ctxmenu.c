@@ -134,7 +134,7 @@ static void render_ctxmenu_popup(struct mkgui_ctx *ctx, struct mkgui_popup *p, i
 
 			int32_t icon_idx = -1;
 			if(it->icon[0] && !(it->flags & (MKGUI_MENUITEM_CHECK | MKGUI_MENUITEM_RADIO))) {
-				icon_idx = icon_resolve(it->icon);
+				icon_idx = icon_resolve(ctx, it->icon);
 			}
 
 			if(icon_idx >= 0) {

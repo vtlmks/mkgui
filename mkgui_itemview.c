@@ -9,6 +9,7 @@
 #define MKGUI_ITEMVIEW_COMPACT_ROW_H_PX 20
 #define MKGUI_ITEMVIEW_DETAIL_ROW_H_PX  20
 #define MKGUI_ITEMVIEW_THUMB_SIZE_PX    64
+#define MKGUI_ITEMVIEW_ICON_SIZE_PX     48
 #define MKGUI_ITEMVIEW_HSCROLL_H_PX     14
 #define MKGUI_ITEMVIEW_ICON_TOP_PAD_PX  8
 #define MKGUI_ITEMVIEW_CELL_PAD_PX      3
@@ -134,8 +135,29 @@ static void itemview_get_label(struct mkgui_itemview_data *iv, uint32_t item, ch
 	}
 }
 
+// [=]===^=[ itemview_icon_render_size ]===========================[=]
+// Per-view-mode icon size: ICON and THUMBNAIL views draw larger icons
+// than the default ctx->icon_size used by buttons and menus. THUMBNAIL
+// honours iv->thumb_size if the caller set it, falling back to the
+// default. COMPACT and DETAIL use ctx->icon_size.
+static int32_t itemview_icon_render_size(struct mkgui_ctx *ctx, struct mkgui_itemview_data *iv) {
+	switch(iv->view_mode) {
+		case MKGUI_VIEW_ICON: {
+			return sc(ctx, MKGUI_ITEMVIEW_ICON_SIZE_PX);
+		}
+
+		case MKGUI_VIEW_THUMBNAIL: {
+			return iv->thumb_size > 0 ? iv->thumb_size : sc(ctx, MKGUI_ITEMVIEW_THUMB_SIZE_PX);
+		}
+
+		default: {
+			return ctx->icon_size;
+		}
+	}
+}
+
 // [=]===^=[ itemview_get_icon_idx ]===============================[=]
-static int32_t itemview_get_icon_idx(struct mkgui_itemview_data *iv, uint32_t item) {
+static int32_t itemview_get_icon_idx(struct mkgui_ctx *ctx, struct mkgui_itemview_data *iv, uint32_t item) {
 	if(!iv->icon_cb) {
 		return -1;
 	}
@@ -145,7 +167,7 @@ static int32_t itemview_get_icon_idx(struct mkgui_itemview_data *iv, uint32_t it
 	if(!name[0]) {
 		return -1;
 	}
-	return icon_resolve(name);
+	return icon_resolve_at(ctx, name, itemview_icon_render_size(ctx, iv));
 }
 
 // [=]===^=[ render_itemview_icon ]================================[=]
@@ -193,7 +215,7 @@ static void render_itemview_icon(struct mkgui_ctx *ctx, uint32_t idx, struct mkg
 				draw_rounded_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, cx + sel_inset, cy + sel_inset, cw - sel_inset * 2, ch - sel_inset * 2, ctx->theme.selection, ctx->theme.corner_radius);
 			}
 
-			int32_t icon_idx = itemview_get_icon_idx(iv, (uint32_t)item);
+			int32_t icon_idx = itemview_get_icon_idx(ctx, iv, (uint32_t)item);
 			int32_t ic_h = (icon_idx >= 0) ? icons[icon_idx].h : 0;
 			if(icon_idx >= 0) {
 				int32_t ix = cx + (cw - icons[icon_idx].w) / 2;
@@ -328,7 +350,7 @@ static void render_itemview_thumbnail(struct mkgui_ctx *ctx, uint32_t idx, struc
 					}
 				}
 			} else {
-				int32_t icon_idx = itemview_get_icon_idx(iv, (uint32_t)item);
+				int32_t icon_idx = itemview_get_icon_idx(ctx, iv, (uint32_t)item);
 				if(icon_idx >= 0) {
 					int32_t ix = cx + (cw - icons[icon_idx].w) / 2;
 					int32_t iy = cy + (ts - icons[icon_idx].h) / 2 + ty_off;
@@ -401,7 +423,7 @@ static void render_itemview_compact(struct mkgui_ctx *ctx, uint32_t idx, struct 
 
 			int32_t item_pad = sc(ctx, MKGUI_ITEMVIEW_ITEM_PAD_PX);
 			int32_t tx = col_x + item_pad;
-			int32_t icon_idx = itemview_get_icon_idx(iv, (uint32_t)item);
+			int32_t icon_idx = itemview_get_icon_idx(ctx, iv, (uint32_t)item);
 			if(icon_idx >= 0) {
 				int32_t iy = cy + (row_h - icons[icon_idx].h) / 2;
 				draw_icon(ctx->pixels, ctx->win_w, ctx->win_h, &icons[icon_idx], tx, iy, ca_x, ca_y, clip_x2, clip_y2);
@@ -458,7 +480,7 @@ static void render_itemview_detail(struct mkgui_ctx *ctx, uint32_t idx, struct m
 		draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, ca_x, cy, ca_w, row_h, row_bg);
 
 		int32_t tx = ca_x + item_pad;
-		int32_t icon_idx = itemview_get_icon_idx(iv, (uint32_t)item);
+		int32_t icon_idx = itemview_get_icon_idx(ctx, iv, (uint32_t)item);
 		if(icon_idx >= 0) {
 			int32_t iy = cy + (row_h - icons[icon_idx].h) / 2;
 			draw_icon(ctx->pixels, ctx->win_w, ctx->win_h, &icons[icon_idx], tx, iy, ca_x, ca_y, ca_x + ca_w, clip_y2);

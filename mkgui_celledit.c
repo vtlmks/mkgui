@@ -200,7 +200,7 @@ static uint32_t celledit_compute_rect_itemview(struct mkgui_ctx *ctx, int32_t wi
 		}
 		int32_t item_pad = sc(ctx, MKGUI_ITEMVIEW_ITEM_PAD_PX);
 		int32_t tx = ca_x + item_pad;
-		int32_t icon_idx = itemview_get_icon_idx(iv, (uint32_t)item);
+		int32_t icon_idx = itemview_get_icon_idx(ctx, iv, (uint32_t)item);
 		if(icon_idx >= 0) {
 			tx += icons[icon_idx].w + item_pad;
 		}
@@ -226,7 +226,7 @@ static uint32_t celledit_compute_rect_itemview(struct mkgui_ctx *ctx, int32_t wi
 		}
 		int32_t item_pad = sc(ctx, MKGUI_ITEMVIEW_ITEM_PAD_PX);
 		int32_t tx = col_x + item_pad;
-		int32_t icon_idx = itemview_get_icon_idx(iv, (uint32_t)item);
+		int32_t icon_idx = itemview_get_icon_idx(ctx, iv, (uint32_t)item);
 		if(icon_idx >= 0) {
 			tx += icons[icon_idx].w + item_pad;
 		}
@@ -251,7 +251,7 @@ static uint32_t celledit_compute_rect_itemview(struct mkgui_ctx *ctx, int32_t wi
 		int32_t cell_pad = sc(ctx, MKGUI_ITEMVIEW_CELL_PAD_PX);
 		int32_t label_y;
 		if(iv->view_mode == MKGUI_VIEW_ICON) {
-			int32_t icon_idx = itemview_get_icon_idx(iv, (uint32_t)item);
+			int32_t icon_idx = itemview_get_icon_idx(ctx, iv, (uint32_t)item);
 			int32_t ic_h = (icon_idx >= 0) ? icons[icon_idx].h : 0;
 			label_y = cy + ic_h + sc(ctx, MKGUI_ITEMVIEW_LABEL_GAP_PX);
 		} else {

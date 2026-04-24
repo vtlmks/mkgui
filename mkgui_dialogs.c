@@ -92,6 +92,10 @@ static void dlg_render(struct mkgui_ctx *ctx, void *userdata) {
 }
 
 // [=]===^=[ dlg_icon_resolve ]=======================================[=]
+// Dialog icons share SVG data with their plain counterparts but are
+// rasterised at dialog_icon_size with a brand-coloured currentColor. The
+// "dlg:" prefix keeps the coloured variant in its own icons[] slot so
+// later widget uses of the same name render with the theme colour.
 static int32_t dlg_icon_resolve(struct mkgui_ctx *ctx, uint32_t icon_type) {
 	if(icon_type == 0 || icon_type >= sizeof(dlg_icon_defs) / sizeof(dlg_icon_defs[0])) {
 		return -1;
@@ -100,51 +104,31 @@ static int32_t dlg_icon_resolve(struct mkgui_ctx *ctx, uint32_t icon_type) {
 	uint32_t color = dlg_icon_defs[icon_type].color;
 	char cache_name[MKGUI_ICON_NAME_LEN];
 	snprintf(cache_name, sizeof(cache_name), "dlg:%s", name);
-	int32_t idx = icon_find_idx(cache_name);
+
+	int32_t idx = icon_find_idx_at(cache_name, ctx->dialog_icon_size);
 	if(idx >= 0) {
 		return idx;
 	}
-	struct mkgui_svg_source *src = svg_find_source(name);
-	if(src) {
-		// svg_rasterize_icon_ex adds a new icon slot with pixels set but
-		// atlas_offset uninitialised; the atlas must be rebuilt before the
-		// icon is drawn or draw_icon reads from stride-mismatched memory
-		idx = svg_rasterize_icon_ex(cache_name, src->svg_data, src->svg_len, ctx->dialog_icon_size, color, 0);
-		if(idx >= 0) {
-			icon_atlas_rebuild();
-		}
-		return idx;
-	}
+
+	// Find or lazy-load the SVG source under the original name so the
+	// same data backs both the dialog-coloured and the theme-coloured
+	// variants.
+	uint32_t src_idx = svg_find_source_idx(name);
 #ifndef _WIN32
-	// try system theme
-	if(ctx->system_theme_count > 0) {
-		char svg_path[4096];
-		for(uint32_t ti = 0; ti < ctx->system_theme_count; ++ti) {
-			if(icon_find_in_system_theme(ctx->system_theme_dirs[ti], name, svg_path, sizeof(svg_path))) {
-				uint32_t svg_len = 0;
-				char *svg_data = svg_read_file(svg_path, &svg_len);
-				if(svg_data) {
-					idx = svg_rasterize_icon_ex(cache_name, svg_data, svg_len, ctx->dialog_icon_size, color, 0);
-					if(idx >= 0) {
-						icon_atlas_rebuild();
-						if(svg_source_count < MKGUI_SVG_ICON_MAX) {
-							struct mkgui_svg_source *s = &svg_sources[svg_source_count++];
-							snprintf(s->name, MKGUI_ICON_NAME_LEN, "%s", cache_name);
-							s->svg_data = svg_data;
-							s->svg_len = svg_len;
-						} else {
-							free(svg_data);
-						}
-					} else {
-						free(svg_data);
-					}
-					return idx;
-				}
-			}
-		}
+	if(src_idx == UINT32_MAX && ctx->system_theme_count > 0) {
+		src_idx = icon_lazy_load_system(ctx, name);
 	}
 #endif
-	return icon_find_idx(name);
+	if(src_idx == UINT32_MAX) {
+		return icon_find_idx_any(name);
+	}
+
+	struct mkgui_svg_source *src = &svg_sources[src_idx];
+	idx = svg_rasterize_icon_ex(cache_name, src->svg_data, src->svg_len, ctx->dialog_icon_size, color, 0, src_idx);
+	if(idx >= 0) {
+		icon_atlas_rebuild();
+	}
+	return idx;
 }
 
 // [=]===^=[ dlg_wrap_text ]==========================================[=]

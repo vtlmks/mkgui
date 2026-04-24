@@ -199,7 +199,7 @@ static char *fd_icon_for_name(char *name, uint32_t is_dir) {
 	char *dot = strrchr(name, '.');
 	if(dot) {
 		char *specific = fd_icon_for_ext(dot);
-		if(specific && icon_find_idx(specific) >= 0) {
+		if(specific && icon_find_idx_any(specific) >= 0) {
 			return specific;
 		}
 	}

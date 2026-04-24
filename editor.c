@@ -2136,7 +2136,7 @@ static void ed_draw_widget_fallback(struct mkgui_ctx *ctx, uint32_t idx) {
 				if(child->type != MKGUI_TAB || child->parent_id != ew->id) {
 					continue;
 				}
-				int32_t tab_ii = child->icon[0] ? icon_resolve(child->icon) : -1;
+				int32_t tab_ii = child->icon[0] ? icon_resolve(ctx, child->icon) : -1;
 				int32_t tab_iw = (tab_ii >= 0) ? icons[tab_ii].w : 0;
 				int32_t tw = text_width(ctx, child->label) + 20 + (tab_ii >= 0 ? tab_iw + 4 : 0);
 				uint32_t active = (child->id == active_id);
@@ -2266,7 +2266,7 @@ static void ed_draw_widget_fallback(struct mkgui_ctx *ctx, uint32_t idx) {
 					bx += ctx->toolbar_sep_w;
 					continue;
 				}
-				int32_t icon_idx = ed_show_icons && btn->icon[0] ? icon_resolve(btn->icon) : -1;
+				int32_t icon_idx = ed_show_icons && btn->icon[0] ? icon_resolve(ctx, btn->icon) : -1;
 				int32_t tw = ed_show_text ? text_width(ctx, btn->label) : 0;
 				int32_t icon_iw = icon_idx >= 0 ? icons[icon_idx].w + 4 : 0;
 				int32_t content_w = icon_iw + tw;
@@ -4789,7 +4789,7 @@ int main(void) {
 										char icon_name[64];
 										char icon_path[1024];
 										if(mkgui_icon_browser(ctx, 16, icon_name, sizeof(icon_name), icon_path, sizeof(icon_path))) {
-											icon_resolve(icon_name);
+											icon_resolve(ctx, icon_name);
 											mkgui_input_set(ctx, ED_PROP_ICON_INP, icon_name);
 											if(ed.selected >= 0) {
 												strncpy(ed.widgets[ed.selected].icon, icon_name, MKGUI_ICON_NAME_LEN - 1);

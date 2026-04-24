@@ -171,7 +171,7 @@ static void render_pathbar(struct mkgui_ctx *ctx, uint32_t idx) {
 #endif
 
 		if(is_root) {
-			int32_t ii = icon_resolve("folder");
+			int32_t ii = icon_resolve(ctx, "folder");
 			if(ii >= 0) {
 				draw_icon(ctx->pixels, ctx->win_w, ctx->win_h, &icons[ii], sx + seg_pad, ry + (rh - icons[ii].h) / 2, rx + 1, ry + 1, rx + rw - 1, ry + rh - 1);
 			}

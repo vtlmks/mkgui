@@ -74,7 +74,7 @@ static void render_toasts(struct mkgui_ctx *ctx) {
 			continue;
 		}
 		struct notify_palette *pal = notify_palette_for(t->severity);
-		int32_t icon_idx = icon_resolve(pal->icon_name);
+		int32_t icon_idx = icon_resolve(ctx, pal->icon_name);
 		int32_t icon_w = icon_idx >= 0 ? icons[icon_idx].w : 0;
 		int32_t icon_h = icon_idx >= 0 ? icons[icon_idx].h : 0;
 		int32_t th = toast_height(ctx, icon_h);
@@ -220,7 +220,7 @@ MKGUI_API void mkgui_toast_ex(struct mkgui_ctx *ctx, uint32_t severity, const ch
 	snprintf(t->text, sizeof(t->text), "%s", text);
 	// Pre-resolve the severity icon so the system-theme lazy-load happens
 	// once here rather than on every render pass.
-	icon_resolve(notify_palette_for(t->severity)->icon_name);
+	icon_resolve(ctx, notify_palette_for(t->severity)->icon_name);
 	dirty_all(ctx);
 }
 
@@ -270,7 +270,7 @@ static void render_banner(struct mkgui_ctx *ctx) {
 	}
 
 	struct notify_palette *pal = notify_palette_for(ctx->banner.severity);
-	int32_t icon_idx = icon_resolve(pal->icon_name);
+	int32_t icon_idx = icon_resolve(ctx, pal->icon_name);
 	int32_t icon_w = icon_idx >= 0 ? icons[icon_idx].w : 0;
 	int32_t icon_h = icon_idx >= 0 ? icons[icon_idx].h : 0;
 	int32_t bh = banner_height(ctx, icon_h);
@@ -355,7 +355,7 @@ MKGUI_API void mkgui_banner_set(struct mkgui_ctx *ctx, uint32_t severity, const 
 	ctx->banner.active = 1;
 	ctx->banner.severity = severity < 4 ? severity : MKGUI_SEVERITY_INFO;
 	snprintf(ctx->banner.text, sizeof(ctx->banner.text), "%s", text);
-	icon_resolve(notify_palette_for(ctx->banner.severity)->icon_name);
+	icon_resolve(ctx, notify_palette_for(ctx->banner.severity)->icon_name);
 	dirty_all(ctx);
 }
 

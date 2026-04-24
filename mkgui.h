@@ -588,6 +588,12 @@ MKGUI_API int32_t mkgui_icon_add(const char *name, const uint32_t *pixels, int32
 MKGUI_API int32_t mkgui_icon_load_svg(struct mkgui_ctx *ctx, const char *name, const char *path);
 MKGUI_API uint32_t mkgui_icon_load_svg_dir(struct mkgui_ctx *ctx, const char *dir_path);
 MKGUI_API uint32_t mkgui_icon_load_app_icons(struct mkgui_ctx *ctx, const char *app_name);
+// Return an icon index for (name, size), rasterising from the cached SVG
+// source (or lazy-loading from the system theme on Linux) if needed. Use
+// this when drawing at a size other than ctx->icon_size -- e.g. the
+// itemview in icon mode, file dialog thumbnails, or a custom gallery
+// widget. Returns -1 if no variant can be produced.
+MKGUI_API int32_t mkgui_icon_at_size(struct mkgui_ctx *ctx, const char *name, int32_t size);
 MKGUI_API const char *mkgui_icon_get_dir(struct mkgui_ctx *ctx);
 MKGUI_API void mkgui_set_icon(struct mkgui_ctx *ctx, uint32_t widget_id, const char *icon_name);
 MKGUI_API void mkgui_set_treenode_icon(struct mkgui_ctx *ctx, uint32_t widget_id, uint32_t node_id, const char *icon_name);

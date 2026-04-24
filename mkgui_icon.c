@@ -2,12 +2,26 @@
 // SPDX-License-Identifier: MIT
 
 
-// [=]===^=[ icon_find_idx ]==========================================[=]
-static int32_t icon_find_idx(const char *name) {
+// [=]===^=[ icon_find_idx_at ]=======================================[=]
+// Look up an icon that was rasterised (or added) at exactly `size`. Misses
+// if the icon exists at other sizes. Pass 0 for raster-only icons added
+// via mkgui_icon_add, whose "size" is implicit in their w/h.
+static int32_t icon_find_idx_at(const char *name, int32_t size) {
 	if(name[0] == '\0') {
 		return -1;
 	}
-	return icon_hash_lookup(name);
+	return icon_hash_lookup_at(name, size);
+}
+
+// [=]===^=[ icon_find_idx_any ]======================================[=]
+// Returns the first entry with this name, regardless of size. Used for
+// existence checks where the caller just wants to know whether any
+// variant of the icon has been loaded.
+static int32_t icon_find_idx_any(const char *name) {
+	if(name[0] == '\0') {
+		return -1;
+	}
+	return icon_hash_lookup_any(name);
 }
 
 // ctx used by icon_resolve for system theme lazy-load (set once at init)
@@ -82,7 +96,12 @@ static void svg_strip_style_blocks(char *data, uint32_t len) {
 	}
 }
 
-static int32_t svg_rasterize_icon_ex(const char *name, char *svg_data, uint32_t svg_len, int32_t target_size, uint32_t theme_text_color, uint32_t snap_native) {
+// Rasterize an SVG at target_size into an owned ARGB buffer, then create
+// or update the icons[] entry keyed on (name, target_size). source_idx
+// links the entry back to its svg_sources[] record so svg_rerasterize_all
+// can find the SVG data on scale/theme change; pass UINT32_MAX for
+// one-shot raster paths that will never re-render.
+static int32_t svg_rasterize_icon_ex(const char *name, char *svg_data, uint32_t svg_len, int32_t target_size, uint32_t theme_text_color, uint32_t snap_native, uint32_t source_idx) {
 	if(!svg_data || target_size <= 0) {
 		return -1;
 	}
@@ -133,7 +152,9 @@ static int32_t svg_rasterize_icon_ex(const char *name, char *svg_data, uint32_t 
 	}
 	plutovg_surface_destroy(surface);
 
-	int32_t existing = icon_find_idx(name);
+	// Dedup is (name, target_size) -- same icon at a different size lives
+	// in its own entry so the atlas holds all variants simultaneously
+	int32_t existing = icon_find_idx_at(name, target_size);
 	if(existing >= 0) {
 		struct mkgui_icon *ic = &icons[existing];
 		if(ic->custom) {
@@ -143,6 +164,9 @@ static int32_t svg_rasterize_icon_ex(const char *name, char *svg_data, uint32_t 
 		ic->w = render_size;
 		ic->h = render_size;
 		ic->custom = 1;
+		if(source_idx != UINT32_MAX) {
+			ic->source_idx = source_idx;
+		}
 		return existing;
 	}
 
@@ -154,6 +178,8 @@ static int32_t svg_rasterize_icon_ex(const char *name, char *svg_data, uint32_t 
 	int32_t idx = (int32_t)icon_count;
 	struct mkgui_icon *ic = &icons[icon_count++];
 	snprintf(ic->name, MKGUI_ICON_NAME_LEN, "%s", name);
+	ic->requested_size = target_size;
+	ic->source_idx = source_idx;
 	ic->pixels = argb;
 	ic->w = render_size;
 	ic->h = render_size;
@@ -171,6 +197,37 @@ static struct mkgui_svg_source *svg_find_source(char *name) {
 		}
 	}
 	return NULL;
+}
+
+// [=]===^=[ svg_source_add ]==========================================[=]
+// Takes ownership of svg_data on success. Returns the source's index, or
+// UINT32_MAX if the table is full -- caller must free svg_data in that
+// case. Duplicate names are rejected; callers should svg_find_source
+// before calling this.
+static uint32_t svg_source_add(const char *name, char *svg_data, uint32_t svg_len) {
+	if(svg_source_count >= MKGUI_SVG_ICON_MAX) {
+		return UINT32_MAX;
+	}
+	uint32_t idx = svg_source_count++;
+	struct mkgui_svg_source *src = &svg_sources[idx];
+	snprintf(src->name, MKGUI_ICON_NAME_LEN, "%s", name);
+	src->svg_data = svg_data;
+	src->svg_len = svg_len;
+	return idx;
+}
+
+// [=]===^=[ svg_find_source_idx ]====================================[=]
+// Like svg_find_source but returns the index instead of a pointer, so
+// the result stays valid across later svg_source_add calls that may
+// relocate the backing array (currently fixed-size, but callers treat
+// the index as the stable handle).
+static uint32_t svg_find_source_idx(const char *name) {
+	for(uint32_t i = 0; i < svg_source_count; ++i) {
+		if(strcmp(svg_sources[i].name, name) == 0) {
+			return i;
+		}
+	}
+	return UINT32_MAX;
 }
 
 // [=]===^=[ icon_dir_exists ]========================================[=]
@@ -670,15 +727,16 @@ static void icon_neg_cache_add(const char *name) {
 }
 
 // [=]===^=[ icon_lazy_load_system ]=================================[=]
-// Attempt to load an icon from the system theme chain. Searches primary
-// theme first, then inherited themes in order.
-static int32_t icon_lazy_load_system(struct mkgui_ctx *ctx, const char *name) {
+// Pull an icon's SVG source from the system theme chain and register it
+// in svg_sources. Returns the source index, or UINT32_MAX if the icon is
+// not in any theme (caches the miss to avoid re-scanning on every call).
+static uint32_t icon_lazy_load_system(struct mkgui_ctx *ctx, const char *name) {
 	if(!ctx || ctx->system_theme_count == 0) {
-		return -1;
+		return UINT32_MAX;
 	}
 
 	if(icon_neg_cache_has(name)) {
-		return -1;
+		return UINT32_MAX;
 	}
 
 	char svg_path[4096];
@@ -692,62 +750,123 @@ static int32_t icon_lazy_load_system(struct mkgui_ctx *ctx, const char *name) {
 
 	if(!found) {
 		icon_neg_cache_add(name);
-		return -1;
+		return UINT32_MAX;
 	}
 
 	uint32_t svg_len = 0;
 	char *svg_data = svg_read_file(svg_path, &svg_len);
 	if(!svg_data) {
-		return -1;
+		return UINT32_MAX;
 	}
 
-	int32_t target_size = ctx->icon_size;
-	uint32_t theme_color = ctx->theme.text & 0x00ffffff;
-	int32_t idx = svg_rasterize_icon_ex(name, svg_data, svg_len, target_size, theme_color, 1);
-
-	if(idx >= 0) {
-		icon_atlas_rebuild();
-		if(svg_source_count < MKGUI_SVG_ICON_MAX) {
-			struct mkgui_svg_source *src = &svg_sources[svg_source_count++];
-			snprintf(src->name, MKGUI_ICON_NAME_LEN, "%s", name);
-			src->svg_data = svg_data;
-			src->svg_len = svg_len;
-		} else {
-			free(svg_data);
-		}
-	} else {
+	uint32_t src_idx = svg_source_add(name, svg_data, svg_len);
+	if(src_idx == UINT32_MAX) {
 		free(svg_data);
 	}
-
-	return idx;
+	return src_idx;
 }
 #endif
 
-// [=]===^=[ icon_resolve ]===========================================[=]
-static int32_t icon_resolve(const char *name) {
-	int32_t idx = icon_find_idx(name);
-	if(idx >= 0 && (uint32_t)idx >= icon_count) {
-		return -1;
+// [=]===^=[ icon_resolve_at ]========================================[=]
+// Find or produce an icon at (name, size). Tries in order:
+//   1. existing icons[] entry keyed on (name, size)
+//   2. re-rasterise from an already-loaded SVG source at the new size
+//   3. lazy-load the SVG from the system theme (Linux) then rasterise
+// Returns -1 if no variant can be produced.
+static int32_t icon_resolve_at(struct mkgui_ctx *ctx, const char *name, int32_t size) {
+	int32_t idx = icon_find_idx_at(name, size);
+	if(idx >= 0) {
+		return idx;
 	}
+
+	struct mkgui_ctx *effective = ctx;
 #ifndef _WIN32
-	if(idx < 0 && name[0] != '\0' && icon_lazy_ctx) {
-		idx = icon_lazy_load_system(icon_lazy_ctx, name);
+	if(!effective) {
+		effective = icon_lazy_ctx;
 	}
 #endif
+	if(!effective) {
+		return -1;
+	}
+
+	uint32_t src_idx = svg_find_source_idx(name);
+#ifndef _WIN32
+	if(src_idx == UINT32_MAX && name[0] != '\0') {
+		src_idx = icon_lazy_load_system(effective, name);
+	}
+#endif
+
+	if(src_idx == UINT32_MAX) {
+		return -1;
+	}
+
+	struct mkgui_svg_source *src = &svg_sources[src_idx];
+	uint32_t theme_color = effective->theme.text & 0x00ffffff;
+	int32_t new_idx = svg_rasterize_icon_ex(name, src->svg_data, src->svg_len, size, theme_color, 1, src_idx);
+	if(new_idx >= 0) {
+		icon_atlas_rebuild();
+	}
+	return new_idx;
+}
+
+// [=]===^=[ icon_resolve ]===========================================[=]
+// Convenience wrapper that resolves at ctx->icon_size. If ctx is NULL,
+// falls back to the lazy ctx (used by internal paths that don't plumb a
+// ctx through). Returns any existing entry at ctx->icon_size, or lazy-
+// loads one from the system theme.
+static int32_t icon_resolve(struct mkgui_ctx *ctx, const char *name) {
+	struct mkgui_ctx *effective = ctx;
+#ifndef _WIN32
+	if(!effective) {
+		effective = icon_lazy_ctx;
+	}
+#endif
+
+	int32_t size = effective ? effective->icon_size : 0;
+	int32_t idx = icon_resolve_at(effective, name, size);
+	if(idx < 0) {
+		idx = icon_find_idx_any(name);
+	}
 	return idx;
 }
 
 // [=]===^=[ widget_icon_idx ]========================================[=]
+// Resolve a widget's icon at ctx->icon_size. Fallback to the _missing
+// placeholder (raster icon, any size) so the user can see that an icon
+// failed to load rather than getting nothing.
 static int32_t widget_icon_idx(struct mkgui_ctx *ctx, struct mkgui_widget *w) {
-	(void)ctx;
 	if(w->icon[0] == '\0') {
 		return -1;
 	}
-	int32_t idx = icon_resolve(w->icon);
+	int32_t idx = icon_resolve(ctx, w->icon);
 	if(idx < 0) {
-		return icon_find_idx("_missing");
+		return icon_find_idx_any("_missing");
 	}
 	return idx;
+}
+
+// [=]===^=[ widget_icon_idx_at ]=====================================[=]
+// Resolve a widget's icon at an explicit size. Used by views (itemview
+// icon mode, file dialog thumbnails) that render at sizes other than
+// ctx->icon_size.
+static int32_t widget_icon_idx_at(struct mkgui_ctx *ctx, struct mkgui_widget *w, int32_t size) {
+	if(w->icon[0] == '\0') {
+		return -1;
+	}
+	int32_t idx = icon_resolve_at(ctx, w->icon, size);
+	if(idx < 0) {
+		return icon_find_idx_any("_missing");
+	}
+	return idx;
+}
+
+// [=]===^=[ mkgui_icon_at_size ]=====================================[=]
+MKGUI_API int32_t mkgui_icon_at_size(struct mkgui_ctx *ctx, const char *name, int32_t size) {
+	MKGUI_CHECK_VAL(ctx, -1);
+	if(!name || !name[0] || size <= 0) {
+		return -1;
+	}
+	return icon_resolve_at(ctx, name, size);
 }
 
 // [=]===^=[ icon_generate_missing ]=================================[=]
@@ -789,7 +908,7 @@ static void mkgui_icon_init(void) {
 static void icon_load_from_widgets(struct mkgui_ctx *ctx) {
 	for(uint32_t i = 0; i < ctx->widget_count; ++i) {
 		if(ctx->widgets[i].icon[0] != '\0') {
-			icon_resolve(ctx->widgets[i].icon);
+			icon_resolve(ctx, ctx->widgets[i].icon);
 		}
 	}
 }
@@ -804,7 +923,10 @@ MKGUI_API int32_t mkgui_icon_add(const char *name, const uint32_t *pixels, int32
 		return -1;
 	}
 
-	int32_t existing = icon_find_idx(name);
+	// Raster icons use requested_size == 0 (their size is implicit in w/h).
+	// Name dedup ignores size here: adding the same raster name twice
+	// replaces the previous raster regardless of dimensions.
+	int32_t existing = icon_find_idx_at(name, 0);
 	if(existing >= 0) {
 		struct mkgui_icon *ic = &icons[existing];
 		if(ic->custom) {
@@ -833,6 +955,8 @@ MKGUI_API int32_t mkgui_icon_add(const char *name, const uint32_t *pixels, int32
 	int32_t idx = (int32_t)icon_count;
 	struct mkgui_icon *ic = &icons[icon_count++];
 	snprintf(ic->name, MKGUI_ICON_NAME_LEN, "%s", name);
+	ic->requested_size = 0;
+	ic->source_idx = UINT32_MAX;
 	ic->pixels = dst;
 	ic->w = w;
 	ic->h = h;
@@ -857,7 +981,7 @@ MKGUI_API void mkgui_set_icon(struct mkgui_ctx *ctx, uint32_t widget_id, const c
 		return;
 	}
 	snprintf(w->icon, MKGUI_ICON_NAME_LEN, "%s", icon_name);
-	icon_resolve(icon_name);
+	icon_resolve(ctx, icon_name);
 	dirty_all(ctx);
 }
 
@@ -868,7 +992,7 @@ MKGUI_API void mkgui_set_treenode_icon(struct mkgui_ctx *ctx, uint32_t widget_id
 	if(!tv) {
 		return;
 	}
-	int32_t idx = icon_resolve(icon_name);
+	int32_t idx = icon_resolve(ctx, icon_name);
 	for(uint32_t i = 0; i < tv->node_count; ++i) {
 		if(tv->nodes[i].id == node_id) {
 			tv->nodes[i].icon_idx = idx;
@@ -887,32 +1011,30 @@ MKGUI_API int32_t mkgui_icon_load_svg(struct mkgui_ctx *ctx, const char *name, c
 		return -1;
 	}
 
-
-
 	uint32_t svg_len = 0;
 	char *svg_data = svg_read_file(path, &svg_len);
 	if(!svg_data) {
 		return -1;
 	}
 
+	// Register the source first so svg_rasterize_icon_ex can point the new
+	// icon entry at it. On svg_sources overflow we still rasterise once but
+	// the icon becomes orphaned (no source for future re-rasterisation).
+	uint32_t src_idx = svg_source_add(name, svg_data, svg_len);
 	int32_t target_size = ctx->icon_size;
 	uint32_t theme_color = ctx->theme.text & 0x00ffffff;
-	int32_t idx = svg_rasterize_icon_ex(name, svg_data, svg_len, target_size, theme_color, 1);
+	int32_t idx = svg_rasterize_icon_ex(name, svg_data, svg_len, target_size, theme_color, 1, src_idx);
 
-	if(idx >= 0) {
-		icon_atlas_rebuild();
-		if(svg_source_count < MKGUI_SVG_ICON_MAX) {
-			struct mkgui_svg_source *src = &svg_sources[svg_source_count++];
-			snprintf(src->name, MKGUI_ICON_NAME_LEN, "%s", name);
-			src->svg_data = svg_data;
-			src->svg_len = svg_len;
-		} else {
+	if(idx < 0) {
+		if(src_idx == UINT32_MAX) {
 			free(svg_data);
 		}
-	} else {
+		return idx;
+	}
+	if(src_idx == UINT32_MAX) {
 		free(svg_data);
 	}
-
+	icon_atlas_rebuild();
 	return idx;
 }
 
@@ -960,7 +1082,7 @@ MKGUI_API uint32_t mkgui_icon_load_svg_dir(struct mkgui_ctx *ctx, const char *di
 		memcpy(name, fname, name_len);
 		name[name_len] = '\0';
 
-		if(icon_find_idx(name) >= 0) {
+		if(icon_find_idx_at(name, ctx->icon_size) >= 0) {
 			continue;
 		}
 
@@ -979,20 +1101,14 @@ MKGUI_API uint32_t mkgui_icon_load_svg_dir(struct mkgui_ctx *ctx, const char *di
 			continue;
 		}
 
+		uint32_t src_idx = svg_source_add(name, svg_data, svg_len);
 		int32_t target_size = ctx->icon_size;
 		uint32_t theme_color = ctx->theme.text & 0x00ffffff;
-		int32_t idx = svg_rasterize_icon_ex(name, svg_data, svg_len, target_size, theme_color, 1);
+		int32_t idx = svg_rasterize_icon_ex(name, svg_data, svg_len, target_size, theme_color, 1, src_idx);
 		if(idx >= 0) {
 			++loaded;
-			if(svg_source_count < MKGUI_SVG_ICON_MAX) {
-				struct mkgui_svg_source *src = &svg_sources[svg_source_count++];
-				snprintf(src->name, MKGUI_ICON_NAME_LEN, "%s", name);
-				src->svg_data = svg_data;
-				src->svg_len = svg_len;
-			} else {
-				free(svg_data);
-			}
-		} else {
+		}
+		if(src_idx == UINT32_MAX) {
 			free(svg_data);
 		}
 	}
@@ -1007,14 +1123,43 @@ MKGUI_API uint32_t mkgui_icon_load_svg_dir(struct mkgui_ctx *ctx, const char *di
 }
 
 // [=]===^=[ svg_rerasterize_all ]====================================[=]
-static void svg_rerasterize_all(struct mkgui_ctx *ctx) {
-	if(svg_source_count == 0) {
+// Re-rasterise every SVG-sourced icon whose icon name matches its source
+// name (the "primary" icons: buttons, menus, etc.). Skipped:
+//   - raster icons (requested_size == 0, no SVG to re-render from)
+//   - icons with no source (UINT32_MAX, loaded from a one-shot path)
+//   - coloured variants whose name differs from the source (dialog dlg:
+//     icons keep their brand colour and re-resolve when the dialog next
+//     opens, because this code path uses the theme colour)
+static void svg_rerasterize_all(struct mkgui_ctx *ctx, float size_ratio) {
+	if(icon_count == 0) {
 		return;
 	}
-	int32_t target_size = ctx->icon_size;
 	uint32_t theme_color = ctx->theme.text & 0x00ffffff;
-	for(uint32_t i = 0; i < svg_source_count; ++i) {
-		svg_rasterize_icon_ex(svg_sources[i].name, svg_sources[i].svg_data, svg_sources[i].svg_len, target_size, theme_color, 1);
+	for(uint32_t i = 0; i < icon_count; ++i) {
+		struct mkgui_icon *ic = &icons[i];
+		if(ic->requested_size <= 0 || ic->source_idx == UINT32_MAX) {
+			continue;
+		}
+		struct mkgui_svg_source *src = &svg_sources[ic->source_idx];
+		if(strcmp(ic->name, src->name) != 0) {
+			continue;
+		}
+		int32_t new_size = (int32_t)((float)ic->requested_size * size_ratio + 0.5f);
+		if(new_size < 1) {
+			new_size = 1;
+		}
+		// svg_rasterize_icon_ex dedups by (name, target_size). If the size
+		// changed, the hash slot must follow -- update requested_size on
+		// the entry so the post-rasterize lookup matches the new key.
+		if(new_size != ic->requested_size) {
+			ic->requested_size = new_size;
+		}
+		svg_rasterize_icon_ex(ic->name, src->svg_data, src->svg_len, new_size, theme_color, 1, ic->source_idx);
+	}
+	// Rebuild the hash so lookups at new sizes hit the right slots
+	icon_hash_clear();
+	for(uint32_t i = 0; i < icon_count; ++i) {
+		icon_hash_insert(i);
 	}
 	icon_atlas_rebuild();
 }

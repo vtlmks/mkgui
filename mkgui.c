@@ -504,6 +504,15 @@ struct mkgui_popup {
 
 struct mkgui_icon {
 	char name[MKGUI_ICON_NAME_LEN];
+	// Logical size requested by the caller; stored so svg_rerasterize_all
+	// can re-render at the correct size on scale/theme change. 0 for raster
+	// icons added via mkgui_icon_add where size is implicit in w/h.
+	int32_t requested_size;
+	// Index into svg_sources[] for the SVG data that backs this icon, or
+	// UINT32_MAX for raster icons and icons whose source was never cached.
+	// Lets one SVG source back many icon variants (same name at different
+	// sizes, or coloured variants under dlg: prefix).
+	uint32_t source_idx;
 	uint32_t *pixels;
 	int32_t w, h;
 	uint32_t atlas_offset;
@@ -522,12 +531,15 @@ static uint32_t icon_count;
 static uint32_t icon_hash[MKGUI_ICON_HASH_SIZE];
 
 // [=]===^=[ icon_hash_fn ]===========================================[=]
-static uint32_t icon_hash_fn(const char *name) {
+// FNV-1a over the name, then mixes in the requested size so the same
+// icon at different sizes lives in separate hash slots.
+static uint32_t icon_hash_fn(const char *name, int32_t size) {
 	uint32_t h = 2166136261u;
 	for(const char *p = name; *p; ++p) {
 		h ^= (uint32_t)(uint8_t)*p;
 		h *= 16777619u;
 	}
+	h ^= (uint32_t)size * 2654435761u;
 	return h & MKGUI_ICON_HASH_MASK;
 }
 
@@ -540,27 +552,40 @@ static void icon_hash_clear(void) {
 
 // [=]===^=[ icon_hash_insert ]=======================================[=]
 static void icon_hash_insert(uint32_t idx) {
-	uint32_t h = icon_hash_fn(icons[idx].name);
+	uint32_t h = icon_hash_fn(icons[idx].name, icons[idx].requested_size);
 	while(icon_hash[h] != UINT32_MAX) {
 		h = (h + 1) & MKGUI_ICON_HASH_MASK;
 	}
 	icon_hash[h] = idx;
 }
 
-// [=]===^=[ icon_hash_lookup ]=======================================[=]
-static int32_t icon_hash_lookup(const char *name) {
-	uint32_t h = icon_hash_fn(name);
+// [=]===^=[ icon_hash_lookup_at ]====================================[=]
+// Exact lookup on (name, size). Misses if the icon exists at other sizes.
+static int32_t icon_hash_lookup_at(const char *name, int32_t size) {
+	uint32_t h = icon_hash_fn(name, size);
 	for(;;) {
 		uint32_t idx = icon_hash[h];
 		if(idx == UINT32_MAX) {
 			return -1;
 		}
 
-		if(strcmp(icons[idx].name, name) == 0) {
+		if(icons[idx].requested_size == size && strcmp(icons[idx].name, name) == 0) {
 			return (int32_t)idx;
 		}
 		h = (h + 1) & MKGUI_ICON_HASH_MASK;
 	}
+}
+
+// [=]===^=[ icon_hash_lookup_any ]===================================[=]
+// Linear scan for the first entry with this name, regardless of size.
+// Used for existence checks (does any variant of this icon exist?).
+static int32_t icon_hash_lookup_any(const char *name) {
+	for(uint32_t i = 0; i < icon_count; ++i) {
+		if(strcmp(icons[i].name, name) == 0) {
+			return (int32_t)i;
+		}
+	}
+	return -1;
 }
 
 struct mkgui_rect {
@@ -3543,7 +3568,7 @@ MKGUI_API uint32_t mkgui_add_widget(struct mkgui_ctx *ctx, struct mkgui_widget w
 	}
 
 	if(w.icon[0] != '\0') {
-		icon_resolve(w.icon);
+		icon_resolve(ctx, w.icon);
 	}
 
 	dirty_all(ctx);
@@ -4238,7 +4263,7 @@ MKGUI_API void mkgui_set_window_icon(struct mkgui_ctx *ctx, const struct mkgui_i
 MKGUI_API void mkgui_set_theme(struct mkgui_ctx *ctx, struct mkgui_theme theme) {
 	MKGUI_CHECK(ctx);
 	ctx->theme = theme;
-	svg_rerasterize_all(ctx);
+	svg_rerasterize_all(ctx, 1.0f);
 	dirty_all(ctx);
 }
 
@@ -4251,10 +4276,11 @@ MKGUI_API void mkgui_set_scale(struct mkgui_ctx *ctx, float scale) {
 	if(scale > 4.0f) {
 		scale = 4.0f;
 	}
+	float old_scale = ctx->scale > 0.0f ? ctx->scale : 1.0f;
 	ctx->scale = scale;
 	mkgui_recompute_metrics(ctx);
 	platform_font_set_size(ctx, (int32_t)(13.0f * scale + 0.5f));
-	svg_rerasterize_all(ctx);
+	svg_rerasterize_all(ctx, scale / old_scale);
 	dirty_all(ctx);
 }
 

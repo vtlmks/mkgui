@@ -1609,6 +1609,18 @@ On Windows, there is no system theme support. The bundled `icons/` directory is 
 
 If a widget references an icon name that isn't loaded and it cannot be resolved from the system theme, a built-in placeholder (magenta diamond) is shown instead. This makes unresolved icons immediately visible during development.
 
+### Multiple sizes
+
+Icons are keyed on `(name, size)` internally. The same SVG can be rasterised and cached at several sizes simultaneously -- for example, a toolbar button at `ctx->icon_size` (18 px by default), the about dialog at `ctx->dialog_icon_size` (32 px), and an itemview icon-mode cell at 48 px all live in separate atlas entries.
+
+```c
+int32_t mkgui_icon_at_size(struct mkgui_ctx *ctx, const char *name, int32_t size);
+```
+
+Use this when drawing at a non-default size. Returns the icon index (for `icons[idx]` / `draw_icon`), or -1 if no variant can be produced. The SVG source is cached on first lookup so repeated requests at different sizes don't touch disk more than once.
+
+On scale change (`mkgui_set_scale`), existing SVG-sourced icons are re-rasterised at proportionally new sizes automatically. Raster icons (added via `mkgui_icon_add`) keep their original pixels -- they are opaque to the size system and don't rescale.
+
 ### Custom icons
 
 ```c
