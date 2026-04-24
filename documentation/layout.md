@@ -137,8 +137,22 @@ return 1 (expand by default); single-line leaves return 0.
 
 ## 6. HBOX rules
 
-Mirror of VBOX, swapping axes. Scrolling steals from the inner **height**.
-Alignment uses `MKGUI_ALIGN_*` combined with an explicit `h`.
+Mirror of VBOX for the main (horizontal) axis: flex distribution by
+weight, `MKGUI_FIXED` children take their declared width, etc. Single-line
+widgets **do** expand horizontally by default because filling form-row
+width is usually what you want.
+
+Cross-axis (height) placement uses `widget_vflex_default` too:
+
+- Widgets with explicit `h` and `MKGUI_ALIGN_*` are placed at that height
+  with the requested alignment (top/center/bottom).
+- Single-line leaves (anything for which `widget_vflex_default` returns 0)
+  take their natural height (or explicit `h` if set) and **center
+  vertically** by default. An OK/Cancel button row in a taller HBOX sits
+  in the middle instead of stretching to fill.
+- Multi-line leaves and containers fill the full HBOX height.
+
+Scrolling steals from the inner **height**.
 
 ## 7. FORM rules
 
@@ -312,6 +326,9 @@ Defined in [mkgui.h](../mkgui.h). All are scaled into `ctx` fields by
 | `MKGUI_TOOLBAR_BTN_W`           | 28      | `toolbar_btn_w`      |
 | `MKGUI_TOOLBAR_SEP_W`           | 8       | `toolbar_sep_w`      |
 | `MKGUI_STATUSBAR_HEIGHT`        | 22      | `statusbar_height`   |
+| `MKGUI_TAB_INSET`               | 2       | (used via `sc()`)    |
+| `MKGUI_WIN_MIN_W`               | 200     | (used via `sc()`)    |
+| `MKGUI_WIN_MIN_H`               | 100     | (used via `sc()`)    |
 
 ## 18. Writing a widget that plays nicely
 
@@ -359,12 +376,14 @@ relative padding to drift slightly at high DPI.
 | FORM measure / layout           | `font_height + 10`       | FORM row height                        |
 | WINDOW chrome / min size        | `font_height + 10`       | Toolbar row height                     |
 | Toolbar with icons              | `+ 10`                   | Toolbar height padding                 |
-| TAB inset                       | `2`, `4`                 | TAB border insets (unscaled literals)  |
 | FORM label column               | `+ 8`                    | Label column padding                   |
-| TABS min size                   | `+ 4`                    | TABS min width/height extra            |
-| Window min-size floor           | `100`, `200`             | Absolute floor before `box_pad*2`      |
 
-These have been left as-is because `font_height` already dominates the
-expression and because they have not been observed to cause visible
-issues at the scale factors in use (0.5x - 4.0x). They are candidates for
-future extraction if high-DPI polish becomes a goal.
+These remain because `font_height` already dominates the expression; the
+literal pixel offset is small next to the scaled font metric. Splitting
+them into `MKGUI_*` defines would be a readability improvement, not a
+correctness fix.
+
+Values that used to be on this list and are now scaled via sc():
+
+- `MKGUI_TAB_INSET` (2) -- MKGUI_TAB page inset and TABS min-size border.
+- `MKGUI_WIN_MIN_W`, `MKGUI_WIN_MIN_H` (200, 100) -- window min-size floor.

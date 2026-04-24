@@ -1979,10 +1979,11 @@ static void lc_layout_node(struct mkgui_ctx *ctx, struct layout_ctx *lc, uint32_
 	}
 
 	if(w->type == MKGUI_TAB) {
-		px += 2;
-		py += ctx->tab_height + 2;
-		pw -= 4;
-		ph -= ctx->tab_height + 4;
+		int32_t tab_inset = sc(ctx, MKGUI_TAB_INSET);
+		px += tab_inset;
+		py += ctx->tab_height + tab_inset;
+		pw -= tab_inset * 2;
+		ph -= ctx->tab_height + tab_inset * 2;
 	}
 
 	if(w->type == MKGUI_GROUP) {
@@ -2258,18 +2259,31 @@ static void lc_layout_node(struct mkgui_ctx *ctx, struct layout_ctx *lc, uint32_
 						cw = min_cw;
 					}
 				}
+				// Cross-axis (height) placement. Single-line leaves hold their
+				// natural height and center vertically so e.g. an OK/Cancel row
+				// doesn't stretch its buttons to fill the HBOX. Multi-line leaves
+				// and containers fill the full height (existing behaviour).
 				int32_t cy_child = py;
 				int32_t ch_child = ph;
 				uint32_t align = jw->flags & MKGUI_ALIGN_MASK;
-				if(align && lw_sw(ctx, jw->h) > 0) {
-					if(align == MKGUI_ALIGN_START) {
-						ch_child = lw_sw(ctx, jw->h);
-					} else if(align == MKGUI_ALIGN_CENTER) {
-						ch_child = lw_sw(ctx, jw->h);
+				int32_t explicit_h = lw_sw(ctx, jw->h);
+				if(align && explicit_h > 0) {
+					ch_child = explicit_h;
+					if(align == MKGUI_ALIGN_CENTER) {
 						cy_child = py + (ph - ch_child) / 2;
 					} else if(align == MKGUI_ALIGN_END) {
-						ch_child = lw_sw(ctx, jw->h);
 						cy_child = py + ph - ch_child;
+					}
+				} else if(!widget_vflex_default(jw->type)) {
+					int32_t nat_h = explicit_h > 0 ? explicit_h : natural_height(ctx, jw->type);
+					if(nat_h > 0 && nat_h < ph) {
+						ch_child = nat_h;
+						uint32_t eff_align = align ? align : MKGUI_ALIGN_CENTER;
+						if(eff_align == MKGUI_ALIGN_CENTER) {
+							cy_child = py + (ph - ch_child) / 2;
+						} else if(eff_align == MKGUI_ALIGN_END) {
+							cy_child = py + ph - ch_child;
+						}
 					}
 				}
 				lc->rects[j].x = cx;
@@ -2479,8 +2493,9 @@ static void layout_min_size(struct mkgui_ctx *ctx, uint32_t idx, int32_t *out_w,
 				}
 			}
 		}
-		*out_w = max_tw + 4;
-		*out_h = ctx->tab_height + 4 + max_th;
+		int32_t tab_inset = sc(ctx, MKGUI_TAB_INSET);
+		*out_w = max_tw + tab_inset * 2;
+		*out_h = ctx->tab_height + tab_inset * 2 + max_th;
 		return;
 	}
 
@@ -2546,12 +2561,14 @@ static void layout_compute_min_size(struct mkgui_ctx *ctx, uint32_t win_idx) {
 		}
 	}
 
-	if(min_h < 100) {
-		min_h = 100;
+	int32_t floor_w = sc(ctx, MKGUI_WIN_MIN_W);
+	int32_t floor_h = sc(ctx, MKGUI_WIN_MIN_H);
+	if(min_h < floor_h) {
+		min_h = floor_h;
 	}
 
-	if(min_w < 200) {
-		min_w = 200;
+	if(min_w < floor_w) {
+		min_w = floor_w;
 	}
 	min_w += ctx->box_pad * 2;
 	min_h += ctx->box_pad * 2;

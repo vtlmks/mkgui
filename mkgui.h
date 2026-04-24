@@ -47,6 +47,9 @@
 #define MKGUI_TOOLBAR_BTN_W        28
 #define MKGUI_TOOLBAR_SEP_W        8
 #define MKGUI_STATUSBAR_HEIGHT     22
+#define MKGUI_TAB_INSET            2
+#define MKGUI_WIN_MIN_W          200
+#define MKGUI_WIN_MIN_H          100
 
 // Natural (default) widget sizes used when a leaf widget declares w or h == 0.
 // All values are unscaled (100 %) pixels; sc() is applied at the use site.
