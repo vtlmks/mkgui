@@ -106,7 +106,14 @@ static int32_t dlg_icon_resolve(struct mkgui_ctx *ctx, uint32_t icon_type) {
 	}
 	struct mkgui_svg_source *src = svg_find_source(name);
 	if(src) {
-		return svg_rasterize_icon_ex(cache_name, src->svg_data, src->svg_len, ctx->dialog_icon_size, color, 0);
+		// svg_rasterize_icon_ex adds a new icon slot with pixels set but
+		// atlas_offset uninitialised; the atlas must be rebuilt before the
+		// icon is drawn or draw_icon reads from stride-mismatched memory
+		idx = svg_rasterize_icon_ex(cache_name, src->svg_data, src->svg_len, ctx->dialog_icon_size, color, 0);
+		if(idx >= 0) {
+			icon_atlas_rebuild();
+		}
+		return idx;
 	}
 #ifndef _WIN32
 	// try system theme
