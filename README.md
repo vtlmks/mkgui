@@ -204,6 +204,7 @@ clang-cl /O2 -fuse-ld=lld-link \
 - [API reference and widget guide](documentation/doc.md)
 - [Visual editor guide](documentation/editor.md)
 - [Adding new widgets](documentation/adding_widgets.md)
+- [Layout engine reference](documentation/layout.md)
 
 ## Limitations
 

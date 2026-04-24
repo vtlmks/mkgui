@@ -33,7 +33,6 @@
 #define MKGUI_SPLIT_MIN_PX        50
 #define MKGUI_BOX_GAP              6
 #define MKGUI_BOX_PAD              6
-#define MKGUI_MARGIN               3
 #define MKGUI_ICON_SIZE            18
 #define MKGUI_ICON_NAME_LEN        64
 #ifndef MKGUI_MAX_ICONS
@@ -48,6 +47,25 @@
 #define MKGUI_TOOLBAR_BTN_W        28
 #define MKGUI_TOOLBAR_SEP_W        8
 #define MKGUI_STATUSBAR_HEIGHT     22
+
+// Natural (default) widget sizes used when a leaf widget declares w or h == 0.
+// All values are unscaled (100 %) pixels; sc() is applied at the use site.
+#define MKGUI_NAT_BUTTON_VPAD      12
+#define MKGUI_NAT_INPUT_VPAD       10
+#define MKGUI_NAT_CHECKBOX_VPAD    6
+#define MKGUI_NAT_LABEL_VPAD       4
+#define MKGUI_NAT_SLIDER_H         24
+#define MKGUI_NAT_PROGRESS_H       20
+#define MKGUI_NAT_DIVIDER_H        6
+#define MKGUI_NAT_CANVAS_H         24
+#define MKGUI_NAT_BUTTON_HPAD      16
+#define MKGUI_NAT_BUTTON_ICON_GAP  4
+#define MKGUI_NAT_LABEL_HPAD       4
+#define MKGUI_NAT_CHECKBOX_BOX_W   22
+#define MKGUI_NAT_TOGGLE_BOX_W     44
+#define MKGUI_NAT_DIVIDER_W        4
+#define MKGUI_NAT_DEFAULT_W        40
+
 #define MKGUI_MAX_TIMERS           8
 #define MKGUI_MAX_ACCELS           64
 #define MKGUI_DROP_MAX             256

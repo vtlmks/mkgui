@@ -744,7 +744,6 @@ struct mkgui_ctx {
 	int32_t split_min_px;
 	int32_t box_gap;
 	int32_t box_pad;
-	int32_t ui_margin;
 	int32_t icon_size;
 	int32_t dialog_icon_size;
 	int32_t pathbar_height;
@@ -1054,7 +1053,6 @@ static void mkgui_recompute_metrics(struct mkgui_ctx *ctx) {
 	ctx->split_min_px    = sc(ctx, MKGUI_SPLIT_MIN_PX);
 	ctx->box_gap         = sc(ctx, MKGUI_BOX_GAP);
 	ctx->box_pad         = sc(ctx, MKGUI_BOX_PAD);
-	ctx->ui_margin       = sc(ctx, MKGUI_MARGIN);
 	ctx->icon_size           = sc(ctx, MKGUI_ICON_SIZE);
 	ctx->dialog_icon_size    = sc(ctx, 32);
 	ctx->pathbar_height  = sc(ctx, MKGUI_PATHBAR_HEIGHT);
@@ -1598,7 +1596,7 @@ static void layout_build_index(struct mkgui_ctx *ctx) {
 static int32_t natural_height(struct mkgui_ctx *ctx, uint32_t widget_type) {
 	switch(widget_type) {
 		case MKGUI_BUTTON: {
-			return ctx->font_height + sc(ctx, 12);
+			return ctx->font_height + sc(ctx, MKGUI_NAT_BUTTON_VPAD);
 		}
 
 		case MKGUI_INPUT:
@@ -1608,31 +1606,31 @@ static int32_t natural_height(struct mkgui_ctx *ctx, uint32_t widget_type) {
 		case MKGUI_DATEPICKER:
 		case MKGUI_IPINPUT:
 		case MKGUI_PATHBAR: {
-			return ctx->font_height + sc(ctx, 10);
+			return ctx->font_height + sc(ctx, MKGUI_NAT_INPUT_VPAD);
 		}
 
 		case MKGUI_CHECKBOX:
 		case MKGUI_RADIO:
 		case MKGUI_TOGGLE: {
-			return ctx->font_height + sc(ctx, 6);
+			return ctx->font_height + sc(ctx, MKGUI_NAT_CHECKBOX_VPAD);
 		}
 
 		case MKGUI_LABEL: {
-			return ctx->font_height + sc(ctx, 4);
+			return ctx->font_height + sc(ctx, MKGUI_NAT_LABEL_VPAD);
 		}
 
 		case MKGUI_SLIDER:
 		case MKGUI_SCROLLBAR: {
-			return sc(ctx, 24);
+			return sc(ctx, MKGUI_NAT_SLIDER_H);
 		}
 
 		case MKGUI_PROGRESS:
 		case MKGUI_METER: {
-			return sc(ctx, 20);
+			return sc(ctx, MKGUI_NAT_PROGRESS_H);
 		}
 
 		case MKGUI_DIVIDER: {
-			return sc(ctx, 6);
+			return sc(ctx, MKGUI_NAT_DIVIDER_H);
 		}
 
 		case MKGUI_LISTVIEW:
@@ -1656,7 +1654,7 @@ static int32_t natural_height(struct mkgui_ctx *ctx, uint32_t widget_type) {
 		case MKGUI_IMAGE:
 		case MKGUI_CANVAS:
 		case MKGUI_GLVIEW: {
-			return sc(ctx, 24);
+			return sc(ctx, MKGUI_NAT_CANVAS_H);
 		}
 
 		case MKGUI_VBOX:
@@ -1679,32 +1677,32 @@ static int32_t natural_width(struct mkgui_ctx *ctx, struct mkgui_widget *w) {
 	switch(w->type) {
 		case MKGUI_BUTTON: {
 			tw = w->label[0] ? label_text_width(ctx, w) : 0;
-			int32_t iw = w->icon[0] ? (ctx->icon_size + (w->label[0] ? sc(ctx, 4) : 0)) : 0;
-			return tw + iw + sc(ctx, 16);
+			int32_t iw = w->icon[0] ? (ctx->icon_size + (w->label[0] ? sc(ctx, MKGUI_NAT_BUTTON_ICON_GAP) : 0)) : 0;
+			return tw + iw + sc(ctx, MKGUI_NAT_BUTTON_HPAD);
 		}
 
 		case MKGUI_LABEL: {
 			tw = label_text_width(ctx, w);
-			return tw + sc(ctx, 4);
+			return tw + sc(ctx, MKGUI_NAT_LABEL_HPAD);
 		}
 
 		case MKGUI_CHECKBOX:
 		case MKGUI_RADIO: {
 			tw = label_text_width(ctx, w);
-			return sc(ctx, 22) + tw;
+			return sc(ctx, MKGUI_NAT_CHECKBOX_BOX_W) + tw;
 		}
 
 		case MKGUI_TOGGLE: {
 			tw = label_text_width(ctx, w);
-			return sc(ctx, 44) + tw;
+			return sc(ctx, MKGUI_NAT_TOGGLE_BOX_W) + tw;
 		}
 
 		case MKGUI_DIVIDER: {
-			return sc(ctx, 4);
+			return sc(ctx, MKGUI_NAT_DIVIDER_W);
 		}
 
 		default: {
-			return sc(ctx, 40);
+			return sc(ctx, MKGUI_NAT_DEFAULT_W);
 		}
 	}
 }
@@ -1717,7 +1715,7 @@ static int32_t lc_measure_container(struct mkgui_ctx *ctx, struct layout_ctx *lc
 		if(w->style & MKGUI_GROUP_COLLAPSED) {
 			return (axis == 1) ? gtop : 0;
 		}
-		int32_t gpad = 6;
+		int32_t gpad = ctx->box_pad;
 		for(uint32_t j = lc->first_child[idx]; j < lc->widget_count; j = lc->next_sibling[j]) {
 			uint32_t ct = lw_get(lc, j)->type;
 			if(ct == MKGUI_VBOX || ct == MKGUI_HBOX || ct == MKGUI_FORM || ct == MKGUI_PANEL) {
@@ -1941,7 +1939,7 @@ static void lc_layout_node(struct mkgui_ctx *ctx, struct layout_ctx *lc, uint32_
 			return;
 		}
 		int32_t gtop = ctx->font_height + 4;
-		int32_t gpad = 6;
+		int32_t gpad = ctx->box_pad;
 		px += gpad;
 		py += gtop;
 		pw -= gpad * 2;
