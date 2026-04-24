@@ -20,11 +20,11 @@ mkgui is in **beta**. The author has used it to ship several working application
 # direct clone pinned to a tag
 git clone https://github.com/<user>/mkgui.git
 cd mkgui
-git checkout v0.1.0-beta
+git checkout v0.2.0-beta
 
 # or as a submodule
 git submodule add https://github.com/<user>/mkgui.git mkgui
-cd mkgui && git checkout v0.1.0-beta
+cd mkgui && git checkout v0.2.0-beta
 ```
 
 If you need a fix that only exists on master, open an issue so it can be cherry-picked into the next tag rather than silently depending on a moving target.
