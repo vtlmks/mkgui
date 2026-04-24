@@ -74,6 +74,13 @@ static void ibt_try_add_theme(const char *dir_path, const char *name) {
 	if(ibt->theme_count >= IB_MAX_THEMES) {
 		return;
 	}
+	// dedup: skip if this exact path was already registered (happens when
+	// multiple scan roots resolve to the same directory, e.g. CWD == exe_dir)
+	for(uint32_t i = 0; i < ibt->theme_count; ++i) {
+		if(strcmp(ibt->theme_dirs[i], dir_path) == 0) {
+			return;
+		}
+	}
 	char idx_path[2048];
 	snprintf(idx_path, sizeof(idx_path), "%s/index.theme", dir_path);
 	if(mkgui_path_readable(idx_path)) {
@@ -132,6 +139,47 @@ static void ibt_scan_icon_dir(const char *base_dir) {
 	mkgui_dir_close(&d);
 }
 
+// [=]===^=[ ibt_scan_local_root ]===================================[=]
+// Enumerate base_dir, treat each direct child as a candidate theme, and
+// descend one level so extracted archives (e.g. Papirus-v1.2.3/Papirus)
+// are discovered. Used for CWD and, on Windows, the executable directory.
+static void ibt_scan_local_root(const char *base_dir) {
+	struct mkgui_dir d;
+	if(!mkgui_dir_open(&d, base_dir)) {
+		return;
+	}
+	struct mkgui_dir_entry *ent;
+	while((ent = mkgui_dir_next(&d)) != NULL && ibt->theme_count < IB_MAX_THEMES) {
+		if(ent->name[0] == '.') {
+			continue;
+		}
+		char child_path[2048];
+		snprintf(child_path, sizeof(child_path), "%s/%s", base_dir, ent->name);
+		if(!mkgui_path_is_dir(child_path)) {
+			continue;
+		}
+		ibt_try_add_theme(child_path, ent->name);
+		// one level deeper for extracted archives
+		struct mkgui_dir sub;
+		if(mkgui_dir_open(&sub, child_path)) {
+			struct mkgui_dir_entry *sent;
+			while((sent = mkgui_dir_next(&sub)) != NULL && ibt->theme_count < IB_MAX_THEMES) {
+				if(sent->name[0] == '.') {
+					continue;
+				}
+				// sub_path must fit child_path (up to 2048) + '/' + sent->name
+				char sub_path[4096];
+				snprintf(sub_path, sizeof(sub_path), "%s/%s", child_path, sent->name);
+				if(mkgui_path_is_dir(sub_path)) {
+					ibt_try_add_theme(sub_path, sent->name);
+				}
+			}
+			mkgui_dir_close(&sub);
+		}
+	}
+	mkgui_dir_close(&d);
+}
+
 // [=]===^=[ ibt_scan_local_themes ]=================================[=]
 static void ibt_scan_local_themes(void) {
 	ibt->theme_count = 0;
@@ -171,40 +219,24 @@ static void ibt_scan_local_themes(void) {
 			p = *colon ? colon + 1 : colon;
 		}
 	}
+#else
+	// scan next to the executable so launching via Start Menu / shortcut
+	// still finds themes extracted into the install directory
+	{
+		char exe_path[2048];
+		DWORD len = GetModuleFileNameA(NULL, exe_path, sizeof(exe_path));
+		if(len > 0 && len < sizeof(exe_path)) {
+			char *slash = strrchr(exe_path, '\\');
+			if(slash) {
+				*slash = '\0';
+				ibt_scan_local_root(exe_path);
+			}
+		}
+	}
 #endif
 
-	// also scan cwd and one level deeper (local/unpacked themes, Windows)
-	struct mkgui_dir d;
-	if(!mkgui_dir_open(&d, ".")) {
-		return;
-	}
-	struct mkgui_dir_entry *ent;
-	while((ent = mkgui_dir_next(&d)) != NULL && ibt->theme_count < IB_MAX_THEMES) {
-		if(ent->name[0] == '.') {
-			continue;
-		}
-		if(!mkgui_path_is_dir(ent->name)) {
-			continue;
-		}
-		ibt_try_add_theme(ent->name, ent->name);
-		// scan one level deeper for extracted archives
-		struct mkgui_dir sub;
-		if(mkgui_dir_open(&sub, ent->name)) {
-			struct mkgui_dir_entry *sent;
-			while((sent = mkgui_dir_next(&sub)) != NULL && ibt->theme_count < IB_MAX_THEMES) {
-				if(sent->name[0] == '.') {
-					continue;
-				}
-				char sub_path[2048];
-				snprintf(sub_path, sizeof(sub_path), "%s/%s", ent->name, sent->name);
-				if(mkgui_path_is_dir(sub_path)) {
-					ibt_try_add_theme(sub_path, sent->name);
-				}
-			}
-			mkgui_dir_close(&sub);
-		}
-	}
-	mkgui_dir_close(&d);
+	// scan cwd and one level deeper (local/unpacked themes, dev workflow)
+	ibt_scan_local_root(".");
 }
 
 // ---------------------------------------------------------------------------

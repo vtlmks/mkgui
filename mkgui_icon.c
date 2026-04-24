@@ -1029,12 +1029,21 @@ static void svg_cleanup(void) {
 }
 
 // [=]===^=[ icon_resolve_dir ]=======================================[=]
-// Search order:
+// Search order -- Linux:
 // 1. $<APPNAME_UPPER>_ICON_DIR env override
 // 2. <exe_dir>/../share/<app_name>/icons/  (relative to /proc/self/exe)
 // 3. $XDG_DATA_HOME/<app_name>/icons/  (default: ~/.local/share/)
 // 4. each $XDG_DATA_DIRS entry/<app_name>/icons/  (default: /usr/share:/usr/local/share)
 // 5. ./icons/  (development fallback)
+//
+// Search order -- Windows:
+// 1. %<APPNAME_UPPER>_ICON_DIR% env override
+// 2. <exe_dir>/icons
+// 3. %LOCALAPPDATA%/<app_name>/icons
+// 4. %APPDATA%/<app_name>/icons
+// 5. %ProgramFiles%/<app_name>/icons
+// 6. %ProgramFiles(x86)%/<app_name>/icons
+// 7. ./icons  (development fallback)
 static uint32_t icon_resolve_dir(const char *app_name, char *out, uint32_t out_size) {
 	if(!app_name || !app_name[0] || !out || out_size < 2) {
 		return 0;
@@ -1127,7 +1136,7 @@ static uint32_t icon_resolve_dir(const char *app_name, char *out, uint32_t out_s
 		}
 	}
 #else
-	// Windows: same directory as executable
+	// 2. <exe_dir>\icons
 	{
 		char exe_path[2048];
 		DWORD len = GetModuleFileNameA(NULL, exe_path, sizeof(exe_path));
@@ -1137,6 +1146,27 @@ static uint32_t icon_resolve_dir(const char *app_name, char *out, uint32_t out_s
 				*slash = '\0';
 			}
 			snprintf(out, out_size, "%s\\icons", exe_path);
+			if(icon_dir_exists(out)) {
+				return 1;
+			}
+		}
+	}
+
+	// 3-6. per-user and system-wide install roots, in order of specificity
+	{
+		static const char *env_vars[] = {
+			"LOCALAPPDATA",
+			"APPDATA",
+			"ProgramFiles",
+			"ProgramFiles(x86)",
+			NULL
+		};
+		for(uint32_t i = 0; env_vars[i]; ++i) {
+			const char *base = getenv(env_vars[i]);
+			if(!base || !base[0]) {
+				continue;
+			}
+			snprintf(out, out_size, "%s\\%s\\icons", base, app_name);
 			if(icon_dir_exists(out)) {
 				return 1;
 			}
@@ -1177,8 +1207,18 @@ MKGUI_API uint32_t mkgui_icon_load_app_icons(struct mkgui_ctx *ctx, const char *
 			fprintf(stderr, "mkgui: no bundled icon directory for '%s', using system theme fallback\n", app_name);
 			return 0;
 		}
+		fprintf(stderr,
+			"mkgui: could not find icon directory for '%s'. Set $%s_ICON_DIR, "
+			"install icons under $XDG_DATA_HOME/%s/icons/ or /usr/share/%s/icons/, "
+			"or place an icons/ directory in the working directory.\n",
+			app_name, app_name, app_name, app_name);
+#else
+		fprintf(stderr,
+			"mkgui: could not find icon directory for '%s'. Place icons\\ next "
+			"to the executable, install under %%LOCALAPPDATA%%\\%s\\icons\\ or "
+			"%%ProgramFiles%%\\%s\\icons\\, or set %%%s_ICON_DIR%%.\n",
+			app_name, app_name, app_name, app_name);
 #endif
-		fprintf(stderr, "mkgui: could not find icon directory for '%s'\n", app_name);
 		return 0;
 	}
 

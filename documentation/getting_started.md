@@ -196,8 +196,8 @@ Browse all available icons in the editor's icon browser, or see the [Freedesktop
 
 Windows has no system-wide icon theme, so mkgui cannot fall back to the user's desktop like it does on Linux. In practice:
 
-- The editor's **icon browser is empty by default** on Windows. To populate it, download a Freedesktop theme (Papirus, Breeze, Adwaita, ...) and unpack the archive next to the editor binary so you have e.g. `./Papirus/index.theme`. You can drop several themes side by side.
-- An application built with mkgui **requires its bundled `icons/` directory** to be present next to the executable. There is no secondary lookup. If it's missing, every widget icon becomes a magenta-diamond placeholder.
+- The editor's **icon browser is empty by default** on Windows. To populate it, download a Freedesktop theme (Papirus, Breeze, Adwaita, ...) and unpack the archive next to the editor binary so you have e.g. `editor.exe` and `Papirus\index.theme` side by side. Multiple themes can coexist. The browser finds them whether you launch the editor from its own directory, from a Start Menu shortcut, or from another CWD.
+- An application built with mkgui looks for its icon directory in a fixed order: `%<APPNAME>_ICON_DIR%`, then `<exe_dir>\icons\`, then `%LOCALAPPDATA%\<appname>\icons\`, `%APPDATA%\<appname>\icons\`, `%ProgramFiles%\<appname>\icons\`, `%ProgramFiles(x86)%\<appname>\icons\`, and finally `.\icons\`. If none of these exist every widget icon becomes a magenta-diamond placeholder and a message is printed to stderr.
 
 Freedesktop icon themes often use symlinks for icon aliases (e.g., `media-floppy.svg` linking to `document-save.svg`). On Linux this works transparently. On Windows, symlinks may not be preserved when extracting the theme archive. Use an extraction tool that resolves symlinks to copies (e.g., 7-Zip or `tar --dereference`), or the aliased icons will be missing.
 

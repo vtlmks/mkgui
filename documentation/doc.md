@@ -1563,7 +1563,9 @@ const char *mkgui_icon_get_dir(struct mkgui_ctx *ctx);
 
 `mkgui_icon_load_svg` loads a single SVG file and registers it under `name`. `mkgui_icon_load_svg_dir` batch-loads all `.svg` files from a flat directory (filename minus `.svg` extension becomes the icon name). All icons (including toolbar icons) are loaded at the same size.
 
-`mkgui_icon_load_app_icons` resolves the icon directory automatically using standard platform paths, then loads all SVGs from it. The search order is:
+`mkgui_icon_load_app_icons` resolves the icon directory automatically using standard platform paths, then loads all SVGs from it.
+
+**Linux search order:**
 
 1. `$<APPNAME>_ICON_DIR` environment variable (override for development/packaging)
 2. `../share/<app_name>/icons/` relative to the executable (covers FHS installs)
@@ -1571,7 +1573,15 @@ const char *mkgui_icon_get_dir(struct mkgui_ctx *ctx);
 4. Each `$XDG_DATA_DIRS` entry + `/<app_name>/icons/` (default: `/usr/share:/usr/local/share`)
 5. `./icons/` (development fallback)
 
-On Windows, the executable's own directory is checked instead of the XDG paths.
+**Windows search order:**
+
+1. `%<APPNAME>_ICON_DIR%` environment variable
+2. `<exe_dir>\icons\` (portable install / dev build)
+3. `%LOCALAPPDATA%\<app_name>\icons\` (per-user install)
+4. `%APPDATA%\<app_name>\icons\` (roaming per-user install)
+5. `%ProgramFiles%\<app_name>\icons\` (system-wide install)
+6. `%ProgramFiles(x86)%\<app_name>\icons\` (32-bit system-wide install)
+7. `.\icons\` (development fallback)
 
 `mkgui_icon_get_dir` returns the resolved icon directory path, or NULL if no icons were loaded.
 
@@ -1618,7 +1628,7 @@ uint32_t mkgui_icon_browser_theme(struct mkgui_ctx *ctx, const char *theme_dir,
                                   int32_t size, char *out, uint32_t out_size);
 ```
 
-`mkgui_icon_browser` opens a modal browser showing icons from available Freedesktop icon themes. On Linux, it scans system icon directories (`/usr/share/icons/`, `$XDG_DATA_HOME/icons/`, etc.) in addition to local directories. On Windows, only local theme directories are scanned. A theme dropdown allows switching between themes; the icon array is reset on each switch to avoid stale icons. Returns 1 and writes the selected icon name to `out_name` and the full source path of the selected SVG to `out_path` if the user picked an icon, 0 on cancel. Multiple themes can coexist, allowing users to mix icons from different icon sets.
+`mkgui_icon_browser` opens a modal browser showing icons from available Freedesktop icon themes. On Linux, it scans system icon directories (`/usr/share/icons/`, `$XDG_DATA_HOME/icons/`, etc.) in addition to the current working directory and one level deeper. On Windows, it scans the executable's own directory and the current working directory (both plus one level deeper) so themes extracted next to the binary are picked up regardless of how the app was launched. A theme dropdown allows switching between themes; the icon array is reset on each switch to avoid stale icons. Returns 1 and writes the selected icon name to `out_name` and the full source path of the selected SVG to `out_path` if the user picked an icon, 0 on cancel. Multiple themes can coexist, allowing users to mix icons from different icon sets.
 
 `mkgui_icon_browser_theme` is a narrower variant that browses only the icons in a single explicit theme directory. It writes the chosen icon name (no path) to `out`. Useful when an application bundles its own custom theme and wants a browser scoped to it.
 
