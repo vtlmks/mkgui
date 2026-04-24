@@ -90,12 +90,32 @@ falls into a generic "fill parent minus margins, optionally fixed" path.
 **Pass 1 -- classify children and sum minimums**:
 
 - Skip `MKGUI_HIDDEN`.
-- **Fixed** children (`MKGUI_FIXED`, or collapsible `MKGUI_GROUP`):
-  height taken from `w->h` (scaled), falling back to `lc_measure_container`
-  for containers or `natural_height` for leaves. Added to `fixed_total`.
-  Collapsed groups are clamped to `ctx->font_height + 4` (header only).
+- **Fixed** children are the union of three cases, decided by
+  `vbox_child_is_fixed`:
+    - the `MKGUI_FIXED` flag is set, or
+    - the widget is a collapsible `MKGUI_GROUP`, or
+    - the widget is a **single-line leaf** (input, button, label,
+      checkbox, radio, toggle, dropdown, combobox, spinbox, datepicker,
+      ipinput, slider, scrollbar, progress, meter, divider, spinner) and
+      `weight == 0`.
+
+  Their height is taken from `w->h` (scaled), falling back to
+  `lc_measure_container` for containers or `natural_height` for leaves,
+  and added to `fixed_total`. Collapsed groups are clamped to
+  `ctx->font_height + 4` (header only).
 - **Flexible** children: same resolution used as a **minimum** added to
   `min_total`; their `weight` (or 1) added to `weight_total`.
+
+The single-line-leaf rule matches Qt/GTK size-policy conventions: a
+`QLineEdit` / `GtkEntry` holds its natural height and does not stretch
+unless the programmer asks for it. To opt a single-line widget back into
+flex behaviour, set `weight > 0` explicitly
+(`mkgui_set_weight(id, 1)`).
+
+The per-type classification lives in `widget_vflex_default` in
+[mkgui.c](../mkgui.c). Multi-line leaves (textarea, listview, gridview,
+richlist, treeview, itemview, image, canvas, glview) and all containers
+return 1 (expand by default); single-line leaves return 0.
 
 **Pass 2 -- scrollbar and remainder**:
 
@@ -301,21 +321,26 @@ Checklist for a new widget:
    child of a VBOX/HBOX/FORM without an explicit `h`).
 2. Add a case to `natural_width` if the widget has an intrinsic width
    different from the `MKGUI_NAT_DEFAULT_W` fallback.
-3. If the widget is a **container**, decide whether to handle it in
+3. Classify the widget in `widget_vflex_default`: return 0 if it is a
+   single-line control that should hold its natural height in a VBOX,
+   return 1 if it should expand to fill leftover space. The default for
+   anything not listed is 1, so you only need to add a case for
+   single-line leaves.
+4. If the widget is a **container**, decide whether to handle it in
    `lc_layout_node` (custom rules) or let the generic fallback distribute
    full-parent rects. Also add it to the padding predicate if it should
    suppress nested children's padding.
-4. Use `sc(ctx, N)` for every pixel constant so DPI scaling is automatic.
+5. Use `sc(ctx, N)` for every pixel constant so DPI scaling is automatic.
    Never write raw px.
-5. Use `ctx->box_gap` / `ctx->box_pad` / `ctx->row_height` etc. -- do not
+6. Use `ctx->box_gap` / `ctx->box_pad` / `ctx->row_height` etc. -- do not
    reference `MKGUI_BOX_GAP` etc. at runtime.
-6. If your widget has its own natural-size literals that might be tweaked
+7. If your widget has its own natural-size literals that might be tweaked
    or overridden by consumers, add them to the `MKGUI_NAT_*` block in
    [mkgui.h](../mkgui.h) rather than inlining the number.
-7. If the widget wants its children's margins honoured, make sure the
+8. If the widget wants its children's margins honoured, make sure the
    layout path for it runs the generic fallback (or copy the
    `margin_l/r/t/b` handling explicitly).
-8. If the widget owns sub-rects not matching any child widget (like
+9. If the widget owns sub-rects not matching any child widget (like
    toolbar button slots), compute and write them yourself during render,
    following the pattern in [mkgui_toolbar.c](../mkgui_toolbar.c).
 

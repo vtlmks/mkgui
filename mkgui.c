@@ -1592,6 +1592,57 @@ static void layout_build_index(struct mkgui_ctx *ctx) {
 }
 
 
+// Single-line controls hold their natural height in a VBOX rather than
+// stretching to share leftover space. Setting weight > 0 explicitly opts
+// the widget back into flex behaviour. This matches Qt/GTK size-policy
+// conventions and prevents text carets from rendering at half-window
+// height when a user drops an input next to a weighted sibling.
+// [=]===^=[ widget_vflex_default ]==================================[=]
+static uint32_t widget_vflex_default(uint32_t widget_type) {
+	switch(widget_type) {
+		case MKGUI_BUTTON:
+		case MKGUI_LABEL:
+		case MKGUI_INPUT:
+		case MKGUI_CHECKBOX:
+		case MKGUI_DROPDOWN:
+		case MKGUI_SLIDER:
+		case MKGUI_SCROLLBAR:
+		case MKGUI_SPINBOX:
+		case MKGUI_RADIO:
+		case MKGUI_PROGRESS:
+		case MKGUI_METER:
+		case MKGUI_SPINNER:
+		case MKGUI_PATHBAR:
+		case MKGUI_IPINPUT:
+		case MKGUI_TOGGLE:
+		case MKGUI_COMBOBOX:
+		case MKGUI_DATEPICKER:
+		case MKGUI_DIVIDER: {
+			return 0;
+		}
+
+		default: {
+			return 1;
+		}
+	}
+}
+
+// [=]===^=[ vbox_child_is_fixed ]==================================[=]
+static uint32_t vbox_child_is_fixed(struct mkgui_widget *jw) {
+	if(jw->flags & MKGUI_FIXED) {
+		return 1;
+	}
+
+	if(jw->type == MKGUI_GROUP && (jw->style & MKGUI_GROUP_COLLAPSIBLE)) {
+		return 1;
+	}
+
+	if(jw->weight == 0 && !widget_vflex_default(jw->type)) {
+		return 1;
+	}
+	return 0;
+}
+
 // [=]===^=[ natural_height ]=======================================[=]
 static int32_t natural_height(struct mkgui_ctx *ctx, uint32_t widget_type) {
 	switch(widget_type) {
@@ -1983,9 +2034,10 @@ static void lc_layout_node(struct mkgui_ctx *ctx, struct layout_ctx *lc, uint32_
 					continue;
 				}
 				++child_count;
-				// collapsible groups are always fixed-height: their size is
-			// deterministic (collapsed header or full content), not weighted
-			uint32_t treat_fixed = (jw->flags & MKGUI_FIXED) || (jw->type == MKGUI_GROUP && (jw->style & MKGUI_GROUP_COLLAPSIBLE));
+				// collapsible groups are deterministically sized; single-line
+				// leaves with weight==0 hold their natural height instead of
+				// eating leftover space (see widget_vflex_default comment)
+				uint32_t treat_fixed = vbox_child_is_fixed(jw);
 				if(treat_fixed) {
 					int32_t fh = lw_sw(ctx, jw->h);
 					if(jw->type == MKGUI_GROUP && (jw->style & MKGUI_GROUP_COLLAPSED)) {
@@ -2048,7 +2100,8 @@ static void lc_layout_node(struct mkgui_ctx *ctx, struct layout_ctx *lc, uint32_
 					continue;
 				}
 				int32_t ch;
-				if((jw->flags & MKGUI_FIXED) || (jw->type == MKGUI_GROUP && (jw->style & MKGUI_GROUP_COLLAPSIBLE))) {
+				uint32_t child_fixed = vbox_child_is_fixed(jw);
+				if(child_fixed) {
 					ch = lc->rects[j].h;
 				} else {
 					uint32_t wt = jw->weight > 0 ? jw->weight : 1;
@@ -2068,7 +2121,7 @@ static void lc_layout_node(struct mkgui_ctx *ctx, struct layout_ctx *lc, uint32_
 				}
 				// floor flexible children at content size so they never collapse
 				// below usable dimensions; fixed children keep their declared size
-				if(!((jw->flags & MKGUI_FIXED) || (jw->type == MKGUI_GROUP && (jw->style & MKGUI_GROUP_COLLAPSIBLE)))) {
+				if(!child_fixed) {
 					uint32_t ct = jw->type;
 					int32_t min_ch;
 					if(ct == MKGUI_VBOX || ct == MKGUI_HBOX || ct == MKGUI_FORM || ct == MKGUI_GROUP || ct == MKGUI_PANEL) {
