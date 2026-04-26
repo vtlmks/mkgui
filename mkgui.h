@@ -265,6 +265,10 @@ enum {
 // -- Progress --
 #define MKGUI_PROGRESS_SHIMMER         (1u << 0)
 
+// -- Window --
+#define MKGUI_WINDOW_HIDDEN            (1u << 0)
+#define MKGUI_WINDOW_HIDE_ON_CLOSE     (1u << 1)
+
 // ---------------------------------------------------------------------------
 // Event types
 // ---------------------------------------------------------------------------
@@ -507,6 +511,9 @@ MKGUI_API void mkgui_set_title(struct mkgui_ctx *ctx, const char *title);
 MKGUI_API void mkgui_set_callback(struct mkgui_ctx *ctx, mkgui_event_cb cb, void *userdata);
 MKGUI_API void mkgui_run(struct mkgui_ctx *ctx, mkgui_event_cb cb, void *userdata);
 MKGUI_API void mkgui_quit(struct mkgui_ctx *ctx);
+MKGUI_API void mkgui_window_show(struct mkgui_ctx *ctx);
+MKGUI_API void mkgui_window_hide(struct mkgui_ctx *ctx);
+MKGUI_API uint32_t mkgui_window_is_visible(struct mkgui_ctx *ctx);
 MKGUI_API uint32_t mkgui_add_timer(struct mkgui_ctx *ctx, uint64_t interval_ns, mkgui_timer_cb cb, void *userdata);
 MKGUI_API void mkgui_remove_timer(struct mkgui_ctx *ctx, uint32_t timer_id);
 

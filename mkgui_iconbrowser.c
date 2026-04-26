@@ -69,115 +69,24 @@ struct ib_theme_state {
 
 static struct ib_theme_state *ibt;
 
-// [=]===^=[ ibt_try_add_theme ]=====================================[=]
-static void ibt_try_add_theme(const char *dir_path, const char *name) {
+// [=]===^=[ ibt_visit_theme ]=======================================[=]
+// Visitor passed to the shared scanners in mkgui_icon.c. Appends each
+// reported theme to ibt->theme_dirs/names with dedup against the existing
+// set (multiple scan roots can resolve to the same directory).
+static void ibt_visit_theme(const char *theme_dir, const char *theme_name, void *userdata) {
+	(void)userdata;
 	if(ibt->theme_count >= IB_MAX_THEMES) {
 		return;
 	}
-	// dedup: skip if this exact path was already registered (happens when
-	// multiple scan roots resolve to the same directory, e.g. CWD == exe_dir)
 	for(uint32_t i = 0; i < ibt->theme_count; ++i) {
-		if(strcmp(ibt->theme_dirs[i], dir_path) == 0) {
+		if(strcmp(ibt->theme_dirs[i], theme_dir) == 0) {
 			return;
 		}
 	}
-	char idx_path[2048];
-	snprintf(idx_path, sizeof(idx_path), "%s/index.theme", dir_path);
-	if(mkgui_path_readable(idx_path)) {
-		uint32_t ti = ibt->theme_count;
-		snprintf(ibt->theme_dirs[ti], sizeof(ibt->theme_dirs[ti]), "%s", dir_path);
-		snprintf(ibt->theme_names[ti], sizeof(ibt->theme_names[ti]), "%s", name);
-		++ibt->theme_count;
-		return;
-	}
-	// source repos (e.g. breeze) may have icons/ subdir with .theme.in files
-	char icons_sub[2048];
-	snprintf(icons_sub, sizeof(icons_sub), "%s/icons", dir_path);
-	struct mkgui_dir probe;
-	if(!mkgui_dir_open(&probe, icons_sub)) {
-		return;
-	}
-	uint32_t has_theme_in = 0;
-	struct mkgui_dir_entry *pe;
-	while((pe = mkgui_dir_next(&probe)) != NULL) {
-		uint32_t plen = (uint32_t)strlen(pe->name);
-		if(plen > 9 && strcmp(pe->name + plen - 9, ".theme.in") == 0) {
-			has_theme_in = 1;
-			break;
-		}
-	}
-	mkgui_dir_close(&probe);
-	if(!has_theme_in) {
-		return;
-	}
 	uint32_t ti = ibt->theme_count;
-	snprintf(ibt->theme_dirs[ti], sizeof(ibt->theme_dirs[ti]), "%s/icons", dir_path);
-	snprintf(ibt->theme_names[ti], sizeof(ibt->theme_names[ti]), "%s", name);
+	snprintf(ibt->theme_dirs[ti], sizeof(ibt->theme_dirs[ti]), "%s", theme_dir);
+	snprintf(ibt->theme_names[ti], sizeof(ibt->theme_names[ti]), "%s", theme_name);
 	++ibt->theme_count;
-}
-
-// [=]===^=[ ibt_scan_icon_dir ]=====================================[=]
-// Scan a directory containing icon themes (e.g. /usr/share/icons/).
-// Each subdirectory with an index.theme is added as a browseable theme.
-static void ibt_scan_icon_dir(const char *base_dir) {
-	struct mkgui_dir d;
-	if(!mkgui_dir_open(&d, base_dir)) {
-		return;
-	}
-	struct mkgui_dir_entry *ent;
-	while((ent = mkgui_dir_next(&d)) != NULL && ibt->theme_count < IB_MAX_THEMES) {
-		if(ent->name[0] == '.') {
-			continue;
-		}
-		char sub_path[2048];
-		snprintf(sub_path, sizeof(sub_path), "%s/%s", base_dir, ent->name);
-		if(!mkgui_path_is_dir(sub_path)) {
-			continue;
-		}
-		ibt_try_add_theme(sub_path, ent->name);
-	}
-	mkgui_dir_close(&d);
-}
-
-// [=]===^=[ ibt_scan_local_root ]===================================[=]
-// Enumerate base_dir, treat each direct child as a candidate theme, and
-// descend one level so extracted archives (e.g. Papirus-v1.2.3/Papirus)
-// are discovered. Used for CWD and, on Windows, the executable directory.
-static void ibt_scan_local_root(const char *base_dir) {
-	struct mkgui_dir d;
-	if(!mkgui_dir_open(&d, base_dir)) {
-		return;
-	}
-	struct mkgui_dir_entry *ent;
-	while((ent = mkgui_dir_next(&d)) != NULL && ibt->theme_count < IB_MAX_THEMES) {
-		if(ent->name[0] == '.') {
-			continue;
-		}
-		char child_path[2048];
-		snprintf(child_path, sizeof(child_path), "%s/%s", base_dir, ent->name);
-		if(!mkgui_path_is_dir(child_path)) {
-			continue;
-		}
-		ibt_try_add_theme(child_path, ent->name);
-		// one level deeper for extracted archives
-		struct mkgui_dir sub;
-		if(mkgui_dir_open(&sub, child_path)) {
-			struct mkgui_dir_entry *sent;
-			while((sent = mkgui_dir_next(&sub)) != NULL && ibt->theme_count < IB_MAX_THEMES) {
-				if(sent->name[0] == '.') {
-					continue;
-				}
-				// sub_path must fit child_path (up to 2048) + '/' + sent->name
-				char sub_path[4096];
-				snprintf(sub_path, sizeof(sub_path), "%s/%s", child_path, sent->name);
-				if(mkgui_path_is_dir(sub_path)) {
-					ibt_try_add_theme(sub_path, sent->name);
-				}
-			}
-			mkgui_dir_close(&sub);
-		}
-	}
-	mkgui_dir_close(&d);
 }
 
 // [=]===^=[ ibt_scan_local_themes ]=================================[=]
@@ -185,18 +94,18 @@ static void ibt_scan_local_themes(void) {
 	ibt->theme_count = 0;
 
 #ifndef _WIN32
-	// scan system icon theme directories on Linux
+	// scan system icon theme directories on Linux (XDG)
 	{
 		const char *data_home = getenv("XDG_DATA_HOME");
 		char path[2048];
 		if(data_home && data_home[0]) {
 			snprintf(path, sizeof(path), "%s/icons", data_home);
-			ibt_scan_icon_dir(path);
+			icon_scan_themes_in_dir(path, ibt_visit_theme, NULL);
 		} else {
 			const char *home = getenv("HOME");
 			if(home && home[0]) {
 				snprintf(path, sizeof(path), "%s/.local/share/icons", home);
-				ibt_scan_icon_dir(path);
+				icon_scan_themes_in_dir(path, ibt_visit_theme, NULL);
 			}
 		}
 	}
@@ -214,7 +123,7 @@ static void ibt_scan_local_themes(void) {
 			if(seg_len > 0) {
 				char path[2048];
 				snprintf(path, sizeof(path), "%.*s/icons", (int)seg_len, p);
-				ibt_scan_icon_dir(path);
+				icon_scan_themes_in_dir(path, ibt_visit_theme, NULL);
 			}
 			p = *colon ? colon + 1 : colon;
 		}
@@ -229,14 +138,14 @@ static void ibt_scan_local_themes(void) {
 			char *slash = strrchr(exe_path, '\\');
 			if(slash) {
 				*slash = '\0';
-				ibt_scan_local_root(exe_path);
+				icon_scan_local_root(exe_path, ibt_visit_theme, NULL);
 			}
 		}
 	}
 #endif
 
-	// scan cwd and one level deeper (local/unpacked themes, dev workflow)
-	ibt_scan_local_root(".");
+	// scan cwd one + two levels deep (local/unpacked themes, dev workflow)
+	icon_scan_local_themes(ibt_visit_theme, NULL);
 }
 
 // ---------------------------------------------------------------------------

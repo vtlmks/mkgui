@@ -78,7 +78,7 @@ esac
 CFLAGS="$COMMON_CFLAGS $MODE_FLAGS"
 
 set -e
-mkdir -p out
+mkdir -p out/linux out/windows
 
 WIN_ENABLED=0
 if [ -z "$SKIP_WINDOWS" ] && command -v $WINCC &>/dev/null; then
@@ -88,22 +88,24 @@ fi
 # -----------------------------------------------------------------------------
 # Phase 1: static libraries (sequential - this is the heavy compile).
 # Building once and linking everyone else against it avoids saturating a
-# low-core laptop with many simultaneous mkgui.c compilations.
+# low-core laptop with many simultaneous mkgui.c compilations. Both static
+# libraries share the canonical name libmkgui.a; platform is encoded in the
+# parent directory (out/linux/, out/windows/).
 # Editor is special (unity build, uses internals) and does not depend on the
 # library, so we skip this phase when target=editor.
 # -----------------------------------------------------------------------------
 
 if [ "$TARGET" != "editor" ]; then
-	echo "[lib] libmkgui.a"
-	$CC $CFLAGS $LIB_DEFINES -c mkgui.c -o out/mkgui.o $LINUX_LIBS
-	ar rcs out/libmkgui.a out/mkgui.o
-	rm -f out/mkgui.o
+	echo "[lib] out/linux/libmkgui.a"
+	$CC $CFLAGS $LIB_DEFINES -c mkgui.c -o out/linux/mkgui.o $LINUX_LIBS
+	ar rcs out/linux/libmkgui.a out/linux/mkgui.o
+	rm -f out/linux/mkgui.o
 
 	if [ "$WIN_ENABLED" -eq 1 ]; then
-		echo "[lib] libmkgui_win.a"
-		$WINCC $CFLAGS $LIB_DEFINES -c mkgui.c -o out/mkgui_win.o $WINDOWS_LIBS
-		$WINAR rcs out/libmkgui_win.a out/mkgui_win.o
-		rm -f out/mkgui_win.o
+		echo "[lib] out/windows/libmkgui.a"
+		$WINCC $CFLAGS $LIB_DEFINES -c mkgui.c -o out/windows/mkgui.o $WINDOWS_LIBS
+		$WINAR rcs out/windows/libmkgui.a out/windows/mkgui.o
+		rm -f out/windows/mkgui.o
 	fi
 fi
 
@@ -115,52 +117,56 @@ fi
 if [ "$TARGET" != "editor" ]; then
 	# Demo: small app, links libmkgui.a
 	(
-		$CC $CFLAGS demo.c out/libmkgui.a -o out/demo $LINUX_LIBS $LINUX_DEMO_LIBS
+		$CC $CFLAGS demo.c out/linux/libmkgui.a -o out/linux/demo $LINUX_LIBS $LINUX_DEMO_LIBS
 	) &
 
 	if [ "$WIN_ENABLED" -eq 1 ]; then
 		(
-			$WINCC $CFLAGS demo.c out/libmkgui_win.a -o out/demo.exe $WINDOWS_LIBS $WINDOWS_DEMO_LIBS
+			$WINCC $CFLAGS demo.c out/windows/libmkgui.a -o out/windows/demo.exe $WINDOWS_LIBS $WINDOWS_DEMO_LIBS
 		) &
 	fi
 
 	# Tests: unity builds (they poke mkgui internals on purpose). Kept unity
 	# rather than polluting the public library with test-only exports.
 	(
-		$CC $CFLAGS tests/test_layout.c -o out/test_layout $LINUX_LIBS
+		$CC $CFLAGS tests/test_layout.c -o out/linux/test_layout $LINUX_LIBS
 	) &
 
 	(
-		$CC $CFLAGS tests/test_widgets.c -o out/test_widgets $LINUX_LIBS
+		$CC $CFLAGS tests/test_widgets.c -o out/linux/test_widgets $LINUX_LIBS
 	) &
 
 	(
-		$CC $CFLAGS tests/test_events.c -o out/test_events $LINUX_LIBS
+		$CC $CFLAGS tests/test_events.c -o out/linux/test_events $LINUX_LIBS
 	) &
 
 	(
-		$CC $CFLAGS tests/test_events_ext.c -o out/test_events_ext $LINUX_LIBS
+		$CC $CFLAGS tests/test_events_ext.c -o out/linux/test_events_ext $LINUX_LIBS
 	) &
 
 	(
-		$CC $CFLAGS tests/test_smoke.c -o out/test_smoke $LINUX_LIBS
+		$CC $CFLAGS tests/test_smoke.c -o out/linux/test_smoke $LINUX_LIBS
+	) &
+
+	(
+		$CC $CFLAGS tests/test_window_visibility.c -o out/linux/test_window_visibility $LINUX_LIBS
 	) &
 
 	# extract_icons is independent (doesn't use mkgui)
 	(
-		$CC -std=gnu99 -O2 -Wall -Wextra -Wno-stringop-truncation -Wno-format-truncation tools/extract_icons.c -o out/extract_icons
+		$CC -std=gnu99 -O2 -Wall -Wextra -Wno-stringop-truncation -Wno-format-truncation tools/extract_icons.c -o out/linux/extract_icons
 	) &
 fi
 
 if [ "$TARGET" = "editor" ] || [ "$TARGET" = "all" ]; then
 	# Editor: unity build (shares mkgui's rendering/layout internals)
 	(
-		$CC $CFLAGS editor.c -o out/editor $LINUX_LIBS
+		$CC $CFLAGS editor.c -o out/linux/editor $LINUX_LIBS
 	) &
 
 	if [ "$WIN_ENABLED" -eq 1 ]; then
 		(
-			$WINCC $CFLAGS editor.c -o out/editor.exe $WINDOWS_LIBS
+			$WINCC $CFLAGS editor.c -o out/windows/editor.exe $WINDOWS_LIBS
 		) &
 	fi
 fi

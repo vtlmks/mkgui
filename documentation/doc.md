@@ -436,6 +436,9 @@ void mkgui_destroy(struct mkgui_ctx *ctx);
 void mkgui_set_callback(struct mkgui_ctx *ctx, mkgui_event_cb cb, void *userdata);
 void mkgui_run(struct mkgui_ctx *ctx, mkgui_event_cb cb, void *userdata);
 void mkgui_quit(struct mkgui_ctx *ctx);
+void mkgui_window_show(struct mkgui_ctx *ctx);
+void mkgui_window_hide(struct mkgui_ctx *ctx);
+uint32_t mkgui_window_is_visible(struct mkgui_ctx *ctx);
 void mkgui_set_title(struct mkgui_ctx *ctx, const char *title);
 void mkgui_set_app_class(struct mkgui_ctx *ctx, const char *app_class);
 void mkgui_set_window_instance(struct mkgui_ctx *ctx, const char *instance);
@@ -453,7 +456,7 @@ void mkgui_remove_timer(struct mkgui_ctx *ctx, uint32_t timer_id);
 
 `mkgui_icon_load_app_icons` takes its own `app_name` argument for the icon directory lookup. It is independent from the WM class, but in practice most applications pass the same string to both calls.
 
-`mkgui_run` runs the event loop. It drains all pending events, delivers each to `cb`, renders the frame, then blocks until the next event or timer. This repeats until `mkgui_quit` is called. It also pumps events for all other registered contexts that have a callback set via `mkgui_set_callback`, rendering and dispatching their events automatically.
+`mkgui_run` runs the event loop. It drains all pending events, delivers each to `cb`, renders the frame, then blocks until the next event or timer. It returns when **either** `mkgui_quit` is called (which sets `ctx->close_requested`) **or** no registered window is currently visible. Calling `mkgui_run` while all windows are already hidden returns immediately. It also pumps events for all other registered contexts that have a callback set via `mkgui_set_callback`, rendering and dispatching their events automatically.
 
 `mkgui_set_callback` registers a per-context event callback without starting an event loop. Use this for secondary windows that should be pumped by an existing `mkgui_run` loop. The context is automatically picked up on the next iteration.
 
@@ -513,6 +516,62 @@ void open_plugin_config(void) {
 ```
 
 Dialogs (`mkgui_message_box`, `mkgui_open_dialog`, etc.) work normally when called from the event callback -- they run their own nested event loop internally.
+
+#### Window visibility
+
+Windows are mapped immediately at create time by default. Two flags on the `MKGUI_WINDOW` widget's `style` field change this:
+
+| Flag                          | Effect                                                                   |
+|-------------------------------|--------------------------------------------------------------------------|
+| `MKGUI_WINDOW_HIDDEN`         | Suppress the initial map. The context exists, but no window is shown.    |
+| `MKGUI_WINDOW_HIDE_ON_CLOSE`  | When the WM close button is clicked, hide the window instead of quitting. |
+
+Three runtime calls control visibility:
+
+```c
+void     mkgui_window_show(struct mkgui_ctx *ctx);
+void     mkgui_window_hide(struct mkgui_ctx *ctx);
+uint32_t mkgui_window_is_visible(struct mkgui_ctx *ctx);
+```
+
+`mkgui_run` returns when `ctx->close_requested` is set OR when no registered window is currently visible. This makes the persistent-hidden-context pattern natural: keep a configuration ctx alive across the application lifetime, show it on demand, and let `mkgui_run` return when the user closes (i.e. hides) it.
+
+A hidden context is fully functional. The X display connection stays open, child windows created with `mkgui_create_child` work, and dialogs (`mkgui_open_dialog`, `mkgui_save_dialog`, ...) accept a hidden ctx as parent -- the WM treats `XSetTransientForHint` against an unmapped window as a hint only.
+
+**Persistent-hidden pattern (e.g. a player whose main UI is not mkgui):**
+
+```c
+static struct mkgui_widget config_widgets[] = {
+    { MKGUI_WINDOW, 1, 0, 480, 320, 0,
+      MKGUI_WINDOW_HIDDEN | MKGUI_WINDOW_HIDE_ON_CLOSE, 0,
+      0, 0, 0, 0, 0, "Preferences", "" },
+    /* ... config widgets ... */
+};
+
+int main(void) {
+    struct mkgui_ctx *config = mkgui_create(config_widgets, ...);  // not mapped
+    /* ... run player main loop ... */
+
+    /* User chose "File -> Open" or "Edit -> Preferences": */
+    mkgui_window_show(config);
+    mkgui_run(config, on_event, NULL);   /* returns when user closes (= hides) */
+    /* control resumes here, config ctx still alive */
+
+    mkgui_destroy(config);
+}
+```
+
+The config ctx can also be used as the parent of file dialogs while it is hidden:
+
+```c
+char path[4096];
+struct mkgui_file_dialog_opts opts = { .start_path = "." };
+if(mkgui_open_dialog(config, &opts, path, sizeof(path))) {
+    /* user picked a file */
+}
+```
+
+Without `MKGUI_WINDOW_HIDE_ON_CLOSE`, behavior is unchanged: a WM close button click sets `close_requested` and `mkgui_run` unwinds. With it, the close button hides the window and `mkgui_run` exits via the no-visible-windows rule.
 
 #### Timers
 

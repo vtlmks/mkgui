@@ -163,10 +163,21 @@ static uint32_t platform_init(struct mkgui_ctx *ctx, const char *title, int32_t 
 		plat->xic = XCreateIC(plat->xim, XNInputStyle, XIMPreeditNothing | XIMStatusNothing, XNClientWindow, plat->win, XNFocusWindow, plat->win, NULL);
 	}
 
-	XMapWindow(plat->dpy, plat->win);
 	XFlush(plat->dpy);
 
 	return 1;
+}
+
+// [=]===^=[ platform_window_map ]==================================[=]
+static void platform_window_map(struct mkgui_ctx *ctx) {
+	XMapWindow(ctx->plat.dpy, ctx->plat.win);
+	XFlush(ctx->plat.dpy);
+}
+
+// [=]===^=[ platform_window_unmap ]================================[=]
+static void platform_window_unmap(struct mkgui_ctx *ctx) {
+	XUnmapWindow(ctx->plat.dpy, ctx->plat.win);
+	XFlush(ctx->plat.dpy);
 }
 
 // [=]===^=[ platform_init_child ]=================================[=]
@@ -225,7 +236,6 @@ static uint32_t platform_init_child(struct mkgui_ctx *ctx, struct mkgui_ctx *par
 		plat->xic = XCreateIC(plat->xim, XNInputStyle, XIMPreeditNothing | XIMStatusNothing, XNClientWindow, plat->win, XNFocusWindow, plat->win, NULL);
 	}
 
-	XMapWindow(plat->dpy, plat->win);
 	XFlush(plat->dpy);
 
 	return 1;

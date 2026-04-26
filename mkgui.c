@@ -759,6 +759,8 @@ struct mkgui_ctx {
 #endif
 	uint32_t anim_active;
 	uint32_t close_requested;
+	uint32_t window_visible;
+	uint32_t hide_on_close;
 
 	float scale;
 	int32_t row_height;
@@ -814,11 +816,9 @@ struct mkgui_ctx {
 
 	char app_class[64];
 	char icon_dir[4096];
-#ifndef _WIN32
 #define MKGUI_THEME_CHAIN_MAX 8
 	char system_theme_dirs[MKGUI_THEME_CHAIN_MAX][4096];
 	uint32_t system_theme_count;
-#endif
 };
 
 // ---------------------------------------------------------------------------
@@ -4139,6 +4139,7 @@ MKGUI_API struct mkgui_ctx *mkgui_create(const struct mkgui_widget *widgets, uin
 
 	int32_t init_w = 800, init_h = 600;
 	char *title = "mkgui";
+	uint32_t window_style = 0;
 	for(uint32_t i = 0; i < count; ++i) {
 		if(widgets[i].type == MKGUI_WINDOW) {
 			if(widgets[i].w > 0) {
@@ -4152,6 +4153,7 @@ MKGUI_API struct mkgui_ctx *mkgui_create(const struct mkgui_widget *widgets, uin
 			if(widgets[i].label[0]) {
 				title = ctx->widgets[i].label;
 			}
+			window_style = widgets[i].style;
 			break;
 		}
 	}
@@ -4164,6 +4166,8 @@ MKGUI_API struct mkgui_ctx *mkgui_create(const struct mkgui_widget *widgets, uin
 		free(ctx);
 		return NULL;
 	}
+
+	ctx->hide_on_close = (window_style & MKGUI_WINDOW_HIDE_ON_CLOSE) ? 1 : 0;
 
 	float detected = platform_detect_scale(ctx);
 	if(detected > 1.01f) {
@@ -4211,6 +4215,11 @@ MKGUI_API struct mkgui_ctx *mkgui_create(const struct mkgui_widget *widgets, uin
 
 	init_aux_data(ctx);
 	window_register(ctx);
+
+	if(!(window_style & MKGUI_WINDOW_HIDDEN)) {
+		platform_window_map(ctx);
+		ctx->window_visible = 1;
+	}
 
 	return ctx;
 }
@@ -4569,6 +4578,14 @@ MKGUI_API struct mkgui_ctx *mkgui_create_child(struct mkgui_ctx *parent, const s
 	memcpy(ctx->widgets, widgets, count * sizeof(struct mkgui_widget));
 	ctx->widget_count = count;
 
+	uint32_t window_style = 0;
+	for(uint32_t i = 0; i < count; ++i) {
+		if(widgets[i].type == MKGUI_WINDOW) {
+			window_style = widgets[i].style;
+			break;
+		}
+	}
+
 	ctx->scale = parent->scale;
 	mkgui_recompute_metrics(ctx);
 
@@ -4579,6 +4596,8 @@ MKGUI_API struct mkgui_ctx *mkgui_create_child(struct mkgui_ctx *parent, const s
 		free(ctx);
 		return NULL;
 	}
+
+	ctx->hide_on_close = (window_style & MKGUI_WINDOW_HIDE_ON_CLOSE) ? 1 : 0;
 
 	render_clip_x1 = 0;
 	render_clip_y1 = 0;
@@ -4606,6 +4625,11 @@ MKGUI_API struct mkgui_ctx *mkgui_create_child(struct mkgui_ctx *parent, const s
 
 	init_aux_data(ctx);
 	window_register(ctx);
+
+	if(!(window_style & MKGUI_WINDOW_HIDDEN)) {
+		platform_window_map(ctx);
+		ctx->window_visible = 1;
+	}
 
 	return ctx;
 }
@@ -7679,7 +7703,14 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 			// -=[ CLOSE ]=-
 			case MKGUI_PLAT_CLOSE: {
 				ev->type = MKGUI_EVENT_CLOSE;
-				ctx->close_requested = 1;
+				if(ctx->hide_on_close) {
+					if(ctx->window_visible) {
+						platform_window_unmap(ctx);
+						ctx->window_visible = 0;
+					}
+				} else {
+					ctx->close_requested = 1;
+				}
 				return 1;
 			} break;
 
@@ -8019,9 +8050,23 @@ MKGUI_API void mkgui_set_callback(struct mkgui_ctx *ctx, mkgui_event_cb cb, void
 }
 
 // [=]===^=[ mkgui_run ]===========================================[=]
+// Runs the event loop until ctx->close_requested is set OR no registered
+// window is currently visible. Returns immediately if all windows are
+// already hidden.
 MKGUI_API void mkgui_run(struct mkgui_ctx *ctx, mkgui_event_cb cb, void *userdata) {
 	MKGUI_CHECK(ctx);
-	while(!ctx->close_requested) {
+	for(;;) {
+		uint32_t any_visible = 0;
+		for(uint32_t i = 0; i < window_registry_count; ++i) {
+			if(window_registry[i]->window_visible) {
+				any_visible = 1;
+				break;
+			}
+		}
+		if(ctx->close_requested || !any_visible) {
+			break;
+		}
+
 		struct mkgui_event ev;
 		while(mkgui_poll(ctx, &ev)) {
 			if(cb) {
@@ -8037,6 +8082,17 @@ MKGUI_API void mkgui_run(struct mkgui_ctx *ctx, mkgui_event_cb cb, void *userdat
 				c->event_cb(c, &ev, c->event_cb_data);
 			}
 		}
+
+		any_visible = 0;
+		for(uint32_t i = 0; i < window_registry_count; ++i) {
+			if(window_registry[i]->window_visible) {
+				any_visible = 1;
+				break;
+			}
+		}
+		if(ctx->close_requested || !any_visible) {
+			break;
+		}
 		mkgui_wait(ctx);
 	}
 }
@@ -8045,6 +8101,33 @@ MKGUI_API void mkgui_run(struct mkgui_ctx *ctx, mkgui_event_cb cb, void *userdat
 MKGUI_API void mkgui_quit(struct mkgui_ctx *ctx) {
 	MKGUI_CHECK(ctx);
 	ctx->close_requested = 1;
+}
+
+// [=]===^=[ mkgui_window_show ]===================================[=]
+MKGUI_API void mkgui_window_show(struct mkgui_ctx *ctx) {
+	MKGUI_CHECK(ctx);
+	if(ctx->window_visible) {
+		return;
+	}
+	platform_window_map(ctx);
+	ctx->window_visible = 1;
+	dirty_all(ctx);
+}
+
+// [=]===^=[ mkgui_window_hide ]===================================[=]
+MKGUI_API void mkgui_window_hide(struct mkgui_ctx *ctx) {
+	MKGUI_CHECK(ctx);
+	if(!ctx->window_visible) {
+		return;
+	}
+	platform_window_unmap(ctx);
+	ctx->window_visible = 0;
+}
+
+// [=]===^=[ mkgui_window_is_visible ]=============================[=]
+MKGUI_API uint32_t mkgui_window_is_visible(struct mkgui_ctx *ctx) {
+	MKGUI_CHECK_VAL(ctx, 0);
+	return ctx->window_visible;
 }
 
 // ---------------------------------------------------------------------------

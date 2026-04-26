@@ -38,13 +38,15 @@ Default (`core`) target produces:
 
 | Output | Description |
 |--------|-------------|
-| `out/libmkgui.a` | Static library for linking |
-| `out/libmkgui_win.a` | Windows static library (when MinGW is available) |
-| `out/demo` | Demo application |
-| `out/extract_icons` | Icon extraction tool |
-| `out/test_layout`, `out/test_widgets`, `out/test_events`, `out/test_events_ext`, `out/test_smoke` | Unit tests |
+| `out/linux/libmkgui.a` | Linux static library for linking |
+| `out/windows/libmkgui.a` | Windows static library (when MinGW is available) |
+| `out/linux/demo`, `out/windows/demo.exe` | Demo application |
+| `out/linux/extract_icons` | Icon extraction tool |
+| `out/linux/test_layout`, `test_widgets`, `test_events`, `test_events_ext`, `test_smoke`, `test_window_visibility` | Unit tests |
 
-`./build.sh editor` adds `out/editor` (the visual UI designer). `./build.sh all` builds both.
+Both static libraries share the canonical name `libmkgui.a`; the platform is encoded in the parent directory. Consumers link with `-Lpath/to/mkgui/out/linux -lmkgui` (or `out/windows`).
+
+`./build.sh editor` adds `out/linux/editor` (and `out/windows/editor.exe` when MinGW is present). `./build.sh all` builds both core and editor.
 
 Build modes: `./build.sh release` (stripped), `./build.sh debug` (no optimization), `./build.sh size` (`-Os`, ~26% smaller than release), `./build.sh asan` (AddressSanitizer + UBSan, Linux only), `./build.sh clean`. Modes and targets can be combined: `./build.sh release editor`.
 
@@ -115,9 +117,9 @@ mkgui uses SVG icons from Freedesktop-compatible icon themes (Papirus, Breeze, A
 The icon workflow differs significantly between platforms and this catches people out, so read this section before anything else:
 
 - **Linux** has a system icon theme. If `mkgui_icon_load_app_icons()` finds no bundled `icons/` directory, mkgui automatically falls back to the user's active theme (Papirus, Breeze, Adwaita, ...) detected from GTK/KDE settings. Shipping a bundled `icons/` is still recommended for reproducible visuals, but the application will work without it, and the editor's icon browser automatically scans `/usr/share/icons/`, `$XDG_DATA_HOME/icons/`, etc.
-- **Windows** has no system icon theme. There is no fallback. Both the editor and the applications you build with it require icon SVGs on disk:
+- **Windows** has no system icon theme. Both the editor and the applications you build with it require icon SVGs on disk -- but mkgui will use any Freedesktop theme dropped alongside the executable as a runtime fallback:
 	- For the **editor's icon browser** to show anything, unpack a Freedesktop icon theme next to the editor binary (e.g. `./Papirus/` containing the theme's `index.theme`). Without at least one such directory the browser will be empty.
-	- For an **end-user application** to display its icons, the bundled `icons/` directory is mandatory. Without it, every widget icon falls back to a magenta-diamond placeholder.
+	- For an **end-user application**, the bundled `icons/` directory is the recommended path (reproducible visuals, single artefact). If no `icons/` is present, mkgui scans the working directory for sibling theme directories (`./Papirus/`, `./breeze/`, ...) and lazy-loads icons from the first match. Only when nothing is found does the magenta-diamond placeholder appear.
 
 If you develop the UI on Linux and ship to Windows, the extraction step (below) is still required to produce the `icons/` directory for the Windows build.
 
@@ -161,7 +163,7 @@ On Linux, this searches the following paths in order:
 4. Each `$XDG_DATA_DIRS` entry + `/myapp/icons/` (default: `/usr/share/` and `/usr/local/share/`)
 5. `./icons/` (development fallback)
 
-On Windows, it checks the executable's own directory for an `icons/` subdirectory.
+On Windows, it checks the executable's own directory for an `icons/` subdirectory. If no `icons/` directory is found, mkgui also scans the working directory for any sibling Freedesktop icon-theme directory (one containing an `index.theme` file -- e.g. `Papirus/`, `breeze/`) one and two levels deep. Found themes are added to the lazy-load chain, so icons referenced by name resolve straight from the unpacked theme. This matches the editor's drop-in workflow: dropping `Papirus/` next to `editor.exe` makes it work for both the editor and any application using mkgui at runtime, without running `extract_icons` first.
 
 6. **Install** the `icons/` directory to `<prefix>/share/<app_name>/icons/` (e.g. `/usr/share/myapp/icons/`).
 
@@ -194,9 +196,10 @@ Browse all available icons in the editor's icon browser, or see the [Freedesktop
 
 ### Icons on Windows
 
-Windows has no system-wide icon theme, so mkgui cannot fall back to the user's desktop like it does on Linux. In practice:
+Windows has no system-wide icon theme, so mkgui cannot fall back to the user's desktop like it does on Linux. Instead, it falls back to whatever Freedesktop theme directory is sitting next to the executable:
 
 - The editor's **icon browser is empty by default** on Windows. To populate it, download a Freedesktop theme (Papirus, Breeze, Adwaita, ...) and unpack the archive next to the editor binary so you have e.g. `editor.exe` and `Papirus\index.theme` side by side. Multiple themes can coexist. The browser finds them whether you launch the editor from its own directory, from a Start Menu shortcut, or from another CWD.
+- The same scan also runs at **runtime** in `mkgui_icon_load_app_icons` / `mkgui_icon_load_svg_dir`: when no bundled `icons/` directory is found, mkgui registers any sibling theme as a lazy-load source, so widget icons can resolve straight from the dropped theme without an `extract_icons` pre-step. This is intended for development and for letting users theme an unsigned-shipped application; production deployments should still ship a baked `icons/` directory for reproducibility.
 - An application built with mkgui looks for its icon directory in a fixed order: `%<APPNAME>_ICON_DIR%`, then `<exe_dir>\icons\`, then `%LOCALAPPDATA%\<appname>\icons\`, `%APPDATA%\<appname>\icons\`, `%ProgramFiles%\<appname>\icons\`, `%ProgramFiles(x86)%\<appname>\icons\`, and finally `.\icons\`. If none of these exist every widget icon becomes a magenta-diamond placeholder and a message is printed to stderr.
 
 Freedesktop icon themes often use symlinks for icon aliases (e.g., `media-floppy.svg` linking to `document-save.svg`). On Linux this works transparently. On Windows, symlinks may not be preserved when extracting the theme archive. Use an extraction tool that resolves symlinks to copies (e.g., 7-Zip or `tar --dereference`), or the aliased icons will be missing.

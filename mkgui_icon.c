@@ -25,9 +25,7 @@ static int32_t icon_find_idx_any(const char *name) {
 }
 
 // ctx used by icon_resolve for system theme lazy-load (set once at init)
-#ifndef _WIN32
 static struct mkgui_ctx *icon_lazy_ctx;
-#endif
 
 // ---------------------------------------------------------------------------
 // SVG icon support (forward declarations for resolve functions)
@@ -648,6 +646,7 @@ static void icon_build_theme_chain(struct mkgui_ctx *ctx, const char *theme_name
 	}
 }
 #pragma GCC diagnostic pop
+#endif // _WIN32 (Linux-only XDG/index.theme detection ends here)
 
 // [=]===^=[ icon_find_in_system_theme ]==============================[=]
 // Search a Freedesktop icon theme hierarchy for a single icon by name.
@@ -765,13 +764,148 @@ static uint32_t icon_lazy_load_system(struct mkgui_ctx *ctx, const char *name) {
 	}
 	return src_idx;
 }
-#endif
+
+// ---------------------------------------------------------------------------
+// Shared theme directory scanners (used by runtime lazy-load and iconbrowser)
+// ---------------------------------------------------------------------------
+
+typedef void (*icon_theme_visitor)(const char *theme_dir, const char *theme_name, void *userdata);
+
+// [=]===^=[ icon_try_add_theme ]=====================================[=]
+// If dir_path is a Freedesktop theme directory (contains index.theme), or
+// is a source repo containing icons/<theme>.theme.in (e.g. breeze source),
+// invoke visit() with the resolved theme path and the supplied display name.
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wformat-truncation"
+static void icon_try_add_theme(const char *dir_path, const char *name, icon_theme_visitor visit, void *userdata) {
+	char idx_path[2048];
+	snprintf(idx_path, sizeof(idx_path), "%s/index.theme", dir_path);
+	if(mkgui_path_readable(idx_path)) {
+		visit(dir_path, name, userdata);
+		return;
+	}
+	char icons_sub[2048];
+	snprintf(icons_sub, sizeof(icons_sub), "%s/icons", dir_path);
+	struct mkgui_dir probe;
+	if(!mkgui_dir_open(&probe, icons_sub)) {
+		return;
+	}
+	uint32_t has_theme_in = 0;
+	struct mkgui_dir_entry *pe;
+	while((pe = mkgui_dir_next(&probe)) != NULL) {
+		uint32_t plen = (uint32_t)strlen(pe->name);
+		if(plen > 9 && strcmp(pe->name + plen - 9, ".theme.in") == 0) {
+			has_theme_in = 1;
+			break;
+		}
+	}
+	mkgui_dir_close(&probe);
+	if(!has_theme_in) {
+		return;
+	}
+	char promoted[2048];
+	snprintf(promoted, sizeof(promoted), "%s/icons", dir_path);
+	visit(promoted, name, userdata);
+}
+#pragma GCC diagnostic pop
+
+// [=]===^=[ icon_scan_themes_in_dir ]================================[=]
+// Scan a base directory (e.g. /usr/share/icons) for theme subdirectories.
+// Each subdirectory containing index.theme is reported via visit().
+static void icon_scan_themes_in_dir(const char *base_dir, icon_theme_visitor visit, void *userdata) {
+	struct mkgui_dir d;
+	if(!mkgui_dir_open(&d, base_dir)) {
+		return;
+	}
+	struct mkgui_dir_entry *ent;
+	while((ent = mkgui_dir_next(&d)) != NULL) {
+		if(ent->name[0] == '.') {
+			continue;
+		}
+		char sub_path[2048];
+		snprintf(sub_path, sizeof(sub_path), "%s/%s", base_dir, ent->name);
+		if(!mkgui_path_is_dir(sub_path)) {
+			continue;
+		}
+		icon_try_add_theme(sub_path, ent->name, visit, userdata);
+	}
+	mkgui_dir_close(&d);
+}
+
+// [=]===^=[ icon_scan_local_root ]===================================[=]
+// Enumerate base_dir, treat each direct child as a candidate theme, and
+// descend one level so extracted archives (e.g. papirus-icon-theme-XYZ/
+// Papirus/) are discovered. Used for the runtime drop-in workflow.
+static void icon_scan_local_root(const char *base_dir, icon_theme_visitor visit, void *userdata) {
+	struct mkgui_dir d;
+	if(!mkgui_dir_open(&d, base_dir)) {
+		return;
+	}
+	struct mkgui_dir_entry *ent;
+	while((ent = mkgui_dir_next(&d)) != NULL) {
+		if(ent->name[0] == '.') {
+			continue;
+		}
+		char child_path[2048];
+		snprintf(child_path, sizeof(child_path), "%s/%s", base_dir, ent->name);
+		if(!mkgui_path_is_dir(child_path)) {
+			continue;
+		}
+		icon_try_add_theme(child_path, ent->name, visit, userdata);
+		struct mkgui_dir sub;
+		if(mkgui_dir_open(&sub, child_path)) {
+			struct mkgui_dir_entry *sent;
+			while((sent = mkgui_dir_next(&sub)) != NULL) {
+				if(sent->name[0] == '.') {
+					continue;
+				}
+				char sub_path[4096];
+				snprintf(sub_path, sizeof(sub_path), "%s/%s", child_path, sent->name);
+				if(mkgui_path_is_dir(sub_path)) {
+					icon_try_add_theme(sub_path, sent->name, visit, userdata);
+				}
+			}
+			mkgui_dir_close(&sub);
+		}
+	}
+	mkgui_dir_close(&d);
+}
+
+// [=]===^=[ icon_scan_local_themes ]=================================[=]
+// Scan the current working directory for theme directories one + two
+// levels deep. Reports each via visit().
+static void icon_scan_local_themes(icon_theme_visitor visit, void *userdata) {
+	icon_scan_local_root(".", visit, userdata);
+}
+
+// [=]===^=[ icon_runtime_visit_theme ]===============================[=]
+// Visitor used by the runtime to populate ctx->system_theme_dirs[]. Saves
+// "hicolor" for last per Freedesktop fallback semantics.
+struct icon_runtime_scan {
+	struct mkgui_ctx *ctx;
+	char hicolor_path[4096];
+};
+
+static void icon_runtime_visit_theme(const char *theme_dir, const char *theme_name, void *userdata) {
+	struct icon_runtime_scan *s = (struct icon_runtime_scan *)userdata;
+	if(s->ctx->system_theme_count >= MKGUI_THEME_CHAIN_MAX) {
+		return;
+	}
+	if(strcmp(theme_name, "hicolor") == 0) {
+		if(!s->hicolor_path[0]) {
+			snprintf(s->hicolor_path, sizeof(s->hicolor_path), "%s", theme_dir);
+		}
+		return;
+	}
+	snprintf(s->ctx->system_theme_dirs[s->ctx->system_theme_count], sizeof(s->ctx->system_theme_dirs[0]), "%s", theme_dir);
+	++s->ctx->system_theme_count;
+}
 
 // [=]===^=[ icon_resolve_at ]========================================[=]
 // Find or produce an icon at (name, size). Tries in order:
 //   1. existing icons[] entry keyed on (name, size)
 //   2. re-rasterise from an already-loaded SVG source at the new size
-//   3. lazy-load the SVG from the system theme (Linux) then rasterise
+//   3. lazy-load the SVG from the system theme then rasterise
 // Returns -1 if no variant can be produced.
 static int32_t icon_resolve_at(struct mkgui_ctx *ctx, const char *name, int32_t size) {
 	int32_t idx = icon_find_idx_at(name, size);
@@ -780,21 +914,17 @@ static int32_t icon_resolve_at(struct mkgui_ctx *ctx, const char *name, int32_t 
 	}
 
 	struct mkgui_ctx *effective = ctx;
-#ifndef _WIN32
 	if(!effective) {
 		effective = icon_lazy_ctx;
 	}
-#endif
 	if(!effective) {
 		return -1;
 	}
 
 	uint32_t src_idx = svg_find_source_idx(name);
-#ifndef _WIN32
 	if(src_idx == UINT32_MAX && name[0] != '\0') {
 		src_idx = icon_lazy_load_system(effective, name);
 	}
-#endif
 
 	if(src_idx == UINT32_MAX) {
 		return -1;
@@ -816,11 +946,9 @@ static int32_t icon_resolve_at(struct mkgui_ctx *ctx, const char *name, int32_t 
 // loads one from the system theme.
 static int32_t icon_resolve(struct mkgui_ctx *ctx, const char *name) {
 	struct mkgui_ctx *effective = ctx;
-#ifndef _WIN32
 	if(!effective) {
 		effective = icon_lazy_ctx;
 	}
-#endif
 
 	int32_t size = effective ? effective->icon_size : 0;
 	int32_t idx = icon_resolve_at(effective, name, size);
@@ -1041,11 +1169,19 @@ MKGUI_API int32_t mkgui_icon_load_svg(struct mkgui_ctx *ctx, const char *name, c
 // [=]===^=[ mkgui_icon_load_svg_dir ]================================[=]
 MKGUI_API uint32_t mkgui_icon_load_svg_dir(struct mkgui_ctx *ctx, const char *dir_path) {
 	MKGUI_CHECK_VAL(ctx, 0);
-#ifndef _WIN32
 	if(ctx->system_theme_count == 0) {
+#ifndef _WIN32
 		char theme_name[256];
 		icon_detect_theme_name(theme_name, sizeof(theme_name));
 		icon_build_theme_chain(ctx, theme_name);
+#else
+		struct icon_runtime_scan s = { .ctx = ctx };
+		icon_scan_local_themes(icon_runtime_visit_theme, &s);
+		if(s.hicolor_path[0] && ctx->system_theme_count < MKGUI_THEME_CHAIN_MAX) {
+			snprintf(ctx->system_theme_dirs[ctx->system_theme_count], sizeof(ctx->system_theme_dirs[0]), "%s", s.hicolor_path);
+			++ctx->system_theme_count;
+		}
+#endif
 		icon_lazy_ctx = ctx;
 		if(ctx->system_theme_count > 0) {
 			fprintf(stderr, "mkgui: system icon theme chain:");
@@ -1055,7 +1191,6 @@ MKGUI_API uint32_t mkgui_icon_load_svg_dir(struct mkgui_ctx *ctx, const char *di
 			fprintf(stderr, "\n");
 		}
 	}
-#endif
 	if(!dir_path) {
 		return 0;
 	}
@@ -1336,22 +1471,29 @@ MKGUI_API uint32_t mkgui_icon_load_app_icons(struct mkgui_ctx *ctx, const char *
 		return 0;
 	}
 
-#ifndef _WIN32
 	if(ctx->system_theme_count == 0) {
+#ifndef _WIN32
 		char theme_name[256];
 		icon_detect_theme_name(theme_name, sizeof(theme_name));
 		icon_build_theme_chain(ctx, theme_name);
+#else
+		struct icon_runtime_scan s = { .ctx = ctx };
+		icon_scan_local_themes(icon_runtime_visit_theme, &s);
+		if(s.hicolor_path[0] && ctx->system_theme_count < MKGUI_THEME_CHAIN_MAX) {
+			snprintf(ctx->system_theme_dirs[ctx->system_theme_count], sizeof(ctx->system_theme_dirs[0]), "%s", s.hicolor_path);
+			++ctx->system_theme_count;
+		}
+#endif
 		icon_lazy_ctx = ctx;
 	}
-#endif
 
 	char resolved[4096];
 	if(!icon_resolve_dir(app_name, resolved, sizeof(resolved))) {
-#ifndef _WIN32
 		if(ctx->system_theme_count > 0) {
 			fprintf(stderr, "mkgui: no bundled icon directory for '%s', using system theme fallback\n", app_name);
 			return 0;
 		}
+#ifndef _WIN32
 		fprintf(stderr,
 			"mkgui: could not find icon directory for '%s'. Set $%s_ICON_DIR, "
 			"install icons under $XDG_DATA_HOME/%s/icons/ or /usr/share/%s/icons/, "

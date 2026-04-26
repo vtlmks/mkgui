@@ -114,11 +114,9 @@ static int32_t dlg_icon_resolve(struct mkgui_ctx *ctx, uint32_t icon_type) {
 	// same data backs both the dialog-coloured and the theme-coloured
 	// variants.
 	uint32_t src_idx = svg_find_source_idx(name);
-#ifndef _WIN32
 	if(src_idx == UINT32_MAX && ctx->system_theme_count > 0) {
 		src_idx = icon_lazy_load_system(ctx, name);
 	}
-#endif
 	if(src_idx == UINT32_MAX) {
 		return icon_find_idx_any(name);
 	}
