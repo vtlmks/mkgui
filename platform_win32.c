@@ -495,14 +495,16 @@ static void platform_set_window_icon(struct mkgui_platform *plat, const struct m
 }
 
 // [=]===^=[ platform_init ]=======================================[=]
-static uint32_t platform_init(struct mkgui_ctx *ctx, const char *title, int32_t w, int32_t h) {
+static uint32_t platform_init(struct mkgui_ctx *ctx, const char *title, int32_t w, int32_t h, uint32_t flags) {
 	struct mkgui_platform *plat = &ctx->plat;
 	platform_register_class();
 
+	DWORD style = (flags & MKGUI_WINDOW_UNDECORATED) ? WS_POPUP : WS_OVERLAPPEDWINDOW;
+	DWORD exstyle = (flags & MKGUI_WINDOW_UNDECORATED) ? WS_EX_APPWINDOW : 0;
 	RECT rc = { 0, 0, w, h };
-	AdjustWindowRect(&rc, WS_OVERLAPPEDWINDOW, FALSE);
+	AdjustWindowRect(&rc, style, FALSE);
 
-	plat->hwnd = CreateWindowExA(0, "mkgui", title, WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, rc.right - rc.left, rc.bottom - rc.top, NULL, NULL, GetModuleHandleA(NULL), NULL);
+	plat->hwnd = CreateWindowExA(exstyle, "mkgui", title, style, CW_USEDEFAULT, CW_USEDEFAULT, rc.right - rc.left, rc.bottom - rc.top, NULL, NULL, GetModuleHandleA(NULL), NULL);
 
 	if(!plat->hwnd) {
 		return 0;
@@ -535,14 +537,17 @@ static void platform_window_unmap(struct mkgui_ctx *ctx) {
 }
 
 // [=]===^=[ platform_init_child ]=================================[=]
-static uint32_t platform_init_child(struct mkgui_ctx *ctx, struct mkgui_ctx *parent, const char *title, int32_t w, int32_t h) {
+static uint32_t platform_init_child(struct mkgui_ctx *ctx, struct mkgui_ctx *parent, const char *title, int32_t w, int32_t h, uint32_t flags) {
 	struct mkgui_platform *plat = &ctx->plat;
 	platform_register_class();
 
+	DWORD style = (flags & MKGUI_WINDOW_UNDECORATED) ? WS_POPUP : WS_OVERLAPPEDWINDOW;
+	DWORD exstyle = (flags & MKGUI_WINDOW_UNDECORATED) ? WS_EX_APPWINDOW : 0;
+	HWND owner = (flags & MKGUI_WINDOW_UNDECORATED) ? NULL : parent->plat.hwnd;
 	RECT rc = { 0, 0, w, h };
-	AdjustWindowRect(&rc, WS_OVERLAPPEDWINDOW, FALSE);
+	AdjustWindowRect(&rc, style, FALSE);
 
-	plat->hwnd = CreateWindowExA(0, "mkgui", title, WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, rc.right - rc.left, rc.bottom - rc.top, parent->plat.hwnd, NULL, GetModuleHandleA(NULL), NULL);
+	plat->hwnd = CreateWindowExA(exstyle, "mkgui", title, style, CW_USEDEFAULT, CW_USEDEFAULT, rc.right - rc.left, rc.bottom - rc.top, owner, NULL, GetModuleHandleA(NULL), NULL);
 
 	if(!plat->hwnd) {
 		return 0;
@@ -667,11 +672,31 @@ static float platform_detect_scale(struct mkgui_ctx *ctx) {
 // [=]===^=[ platform_resize_window ]===============================[=]
 static void platform_resize_window(struct mkgui_ctx *ctx, int32_t w, int32_t h) {
 	RECT rc = { 0, 0, w, h };
-	AdjustWindowRect(&rc, WS_OVERLAPPEDWINDOW, FALSE);
+	DWORD style = ctx->undecorated ? WS_POPUP : WS_OVERLAPPEDWINDOW;
+	AdjustWindowRect(&rc, style, FALSE);
 	SetWindowPos(ctx->plat.hwnd, NULL, 0, 0, rc.right - rc.left, rc.bottom - rc.top, SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
 	ctx->win_w = w;
 	ctx->win_h = h;
 	platform_fb_resize(ctx);
+}
+
+// [=]===^=[ platform_move_window ]=================================[=]
+static void platform_move_window(struct mkgui_ctx *ctx, int32_t x, int32_t y) {
+	SetWindowPos(ctx->plat.hwnd, NULL, x, y, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+}
+
+// [=]===^=[ platform_get_window_position ]=========================[=]
+static void platform_get_window_position(struct mkgui_ctx *ctx, int32_t *out_x, int32_t *out_y) {
+	RECT rc;
+	GetWindowRect(ctx->plat.hwnd, &rc);
+	*out_x = rc.left;
+	*out_y = rc.top;
+}
+
+// [=]===^=[ platform_begin_drag ]==================================[=]
+static void platform_begin_drag(struct mkgui_ctx *ctx) {
+	ReleaseCapture();
+	SendMessageA(ctx->plat.hwnd, WM_NCLBUTTONDOWN, HTCAPTION, 0);
 }
 
 // ---------------------------------------------------------------------------

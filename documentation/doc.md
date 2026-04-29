@@ -417,6 +417,9 @@ struct mkgui_event {
 | `MKGUI_EVENT_TIMER` | Timer fired (when cb is NULL) | timer id | -- |
 | `MKGUI_EVENT_ACCEL` | Keyboard accelerator matched (non-menu target) | -- | -- |
 | `MKGUI_EVENT_FILE_DROP` | Files dropped on window from OS | file count | -- |
+| `MKGUI_EVENT_CANVAS_PRESS` | Mouse button down on canvas | mouse x | mouse y |
+| `MKGUI_EVENT_CANVAS_RELEASE` | Mouse button up on canvas | mouse x | mouse y |
+| `MKGUI_EVENT_CANVAS_MOTION` | Mouse moved over canvas | mouse x | mouse y |
 | `MKGUI_EVENT_PATHBAR_NAV` | Pathbar segment clicked | segment index | -- |
 | `MKGUI_EVENT_PATHBAR_SUBMIT` | Pathbar edit-mode Enter pressed | -- | -- |
 | `MKGUI_EVENT_IPINPUT_CHANGED` | IPv4 address octet changed | -- | -- |
@@ -439,6 +442,9 @@ void mkgui_quit(struct mkgui_ctx *ctx);
 void mkgui_window_show(struct mkgui_ctx *ctx);
 void mkgui_window_hide(struct mkgui_ctx *ctx);
 uint32_t mkgui_window_is_visible(struct mkgui_ctx *ctx);
+void mkgui_window_move(struct mkgui_ctx *ctx, int32_t x, int32_t y);
+void mkgui_window_get_position(struct mkgui_ctx *ctx, int32_t *x, int32_t *y);
+void mkgui_window_begin_drag(struct mkgui_ctx *ctx);
 void mkgui_set_title(struct mkgui_ctx *ctx, const char *title);
 void mkgui_set_app_class(struct mkgui_ctx *ctx, const char *app_class);
 void mkgui_set_window_instance(struct mkgui_ctx *ctx, const char *instance);
@@ -525,6 +531,8 @@ Windows are mapped immediately at create time by default. Two flags on the `MKGU
 |-------------------------------|--------------------------------------------------------------------------|
 | `MKGUI_WINDOW_HIDDEN`         | Suppress the initial map. The context exists, but no window is shown.    |
 | `MKGUI_WINDOW_HIDE_ON_CLOSE`  | When the WM close button is clicked, hide the window instead of quitting. |
+| `MKGUI_WINDOW_UNDECORATED`    | Remove all window manager decorations (title bar, borders). Uses `_MOTIF_WM_HINTS` on X11, `WS_POPUP` on Windows. |
+| `MKGUI_WINDOW_CANVAS`         | Entire window is a user-drawn canvas. Suppresses all mkgui chrome; the canvas callback receives the full window surface. Requires one `MKGUI_CANVAS` widget as a child. |
 
 Three runtime calls control visibility:
 
@@ -533,6 +541,16 @@ void     mkgui_window_show(struct mkgui_ctx *ctx);
 void     mkgui_window_hide(struct mkgui_ctx *ctx);
 uint32_t mkgui_window_is_visible(struct mkgui_ctx *ctx);
 ```
+
+Three runtime calls control window position:
+
+```c
+void mkgui_window_move(struct mkgui_ctx *ctx, int32_t x, int32_t y);
+void mkgui_window_get_position(struct mkgui_ctx *ctx, int32_t *x, int32_t *y);
+void mkgui_window_begin_drag(struct mkgui_ctx *ctx);
+```
+
+`mkgui_window_move` sets the window position in screen coordinates. `mkgui_window_get_position` reads it. `mkgui_window_begin_drag` initiates a WM-managed move operation (`_NET_WM_MOVERESIZE` on X11, `WM_NCLBUTTONDOWN` on Windows); call it from a mouse press handler when the user clicks a drag region.
 
 `mkgui_run` returns when `ctx->close_requested` is set OR when no registered window is currently visible. This makes the persistent-hidden-context pattern natural: keep a configuration ctx alive across the application lifetime, show it on demand, and let `mkgui_run` return when the user closes (i.e. hides) it.
 
@@ -1236,6 +1254,36 @@ void my_draw(struct mkgui_ctx *ctx, uint32_t id, uint32_t *pixels,
 
 mkgui_canvas_set_callback(ctx, ID_CANVAS, my_draw, NULL);
 ```
+
+#### Canvas input events
+
+Canvas widgets emit `MKGUI_EVENT_CANVAS_PRESS`, `MKGUI_EVENT_CANVAS_RELEASE`, and `MKGUI_EVENT_CANVAS_MOTION`. The event fields: `value` = mouse x, `col` = mouse y, `keysym` = button number (1/2/3 for press/release, 0 for motion), `keymod` = modifier mask.
+
+In canvas-only windows (`MKGUI_WINDOW_CANVAS`), these events are always delivered. In regular windows, canvas events fire when the canvas widget is hit-tested.
+
+#### Canvas-only windows
+
+Combine `MKGUI_WINDOW_UNDECORATED` and `MKGUI_WINDOW_CANVAS` to create a window where the entire surface is user-drawn with no WM decorations or mkgui chrome. This is the pattern for skinned applications (e.g. media players, visualizers):
+
+```c
+enum { ID_WIN, ID_CANVAS };
+
+struct mkgui_widget widgets[] = {
+    MKGUI_W(MKGUI_WINDOW, ID_WIN, "Player", "", 0, 275, 116, 0,
+            MKGUI_WINDOW_UNDECORATED | MKGUI_WINDOW_CANVAS, 0),
+    MKGUI_W(MKGUI_CANVAS, ID_CANVAS, "", "", ID_WIN, 0, 0, 0, 0, 1),
+};
+
+struct mkgui_ctx *ctx = mkgui_create(widgets, 2);
+mkgui_canvas_set_callback(ctx, ID_CANVAS, skin_draw, &app);
+mkgui_window_move(ctx, 100, 100);
+```
+
+The canvas callback receives `x=0, y=0, w=window_width, h=window_height`, giving full control of every pixel. The window participates in mkgui's event loop normally; mouse/keyboard events arrive as canvas events or `MKGUI_EVENT_KEY`.
+
+Multiple canvas-only windows work via `mkgui_create_child` with the same flags. Undecorated child windows are not set as transient-for the parent, so they appear independently in the taskbar.
+
+Since undecorated windows have no title bar, use `mkgui_window_begin_drag` from a canvas press handler to let the WM handle single-window dragging, or use `mkgui_window_move` and `mkgui_window_get_position` for app-managed movement (required for docking or moving multiple windows in unison).
 
 ## Menus
 
@@ -2057,7 +2105,7 @@ mkgui supports multiple windows through child contexts. All child windows share 
 struct mkgui_ctx *child = mkgui_create_child(parent_ctx, widgets, count, "Title", 640, 480);
 ```
 
-`mkgui_create_child` creates a new window that shares the parent's display connection, font data, and theme. The child window is set as transient-for the parent (window managers typically keep it above the parent).
+`mkgui_create_child` creates a new window that shares the parent's display connection, font data, and theme. By default the child window is set as transient-for the parent (window managers typically keep it above the parent). When `MKGUI_WINDOW_UNDECORATED` is set in the child's window style, the transient-for hint is skipped and the child appears as an independent window in the taskbar.
 
 Destroy child windows with `mkgui_destroy_child(child)` instead of `mkgui_destroy()`. The parent must outlive all its children.
 

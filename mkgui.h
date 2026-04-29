@@ -268,6 +268,8 @@ enum {
 // -- Window --
 #define MKGUI_WINDOW_HIDDEN            (1u << 0)
 #define MKGUI_WINDOW_HIDE_ON_CLOSE     (1u << 1)
+#define MKGUI_WINDOW_UNDECORATED       (1u << 2)
+#define MKGUI_WINDOW_CANVAS            (1u << 3)
 
 // ---------------------------------------------------------------------------
 // Event types
@@ -333,6 +335,9 @@ enum {
 	MKGUI_EVENT_ACCEL,
 	MKGUI_EVENT_FILE_DROP,
 	MKGUI_EVENT_CELL_EDIT_COMMIT,
+	MKGUI_EVENT_CANVAS_PRESS,
+	MKGUI_EVENT_CANVAS_RELEASE,
+	MKGUI_EVENT_CANVAS_MOTION,
 };
 
 // ---------------------------------------------------------------------------
@@ -514,6 +519,9 @@ MKGUI_API void mkgui_quit(struct mkgui_ctx *ctx);
 MKGUI_API void mkgui_window_show(struct mkgui_ctx *ctx);
 MKGUI_API void mkgui_window_hide(struct mkgui_ctx *ctx);
 MKGUI_API uint32_t mkgui_window_is_visible(struct mkgui_ctx *ctx);
+MKGUI_API void mkgui_window_move(struct mkgui_ctx *ctx, int32_t x, int32_t y);
+MKGUI_API void mkgui_window_get_position(struct mkgui_ctx *ctx, int32_t *x, int32_t *y);
+MKGUI_API void mkgui_window_begin_drag(struct mkgui_ctx *ctx);
 MKGUI_API uint32_t mkgui_add_timer(struct mkgui_ctx *ctx, uint64_t interval_ns, mkgui_timer_cb cb, void *userdata);
 MKGUI_API void mkgui_remove_timer(struct mkgui_ctx *ctx, uint32_t timer_id);
 

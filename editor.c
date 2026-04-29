@@ -95,6 +95,10 @@ enum {
 	ED_PROP_FL_SHIMMER,
 	ED_PROP_FL_MULTI_SELECT,
 	ED_PROP_FL_IMG_STRETCH,
+	ED_PROP_FL_WIN_HIDDEN,
+	ED_PROP_FL_WIN_HIDE_CLOSE,
+	ED_PROP_FL_WIN_UNDECORATED,
+	ED_PROP_FL_WIN_CANVAS,
 	ED_PROP_TB_MODE_LBL, ED_PROP_TB_MODE_DRP,
 	ED_PROP_WEIGHT_LBL, ED_PROP_WEIGHT_SPN,
 	ED_PROP_ALIGN_LBL, ED_PROP_ALIGN_DRP,
@@ -210,6 +214,7 @@ static struct ed_type_event_map ed_type_events[] = {
 	{ MKGUI_MENUITEM,  { MKGUI_EVENT_MENU, MKGUI_EVENT_HOVER_ENTER, MKGUI_EVENT_HOVER_LEAVE }, 3 },
 	{ MKGUI_HSPLIT,    { MKGUI_EVENT_SPLIT_MOVED, MKGUI_EVENT_HOVER_ENTER, MKGUI_EVENT_HOVER_LEAVE }, 3 },
 	{ MKGUI_VSPLIT,    { MKGUI_EVENT_SPLIT_MOVED, MKGUI_EVENT_HOVER_ENTER, MKGUI_EVENT_HOVER_LEAVE }, 3 },
+	{ MKGUI_CANVAS,   { MKGUI_EVENT_CANVAS_PRESS, MKGUI_EVENT_CANVAS_RELEASE, MKGUI_EVENT_CANVAS_MOTION, MKGUI_EVENT_SCROLL, MKGUI_EVENT_KEY }, 5 },
 };
 #define ED_TYPE_EVENT_COUNT (sizeof(ed_type_events) / sizeof(ed_type_events[0]))
 
@@ -280,6 +285,9 @@ static char *ed_event_name(uint32_t event_type) {
 		case MKGUI_EVENT_HOVER_ENTER:        { return "HOVER_ENTER"; }
 		case MKGUI_EVENT_HOVER_LEAVE:        { return "HOVER_LEAVE"; }
 		case MKGUI_EVENT_KEY:                { return "KEY"; }
+		case MKGUI_EVENT_CANVAS_PRESS:       { return "CANVAS_PRESS"; }
+		case MKGUI_EVENT_CANVAS_RELEASE:     { return "CANVAS_RELEASE"; }
+		case MKGUI_EVENT_CANVAS_MOTION:      { return "CANVAS_MOTION"; }
 		default:                             { return "UNKNOWN"; }
 	}
 }
@@ -341,6 +349,9 @@ static uint32_t ed_event_from_name(char *name) {
 		{ "HOVER_ENTER",        MKGUI_EVENT_HOVER_ENTER },
 		{ "HOVER_LEAVE",        MKGUI_EVENT_HOVER_LEAVE },
 		{ "KEY",                MKGUI_EVENT_KEY },
+		{ "CANVAS_PRESS",       MKGUI_EVENT_CANVAS_PRESS },
+		{ "CANVAS_RELEASE",     MKGUI_EVENT_CANVAS_RELEASE },
+		{ "CANVAS_MOTION",      MKGUI_EVENT_CANVAS_MOTION },
 	};
 	for(uint32_t i = 0; i < sizeof(map) / sizeof(map[0]); ++i) {
 		if(strcmp(map[i].name, name) == 0) {
@@ -902,6 +913,7 @@ enum {
 	ED_VIS_HAS_MULTI   = (1 << 19),
 	ED_VIS_IMAGE       = (1 << 20),
 	ED_VIS_PROGRESS    = (1 << 21),
+	ED_VIS_WINDOW      = (1 << 22),
 };
 
 enum {
@@ -981,6 +993,10 @@ static struct ed_prop_desc ed_props[] = {
 	{ ED_PK_FLAG,          "Shimmer",       offsetof(struct ed_widget, style),         MKGUI_PROGRESS_SHIMMER, 0,  0,    ED_VIS_PROGRESS,   ED_ACT_NONE,        ED_PROP_FL_SHIMMER,   0,                   0,                 0 },
 	{ ED_PK_FLAG,          "MultiSel",      offsetof(struct ed_widget, style),         MKGUI_LISTVIEW_MULTI_SELECT, 0, 0, ED_VIS_HAS_MULTI, ED_ACT_NONE,        ED_PROP_FL_MULTI_SELECT, 0,                0,                 0 },
 	{ ED_PK_FLAG,          "Stretch",       offsetof(struct ed_widget, style),         MKGUI_IMAGE_STRETCH, 0,     0,    ED_VIS_IMAGE,      ED_ACT_NONE,        ED_PROP_FL_IMG_STRETCH, 0,                 0,                 0 },
+	{ ED_PK_FLAG,          "WinHidden",    offsetof(struct ed_widget, style),         MKGUI_WINDOW_HIDDEN, 0,     0,    ED_VIS_WINDOW,     ED_ACT_NONE,        ED_PROP_FL_WIN_HIDDEN, 0,                  0,                 0 },
+	{ ED_PK_FLAG,          "HideClose",    offsetof(struct ed_widget, style),         MKGUI_WINDOW_HIDE_ON_CLOSE, 0, 0, ED_VIS_WINDOW,     ED_ACT_NONE,        ED_PROP_FL_WIN_HIDE_CLOSE, 0,              0,                 0 },
+	{ ED_PK_FLAG,          "NoDeco",       offsetof(struct ed_widget, style),         MKGUI_WINDOW_UNDECORATED, 0, 0,   ED_VIS_WINDOW,     ED_ACT_NONE,        ED_PROP_FL_WIN_UNDECORATED, 0,             0,                 0 },
+	{ ED_PK_FLAG,          "CanvasWin",    offsetof(struct ed_widget, style),         MKGUI_WINDOW_CANVAS, 0,     0,    ED_VIS_WINDOW,     ED_ACT_NONE,        ED_PROP_FL_WIN_CANVAS, 0,                  0,                 0 },
 	{ ED_PK_ACCEL,         "Accel:",         0,                                        0,                  0,      0,    ED_VIS_ACCELABLE,  ED_ACT_NONE,        ED_PROP_ACCEL_BTN,    ED_PROP_ACCEL_LBL,   ED_PROP_ACCEL_CLEAR, ED_PROP_ACCEL_HBOX },
 	{ ED_PK_MENU_TREE,     "",                0,                                        0,                  0,      0,    ED_VIS_MENU,      ED_ACT_NONE,         ED_MENU_TREE,         0,                   0,                 0 },
 };
@@ -989,6 +1005,10 @@ static struct ed_prop_desc ed_props[] = {
 // [=]===^=[ ed_compute_vis_mask ]=================================[=]
 static uint32_t ed_compute_vis_mask(struct ed_widget *w) {
 	uint32_t mask = 0;
+	if(w->type == MKGUI_WINDOW) {
+		mask |= ED_VIS_WINDOW;
+	}
+
 	if(w->type == MKGUI_CHECKBOX || w->type == MKGUI_RADIO) {
 		mask |= ED_VIS_HAS_CHECK;
 	}
@@ -3641,11 +3661,22 @@ static char *ed_style_to_str(uint32_t style, uint32_t widget_type, char *buf, ui
 	static struct ed_bit_name bits_progress[] = {
 		{ MKGUI_PROGRESS_SHIMMER,    "MKGUI_PROGRESS_SHIMMER" },
 	};
+	static struct ed_bit_name bits_window[] = {
+		{ MKGUI_WINDOW_HIDDEN,       "MKGUI_WINDOW_HIDDEN" },
+		{ MKGUI_WINDOW_HIDE_ON_CLOSE, "MKGUI_WINDOW_HIDE_ON_CLOSE" },
+		{ MKGUI_WINDOW_UNDECORATED,  "MKGUI_WINDOW_UNDECORATED" },
+		{ MKGUI_WINDOW_CANVAS,       "MKGUI_WINDOW_CANVAS" },
+	};
 
 	struct ed_bit_name *bits = NULL;
 	uint32_t bits_count = 0;
 
 	switch(widget_type) {
+		case MKGUI_WINDOW: {
+			bits = bits_window;
+			bits_count = sizeof(bits_window) / sizeof(bits_window[0]);
+		} break;
+
 		case MKGUI_CHECKBOX:
 		case MKGUI_RADIO: {
 			bits = bits_checkbox;

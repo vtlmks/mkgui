@@ -892,6 +892,55 @@ static void test_banner_set_clear(void) {
 }
 
 // ---------------------------------------------------------------------------
+// Canvas-window render path
+// ---------------------------------------------------------------------------
+
+static int32_t cw_cb_x, cw_cb_y, cw_cb_w, cw_cb_h;
+static uint32_t cw_cb_called;
+
+// [=]===^=[ canvas_window_draw_cb ]==================================[=]
+static void canvas_window_draw_cb(struct mkgui_ctx *ctx, uint32_t id, uint32_t *pixels, int32_t x, int32_t y, int32_t w, int32_t h, void *userdata) {
+	(void)ctx; (void)id; (void)pixels; (void)userdata;
+	cw_cb_x = x;
+	cw_cb_y = y;
+	cw_cb_w = w;
+	cw_cb_h = h;
+	cw_cb_called = 1;
+}
+
+// [=]===^=[ test_canvas_window_render ]===============================[=]
+static void test_canvas_window_render(void) {
+	TEST_BEGIN("canvas-window: callback receives full window dimensions");
+	enum { WIN = 1, CANVAS = 2 };
+	struct mkgui_widget widgets[] = {
+		MKGUI_W(MKGUI_WINDOW, WIN, "T", "", 0, 275, 116, 0, MKGUI_WINDOW_UNDECORATED | MKGUI_WINDOW_CANVAS | MKGUI_WINDOW_HIDDEN, 0),
+		MKGUI_W(MKGUI_CANVAS, CANVAS, "", "", WIN, 0, 0, 0, 0, 1),
+	};
+	struct mkgui_ctx *ctx = mkgui_create(widgets, 2);
+	CHECK(ctx, "mkgui_create failed");
+	if(ctx) {
+		CHECK(ctx->canvas_window == 1, "canvas_window flag set");
+		CHECK(ctx->undecorated == 1, "undecorated flag set");
+
+		mkgui_canvas_set_callback(ctx, CANVAS, canvas_window_draw_cb, NULL);
+
+		cw_cb_called = 0;
+		layout_widgets(ctx);
+		ctx->dirty_full = 1;
+		render_widgets(ctx);
+
+		CHECK(cw_cb_called == 1, "canvas callback was invoked");
+		CHECK(cw_cb_x == 0, "callback x == 0, got %d", cw_cb_x);
+		CHECK(cw_cb_y == 0, "callback y == 0, got %d", cw_cb_y);
+		CHECK(cw_cb_w == ctx->win_w, "callback w == win_w (%d), got %d", ctx->win_w, cw_cb_w);
+		CHECK(cw_cb_h == ctx->win_h, "callback h == win_h (%d), got %d", ctx->win_h, cw_cb_h);
+
+		mkgui_destroy(ctx);
+	}
+	TEST_END();
+}
+
+// ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
 
@@ -924,6 +973,8 @@ int main(void) {
 	test_toast_overflow_evicts_oldest();
 	test_toast_expiry();
 	test_banner_set_clear();
+
+	test_canvas_window_render();
 
 	printf("\n=================================\n");
 	printf("%u tests: %u passed, %u failed\n", tests_run, tests_passed, tests_failed);

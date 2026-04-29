@@ -101,11 +101,57 @@ static void test_hide_on_close_intercept(void) {
 	mkgui_destroy(ctx);
 }
 
+static struct mkgui_widget undecorated_widgets[] = {
+	{ MKGUI_WINDOW, 1, 0, 320, 200, 0, MKGUI_WINDOW_UNDECORATED | MKGUI_WINDOW_HIDDEN, 0, 0, 0, 0, 0, 0, "test_undeco", "" },
+};
+
+static struct mkgui_widget canvas_window_widgets[] = {
+	{ MKGUI_WINDOW, 1, 0, 275, 116, 0, MKGUI_WINDOW_UNDECORATED | MKGUI_WINDOW_CANVAS | MKGUI_WINDOW_HIDDEN, 0, 0, 0, 0, 0, 0, "test_canvas", "" },
+	{ MKGUI_CANVAS, 2, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, "", "" },
+};
+
+static void test_undecorated_flag(void) {
+	struct mkgui_ctx *ctx = mkgui_create(undecorated_widgets, sizeof(undecorated_widgets) / sizeof(undecorated_widgets[0]));
+	CHECK(ctx != NULL, "undecorated create returned non-NULL ctx");
+	CHECK(ctx->undecorated == 1, "ctx->undecorated is set");
+	CHECK(ctx->canvas_window == 0, "ctx->canvas_window is not set");
+	mkgui_destroy(ctx);
+}
+
+static void test_canvas_window_flag(void) {
+	struct mkgui_ctx *ctx = mkgui_create(canvas_window_widgets, sizeof(canvas_window_widgets) / sizeof(canvas_window_widgets[0]));
+	CHECK(ctx != NULL, "canvas window create returned non-NULL ctx");
+	CHECK(ctx->undecorated == 1, "ctx->undecorated is set");
+	CHECK(ctx->canvas_window == 1, "ctx->canvas_window is set");
+	mkgui_destroy(ctx);
+}
+
+static void test_window_move_get_position(void) {
+	struct mkgui_ctx *ctx = mkgui_create(undecorated_widgets, sizeof(undecorated_widgets) / sizeof(undecorated_widgets[0]));
+	CHECK(ctx != NULL, "create for move test");
+	mkgui_window_show(ctx);
+	XSync(ctx->plat.dpy, False);
+	mkgui_window_move(ctx, 50, 75);
+	XSync(ctx->plat.dpy, False);
+	while(XPending(ctx->plat.dpy)) {
+		XEvent xev;
+		XNextEvent(ctx->plat.dpy, &xev);
+	}
+	int32_t x = -1, y = -1;
+	mkgui_window_get_position(ctx, &x, &y);
+	CHECK(x == 50, "window x after move");
+	CHECK(y == 75, "window y after move");
+	mkgui_destroy(ctx);
+}
+
 int32_t main(void) {
 	test_default_is_visible();
 	test_run_returns_with_no_visible_windows();
 	test_show_hide_cycle();
 	test_hide_on_close_intercept();
+	test_undecorated_flag();
+	test_canvas_window_flag();
+	test_window_move_get_position();
 
 	fprintf(stderr, "\n%u tests, %u failed\n", tests_run, tests_failed);
 	return tests_failed > 0 ? 1 : 0;

@@ -761,6 +761,8 @@ struct mkgui_ctx {
 	uint32_t close_requested;
 	uint32_t window_visible;
 	uint32_t hide_on_close;
+	uint32_t undecorated;
+	uint32_t canvas_window;
 
 	float scale;
 	int32_t row_height;
@@ -3204,6 +3206,22 @@ static void set_parent_clip(struct mkgui_ctx *ctx, uint32_t idx) {
 static void render_widgets(struct mkgui_ctx *ctx) {
 	text_cmd_count = 0;
 
+	if(ctx->canvas_window) {
+		render_clip_x1 = 0;
+		render_clip_y1 = 0;
+		render_clip_x2 = ctx->win_w;
+		render_clip_y2 = ctx->win_h;
+		for(uint32_t i = 0; i < ctx->canvas_count; ++i) {
+			struct mkgui_canvas_data *cd = &ctx->canvases[i];
+			if(cd->callback) {
+				cd->callback(ctx, cd->widget_id, ctx->pixels, 0, 0, ctx->win_w, ctx->win_h, cd->userdata);
+				break;
+			}
+		}
+		ctx->dirty_full = 1;
+		return;
+	}
+
 	if(ctx->dirty_full || ctx->render_cb) {
 		render_base_clip_x1 = 0;
 		render_base_clip_y1 = 0;
@@ -4161,13 +4179,15 @@ MKGUI_API struct mkgui_ctx *mkgui_create(const struct mkgui_widget *widgets, uin
 	ctx->scale = 1.0f;
 	mkgui_recompute_metrics(ctx);
 
-	if(!platform_init(ctx, title, init_w, init_h)) {
+	if(!platform_init(ctx, title, init_w, init_h, window_style)) {
 		mkgui_free_arrays(ctx);
 		free(ctx);
 		return NULL;
 	}
 
 	ctx->hide_on_close = (window_style & MKGUI_WINDOW_HIDE_ON_CLOSE) ? 1 : 0;
+	ctx->undecorated = (window_style & MKGUI_WINDOW_UNDECORATED) ? 1 : 0;
+	ctx->canvas_window = (window_style & MKGUI_WINDOW_CANVAS) ? 1 : 0;
 
 	float detected = platform_detect_scale(ctx);
 	if(detected > 1.01f) {
@@ -4591,13 +4611,15 @@ MKGUI_API struct mkgui_ctx *mkgui_create_child(struct mkgui_ctx *parent, const s
 
 	int32_t sw = sc(ctx, w);
 	int32_t sh = sc(ctx, h);
-	if(!platform_init_child(ctx, parent, title, sw, sh)) {
+	if(!platform_init_child(ctx, parent, title, sw, sh, window_style)) {
 		mkgui_free_arrays(ctx);
 		free(ctx);
 		return NULL;
 	}
 
 	ctx->hide_on_close = (window_style & MKGUI_WINDOW_HIDE_ON_CLOSE) ? 1 : 0;
+	ctx->undecorated = (window_style & MKGUI_WINDOW_UNDECORATED) ? 1 : 0;
+	ctx->canvas_window = (window_style & MKGUI_WINDOW_CANVAS) ? 1 : 0;
 
 	render_clip_x1 = 0;
 	render_clip_y1 = 0;
@@ -4906,6 +4928,20 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 
 				ctx->mouse_x = pev.x;
 				ctx->mouse_y = pev.y;
+
+				if(ctx->canvas_window) {
+					for(uint32_t ci = 0; ci < ctx->canvas_count; ++ci) {
+						ev->type = MKGUI_EVENT_CANVAS_MOTION;
+						ev->id = ctx->canvases[ci].widget_id;
+						ev->value = pev.x;
+						ev->col = pev.y;
+						ev->keysym = 0;
+						ev->keymod = pev.keymod;
+						dirty_all(ctx);
+						return 1;
+					}
+					break;
+				}
 
 				if(ctx->drag_text_id) {
 					int32_t dsi = find_widget_idx(ctx, ctx->drag_text_id);
@@ -5439,6 +5475,19 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 				// Toast and banner clicks dismiss the notification without
 				// reaching the underlying widget. Only left-click.
 				if(pev.button == 1 && popup_idx < 0 && notify_handle_click(ctx, ctx->mouse_x, ctx->mouse_y)) {
+					break;
+				}
+
+				if(ctx->canvas_window && popup_idx < 0) {
+					for(uint32_t ci = 0; ci < ctx->canvas_count; ++ci) {
+						ev->type = MKGUI_EVENT_CANVAS_PRESS;
+						ev->id = ctx->canvases[ci].widget_id;
+						ev->value = pev.x;
+						ev->col = pev.y;
+						ev->keysym = pev.button;
+						ev->keymod = pev.keymod;
+						return 1;
+					}
 					break;
 				}
 
@@ -6824,6 +6873,19 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 					break;
 				}
 
+				if(ctx->canvas_window && popup_idx < 0) {
+					for(uint32_t ci = 0; ci < ctx->canvas_count; ++ci) {
+						ev->type = MKGUI_EVENT_CANVAS_RELEASE;
+						ev->id = ctx->canvases[ci].widget_id;
+						ev->value = pev.x;
+						ev->col = pev.y;
+						ev->keysym = pev.button;
+						ev->keymod = pev.keymod;
+						return 1;
+					}
+					break;
+				}
+
 				ctx->cell_edit.dragging = 0;
 
 				for(uint32_t si = 0; si < ctx->spinbox_count; ++si) {
@@ -8128,6 +8190,26 @@ MKGUI_API void mkgui_window_hide(struct mkgui_ctx *ctx) {
 MKGUI_API uint32_t mkgui_window_is_visible(struct mkgui_ctx *ctx) {
 	MKGUI_CHECK_VAL(ctx, 0);
 	return ctx->window_visible;
+}
+
+// [=]===^=[ mkgui_window_move ]====================================[=]
+MKGUI_API void mkgui_window_move(struct mkgui_ctx *ctx, int32_t x, int32_t y) {
+	MKGUI_CHECK(ctx);
+	platform_move_window(ctx, x, y);
+}
+
+// [=]===^=[ mkgui_window_get_position ]============================[=]
+MKGUI_API void mkgui_window_get_position(struct mkgui_ctx *ctx, int32_t *x, int32_t *y) {
+	MKGUI_CHECK(ctx);
+	MKGUI_CHECK(x);
+	MKGUI_CHECK(y);
+	platform_get_window_position(ctx, x, y);
+}
+
+// [=]===^=[ mkgui_window_begin_drag ]==============================[=]
+MKGUI_API void mkgui_window_begin_drag(struct mkgui_ctx *ctx) {
+	MKGUI_CHECK(ctx);
+	platform_begin_drag(ctx);
 }
 
 // ---------------------------------------------------------------------------

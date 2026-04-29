@@ -85,7 +85,7 @@ static void platform_set_window_icon(struct mkgui_platform *plat, const struct m
 // ---------------------------------------------------------------------------
 
 // [=]===^=[ platform_init ]======================================[=]
-static uint32_t platform_init(struct mkgui_ctx *ctx, const char *title, int32_t w, int32_t h) {
+static uint32_t platform_init(struct mkgui_ctx *ctx, const char *title, int32_t w, int32_t h, uint32_t flags) {
 	struct mkgui_platform *plat = &ctx->plat;
 
 	plat->dpy = XOpenDisplay(NULL);
@@ -134,6 +134,12 @@ static uint32_t platform_init(struct mkgui_ctx *ctx, const char *title, int32_t 
 	plat->text_uri_list = XInternAtom(plat->dpy, "text/uri-list", False);
 	XSetWMProtocols(plat->dpy, plat->win, &plat->wm_delete, 1);
 
+	if(flags & MKGUI_WINDOW_UNDECORATED) {
+		struct { unsigned long flags, functions, decorations; long input_mode; unsigned long status; } mwm = { 2, 0, 0, 0, 0 };
+		Atom motif_wm_hints = XInternAtom(plat->dpy, "_MOTIF_WM_HINTS", False);
+		XChangeProperty(plat->dpy, plat->win, motif_wm_hints, motif_wm_hints, 32, PropModeReplace, (unsigned char *)&mwm, 5);
+	}
+
 	pid_t pid = getpid();
 	XChangeProperty(plat->dpy, plat->win, plat->net_wm_pid, XA_CARDINAL, 32, PropModeReplace, (unsigned char *)&pid, 1);
 	XSetWMClientMachine(plat->dpy, plat->win, &(XTextProperty){ .value = (unsigned char *)"localhost", .encoding = XA_STRING, .format = 8, .nitems = 9 });
@@ -147,11 +153,13 @@ static uint32_t platform_init(struct mkgui_ctx *ctx, const char *title, int32_t 
 
 	platform_fb_create(plat, &plat->shm, &plat->img, &ctx->pixels, w, h);
 
-	XSizeHints hints = {0};
-	hints.flags = PMinSize;
-	hints.min_width = 200;
-	hints.min_height = 100;
-	XSetWMNormalHints(plat->dpy, plat->win, &hints);
+	if(!(flags & MKGUI_WINDOW_UNDECORATED)) {
+		XSizeHints hints = {0};
+		hints.flags = PMinSize;
+		hints.min_width = 200;
+		hints.min_height = 100;
+		XSetWMNormalHints(plat->dpy, plat->win, &hints);
+	}
 
 	plat->cursor_default = XCreateFontCursor(plat->dpy, XC_left_ptr);
 	plat->cursor_h_resize = XCreateFontCursor(plat->dpy, XC_sb_h_double_arrow);
@@ -181,7 +189,7 @@ static void platform_window_unmap(struct mkgui_ctx *ctx) {
 }
 
 // [=]===^=[ platform_init_child ]=================================[=]
-static uint32_t platform_init_child(struct mkgui_ctx *ctx, struct mkgui_ctx *parent, const char *title, int32_t w, int32_t h) {
+static uint32_t platform_init_child(struct mkgui_ctx *ctx, struct mkgui_ctx *parent, const char *title, int32_t w, int32_t h, uint32_t flags) {
 	struct mkgui_platform *plat = &ctx->plat;
 	struct mkgui_platform *pplat = &parent->plat;
 
@@ -207,10 +215,18 @@ static uint32_t platform_init_child(struct mkgui_ctx *ctx, struct mkgui_ctx *par
 	XStoreName(plat->dpy, plat->win, title);
 	platform_set_class_hint(plat, "dialog", parent->app_class[0] ? parent->app_class : "mkgui");
 
-	XSetTransientForHint(plat->dpy, plat->win, pplat->win);
+	if(!(flags & MKGUI_WINDOW_UNDECORATED)) {
+		XSetTransientForHint(plat->dpy, plat->win, pplat->win);
+	}
 
 	plat->wm_delete = XInternAtom(plat->dpy, "WM_DELETE_WINDOW", False);
 	XSetWMProtocols(plat->dpy, plat->win, &plat->wm_delete, 1);
+
+	if(flags & MKGUI_WINDOW_UNDECORATED) {
+		struct { unsigned long flags, functions, decorations; long input_mode; unsigned long status; } mwm = { 2, 0, 0, 0, 0 };
+		Atom motif_wm_hints = XInternAtom(plat->dpy, "_MOTIF_WM_HINTS", False);
+		XChangeProperty(plat->dpy, plat->win, motif_wm_hints, motif_wm_hints, 32, PropModeReplace, (unsigned char *)&mwm, 5);
+	}
 
 	pid_t pid = getpid();
 	XChangeProperty(plat->dpy, plat->win, plat->net_wm_pid, XA_CARDINAL, 32, PropModeReplace, (unsigned char *)&pid, 1);
@@ -366,6 +382,44 @@ static void platform_resize_window(struct mkgui_ctx *ctx, int32_t w, int32_t h) 
 	ctx->win_w = w;
 	ctx->win_h = h;
 	platform_fb_resize(ctx);
+}
+
+// [=]===^=[ platform_move_window ]=================================[=]
+static void platform_move_window(struct mkgui_ctx *ctx, int32_t x, int32_t y) {
+	XMoveWindow(ctx->plat.dpy, ctx->plat.win, x, y);
+	XFlush(ctx->plat.dpy);
+}
+
+// [=]===^=[ platform_get_window_position ]=========================[=]
+static void platform_get_window_position(struct mkgui_ctx *ctx, int32_t *out_x, int32_t *out_y) {
+	Window child;
+	int32_t x, y;
+	XTranslateCoordinates(ctx->plat.dpy, ctx->plat.win, ctx->plat.root, 0, 0, &x, &y, &child);
+	*out_x = x;
+	*out_y = y;
+}
+
+// [=]===^=[ platform_begin_drag ]==================================[=]
+static void platform_begin_drag(struct mkgui_ctx *ctx) {
+	Atom net_wm_moveresize = XInternAtom(ctx->plat.dpy, "_NET_WM_MOVERESIZE", False);
+	Window root_ret, child_ret;
+	int32_t rx, ry, wx, wy;
+	uint32_t mask;
+	XQueryPointer(ctx->plat.dpy, ctx->plat.win, &root_ret, &child_ret, &rx, &ry, &wx, &wy, &mask);
+	XUngrabPointer(ctx->plat.dpy, CurrentTime);
+	XEvent ev;
+	memset(&ev, 0, sizeof(ev));
+	ev.xclient.type = ClientMessage;
+	ev.xclient.window = ctx->plat.win;
+	ev.xclient.message_type = net_wm_moveresize;
+	ev.xclient.format = 32;
+	ev.xclient.data.l[0] = rx;
+	ev.xclient.data.l[1] = ry;
+	ev.xclient.data.l[2] = 8;
+	ev.xclient.data.l[3] = 1;
+	ev.xclient.data.l[4] = 1;
+	XSendEvent(ctx->plat.dpy, ctx->plat.root, False, SubstructureRedirectMask | SubstructureNotifyMask, &ev);
+	XFlush(ctx->plat.dpy);
 }
 
 // ---------------------------------------------------------------------------
