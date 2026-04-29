@@ -445,6 +445,9 @@ uint32_t mkgui_window_is_visible(struct mkgui_ctx *ctx);
 void mkgui_window_move(struct mkgui_ctx *ctx, int32_t x, int32_t y);
 void mkgui_window_get_position(struct mkgui_ctx *ctx, int32_t *x, int32_t *y);
 void mkgui_window_begin_drag(struct mkgui_ctx *ctx);
+void mkgui_window_set_shape(struct mkgui_ctx *ctx, const int32_t *xy_pairs, uint32_t point_count);
+void mkgui_window_set_shape_mask(struct mkgui_ctx *ctx, const uint32_t *argb, int32_t w, int32_t h, uint32_t alpha_threshold);
+void mkgui_window_clear_shape(struct mkgui_ctx *ctx);
 void mkgui_set_title(struct mkgui_ctx *ctx, const char *title);
 void mkgui_set_app_class(struct mkgui_ctx *ctx, const char *app_class);
 void mkgui_set_window_instance(struct mkgui_ctx *ctx, const char *instance);
@@ -1284,6 +1287,24 @@ The canvas callback receives `x=0, y=0, w=window_width, h=window_height`, giving
 Multiple canvas-only windows work via `mkgui_create_child` with the same flags. Undecorated child windows are not set as transient-for the parent, so they appear independently in the taskbar.
 
 Since undecorated windows have no title bar, use `mkgui_window_begin_drag` from a canvas press handler to let the WM handle single-window dragging, or use `mkgui_window_move` and `mkgui_window_get_position` for app-managed movement (required for docking or moving multiple windows in unison).
+
+#### Non-rectangular windows (XShape)
+
+Canvas-only windows can be given a non-rectangular shape via the X11 Shape extension (Linux) or `SetWindowRgn` (Windows). Two variants:
+
+```c
+// Polygon outline
+int32_t points[] = { x0,y0, x1,y1, x2,y2, ... };
+mkgui_window_set_shape(ctx, points, point_count);
+
+// Mask from ARGB bitmap (pixels with alpha >= threshold are visible)
+mkgui_window_set_shape_mask(ctx, skin_pixels, skin_w, skin_h, 128);
+
+// Restore rectangular shape
+mkgui_window_clear_shape(ctx);
+```
+
+`mkgui_window_set_shape` takes interleaved x,y pairs defining a polygon. `mkgui_window_set_shape_mask` scans an ARGB pixel buffer and builds the shape from spans where the alpha channel meets or exceeds `alpha_threshold`. Both use winding-rule fill. Call `mkgui_window_clear_shape` to remove the shape and return to a normal rectangle.
 
 ## Menus
 

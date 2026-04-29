@@ -422,6 +422,20 @@ static void platform_begin_drag(struct mkgui_ctx *ctx) {
 	XFlush(ctx->plat.dpy);
 }
 
+// [=]===^=[ platform_set_shape ]====================================[=]
+static void platform_set_shape(struct mkgui_ctx *ctx, const XPoint *points, int32_t count) {
+	Region rgn = XPolygonRegion((XPoint *)points, count, WindingRule);
+	XShapeCombineRegion(ctx->plat.dpy, ctx->plat.win, ShapeBounding, 0, 0, rgn, ShapeSet);
+	XDestroyRegion(rgn);
+	XFlush(ctx->plat.dpy);
+}
+
+// [=]===^=[ platform_clear_shape ]==================================[=]
+static void platform_clear_shape(struct mkgui_ctx *ctx) {
+	XShapeCombineMask(ctx->plat.dpy, ctx->plat.win, ShapeBounding, 0, 0, None, ShapeSet);
+	XFlush(ctx->plat.dpy);
+}
+
 // ---------------------------------------------------------------------------
 // Blit / flush
 // ---------------------------------------------------------------------------

@@ -8212,6 +8212,99 @@ MKGUI_API void mkgui_window_begin_drag(struct mkgui_ctx *ctx) {
 	platform_begin_drag(ctx);
 }
 
+// [=]===^=[ mkgui_window_set_shape ]===============================[=]
+MKGUI_API void mkgui_window_set_shape(struct mkgui_ctx *ctx, const int32_t *xy_pairs, uint32_t point_count) {
+	MKGUI_CHECK(ctx);
+	MKGUI_CHECK(xy_pairs);
+	if(point_count < 3) {
+		return;
+	}
+#ifdef _WIN32
+	POINT *pts = (POINT *)malloc(point_count * sizeof(POINT));
+	if(!pts) {
+		return;
+	}
+	for(uint32_t i = 0; i < point_count; ++i) {
+		pts[i].x = xy_pairs[i * 2];
+		pts[i].y = xy_pairs[i * 2 + 1];
+	}
+	platform_set_shape(ctx, pts, (int32_t)point_count);
+	free(pts);
+#else
+	XPoint *pts = (XPoint *)malloc(point_count * sizeof(XPoint));
+	if(!pts) {
+		return;
+	}
+	for(uint32_t i = 0; i < point_count; ++i) {
+		pts[i].x = (short)xy_pairs[i * 2];
+		pts[i].y = (short)xy_pairs[i * 2 + 1];
+	}
+	platform_set_shape(ctx, pts, (int32_t)point_count);
+	free(pts);
+#endif
+}
+
+// [=]===^=[ mkgui_window_set_shape_mask ]=========================[=]
+MKGUI_API void mkgui_window_set_shape_mask(struct mkgui_ctx *ctx, const uint32_t *argb, int32_t w, int32_t h, uint32_t alpha_threshold) {
+	MKGUI_CHECK(ctx);
+	MKGUI_CHECK(argb);
+	if(w <= 0 || h <= 0) {
+		return;
+	}
+#ifdef _WIN32
+	HRGN combined = CreateRectRgn(0, 0, 0, 0);
+	for(int32_t y = 0; y < h; ++y) {
+		int32_t x = 0;
+		while(x < w) {
+			while(x < w && (argb[y * w + x] >> 24) < alpha_threshold) {
+				++x;
+			}
+			int32_t x0 = x;
+			while(x < w && (argb[y * w + x] >> 24) >= alpha_threshold) {
+				++x;
+			}
+			if(x > x0) {
+				HRGN span = CreateRectRgn(x0, y, x, y + 1);
+				CombineRgn(combined, combined, span, RGN_OR);
+				DeleteObject(span);
+			}
+		}
+	}
+	SetWindowRgn(ctx->plat.hwnd, combined, TRUE);
+#else
+	Pixmap mask = XCreatePixmap(ctx->plat.dpy, ctx->plat.root, (uint32_t)w, (uint32_t)h, 1);
+	GC gc = XCreateGC(ctx->plat.dpy, mask, 0, NULL);
+	XSetForeground(ctx->plat.dpy, gc, 0);
+	XFillRectangle(ctx->plat.dpy, mask, gc, 0, 0, (uint32_t)w, (uint32_t)h);
+	XSetForeground(ctx->plat.dpy, gc, 1);
+	for(int32_t y = 0; y < h; ++y) {
+		int32_t x = 0;
+		while(x < w) {
+			while(x < w && (argb[y * w + x] >> 24) < alpha_threshold) {
+				++x;
+			}
+			int32_t x0 = x;
+			while(x < w && (argb[y * w + x] >> 24) >= alpha_threshold) {
+				++x;
+			}
+			if(x > x0) {
+				XFillRectangle(ctx->plat.dpy, mask, gc, x0, y, (uint32_t)(x - x0), 1);
+			}
+		}
+	}
+	XShapeCombineMask(ctx->plat.dpy, ctx->plat.win, ShapeBounding, 0, 0, mask, ShapeSet);
+	XFreeGC(ctx->plat.dpy, gc);
+	XFreePixmap(ctx->plat.dpy, mask);
+	XFlush(ctx->plat.dpy);
+#endif
+}
+
+// [=]===^=[ mkgui_window_clear_shape ]=============================[=]
+MKGUI_API void mkgui_window_clear_shape(struct mkgui_ctx *ctx) {
+	MKGUI_CHECK(ctx);
+	platform_clear_shape(ctx);
+}
+
 // ---------------------------------------------------------------------------
 // Dialog windows
 // ---------------------------------------------------------------------------

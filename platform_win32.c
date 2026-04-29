@@ -699,6 +699,17 @@ static void platform_begin_drag(struct mkgui_ctx *ctx) {
 	SendMessageA(ctx->plat.hwnd, WM_NCLBUTTONDOWN, HTCAPTION, 0);
 }
 
+// [=]===^=[ platform_set_shape ]====================================[=]
+static void platform_set_shape(struct mkgui_ctx *ctx, const POINT *points, int32_t count) {
+	HRGN rgn = CreatePolygonRgn(points, count, WINDING);
+	SetWindowRgn(ctx->plat.hwnd, rgn, TRUE);
+}
+
+// [=]===^=[ platform_clear_shape ]==================================[=]
+static void platform_clear_shape(struct mkgui_ctx *ctx) {
+	SetWindowRgn(ctx->plat.hwnd, NULL, TRUE);
+}
+
 // ---------------------------------------------------------------------------
 // Blit / flush
 // ---------------------------------------------------------------------------

@@ -8,6 +8,7 @@
 #include <X11/keysym.h>
 #include <X11/cursorfont.h>
 #include <X11/extensions/XShm.h>
+#include <X11/extensions/shape.h>
 #include <sys/shm.h>
 #include <unistd.h>
 #include <poll.h>
