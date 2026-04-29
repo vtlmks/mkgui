@@ -346,6 +346,7 @@ static uint32_t platform_fb_create_dib(HDC hdc_ref, HDC *hdc_mem, HBITMAP *hbmp,
 
 	*hdc_mem = CreateCompatibleDC(hdc_ref);
 	*hbmp = CreateDIBSection(*hdc_mem, &bmi, DIB_RGB_COLORS, (void **)pixels, NULL, 0);
+	memset(*pixels, 0, (size_t)w * (size_t)h * 4);
 	*hbmp_old = (HBITMAP)SelectObject(*hdc_mem, *hbmp);
 	return 1;
 }

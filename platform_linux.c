@@ -18,6 +18,7 @@ static uint32_t platform_fb_create(struct mkgui_platform *plat, XShmSegmentInfo 
 		return 0;
 	}
 	shm->shmaddr = (char *)shmat(shm->shmid, NULL, 0);
+	memset(shm->shmaddr, 0, (size_t)((*img)->bytes_per_line * h));
 	(*img)->data = shm->shmaddr;
 	shm->readOnly = False;
 	XShmAttach(plat->dpy, shm);
