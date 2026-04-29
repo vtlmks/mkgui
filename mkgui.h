@@ -525,6 +525,8 @@ MKGUI_API void mkgui_window_begin_drag(struct mkgui_ctx *ctx);
 MKGUI_API void mkgui_window_set_shape(struct mkgui_ctx *ctx, const int32_t *xy_pairs, uint32_t point_count);
 MKGUI_API void mkgui_window_set_shape_mask(struct mkgui_ctx *ctx, const uint32_t *argb, int32_t w, int32_t h, uint32_t alpha_threshold);
 MKGUI_API void mkgui_window_clear_shape(struct mkgui_ctx *ctx);
+MKGUI_API void mkgui_window_resize(struct mkgui_ctx *ctx, int32_t w, int32_t h);
+MKGUI_API void mkgui_invalidate(struct mkgui_ctx *ctx);
 MKGUI_API uint32_t mkgui_add_timer(struct mkgui_ctx *ctx, uint64_t interval_ns, mkgui_timer_cb cb, void *userdata);
 MKGUI_API void mkgui_remove_timer(struct mkgui_ctx *ctx, uint32_t timer_id);
 

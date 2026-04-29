@@ -8305,6 +8305,22 @@ MKGUI_API void mkgui_window_clear_shape(struct mkgui_ctx *ctx) {
 	platform_clear_shape(ctx);
 }
 
+// [=]===^=[ mkgui_window_resize ]==================================[=]
+MKGUI_API void mkgui_window_resize(struct mkgui_ctx *ctx, int32_t w, int32_t h) {
+	MKGUI_CHECK(ctx);
+	if(w <= 0 || h <= 0) {
+		return;
+	}
+	platform_resize_window(ctx, w, h);
+	dirty_all(ctx);
+}
+
+// [=]===^=[ mkgui_invalidate ]=====================================[=]
+MKGUI_API void mkgui_invalidate(struct mkgui_ctx *ctx) {
+	MKGUI_CHECK(ctx);
+	dirty_all(ctx);
+}
+
 // ---------------------------------------------------------------------------
 // Dialog windows
 // ---------------------------------------------------------------------------

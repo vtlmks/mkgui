@@ -448,6 +448,8 @@ void mkgui_window_begin_drag(struct mkgui_ctx *ctx);
 void mkgui_window_set_shape(struct mkgui_ctx *ctx, const int32_t *xy_pairs, uint32_t point_count);
 void mkgui_window_set_shape_mask(struct mkgui_ctx *ctx, const uint32_t *argb, int32_t w, int32_t h, uint32_t alpha_threshold);
 void mkgui_window_clear_shape(struct mkgui_ctx *ctx);
+void mkgui_window_resize(struct mkgui_ctx *ctx, int32_t w, int32_t h);
+void mkgui_invalidate(struct mkgui_ctx *ctx);
 void mkgui_set_title(struct mkgui_ctx *ctx, const char *title);
 void mkgui_set_app_class(struct mkgui_ctx *ctx, const char *app_class);
 void mkgui_set_window_instance(struct mkgui_ctx *ctx, const char *instance);
@@ -554,6 +556,8 @@ void mkgui_window_begin_drag(struct mkgui_ctx *ctx);
 ```
 
 `mkgui_window_move` sets the window position in screen coordinates. `mkgui_window_get_position` reads it. `mkgui_window_begin_drag` initiates a WM-managed move operation (`_NET_WM_MOVERESIZE` on X11, `WM_NCLBUTTONDOWN` on Windows); call it from a mouse press handler when the user clicks a drag region.
+
+`mkgui_window_resize` changes the window's client area size and rebuilds the framebuffer. `mkgui_invalidate` marks the entire window dirty, triggering a full repaint on the next frame. Use it from timer callbacks to drive canvas animation.
 
 `mkgui_run` returns when `ctx->close_requested` is set OR when no registered window is currently visible. This makes the persistent-hidden-context pattern natural: keep a configuration ctx alive across the application lifetime, show it on demand, and let `mkgui_run` return when the user closes (i.e. hides) it.
 
