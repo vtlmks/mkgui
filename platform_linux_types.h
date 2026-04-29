@@ -19,15 +19,7 @@
 
 #define MKGUI_DEFERRED_SIZE 64
 
-struct mkgui_platform {
-	Display *dpy;
-	Window root;
-	Window win;
-	int32_t screen;
-	GC gc;
-	Visual *visual;
-	Colormap colormap;
-	uint32_t depth;
+struct mkgui_platform_atoms {
 	Atom wm_delete;
 	Atom clipboard;
 	Atom utf8_string;
@@ -44,6 +36,18 @@ struct mkgui_platform {
 	Atom xdnd_action_copy;
 	Atom xdnd_selection;
 	Atom text_uri_list;
+};
+
+struct mkgui_platform {
+	Display *dpy;
+	Window root;
+	Window win;
+	int32_t screen;
+	GC gc;
+	Visual *visual;
+	Colormap colormap;
+	uint32_t depth;
+	struct mkgui_platform_atoms atoms;
 	Window xdnd_source;
 	uint32_t xdnd_uri_ok;
 	XShmSegmentInfo shm;

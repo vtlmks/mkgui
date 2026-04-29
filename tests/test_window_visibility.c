@@ -89,7 +89,7 @@ static void test_hide_on_close_intercept(void) {
 	xc.window = ctx->plat.win;
 	xc.message_type = XInternAtom(ctx->plat.dpy, "WM_PROTOCOLS", False);
 	xc.format = 32;
-	xc.data.l[0] = (long)ctx->plat.wm_delete;
+	xc.data.l[0] = (long)ctx->plat.atoms.wm_delete;
 	xc.data.l[1] = CurrentTime;
 	XSendEvent(ctx->plat.dpy, ctx->plat.win, False, NoEventMask, (XEvent *)&xc);
 	XFlush(ctx->plat.dpy);
