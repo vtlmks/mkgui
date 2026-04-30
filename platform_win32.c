@@ -676,9 +676,6 @@ static void platform_resize_window(struct mkgui_ctx *ctx, int32_t w, int32_t h) 
 	DWORD style = ctx->undecorated ? WS_POPUP : WS_OVERLAPPEDWINDOW;
 	AdjustWindowRect(&rc, style, FALSE);
 	SetWindowPos(ctx->plat.hwnd, NULL, 0, 0, rc.right - rc.left, rc.bottom - rc.top, SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
-	ctx->win_w = w;
-	ctx->win_h = h;
-	platform_fb_resize(ctx);
 }
 
 // [=]===^=[ platform_move_window ]=================================[=]

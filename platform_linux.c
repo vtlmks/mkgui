@@ -154,11 +154,16 @@ static uint32_t platform_init(struct mkgui_ctx *ctx, const char *title, int32_t 
 
 	platform_fb_create(plat, &plat->shm, &plat->img, &ctx->pixels, w, h);
 
-	if(!(flags & MKGUI_WINDOW_UNDECORATED)) {
+	{
 		XSizeHints hints = {0};
 		hints.flags = PMinSize;
-		hints.min_width = 200;
-		hints.min_height = 100;
+		if(flags & MKGUI_WINDOW_UNDECORATED) {
+			hints.min_width = 1;
+			hints.min_height = 1;
+		} else {
+			hints.min_width = 200;
+			hints.min_height = 100;
+		}
 		XSetWMNormalHints(plat->dpy, plat->win, &hints);
 	}
 
@@ -236,6 +241,19 @@ static uint32_t platform_init_child(struct mkgui_ctx *ctx, struct mkgui_ctx *par
 	ctx->win_h = h;
 
 	platform_fb_create(plat, &plat->shm, &plat->img, &ctx->pixels, w, h);
+
+	{
+		XSizeHints hints = {0};
+		hints.flags = PMinSize;
+		if(flags & MKGUI_WINDOW_UNDECORATED) {
+			hints.min_width = 1;
+			hints.min_height = 1;
+		} else {
+			hints.min_width = 200;
+			hints.min_height = 100;
+		}
+		XSetWMNormalHints(plat->dpy, plat->win, &hints);
+	}
 
 	plat->cursor_default = XCreateFontCursor(plat->dpy, XC_left_ptr);
 	plat->cursor_h_resize = XCreateFontCursor(plat->dpy, XC_sb_h_double_arrow);
@@ -375,9 +393,6 @@ static float platform_detect_scale(struct mkgui_ctx *ctx) {
 // [=]===^=[ platform_resize_window ]===============================[=]
 static void platform_resize_window(struct mkgui_ctx *ctx, int32_t w, int32_t h) {
 	XResizeWindow(ctx->plat.dpy, ctx->plat.win, (uint32_t)w, (uint32_t)h);
-	ctx->win_w = w;
-	ctx->win_h = h;
-	platform_fb_resize(ctx);
 }
 
 // [=]===^=[ platform_move_window ]=================================[=]

@@ -2612,7 +2612,7 @@ static void layout_widgets(struct mkgui_ctx *ctx) {
 			ctx->rects[i].w = ctx->win_w;
 			ctx->rects[i].h = ctx->win_h;
 			layout_node(ctx, i);
-			if(ctx->dirty_full) {
+			if(ctx->dirty_full && !ctx->canvas_window) {
 				layout_compute_min_size(ctx, i);
 			}
 		}
@@ -8312,7 +8312,6 @@ MKGUI_API void mkgui_window_resize(struct mkgui_ctx *ctx, int32_t w, int32_t h) 
 		return;
 	}
 	platform_resize_window(ctx, w, h);
-	dirty_all(ctx);
 }
 
 // [=]===^=[ mkgui_invalidate ]=====================================[=]
