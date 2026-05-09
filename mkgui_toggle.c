@@ -30,12 +30,14 @@ static void render_toggle(struct mkgui_ctx *ctx, uint32_t idx) {
 	uint32_t track_fill;
 	uint32_t track_border;
 	if(on) {
-		track_fill = disabled ? ctx->theme.widget_border : ctx->theme.accent;
+		track_fill = ctx->theme.accent;
 		track_border = track_fill;
 	} else {
 		track_fill = ctx->theme.bg;
 		track_border = (focused || hovered) ? ctx->theme.highlight : ctx->theme.widget_border;
 	}
+	track_fill = disabled_blend(track_fill, ctx->theme.bg, disabled);
+	track_border = disabled_blend(track_border, ctx->theme.bg, disabled);
 	draw_rounded_rect(ctx->pixels, ctx->win_w, ctx->win_h, rx, ty, track_w, track_h, track_fill, track_border, track_r);
 
 	int32_t knob_x;
@@ -46,7 +48,8 @@ static void render_toggle(struct mkgui_ctx *ctx, uint32_t idx) {
 	}
 	int32_t knob_y = ty + knob_pad;
 	int32_t knob_r = knob_size / 2;
-	uint32_t knob_color = on ? 0xffffffff : (disabled ? ctx->theme.text_disabled : ctx->theme.widget_border);
+	uint32_t knob_color = on ? 0xffffffff : ctx->theme.widget_border;
+	knob_color = disabled_blend(knob_color, ctx->theme.bg, disabled);
 	draw_rounded_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, knob_x, knob_y, knob_size, knob_size, knob_color, knob_r);
 
 	if(w->label[0]) {

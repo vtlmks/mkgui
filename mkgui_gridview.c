@@ -94,8 +94,11 @@ static void render_gridview(struct mkgui_ctx *ctx, uint32_t idx) {
 		return;
 	}
 
+	uint32_t disabled = (w->flags & MKGUI_DISABLED);
 	uint32_t focused = (ctx->focus_id == w->id);
-	draw_patch(ctx, MKGUI_STYLE_SUNKEN, rx, ry, rw, rh, ctx->theme.input_bg, focused ? ctx->theme.highlight : ctx->theme.widget_border);
+	uint32_t frame_bg = disabled_blend(ctx->theme.input_bg, ctx->theme.bg, disabled);
+	uint32_t frame_border = disabled_blend(focused ? ctx->theme.highlight : ctx->theme.widget_border, ctx->theme.bg, disabled);
+	draw_patch(ctx, MKGUI_STYLE_SUNKEN, rx, ry, rw, rh, frame_bg, frame_border);
 
 	int32_t hh = gv->header_height > 0 ? gv->header_height : ctx->row_height;
 	int32_t content_w = rw - 2 - ctx->scrollbar_w;

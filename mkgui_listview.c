@@ -368,8 +368,11 @@ static void render_listview(struct mkgui_ctx *ctx, uint32_t idx) {
 		return;
 	}
 
+	uint32_t disabled = (w->flags & MKGUI_DISABLED);
 	uint32_t focused = (ctx->focus_id == w->id);
-	draw_patch(ctx, MKGUI_STYLE_SUNKEN, rx, ry, rw, rh, ctx->theme.input_bg, focused ? ctx->theme.highlight : ctx->theme.widget_border);
+	uint32_t frame_bg = disabled_blend(ctx->theme.input_bg, ctx->theme.bg, disabled);
+	uint32_t frame_border = disabled_blend(focused ? ctx->theme.highlight : ctx->theme.widget_border, ctx->theme.bg, disabled);
+	draw_patch(ctx, MKGUI_STYLE_SUNKEN, rx, ry, rw, rh, frame_bg, frame_border);
 
 	int32_t hh = lv->header_height > 0 ? lv->header_height : ctx->row_height;
 	int32_t content_w = rw - 2 - ctx->scrollbar_w;
@@ -388,7 +391,8 @@ static void render_listview(struct mkgui_ctx *ctx, uint32_t idx) {
 	listview_clamp_scroll_y(ctx, lv, content_h);
 	int32_t sx = lv->scroll_x;
 
-	draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, rx + 1, ry + 1, content_w, hh, ctx->theme.header_bg);
+	uint32_t header_bg = disabled_blend(ctx->theme.header_bg, ctx->theme.bg, disabled);
+	draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, rx + 1, ry + 1, content_w, hh, header_bg);
 
 	int32_t hdr_pad = sc(ctx, 4);
 	int32_t sort_icon_w = sc(ctx, 12);

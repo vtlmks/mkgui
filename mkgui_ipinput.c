@@ -53,8 +53,11 @@ static void render_ipinput(struct mkgui_ctx *ctx, uint32_t idx) {
 	int32_t rw = ctx->rects[idx].w;
 	int32_t rh = ctx->rects[idx].h;
 
+	uint32_t disabled = (w->flags & MKGUI_DISABLED);
 	uint32_t focused = (ctx->focus_id == w->id);
-	draw_patch(ctx, MKGUI_STYLE_SUNKEN, rx, ry, rw, rh, ctx->theme.input_bg, focused ? ctx->theme.highlight : ctx->theme.widget_border);
+	uint32_t input_bg = disabled_blend(ctx->theme.input_bg, ctx->theme.bg, disabled);
+	uint32_t border_color = disabled_blend(focused ? ctx->theme.highlight : ctx->theme.widget_border, ctx->theme.bg, disabled);
+	draw_patch(ctx, MKGUI_STYLE_SUNKEN, rx, ry, rw, rh, input_bg, border_color);
 
 	struct mkgui_ipinput_data *ip = find_ipinput_data(ctx, w->id);
 	if(!ip) {
@@ -63,7 +66,7 @@ static void render_ipinput(struct mkgui_ctx *ctx, uint32_t idx) {
 
 	int32_t ty = ry + (rh - ctx->font_height) / 2;
 	int32_t fw = ipinput_field_w(ctx, rw);
-	uint32_t tc = (w->flags & MKGUI_DISABLED) ? ctx->theme.text_disabled : ctx->theme.text;
+	uint32_t tc = disabled ? ctx->theme.text_disabled : ctx->theme.text;
 	int32_t inset = sc(ctx, 2);
 
 	for(uint32_t i = 0; i < 4; ++i) {

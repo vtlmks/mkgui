@@ -38,6 +38,13 @@
 #ifndef MKGUI_MAX_ICONS
 #define MKGUI_MAX_ICONS            2048
 #endif
+// Amount that non-text widget colors (frame, fill, border, accent) are
+// blended toward the surrounding background when MKGUI_DISABLED is set.
+// 0.0 = no fade (looks identical to enabled), 1.0 = invisible.
+// Define this before #include "mkgui.h" to override.
+#ifndef MKGUI_DISABLED_BLEND
+#define MKGUI_DISABLED_BLEND       0.45f
+#endif
 #define MKGUI_MAX_MULTI_SEL        4096
 #define MKGUI_MAX_STATUSBAR_SECTIONS 8
 #define MKGUI_MAX_CTXMENU          64

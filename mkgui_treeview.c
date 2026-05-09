@@ -125,8 +125,11 @@ static void render_treeview(struct mkgui_ctx *ctx, uint32_t idx) {
 	int32_t rw = ctx->rects[idx].w;
 	int32_t rh = ctx->rects[idx].h;
 
+	uint32_t disabled = (w->flags & MKGUI_DISABLED);
 	uint32_t focused = (ctx->focus_id == w->id);
-	draw_patch(ctx, MKGUI_STYLE_SUNKEN, rx, ry, rw, rh, ctx->theme.input_bg, focused ? ctx->theme.highlight : ctx->theme.widget_border);
+	uint32_t frame_bg = disabled_blend(ctx->theme.input_bg, ctx->theme.bg, disabled);
+	uint32_t frame_border = disabled_blend(focused ? ctx->theme.highlight : ctx->theme.widget_border, ctx->theme.bg, disabled);
+	draw_patch(ctx, MKGUI_STYLE_SUNKEN, rx, ry, rw, rh, frame_bg, frame_border);
 
 	struct mkgui_treeview_data *tv = find_treeview_data(ctx, w->id);
 	if(!tv) {

@@ -106,14 +106,21 @@ static void render_slider(struct mkgui_ctx *ctx, uint32_t idx) {
 		range = 1;
 	}
 
-	uint32_t thumb_color = disabled ? ctx->theme.widget_border : ((ctx->focus_id == w->id) ? ctx->theme.sel_text : ctx->theme.highlight);
-	uint32_t thumb_border = disabled ? ctx->theme.widget_border : ctx->theme.highlight;
+	uint32_t thumb_color = (ctx->focus_id == w->id) ? ctx->theme.sel_text : ctx->theme.highlight;
+	uint32_t thumb_border = ctx->theme.highlight;
+	uint32_t track_color = ctx->theme.widget_border;
 	uint32_t wedge_color = blend_pixel(ctx->theme.bg, ctx->theme.widget_border, 128);
+	thumb_color = disabled_blend(thumb_color, ctx->theme.bg, disabled);
+	thumb_border = disabled_blend(thumb_border, ctx->theme.bg, disabled);
+	track_color = disabled_blend(track_color, ctx->theme.bg, disabled);
+	wedge_color = disabled_blend(wedge_color, ctx->theme.bg, disabled);
+	uint32_t meter_pre_color = disabled_blend(sd->meter_pre_color, ctx->theme.bg, disabled);
+	uint32_t meter_post_color = disabled_blend(sd->meter_post_color, ctx->theme.bg, disabled);
 
 	if(vertical) {
 		int32_t track_w = mixer ? meter_track_size : track_size;
 		int32_t track_x = rx + rw / 2 - track_w / 2;
-		draw_rounded_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, track_x, ry, track_w, rh, ctx->theme.widget_border, 2);
+		draw_rounded_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, track_x, ry, track_w, rh, track_color, 2);
 
 		if(mixer) {
 			int32_t meter_x = track_x + 1;
@@ -124,7 +131,7 @@ static void render_slider(struct mkgui_ctx *ctx, uint32_t idx) {
 				float pre = sd->meter_pre > 1.0f ? 1.0f : sd->meter_pre;
 				int32_t ph = (int32_t)(pre * (float)meter_h);
 				if(ph > 0) {
-					draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, meter_x, meter_y + meter_h - ph, meter_w, ph, sd->meter_pre_color);
+					draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, meter_x, meter_y + meter_h - ph, meter_w, ph, meter_pre_color);
 				}
 			}
 
@@ -132,7 +139,7 @@ static void render_slider(struct mkgui_ctx *ctx, uint32_t idx) {
 				float post = sd->meter_post > 1.0f ? 1.0f : sd->meter_post;
 				int32_t ph = (int32_t)(post * (float)meter_h);
 				if(ph > 0) {
-					draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, meter_x, meter_y + meter_h - ph, meter_w, ph, sd->meter_post_color);
+					draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, meter_x, meter_y + meter_h - ph, meter_w, ph, meter_post_color);
 				}
 			}
 
@@ -146,7 +153,7 @@ static void render_slider(struct mkgui_ctx *ctx, uint32_t idx) {
 	} else {
 		int32_t track_h = mixer ? meter_track_size : track_size;
 		int32_t track_y = ry + rh / 2 - track_h / 2;
-		draw_rounded_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, rx, track_y, rw, track_h, ctx->theme.widget_border, 2);
+		draw_rounded_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, rx, track_y, rw, track_h, track_color, 2);
 
 		if(mixer) {
 			int32_t meter_x = rx + 1;
@@ -157,7 +164,7 @@ static void render_slider(struct mkgui_ctx *ctx, uint32_t idx) {
 				float pre = sd->meter_pre > 1.0f ? 1.0f : sd->meter_pre;
 				int32_t pw = (int32_t)(pre * (float)meter_w);
 				if(pw > 0) {
-					draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, meter_x, meter_y, pw, meter_h, sd->meter_pre_color);
+					draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, meter_x, meter_y, pw, meter_h, meter_pre_color);
 				}
 			}
 
@@ -165,7 +172,7 @@ static void render_slider(struct mkgui_ctx *ctx, uint32_t idx) {
 				float post = sd->meter_post > 1.0f ? 1.0f : sd->meter_post;
 				int32_t pw = (int32_t)(post * (float)meter_w);
 				if(pw > 0) {
-					draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, meter_x, meter_y, pw, meter_h, sd->meter_post_color);
+					draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, meter_x, meter_y, pw, meter_h, meter_post_color);
 				}
 			}
 

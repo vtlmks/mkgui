@@ -17,6 +17,8 @@ static void render_dropdown(struct mkgui_ctx *ctx, uint32_t idx) {
 		bg = ctx->theme.widget_hover;
 	}
 	uint32_t border = (ctx->focus_id == w->id) ? ctx->theme.highlight : ctx->theme.widget_border;
+	bg = disabled_blend(bg, ctx->theme.bg, disabled);
+	border = disabled_blend(border, ctx->theme.bg, disabled);
 	draw_patch(ctx, MKGUI_STYLE_RAISED, rx, ry, rw, rh, bg, border);
 
 	struct mkgui_dropdown_data *dd = find_dropdown_data(ctx, w->id);

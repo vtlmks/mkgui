@@ -149,10 +149,12 @@ static void render_radio(struct mkgui_ctx *ctx, uint32_t idx) {
 	uint32_t pressed = (!disabled && ctx->press_id == w->id);
 	uint32_t border = (ctx->focus_id == w->id || hovered) ? ctx->theme.highlight : ctx->theme.widget_border;
 	uint32_t fill = pressed ? ctx->theme.widget_press : ctx->theme.widget_bg;
+	border = disabled_blend(border, ctx->theme.bg, disabled);
+	fill = disabled_blend(fill, ctx->theme.bg, disabled);
 	draw_aa_circle_ring(ctx->pixels, ctx->win_w, ctx->win_h, cx, cy, outer_r, inner_r, fill, border);
 
 	if(w->style & MKGUI_RADIO_CHECKED) {
-		uint32_t dot_color = disabled ? ctx->theme.widget_border : ctx->theme.highlight;
+		uint32_t dot_color = disabled_blend(ctx->theme.highlight, ctx->theme.bg, disabled);
 		draw_aa_circle_fill(ctx->pixels, ctx->win_w, ctx->win_h, cx, cy, sc(ctx, 4), dot_color);
 	}
 

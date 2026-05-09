@@ -392,6 +392,19 @@ static inline uint32_t blend_pixel(uint32_t dst, uint32_t color, uint8_t alpha) 
 	return 0xff000000 | rb | g;
 }
 
+// [=]===^=[ disabled_blend ]====================================[=]
+// Returns fg blended MKGUI_DISABLED_BLEND of the way toward bg when disabled
+// is non-zero, else returns fg unchanged. Used by widget render code to
+// uniformly fade frame/fill/border/accent colors for disabled widgets.
+// Label text is NOT blended; widgets pick theme.text_disabled directly so
+// theme authors can keep it legible against busy backgrounds.
+static inline uint32_t disabled_blend(uint32_t fg, uint32_t bg, uint32_t disabled) {
+	if(!disabled) {
+		return fg;
+	}
+	return blend_pixel(fg, bg, (uint8_t)(MKGUI_DISABLED_BLEND * 255.0f + 0.5f));
+}
+
 static int32_t render_clip_x1, render_clip_y1, render_clip_x2, render_clip_y2;
 static int32_t render_base_clip_x1, render_base_clip_y1, render_base_clip_x2, render_base_clip_y2;
 

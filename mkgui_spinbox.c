@@ -76,7 +76,9 @@ static void render_spinbox(struct mkgui_ctx *ctx, uint32_t idx) {
 
 	uint32_t disabled = (w->flags & MKGUI_DISABLED);
 	uint32_t focused = (ctx->focus_id == w->id);
-	draw_patch(ctx, MKGUI_STYLE_SUNKEN, rx, ry, rw, rh, ctx->theme.input_bg, focused ? ctx->theme.highlight : ctx->theme.widget_border);
+	uint32_t input_bg = disabled_blend(ctx->theme.input_bg, ctx->theme.bg, disabled);
+	uint32_t border_color = disabled_blend(focused ? ctx->theme.highlight : ctx->theme.widget_border, ctx->theme.bg, disabled);
+	draw_patch(ctx, MKGUI_STYLE_SUNKEN, rx, ry, rw, rh, input_bg, border_color);
 
 	int32_t btn_w = sc(ctx, 20);
 	int32_t text_pad = sc(ctx, 4);
@@ -123,8 +125,10 @@ static void render_spinbox(struct mkgui_ctx *ctx, uint32_t idx) {
 	int32_t half = rh / 2;
 	int32_t hover_btn = (!disabled && ctx->hover_id == w->id && sd) ? sd->hover_btn : 0;
 
+	uint32_t btn_border = disabled_blend(ctx->theme.widget_border, ctx->theme.bg, disabled);
 	uint32_t up_bg = (hover_btn == 1) ? ctx->theme.widget_hover : ctx->theme.widget_bg;
-	draw_patch(ctx, MKGUI_STYLE_RAISED, bx, ry, btn_w, half, up_bg, ctx->theme.widget_border);
+	up_bg = disabled_blend(up_bg, ctx->theme.bg, disabled);
+	draw_patch(ctx, MKGUI_STYLE_RAISED, bx, ry, btn_w, half, up_bg, btn_border);
 
 	int32_t as = sc(ctx, 3);
 	int32_t acx = bx + btn_w / 2;
@@ -132,7 +136,8 @@ static void render_spinbox(struct mkgui_ctx *ctx, uint32_t idx) {
 	draw_triangle_aa(ctx->pixels, ctx->win_w, ctx->win_h, acx, acy - as / 2, acx - as, acy + as / 2, acx + as, acy + as / 2, tc);
 
 	uint32_t dn_bg = (hover_btn == -1) ? ctx->theme.widget_hover : ctx->theme.widget_bg;
-	draw_patch(ctx, MKGUI_STYLE_RAISED, bx, ry + half, btn_w, rh - half, dn_bg, ctx->theme.widget_border);
+	dn_bg = disabled_blend(dn_bg, ctx->theme.bg, disabled);
+	draw_patch(ctx, MKGUI_STYLE_RAISED, bx, ry + half, btn_w, rh - half, dn_bg, btn_border);
 
 	int32_t acy2 = ry + half + (rh - half) / 2;
 	draw_triangle_aa(ctx->pixels, ctx->win_w, ctx->win_h, acx - as, acy2 - as / 2, acx + as, acy2 - as / 2, acx, acy2 + as / 2, tc);

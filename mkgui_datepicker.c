@@ -70,14 +70,16 @@ static void render_datepicker(struct mkgui_ctx *ctx, uint32_t idx) {
 
 	uint32_t disabled = (w->flags & MKGUI_DISABLED);
 	uint32_t focused = (ctx->focus_id == w->id);
-	uint32_t border = focused ? ctx->theme.highlight : ctx->theme.widget_border;
+	uint32_t border = disabled_blend(focused ? ctx->theme.highlight : ctx->theme.widget_border, ctx->theme.bg, disabled);
+	uint32_t input_bg = disabled_blend(ctx->theme.input_bg, ctx->theme.bg, disabled);
 
 	int32_t btn_w = sc(ctx, DATEPICKER_BTN_W_PX);
 	int32_t text_w = rw - btn_w;
-	draw_patch(ctx, MKGUI_STYLE_SUNKEN, rx, ry, text_w, rh, ctx->theme.input_bg, border);
+	draw_patch(ctx, MKGUI_STYLE_SUNKEN, rx, ry, text_w, rh, input_bg, border);
 
 	uint32_t hovered = (!disabled && ctx->hover_id == w->id);
 	uint32_t btn_bg = hovered ? ctx->theme.widget_hover : ctx->theme.widget_bg;
+	btn_bg = disabled_blend(btn_bg, ctx->theme.bg, disabled);
 	draw_patch(ctx, MKGUI_STYLE_RAISED, rx + text_w, ry, btn_w, rh, btn_bg, border);
 
 	struct mkgui_datepicker_data *dp = find_datepicker_data(ctx, w->id);
