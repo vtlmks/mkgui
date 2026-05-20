@@ -1,9 +1,14 @@
 // Copyright (c) 2026, Peter Fors
 // SPDX-License-Identifier: MIT
 
+#ifndef _POSIX_C_SOURCE
+#define _POSIX_C_SOURCE 200809L
+#endif
+
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <time.h>
 #include "mkgui.h"
 
 #ifdef _WIN32
@@ -65,6 +70,8 @@ enum {
 	/* Tree / Text tab */
 	ID_TREE_SPLIT, ID_TREE_LVBOX, ID_TREE_LBL, ID_TREEVIEW1,
 	ID_TREE_RVBOX, ID_TEXT_LBL, ID_TEXTAREA1,
+	ID_LOG_LBL, ID_LOGVIEW1,
+	ID_LOG_BTN_HBOX, ID_LOG_BTN_10K, ID_LOG_BTN_100K, ID_LOG_BTN_CLEAR, ID_LOG_TIME_LBL,
 
 	/* Data Views tab */
 	ID_DATA_SPLIT,
@@ -398,6 +405,39 @@ static void demo_gl_timer(struct mkgui_ctx *ctx, uint32_t timer_id, void *userda
 	demo_gl_render(ctx, (struct demo_state *)userdata);
 }
 
+// [=]===^=[ demo_logview_stress ]==================================[=]
+// Pump n lines through the logview while timing the append phase. The result
+// is written to a label so the user sees the per-line cost without having to
+// look at stdout. Some lines carry ANSI colour markers so the parser runs in
+// the hot path; others are plain to balance the mix.
+static void demo_logview_stress(struct mkgui_ctx *ctx, uint32_t n) {
+	struct timespec t0, t1;
+	clock_gettime(CLOCK_MONOTONIC, &t0);
+	char line[160];
+	for(uint32_t i = 0; i < n; ++i) {
+		uint32_t kind = i & 3;
+		if(kind == 0) {
+			snprintf(line, sizeof(line), "\x1b[32m[INFO]\x1b[0m line %u of %u, lorem ipsum dolor sit amet\n", i, n);
+
+		} else if(kind == 1) {
+			snprintf(line, sizeof(line), "\x1b[33m[WARN]\x1b[0m line %u of %u, mostly harmless yellow output\n", i, n);
+
+		} else if(kind == 2) {
+			snprintf(line, sizeof(line), "\x1b[31m[ERR ]\x1b[0m line %u of %u, red lines have negative drama\n", i, n);
+
+		} else {
+			snprintf(line, sizeof(line), "plain line %u of %u, no ANSI, just text and some words\n", i, n);
+		}
+		mkgui_logview_append(ctx, ID_LOGVIEW1, line);
+	}
+	clock_gettime(CLOCK_MONOTONIC, &t1);
+	double elapsed_ms = (double)(t1.tv_sec - t0.tv_sec) * 1000.0 + (double)(t1.tv_nsec - t0.tv_nsec) / 1.0e6;
+	double per_line_us = elapsed_ms * 1000.0 / (double)n;
+	char buf[128];
+	snprintf(buf, sizeof(buf), "appended %u in %.1f ms (%.2f us/line)", n, elapsed_ms, per_line_us);
+	mkgui_label_set(ctx, ID_LOG_TIME_LBL, buf);
+}
+
 // [=]===^=[ demo_event ]==========================================[=]
 static void demo_event(struct mkgui_ctx *ctx, struct mkgui_event *ev, void *userdata) {
 	(void)userdata;
@@ -458,6 +498,16 @@ static void demo_event(struct mkgui_ctx *ctx, struct mkgui_event *ev, void *user
 
 			} else if(ev->id == ID_IV_DETAIL) {
 				mkgui_itemview_set_view(ctx, ID_ITEMVIEW1, MKGUI_VIEW_DETAIL);
+
+			} else if(ev->id == ID_LOG_BTN_10K) {
+				demo_logview_stress(ctx, 10000);
+
+			} else if(ev->id == ID_LOG_BTN_100K) {
+				demo_logview_stress(ctx, 100000);
+
+			} else if(ev->id == ID_LOG_BTN_CLEAR) {
+				mkgui_logview_clear(ctx, ID_LOGVIEW1);
+				mkgui_label_set(ctx, ID_LOG_TIME_LBL, "");
 			}
 		} break;
 
@@ -739,6 +789,13 @@ int main(void) {
 		MKGUI_W(MKGUI_VBOX,     ID_TREE_RVBOX,"",                  "", ID_TREE_SPLIT, 0, 0, MKGUI_REGION_RIGHT, 0, 0),
 		MKGUI_W(MKGUI_LABEL,    ID_TEXT_LBL,  "Notes:",            "", ID_TREE_RVBOX, 0, 20, MKGUI_FIXED, 0, 0),
 		MKGUI_W(MKGUI_TEXTAREA, ID_TEXTAREA1, "",                  "", ID_TREE_RVBOX, 0, 0, 0, 0, 1),
+		MKGUI_W(MKGUI_LABEL,    ID_LOG_LBL,   "Log:",              "", ID_TREE_RVBOX, 0, 20, MKGUI_FIXED, 0, 0),
+		MKGUI_W(MKGUI_LOGVIEW,  ID_LOGVIEW1,  "",                  "", ID_TREE_RVBOX, 0, 0, 0, 0, 1),
+		MKGUI_W(MKGUI_HBOX,     ID_LOG_BTN_HBOX, "",               "", ID_TREE_RVBOX, 0, 26, MKGUI_FIXED, 0, 0),
+		MKGUI_W(MKGUI_BUTTON,   ID_LOG_BTN_10K,  "Spam 10k",       "", ID_LOG_BTN_HBOX, 0, 0, 0, 0, 1),
+		MKGUI_W(MKGUI_BUTTON,   ID_LOG_BTN_100K, "Spam 100k",      "", ID_LOG_BTN_HBOX, 0, 0, 0, 0, 1),
+		MKGUI_W(MKGUI_BUTTON,   ID_LOG_BTN_CLEAR,"Clear",          "", ID_LOG_BTN_HBOX, 0, 0, 0, 0, 1),
+		MKGUI_W(MKGUI_LABEL,    ID_LOG_TIME_LBL, "",               "", ID_LOG_BTN_HBOX, 0, 0, 0, 0, 2),
 
 		/* ---- Data Views tab ---- */
 		MKGUI_W(MKGUI_VSPLIT,   ID_DATA_SPLIT,"",                  "", ID_TAB_DATA, 0, 0, 0, 0, 0),
@@ -894,6 +951,13 @@ int main(void) {
 	mkgui_set_treenode_icon(ctx, ID_TREEVIEW1, 11, "file-document");
 
 	mkgui_textarea_set(ctx, ID_TEXTAREA1, "Type your notes here.\nLine 2.\nLine 3.");
+
+	mkgui_logview_setup(ctx, ID_LOGVIEW1, 10000, 256 * 1024);
+	mkgui_logview_append(ctx, ID_LOGVIEW1, "\x1b[32m[INFO]\x1b[0m mkgui demo started\n");
+	mkgui_logview_append(ctx, ID_LOGVIEW1, "\x1b[33m[WARN]\x1b[0m this is a sample warning message\n");
+	mkgui_logview_append(ctx, ID_LOGVIEW1, "\x1b[31m[ERROR]\x1b[0m red error line, ANSI escapes are parsed inline\n");
+	mkgui_logview_append(ctx, ID_LOGVIEW1, "\x1b[36m[DEBUG]\x1b[0m cyan debug, \x1b[1m\x1b[35mbold magenta\x1b[0m, default colour again\n");
+	mkgui_logview_append(ctx, ID_LOGVIEW1, "Plain line with no ANSI; word wrap will reflow this if the widget is narrow enough to need it.\n");
 
 	/* Layout tab setup */
 	const char *form_cats[] = { "General", "Support", "Sales", "Billing" };

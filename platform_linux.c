@@ -396,9 +396,25 @@ static void platform_resize_window(struct mkgui_ctx *ctx, int32_t w, int32_t h) 
 }
 
 // [=]===^=[ platform_move_window ]=================================[=]
+// XMoveWindow is a hint that travels through the WM asynchronously; the
+// server's reported position doesn't update until the WM has finished its
+// reparenting / placement work. Poll briefly for the position to catch up so
+// a callsite that follows with mkgui_window_get_position observes the move.
 static void platform_move_window(struct mkgui_ctx *ctx, int32_t x, int32_t y) {
 	XMoveWindow(ctx->plat.dpy, ctx->plat.win, x, y);
 	XFlush(ctx->plat.dpy);
+	XSync(ctx->plat.dpy, False);
+	for(uint32_t i = 0; i < 40; ++i) {
+		int32_t cx, cy;
+		Window child;
+		XTranslateCoordinates(ctx->plat.dpy, ctx->plat.win, ctx->plat.root, 0, 0, &cx, &cy, &child);
+		if(cx == x && cy == y) {
+			break;
+		}
+		struct timespec ts = { 0, 5 * 1000 * 1000 };
+		nanosleep(&ts, NULL);
+		XSync(ctx->plat.dpy, False);
+	}
 }
 
 // [=]===^=[ platform_get_window_position ]=========================[=]

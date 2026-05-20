@@ -143,6 +143,7 @@ static struct ed_palette_entry ed_widgets[] = {
 	{ "ItemView",   MKGUI_ITEMVIEW },
 	{ "Label",      MKGUI_LABEL },
 	{ "Listview",   MKGUI_LISTVIEW },
+	{ "Logview",    MKGUI_LOGVIEW },
 	{ "Meter",      MKGUI_METER },
 	{ "Pathbar",    MKGUI_PATHBAR },
 	{ "Progress",   MKGUI_PROGRESS },
@@ -199,6 +200,7 @@ static struct ed_type_event_map ed_type_events[] = {
 	{ MKGUI_TABS,      { MKGUI_EVENT_TAB_CHANGED, MKGUI_EVENT_TAB_CLOSE, MKGUI_EVENT_CONTEXT, MKGUI_EVENT_FOCUS, MKGUI_EVENT_UNFOCUS, MKGUI_EVENT_HOVER_ENTER, MKGUI_EVENT_HOVER_LEAVE, MKGUI_EVENT_KEY }, 8 },
 	{ MKGUI_RADIO,     { MKGUI_EVENT_RADIO_CHANGED, MKGUI_EVENT_CONTEXT, MKGUI_EVENT_FOCUS, MKGUI_EVENT_UNFOCUS, MKGUI_EVENT_HOVER_ENTER, MKGUI_EVENT_HOVER_LEAVE, MKGUI_EVENT_KEY }, 7 },
 	{ MKGUI_TEXTAREA,  { MKGUI_EVENT_TEXTAREA_CHANGED, MKGUI_EVENT_TEXTAREA_CURSOR, MKGUI_EVENT_CONTEXT, MKGUI_EVENT_FOCUS, MKGUI_EVENT_UNFOCUS, MKGUI_EVENT_HOVER_ENTER, MKGUI_EVENT_HOVER_LEAVE, MKGUI_EVENT_KEY }, 8 },
+	{ MKGUI_LOGVIEW,   { MKGUI_EVENT_LOGVIEW_LINE_CLICKED, MKGUI_EVENT_CONTEXT, MKGUI_EVENT_FOCUS, MKGUI_EVENT_UNFOCUS, MKGUI_EVENT_HOVER_ENTER, MKGUI_EVENT_HOVER_LEAVE, MKGUI_EVENT_KEY }, 7 },
 	{ MKGUI_SPINBOX,   { MKGUI_EVENT_SPINBOX_CHANGED, MKGUI_EVENT_CONTEXT, MKGUI_EVENT_FOCUS, MKGUI_EVENT_UNFOCUS, MKGUI_EVENT_HOVER_ENTER, MKGUI_EVENT_HOVER_LEAVE, MKGUI_EVENT_KEY }, 7 },
 	{ MKGUI_SCROLLBAR, { MKGUI_EVENT_SCROLL, MKGUI_EVENT_CONTEXT, MKGUI_EVENT_FOCUS, MKGUI_EVENT_UNFOCUS, MKGUI_EVENT_HOVER_ENTER, MKGUI_EVENT_HOVER_LEAVE, MKGUI_EVENT_KEY }, 7 },
 	{ MKGUI_IPINPUT,   { MKGUI_EVENT_IPINPUT_CHANGED, MKGUI_EVENT_CONTEXT, MKGUI_EVENT_FOCUS, MKGUI_EVENT_UNFOCUS, MKGUI_EVENT_HOVER_ENTER, MKGUI_EVENT_HOVER_LEAVE, MKGUI_EVENT_KEY }, 7 },
@@ -288,6 +290,7 @@ static char *ed_event_name(uint32_t event_type) {
 		case MKGUI_EVENT_CANVAS_PRESS:       { return "CANVAS_PRESS"; }
 		case MKGUI_EVENT_CANVAS_RELEASE:     { return "CANVAS_RELEASE"; }
 		case MKGUI_EVENT_CANVAS_MOTION:      { return "CANVAS_MOTION"; }
+		case MKGUI_EVENT_LOGVIEW_LINE_CLICKED:{ return "LOGVIEW_LINE_CLICKED"; }
 		default:                             { return "UNKNOWN"; }
 	}
 }
@@ -321,6 +324,7 @@ static uint32_t ed_event_from_name(char *name) {
 		{ "RADIO_CHANGED",      MKGUI_EVENT_RADIO_CHANGED },
 		{ "TEXTAREA_CHANGED",   MKGUI_EVENT_TEXTAREA_CHANGED },
 		{ "TEXTAREA_CURSOR",    MKGUI_EVENT_TEXTAREA_CURSOR },
+		{ "LOGVIEW_LINE_CLICKED", MKGUI_EVENT_LOGVIEW_LINE_CLICKED },
 		{ "CLOSE",              MKGUI_EVENT_CLOSE },
 		{ "RESIZE",             MKGUI_EVENT_RESIZE },
 		{ "ITEMVIEW_SELECT",    MKGUI_EVENT_ITEMVIEW_SELECT },
@@ -716,6 +720,7 @@ static struct ed_help_entry ed_help[] = {
 	{ MKGUI_SPINNER,   "Animated spinning arc. Place it as a loading indicator. Animates automatically when visible, zero CPU when hidden." },
 	{ MKGUI_STATUSBAR, "Status bar with multiple sections. Set section widths (positive=fixed, negative=flex) and text per section." },
 	{ MKGUI_TEXTAREA,  "Multi-line text editor. Supports clipboard, selection, and scrolling. READONLY flag disables editing." },
+	{ MKGUI_LOGVIEW,   "Append-only scrolling log view with ANSI color parsing, word wrap, and selection. Configure capacity with mkgui_logview_setup() before appending. NOWRAP flag disables wrapping." },
 	{ MKGUI_TREEVIEW,  "Hierarchical tree with expand/collapse. Supports drag-and-drop reordering of nodes." },
 	{ MKGUI_FORM,      "Two-column form layout. Children are paired: label on the left, control on the right. Label column auto-sizes." },
 	{ MKGUI_GROUP,     "Bordered container with a title label. Children are inset inside the frame. Useful for grouping related controls." },
@@ -1431,6 +1436,7 @@ static void ed_gen_id_name(struct ed_widget *w) {
 		case MKGUI_PROGRESS:   { prefix = "ID_PROGRESS"; } break;
 		case MKGUI_METER:      { prefix = "ID_METER"; } break;
 		case MKGUI_TEXTAREA:   { prefix = "ID_TEXTAREA"; } break;
+		case MKGUI_LOGVIEW:    { prefix = "ID_LOGVIEW"; } break;
 		case MKGUI_SPINBOX:    { prefix = "ID_SPINBOX"; } break;
 		case MKGUI_GROUP:      { prefix = "ID_GROUP"; } break;
 		case MKGUI_SPINNER:    { prefix = "ID_SPINNER"; } break;
@@ -1604,6 +1610,11 @@ static int32_t ed_add_widget(uint32_t type, int32_t x, int32_t y) {
 		case MKGUI_TEXTAREA: {
 			w->w = 200;
 			w->h = 100;
+		} break;
+
+		case MKGUI_LOGVIEW: {
+			w->w = 320;
+			w->h = 200;
 		} break;
 
 		case MKGUI_SPINBOX: {
@@ -2259,6 +2270,12 @@ static void ed_draw_widget_fallback(struct mkgui_ctx *ctx, uint32_t idx) {
 				int32_t ty = ry + 2;
 				push_text_clip(rx + 4, ty, ew->label, ctx->theme.text_disabled, rx + 1, ry + 1, rx + rw - 1, ry + rh - 1);
 			}
+		} break;
+
+		case MKGUI_LOGVIEW: {
+			draw_patch(ctx, MKGUI_STYLE_SUNKEN, rx, ry, rw, rh, ctx->theme.input_bg, ctx->theme.widget_border);
+			int32_t ty = ry + (rh - ctx->font_height) / 2;
+			push_text_clip(rx + 4, ty, ew->label[0] ? ew->label : "LogView", ctx->theme.text_disabled, rx + 1, ry + 1, rx + rw - 1, ry + rh - 1);
 		} break;
 
 		case MKGUI_ITEMVIEW: {
@@ -3525,6 +3542,7 @@ static char *ed_type_name_upper(uint32_t type) {
 		case MKGUI_PROGRESS:   { return "MKGUI_PROGRESS"; }
 		case MKGUI_METER:      { return "MKGUI_METER"; }
 		case MKGUI_TEXTAREA:   { return "MKGUI_TEXTAREA"; }
+		case MKGUI_LOGVIEW:    { return "MKGUI_LOGVIEW"; }
 		case MKGUI_GROUP:      { return "MKGUI_GROUP"; }
 		case MKGUI_SPINNER:    { return "MKGUI_SPINNER"; }
 		case MKGUI_ITEMVIEW:   { return "MKGUI_ITEMVIEW"; }
@@ -3629,6 +3647,9 @@ static char *ed_style_to_str(uint32_t style, uint32_t widget_type, char *buf, ui
 		{ MKGUI_INPUT_READONLY,      "MKGUI_INPUT_READONLY" },
 		{ MKGUI_INPUT_NUMERIC,       "MKGUI_INPUT_NUMERIC" },
 	};
+	static struct ed_bit_name bits_logview[] = {
+		{ MKGUI_LOGVIEW_NOWRAP,      "MKGUI_LOGVIEW_NOWRAP" },
+	};
 	static struct ed_bit_name bits_menuitem[] = {
 		{ MKGUI_MENUITEM_SEPARATOR,  "MKGUI_MENUITEM_SEPARATOR" },
 		{ MKGUI_MENUITEM_CHECK,      "MKGUI_MENUITEM_CHECK" },
@@ -3692,6 +3713,11 @@ static char *ed_style_to_str(uint32_t style, uint32_t widget_type, char *buf, ui
 		case MKGUI_TEXTAREA: {
 			bits = bits_input;
 			bits_count = sizeof(bits_input) / sizeof(bits_input[0]);
+		} break;
+
+		case MKGUI_LOGVIEW: {
+			bits = bits_logview;
+			bits_count = sizeof(bits_logview) / sizeof(bits_logview[0]);
 		} break;
 
 		case MKGUI_MENUITEM: {

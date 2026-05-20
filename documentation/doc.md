@@ -279,6 +279,12 @@ Each widget type has its own private flag namespace inside the `style` field, st
 | `MKGUI_TEXTAREA_READONLY` | Not editable |
 | `MKGUI_DATEPICKER_READONLY` | Not editable |
 
+**Logview:**
+
+| Flag | Description |
+|------|-------------|
+| `MKGUI_LOGVIEW_NOWRAP` | Disable word wrap; long lines clip at the right edge |
+
 **Label:**
 
 | Flag | Description |
@@ -410,6 +416,7 @@ struct mkgui_event {
 | `MKGUI_EVENT_SLIDER_END` | Slider drag ended | final value | -- |
 | `MKGUI_EVENT_TREEVIEW_DBLCLICK` | Tree node double-clicked | node id | -- |
 | `MKGUI_EVENT_TEXTAREA_CURSOR` | Textarea cursor moved | cursor position | -- |
+| `MKGUI_EVENT_LOGVIEW_LINE_CLICKED` | Line in a logview clicked | source line index (sequence number, 0-based) | -- |
 | `MKGUI_EVENT_DRAG_START` | DnD drag started | source id/row | -- |
 | `MKGUI_EVENT_DRAG_END` | DnD drag cancelled | -- | -- |
 | `MKGUI_EVENT_TREEVIEW_MOVE` | Tree node moved via DnD | source node id | target node id |
@@ -1216,6 +1223,38 @@ void mkgui_textarea_scroll_to_end(struct mkgui_ctx *ctx, uint32_t id);
 Supports Ctrl+C (copy) and Ctrl+V (paste). Uses the system clipboard (X11 CLIPBOARD selection / Win32 clipboard).
 
 `textarea_set_readonly` / `textarea_get_readonly` toggle the `MKGUI_TEXTAREA_READONLY` flag at runtime. Cursor position is returned as line/col (0-based). Selection start/end are byte offsets. `textarea_insert` inserts text at the cursor (replacing any selection). `textarea_append` appends to the end without moving the cursor. `textarea_scroll_to_end` scrolls to the bottom -- useful for log views. Text is stored as UTF-8. Cursor navigation (left/right, backspace, delete) is UTF-8 aware -- multi-byte characters are treated as single units.
+
+### Logview
+
+Append-only scrolling log widget with ANSI color parsing, optional word wrap, and selection. Designed for streaming program/process output where the textarea widget would be the wrong tool (textarea is for small editable notes, not large or growing buffers).
+
+```c
+void mkgui_logview_setup(struct mkgui_ctx *ctx, uint32_t id, uint32_t max_lines, uint32_t arena_bytes);
+void mkgui_logview_append(struct mkgui_ctx *ctx, uint32_t id, const char *text);
+void mkgui_logview_append_n(struct mkgui_ctx *ctx, uint32_t id, const char *text, uint32_t len);
+void mkgui_logview_clear(struct mkgui_ctx *ctx, uint32_t id);
+uint32_t mkgui_logview_get_line_count(struct mkgui_ctx *ctx, uint32_t id);
+void mkgui_logview_scroll_to_end(struct mkgui_ctx *ctx, uint32_t id);
+uint32_t mkgui_logview_is_at_end(struct mkgui_ctx *ctx, uint32_t id);
+uint32_t mkgui_logview_get_selection_text(struct mkgui_ctx *ctx, uint32_t id, char *out, uint32_t out_size);
+```
+
+`mkgui_logview_setup` is required before any append; it sizes the backing storage and is the only place that allocates. There is no default capacity -- the caller picks `max_lines` (oldest evicts when the ring fills) and `arena_bytes` (oldest lines also evict when their bytes get overwritten). Calling setup again reconfigures and clears the widget. Typical sizes: 10000 lines with a 256 KB text arena for verbose program output; smaller for embedded uses.
+
+`append` / `append_n` stream raw text through an inline ANSI parser:
+
+- `ESC[<n>m` SGR sequences: color reset (0), bold (1) / normal intensity (22), foreground 30-37 / 38;5;N / 38;2;R;G;B / 39, background 40-47 / 48;5;N / 48;2;R;G;B / 49, bright foreground 90-97, bright background 100-107.
+- `ESC[...` other CSI sequences (cursor moves, erase) are silently stripped.
+- `ESC]...BEL` (OSC, e.g. terminal title) are silently stripped.
+- `\r` is dropped; `\n` commits the line. Other control bytes below 0x20 are stripped except `\t`.
+
+The standard "Tango" 16-color palette is used for ANSI named colors. ANSI parser state (current fg/bg, half-parsed escape) persists across appends, so multi-call streaming works as expected.
+
+`scroll_to_end` snaps to the bottom and re-arms the stick-to-end auto-follow. The view auto-follows new appends only when the user was already at the bottom; if they scrolled up to read history, new lines won't yank the view. `is_at_end` reports whether the auto-follow is currently armed.
+
+Selection: click-drag selects text in source-line/byte-offset space (so a window resize doesn't break a selection by reflowing wrap). Ctrl+A selects all. Ctrl+C copies the selection to the system clipboard. `mkgui_logview_get_selection_text` returns the selected text into a caller-provided buffer (lines are joined with `\n`), returning the number of bytes written (excluding the terminator).
+
+Style flag `MKGUI_LOGVIEW_NOWRAP` disables word wrap; long lines clip at the right edge.
 
 ### Statusbar
 

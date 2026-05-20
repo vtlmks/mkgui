@@ -386,6 +386,73 @@ struct mkgui_textarea_data {
 };
 
 
+struct mkgui_logview_line {
+	uint64_t arena_off;
+	uint32_t len;
+	uint64_t runs_off;
+	uint32_t runs_count;
+};
+
+struct mkgui_logview_run {
+	uint32_t start;
+	uint32_t fg;
+	uint32_t bg;
+};
+
+struct mkgui_logview_vline {
+	uint64_t line_seq;
+	uint32_t src_off;
+	uint32_t len;
+};
+
+struct mkgui_logview_data {
+	uint32_t widget_id;
+
+	uint32_t max_lines;
+	uint32_t arena_bytes;
+	uint32_t max_runs;
+
+	char *text_arena;
+	uint64_t arena_head;
+
+	struct mkgui_logview_line *lines;
+	uint64_t line_seq_head;
+	uint64_t line_seq_tail;
+
+	struct mkgui_logview_run *runs;
+	uint64_t runs_head;
+
+	uint32_t cur_fg;
+	uint32_t cur_bg;
+	uint32_t esc_state;
+	char esc_buf[64];
+	uint32_t esc_len;
+
+	char *pending_text;
+	uint32_t pending_len;
+	uint32_t pending_cap;
+	struct mkgui_logview_run *pending_runs;
+	uint32_t pending_runs_count;
+	uint32_t pending_runs_cap;
+
+	struct mkgui_logview_vline *vlines;
+	uint32_t vline_count;
+	uint32_t vline_cap;
+	uint64_t vline_seq_tail;
+	int32_t cached_width;
+	int32_t cached_row_h;
+
+	int32_t scroll_y;
+	int32_t scroll_x;
+	uint32_t stuck_to_end;
+
+	uint32_t has_selection;
+	uint64_t sel_anchor_line_seq;
+	uint32_t sel_anchor_off;
+	uint64_t sel_cursor_line_seq;
+	uint32_t sel_cursor_off;
+};
+
 struct mkgui_itemview_data {
 	uint32_t widget_id;
 	uint32_t item_count;
@@ -651,6 +718,8 @@ struct mkgui_ctx {
 	uint32_t meter_count, meter_cap;
 	struct mkgui_textarea_data *textareas;
 	uint32_t textarea_count, textarea_cap;
+	struct mkgui_logview_data *logviews;
+	uint32_t logview_count, logview_cap;
 	struct mkgui_itemview_data *itemviews;
 	uint32_t itemview_count, itemview_cap;
 	struct mkgui_scrollbar_data *scrollbars;
@@ -1209,6 +1278,7 @@ MKGUI_FIND_AUX(find_spinbox_data,    mkgui_spinbox_data,    spinboxes,   spinbox
 MKGUI_FIND_AUX(find_progress_data,   mkgui_progress_data,   progress,    progress_count)
 MKGUI_FIND_AUX(find_meter_data,     mkgui_meter_data,      meters,      meter_count)
 MKGUI_FIND_AUX(find_textarea_data,   mkgui_textarea_data,   textareas,   textarea_count)
+MKGUI_FIND_AUX(find_logview_data,    mkgui_logview_data,    logviews,    logview_count)
 MKGUI_FIND_AUX(find_itemview_data,   mkgui_itemview_data,   itemviews,   itemview_count)
 MKGUI_FIND_AUX(find_canvas_data,     mkgui_canvas_data,     canvases,    canvas_count)
 MKGUI_FIND_AUX(find_pathbar_data,    mkgui_pathbar_data,    pathbars,    pathbar_count)
@@ -1320,6 +1390,7 @@ static uint32_t is_focusable(struct mkgui_widget *w) {
 		case MKGUI_SPINBOX:
 		case MKGUI_RADIO:
 		case MKGUI_TEXTAREA:
+		case MKGUI_LOGVIEW:
 		case MKGUI_ITEMVIEW:
 		case MKGUI_TABS:
 		case MKGUI_PATHBAR:
@@ -1716,7 +1787,8 @@ static int32_t natural_height(struct mkgui_ctx *ctx, uint32_t widget_type) {
 		case MKGUI_RICHLIST:
 		case MKGUI_TREEVIEW:
 		case MKGUI_ITEMVIEW:
-		case MKGUI_TEXTAREA: {
+		case MKGUI_TEXTAREA:
+		case MKGUI_LOGVIEW: {
 			return ctx->row_height * 3;
 		}
 
@@ -2916,6 +2988,7 @@ plutovg_surface_t *plutovg_surface_load_from_image_data(const void *d, int l) { 
 #include "mkgui_progress.c"
 #include "mkgui_meter.c"
 #include "mkgui_textarea.c"
+#include "mkgui_logview.c"
 #include "mkgui_group.c"
 #include "mkgui_panel.c"
 #include "mkgui_spacer.c"
@@ -3020,6 +3093,10 @@ static void render_widget(struct mkgui_ctx *ctx, uint32_t idx) {
 
 		case MKGUI_TEXTAREA: {
 			render_textarea(ctx, idx);
+		} break;
+
+		case MKGUI_LOGVIEW: {
+			render_logview(ctx, idx);
 		} break;
 
 		case MKGUI_GROUP: {
@@ -3464,6 +3541,17 @@ static void init_widget_aux(struct mkgui_ctx *ctx, struct mkgui_widget *w) {
 			}
 		} break;
 
+		case MKGUI_LOGVIEW: {
+			MKGUI_AUX_GROW(ctx->logviews, ctx->logview_count, ctx->logview_cap, struct mkgui_logview_data);
+			if(ctx->logview_count < ctx->logview_cap) {
+				struct mkgui_logview_data *lv = &ctx->logviews[ctx->logview_count++];
+				memset(lv, 0, sizeof(*lv));
+				lv->widget_id = w->id;
+				lv->cached_width = -1;
+				lv->stuck_to_end = 1;
+			}
+		} break;
+
 		case MKGUI_ITEMVIEW: {
 			MKGUI_AUX_GROW(ctx->itemviews, ctx->itemview_count, ctx->itemview_cap, struct mkgui_itemview_data);
 			if(ctx->itemview_count < ctx->itemview_cap) {
@@ -3792,6 +3880,25 @@ static void mkgui_remove_aux_(struct mkgui_ctx *ctx, uint32_t id, uint32_t type)
 			}
 		} break;
 
+		case MKGUI_LOGVIEW: {
+			for(uint32_t i = 0; i < ctx->logview_count; ++i) {
+				if(ctx->logviews[i].widget_id == id) {
+					struct mkgui_logview_data *lv = &ctx->logviews[i];
+					free(lv->text_arena);
+					free(lv->lines);
+					free(lv->runs);
+					free(lv->pending_text);
+					free(lv->pending_runs);
+					free(lv->vlines);
+					if(i < ctx->logview_count - 1) {
+						ctx->logviews[i] = ctx->logviews[ctx->logview_count - 1];
+					}
+					--ctx->logview_count;
+					break;
+				}
+			}
+		} break;
+
 		case MKGUI_ITEMVIEW: {
 			for(uint32_t i = 0; i < ctx->itemview_count; ++i) {
 				if(ctx->itemviews[i].widget_id == id) {
@@ -4071,6 +4178,8 @@ static uint32_t mkgui_alloc_arrays(struct mkgui_ctx *ctx, uint32_t widget_cap) {
 	ctx->meters = (struct mkgui_meter_data *)calloc(ctx->meter_cap, sizeof(struct mkgui_meter_data));
 	ctx->textarea_cap = 16;
 	ctx->textareas = (struct mkgui_textarea_data *)calloc(ctx->textarea_cap, sizeof(struct mkgui_textarea_data));
+	ctx->logview_cap = 8;
+	ctx->logviews = (struct mkgui_logview_data *)calloc(ctx->logview_cap, sizeof(struct mkgui_logview_data));
 	ctx->itemview_cap = 16;
 	ctx->itemviews = (struct mkgui_itemview_data *)calloc(ctx->itemview_cap, sizeof(struct mkgui_itemview_data));
 	ctx->scrollbar_cap = 32;
@@ -4118,6 +4227,7 @@ static void mkgui_free_arrays(struct mkgui_ctx *ctx) {
 	free(ctx->progress);
 	free(ctx->meters);
 	free(ctx->textareas);
+	free(ctx->logviews);
 	free(ctx->itemviews);
 	free(ctx->scrollbars);
 	free(ctx->box_scrolls);
@@ -4544,6 +4654,14 @@ MKGUI_API void mkgui_destroy(struct mkgui_ctx *ctx) {
 		textarea_undo_free(&ctx->textareas[i]);
 		free(ctx->textareas[i].text);
 	}
+	for(uint32_t i = 0; i < ctx->logview_count; ++i) {
+		free(ctx->logviews[i].text_arena);
+		free(ctx->logviews[i].lines);
+		free(ctx->logviews[i].runs);
+		free(ctx->logviews[i].pending_text);
+		free(ctx->logviews[i].pending_runs);
+		free(ctx->logviews[i].vlines);
+	}
 	for(uint32_t i = 0; i < ctx->itemview_count; ++i) {
 		free(ctx->itemviews[i].thumb_buf);
 	}
@@ -4669,6 +4787,14 @@ MKGUI_API void mkgui_destroy_child(struct mkgui_ctx *ctx) {
 	for(uint32_t i = 0; i < ctx->textarea_count; ++i) {
 		textarea_undo_free(&ctx->textareas[i]);
 		free(ctx->textareas[i].text);
+	}
+	for(uint32_t i = 0; i < ctx->logview_count; ++i) {
+		free(ctx->logviews[i].text_arena);
+		free(ctx->logviews[i].lines);
+		free(ctx->logviews[i].runs);
+		free(ctx->logviews[i].pending_text);
+		free(ctx->logviews[i].pending_runs);
+		free(ctx->logviews[i].vlines);
 	}
 	for(uint32_t i = 0; i < ctx->itemview_count; ++i) {
 		free(ctx->itemviews[i].thumb_buf);
@@ -5015,6 +5141,37 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 							dirty_widget(ctx, (uint32_t)dsi);
 						}
 
+					} else if(dsi >= 0 && ctx->widgets[dsi].type == MKGUI_LOGVIEW) {
+						struct mkgui_logview_data *lv = find_logview_data(ctx, ctx->drag_select_id);
+						if(lv) {
+							int32_t ry = ctx->rects[dsi].y;
+							int32_t rh = ctx->rects[dsi].h;
+							int32_t view_h = rh - 2;
+							int32_t content_h = logview_total_content_h(ctx, lv);
+							if(ctx->mouse_y < ry + 1) {
+								lv->scroll_y -= ctx->row_height;
+								logview_clamp_scroll(lv, content_h, view_h);
+
+							} else if(ctx->mouse_y > ry + rh - 1) {
+								lv->scroll_y += ctx->row_height;
+								logview_clamp_scroll(lv, content_h, view_h);
+							}
+							uint32_t vline, off;
+							logview_hit_vline(ctx, lv, ctx->rects[dsi].x, ctx->rects[dsi].y, ctx->mouse_y, ctx->mouse_x, &vline, &off);
+							uint64_t seq;
+							uint32_t soff;
+							logview_vline_to_pos(lv, vline, off, &seq, &soff);
+							lv->sel_cursor_line_seq = seq;
+							lv->sel_cursor_off = soff;
+							lv->has_selection = (lv->sel_anchor_line_seq != lv->sel_cursor_line_seq || lv->sel_anchor_off != lv->sel_cursor_off);
+							int32_t max_scroll = content_h - view_h;
+							if(max_scroll < 0) {
+								max_scroll = 0;
+							}
+							lv->stuck_to_end = (lv->scroll_y >= max_scroll) ? 1 : 0;
+							dirty_widget(ctx, (uint32_t)dsi);
+						}
+
 					} else if(dsi >= 0 && ctx->widgets[dsi].type == MKGUI_PATHBAR) {
 						struct mkgui_pathbar_data *pb = find_pathbar_data(ctx, ctx->drag_select_id);
 						if(pb && pb->editing) {
@@ -5044,6 +5201,11 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 						struct mkgui_textarea_data *ta = find_textarea_data(ctx, ctx->drag_scrollbar_id);
 						if(ta) {
 							textarea_scroll_drag(ctx, (uint32_t)dsi, ta, ctx->mouse_y, ctx->drag_scrollbar_offset);
+						}
+					} else if(dsi >= 0 && ctx->widgets[dsi].type == MKGUI_LOGVIEW) {
+						struct mkgui_logview_data *lv = find_logview_data(ctx, ctx->drag_scrollbar_id);
+						if(lv) {
+							logview_sb_drag(ctx, (uint32_t)dsi, lv, ctx->mouse_y, ctx->drag_scrollbar_offset);
 						}
 					} else if(dsi >= 0 && ctx->widgets[dsi].type == MKGUI_SCROLLBAR) {
 						scrollbar_drag_to(ctx, ctx->drag_scrollbar_id, ctx->mouse_x, ctx->mouse_y);
@@ -6035,6 +6197,21 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 							dirty_widget(ctx, (uint32_t)hi);
 						}
 
+					} else if(hi >= 0 && ctx->widgets[hi].type == MKGUI_LOGVIEW) {
+						struct mkgui_logview_data *lv = find_logview_data(ctx, ctx->widgets[hi].id);
+						if(lv) {
+							lv->scroll_y += delta;
+							int32_t content_h = logview_total_content_h(ctx, lv);
+							int32_t view_h = ctx->rects[hi].h - 2;
+							int32_t max_scroll = content_h - view_h;
+							if(max_scroll < 0) {
+								max_scroll = 0;
+							}
+							lv->stuck_to_end = (lv->scroll_y >= max_scroll) ? 1 : 0;
+							logview_recompute(ctx, lv, hi);
+							dirty_widget(ctx, (uint32_t)hi);
+						}
+
 					} else if(hi >= 0 && ctx->widgets[hi].type == MKGUI_ITEMVIEW) {
 						struct mkgui_itemview_data *iv = find_itemview_data(ctx, ctx->widgets[hi].id);
 						if(iv) {
@@ -6384,6 +6561,33 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 							}
 							ta->cursor = hit;
 							textarea_clear_selection(ta);
+							ctx->drag_select_id = hw->id;
+							dirty_widget(ctx, (uint32_t)hi);
+						}
+					}
+
+					if(hw->type == MKGUI_LOGVIEW) {
+						struct mkgui_logview_data *lv = find_logview_data(ctx, hw->id);
+						if(lv) {
+							logview_recompute(ctx, lv, hi);
+							if(logview_has_scrollbar(ctx, (uint32_t)hi, lv)) {
+								int32_t sb_off = logview_sb_hit(ctx, (uint32_t)hi, lv, ctx->mouse_x, ctx->mouse_y);
+								if(sb_off >= 0) {
+									ctx->drag_scrollbar_id = hw->id;
+									ctx->drag_scrollbar_offset = sb_off;
+									break;
+								}
+							}
+							uint32_t vline, off;
+							logview_hit_vline(ctx, lv, ctx->rects[hi].x, ctx->rects[hi].y, ctx->mouse_y, ctx->mouse_x, &vline, &off);
+							uint64_t seq;
+							uint32_t soff;
+							logview_vline_to_pos(lv, vline, off, &seq, &soff);
+							lv->sel_anchor_line_seq = seq;
+							lv->sel_anchor_off = soff;
+							lv->sel_cursor_line_seq = seq;
+							lv->sel_cursor_off = soff;
+							lv->has_selection = 0;
 							ctx->drag_select_id = hw->id;
 							dirty_widget(ctx, (uint32_t)hi);
 						}
@@ -7343,6 +7547,18 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 								ta->cursor = ta->text_len;
 								dirty_widget_id(ctx, ctx->focus_id);
 							}
+
+						} else if(fw->type == MKGUI_LOGVIEW) {
+							struct mkgui_logview_data *lv = find_logview_data(ctx, ctx->focus_id);
+							if(lv && lv->line_seq_head > lv->line_seq_tail) {
+								struct mkgui_logview_line *last = logview_get_line(lv, lv->line_seq_head - 1);
+								lv->sel_anchor_line_seq = lv->line_seq_tail;
+								lv->sel_anchor_off = 0;
+								lv->sel_cursor_line_seq = lv->line_seq_head - 1;
+								lv->sel_cursor_off = last ? last->len : 0;
+								lv->has_selection = 1;
+								dirty_widget_id(ctx, ctx->focus_id);
+							}
 						}
 						break;
 					}
@@ -7369,6 +7585,30 @@ MKGUI_API uint32_t mkgui_poll(struct mkgui_ctx *ctx, struct mkgui_event *ev) {
 									platform_clipboard_set(ctx, ta->text + lo, hi - lo);
 								} else {
 									platform_clipboard_set(ctx, ta->text, ta->text_len);
+								}
+							}
+
+						} else if(fw->type == MKGUI_LOGVIEW) {
+							struct mkgui_logview_data *lv = find_logview_data(ctx, ctx->focus_id);
+							if(lv && lv->has_selection) {
+								uint64_t lo_seq, hi_seq;
+								uint32_t lo_off, hi_off;
+								if(logview_sel_range(lv, &lo_seq, &lo_off, &hi_seq, &hi_off)) {
+									uint32_t total = 0;
+									for(uint64_t s = lo_seq; s <= hi_seq; ++s) {
+										struct mkgui_logview_line *line = logview_get_line(lv, s);
+										if(line) {
+											uint32_t a = (s == lo_seq) ? lo_off : 0;
+											uint32_t b = (s == hi_seq) ? hi_off : line->len;
+											total += (b > a ? b - a : 0) + (s < hi_seq ? 1 : 0);
+										}
+									}
+									char *buf = (char *)malloc(total + 1);
+									if(buf) {
+										uint32_t written = mkgui_logview_get_selection_text(ctx, ctx->focus_id, buf, total + 1);
+										platform_clipboard_set(ctx, buf, written);
+										free(buf);
+									}
 								}
 							}
 

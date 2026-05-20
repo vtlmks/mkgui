@@ -161,6 +161,7 @@ enum {
 	MKGUI_RICHLIST,
 	MKGUI_METER,
 	MKGUI_DIVIDER,
+	MKGUI_LOGVIEW,
 };
 
 // ---------------------------------------------------------------------------
@@ -207,6 +208,9 @@ enum {
 
 // -- Textarea --
 #define MKGUI_TEXTAREA_READONLY        (1u << 0)
+
+// -- Logview --
+#define MKGUI_LOGVIEW_NOWRAP           (1u << 0)
 
 // -- Datepicker --
 #define MKGUI_DATEPICKER_READONLY      (1u << 0)
@@ -345,6 +349,7 @@ enum {
 	MKGUI_EVENT_CANVAS_PRESS,
 	MKGUI_EVENT_CANVAS_RELEASE,
 	MKGUI_EVENT_CANVAS_MOTION,
+	MKGUI_EVENT_LOGVIEW_LINE_CLICKED,
 };
 
 // ---------------------------------------------------------------------------
@@ -776,6 +781,19 @@ MKGUI_API void mkgui_textarea_get_selection(struct mkgui_ctx *ctx, uint32_t id, 
 MKGUI_API void mkgui_textarea_insert(struct mkgui_ctx *ctx, uint32_t id, const char *text);
 MKGUI_API void mkgui_textarea_append(struct mkgui_ctx *ctx, uint32_t id, const char *text);
 MKGUI_API void mkgui_textarea_scroll_to_end(struct mkgui_ctx *ctx, uint32_t id);
+
+// ---------------------------------------------------------------------------
+// Logview
+// ---------------------------------------------------------------------------
+
+MKGUI_API void mkgui_logview_setup(struct mkgui_ctx *ctx, uint32_t id, uint32_t max_lines, uint32_t arena_bytes);
+MKGUI_API void mkgui_logview_append(struct mkgui_ctx *ctx, uint32_t id, const char *text);
+MKGUI_API void mkgui_logview_append_n(struct mkgui_ctx *ctx, uint32_t id, const char *text, uint32_t len);
+MKGUI_API void mkgui_logview_clear(struct mkgui_ctx *ctx, uint32_t id);
+MKGUI_API uint32_t mkgui_logview_get_line_count(struct mkgui_ctx *ctx, uint32_t id);
+MKGUI_API void mkgui_logview_scroll_to_end(struct mkgui_ctx *ctx, uint32_t id);
+MKGUI_API uint32_t mkgui_logview_is_at_end(struct mkgui_ctx *ctx, uint32_t id);
+MKGUI_API uint32_t mkgui_logview_get_selection_text(struct mkgui_ctx *ctx, uint32_t id, char *out, uint32_t out_size);
 
 // ---------------------------------------------------------------------------
 // DatePicker
