@@ -19,7 +19,7 @@ MKGUI_API void mkgui_image_set(struct mkgui_ctx *ctx, uint32_t id, const uint32_
 	}
 	struct mkgui_image_data *img = find_image_data(ctx, id);
 	if(!img) {
-		MKGUI_AUX_GROW(ctx->images, ctx->image_count, ctx->image_cap, struct mkgui_image_data);
+		MKGUI_AUX_GROW(&ctx->arenas.images, ctx->image_count, ctx->image_cap, struct mkgui_image_data);
 		if(ctx->image_count >= ctx->image_cap) {
 			return;
 		}

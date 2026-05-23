@@ -636,7 +636,7 @@ MKGUI_API void mkgui_gridview_setup(struct mkgui_ctx *ctx, uint32_t id, uint32_t
 	}
 	struct mkgui_gridview_data *gv = find_gridv_data(ctx, id);
 	if(!gv) {
-		MKGUI_AUX_GROW(ctx->gridviews, ctx->gridview_count, ctx->gridview_cap, struct mkgui_gridview_data);
+		MKGUI_AUX_GROW(&ctx->arenas.gridviews, ctx->gridview_count, ctx->gridview_cap, struct mkgui_gridview_data);
 		if(ctx->gridview_count >= ctx->gridview_cap) {
 			return;
 		}

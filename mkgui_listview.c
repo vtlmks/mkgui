@@ -1060,7 +1060,7 @@ MKGUI_API void mkgui_listview_setup(struct mkgui_ctx *ctx, uint32_t id, uint32_t
 	}
 	struct mkgui_listview_data *lv = find_listv_data(ctx, id);
 	if(!lv) {
-		MKGUI_AUX_GROW(ctx->listvs, ctx->listv_count, ctx->listv_cap, struct mkgui_listview_data);
+		MKGUI_AUX_GROW(&ctx->arenas.listvs, ctx->listv_count, ctx->listv_cap, struct mkgui_listview_data);
 		if(ctx->listv_count >= ctx->listv_cap) {
 			return;
 		}

@@ -444,7 +444,7 @@ MKGUI_API void mkgui_richlist_setup(struct mkgui_ctx *ctx, uint32_t id, uint32_t
 	}
 	struct mkgui_richlist_data *rl = find_richlist_data(ctx, id);
 	if(!rl) {
-		MKGUI_AUX_GROW(ctx->richlists, ctx->richlist_count, ctx->richlist_cap, struct mkgui_richlist_data);
+		MKGUI_AUX_GROW(&ctx->arenas.richlists, ctx->richlist_count, ctx->richlist_cap, struct mkgui_richlist_data);
 		if(ctx->richlist_count >= ctx->richlist_cap) {
 			return;
 		}

@@ -1121,7 +1121,7 @@ MKGUI_API void mkgui_itemview_setup(struct mkgui_ctx *ctx, uint32_t id, uint32_t
 	MKGUI_CHECK(ctx);
 	struct mkgui_itemview_data *iv = find_itemview_data(ctx, id);
 	if(!iv) {
-		MKGUI_AUX_GROW(ctx->itemviews, ctx->itemview_count, ctx->itemview_cap, struct mkgui_itemview_data);
+		MKGUI_AUX_GROW(&ctx->arenas.itemviews, ctx->itemview_count, ctx->itemview_cap, struct mkgui_itemview_data);
 		if(ctx->itemview_count >= ctx->itemview_cap) {
 			return;
 		}

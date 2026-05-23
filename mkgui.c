@@ -680,11 +680,60 @@ struct mkgui_accel {
 	uint32_t id;
 };
 
+// Reserve-commit virtual memory arena. Pages are mapped PROT_NONE up front,
+// committed (read/write) on demand in fixed-size bumps. Pointers handed out
+// from .base never move, so callers can cache them across grow operations.
+// The implementation (vm_arena_create/ensure/destroy) is defined below.
+struct vm_arena {
+	uint8_t *base;
+	size_t reserved;
+	size_t committed;
+};
+
+// Per-ctx virtual reserve. One arena per array; the array pointer in
+// mkgui_ctx is set once to arena.base and stays valid forever. Cap and
+// count fields advance as vm_arena_ensure commits more pages. The reserve
+// is sized so the practical maximum (well past any real-world UI count)
+// fits in committed pages without ever hitting the ceiling.
+struct mkgui_ctx_arenas {
+	struct vm_arena widgets;
+	struct vm_arena rects;
+	struct vm_arena tooltip_texts;
+	struct vm_arena listvs;
+	struct vm_arena inputs;
+	struct vm_arena dropdowns;
+	struct vm_arena sliders;
+	struct vm_arena tabs;
+	struct vm_arena splits;
+	struct vm_arena treeviews;
+	struct vm_arena statusbars;
+	struct vm_arena spinboxes;
+	struct vm_arena progress;
+	struct vm_arena meters;
+	struct vm_arena textareas;
+	struct vm_arena logviews;
+	struct vm_arena itemviews;
+	struct vm_arena scrollbars;
+	struct vm_arena box_scrolls;
+	struct vm_arena images;
+	struct vm_arena glviews;
+	struct vm_arena canvases;
+	struct vm_arena pathbars;
+	struct vm_arena ipinputs;
+	struct vm_arena toggles;
+	struct vm_arena comboboxes;
+	struct vm_arena datepickers;
+	struct vm_arena gridviews;
+	struct vm_arena richlists;
+};
+
 struct mkgui_ctx {
 	struct mkgui_platform plat;
 
 	uint32_t *pixels;
 	int32_t win_w, win_h;
+
+	struct mkgui_ctx_arenas arenas;
 
 	struct mkgui_widget *widgets;
 	uint32_t widget_count;
@@ -896,15 +945,13 @@ struct mkgui_ctx {
 // Virtual memory arena (reserve-commit, no realloc)
 // ---------------------------------------------------------------------------
 
+// Sized at 1M widgets: an order of magnitude past any conceivable real UI
+// (a desktop full of 100 windows with 100 widgets each is only 10k), while
+// still bounded so the per-ctx virtual reserve stays sane on 32-bit-virtual
+// hosts. Bumping later is a constant change and a recompile.
 #define MKGUI_VM_MAX_TEXT_CMDS   32768
-#define MKGUI_VM_MAX_WIDGETS     65536
+#define MKGUI_VM_MAX_WIDGETS     (1u << 20)
 #define MKGUI_VM_MAX_HASH_SLOTS  (MKGUI_VM_MAX_WIDGETS * 2)
-
-struct vm_arena {
-	uint8_t *base;
-	size_t reserved;
-	size_t committed;
-};
 
 #ifdef _WIN32
 
@@ -1009,13 +1056,14 @@ static void vm_arena_destroy(struct vm_arena *a) {
 #define MKGUI_GROW_AUX     16
 #define STYLE_BORDER_BIT   (1u << 0)
 
-#define MKGUI_AUX_GROW(arr, count, cap, type) do { \
+// Bump the per-array vm_arena to fit at least cap+GROW_AUX elements. The
+// array pointer never moves; only the committed footprint grows. Pages
+// committed by mprotect/VirtualAlloc(COMMIT) are zero-initialised by the
+// kernel, so no memset is required for the new tail.
+#define MKGUI_AUX_GROW(arena_ptr, count, cap, type) do { \
 	if((count) >= (cap)) { \
 		uint32_t _nc = (cap) + MKGUI_GROW_AUX; \
-		type *_tmp = (type *)realloc((arr), (size_t)_nc * sizeof(type)); \
-		if(_tmp) { \
-			memset(&_tmp[(cap)], 0, (size_t)MKGUI_GROW_AUX * sizeof(type)); \
-			(arr) = _tmp; \
+		if(vm_arena_ensure((arena_ptr), (size_t)_nc * sizeof(type))) { \
 			(cap) = _nc; \
 		} \
 	} \
@@ -3361,7 +3409,7 @@ static void render_widgets(struct mkgui_ctx *ctx) {
 static void init_widget_aux(struct mkgui_ctx *ctx, struct mkgui_widget *w) {
 	switch(w->type) {
 		case MKGUI_INPUT: {
-			MKGUI_AUX_GROW(ctx->inputs, ctx->input_count, ctx->input_cap, struct mkgui_input_data);
+			MKGUI_AUX_GROW(&ctx->arenas.inputs, ctx->input_count, ctx->input_cap, struct mkgui_input_data);
 			if(ctx->input_count < ctx->input_cap) {
 				struct mkgui_input_data *inp = &ctx->inputs[ctx->input_count++];
 				memset(inp, 0, sizeof(*inp));
@@ -3370,7 +3418,7 @@ static void init_widget_aux(struct mkgui_ctx *ctx, struct mkgui_widget *w) {
 		} break;
 
 		case MKGUI_IPINPUT: {
-			MKGUI_AUX_GROW(ctx->ipinputs, ctx->ipinput_count, ctx->ipinput_cap, struct mkgui_ipinput_data);
+			MKGUI_AUX_GROW(&ctx->arenas.ipinputs, ctx->ipinput_count, ctx->ipinput_cap, struct mkgui_ipinput_data);
 			if(ctx->ipinput_count < ctx->ipinput_cap) {
 				struct mkgui_ipinput_data *ip = &ctx->ipinputs[ctx->ipinput_count++];
 				memset(ip, 0, sizeof(*ip));
@@ -3379,7 +3427,7 @@ static void init_widget_aux(struct mkgui_ctx *ctx, struct mkgui_widget *w) {
 		} break;
 
 		case MKGUI_TOGGLE: {
-			MKGUI_AUX_GROW(ctx->toggles, ctx->toggle_count, ctx->toggle_cap, struct mkgui_toggle_data);
+			MKGUI_AUX_GROW(&ctx->arenas.toggles, ctx->toggle_count, ctx->toggle_cap, struct mkgui_toggle_data);
 			if(ctx->toggle_count < ctx->toggle_cap) {
 				struct mkgui_toggle_data *td = &ctx->toggles[ctx->toggle_count++];
 				memset(td, 0, sizeof(*td));
@@ -3388,7 +3436,7 @@ static void init_widget_aux(struct mkgui_ctx *ctx, struct mkgui_widget *w) {
 		} break;
 
 		case MKGUI_COMBOBOX: {
-			MKGUI_AUX_GROW(ctx->comboboxes, ctx->combobox_count, ctx->combobox_cap, struct mkgui_combobox_data);
+			MKGUI_AUX_GROW(&ctx->arenas.comboboxes, ctx->combobox_count, ctx->combobox_cap, struct mkgui_combobox_data);
 			if(ctx->combobox_count < ctx->combobox_cap) {
 				struct mkgui_combobox_data *cb = &ctx->comboboxes[ctx->combobox_count++];
 				memset(cb, 0, sizeof(*cb));
@@ -3398,7 +3446,7 @@ static void init_widget_aux(struct mkgui_ctx *ctx, struct mkgui_widget *w) {
 		} break;
 
 		case MKGUI_DATEPICKER: {
-			MKGUI_AUX_GROW(ctx->datepickers, ctx->datepicker_count, ctx->datepicker_cap, struct mkgui_datepicker_data);
+			MKGUI_AUX_GROW(&ctx->arenas.datepickers, ctx->datepicker_count, ctx->datepicker_cap, struct mkgui_datepicker_data);
 			if(ctx->datepicker_count < ctx->datepicker_cap) {
 				struct mkgui_datepicker_data *dp = &ctx->datepickers[ctx->datepicker_count++];
 				memset(dp, 0, sizeof(*dp));
@@ -3410,7 +3458,7 @@ static void init_widget_aux(struct mkgui_ctx *ctx, struct mkgui_widget *w) {
 		} break;
 
 		case MKGUI_DROPDOWN: {
-			MKGUI_AUX_GROW(ctx->dropdowns, ctx->dropdown_count, ctx->dropdown_cap, struct mkgui_dropdown_data);
+			MKGUI_AUX_GROW(&ctx->arenas.dropdowns, ctx->dropdown_count, ctx->dropdown_cap, struct mkgui_dropdown_data);
 			if(ctx->dropdown_count < ctx->dropdown_cap) {
 				struct mkgui_dropdown_data *dd = &ctx->dropdowns[ctx->dropdown_count++];
 				memset(dd, 0, sizeof(*dd));
@@ -3420,7 +3468,7 @@ static void init_widget_aux(struct mkgui_ctx *ctx, struct mkgui_widget *w) {
 		} break;
 
 		case MKGUI_SLIDER: {
-			MKGUI_AUX_GROW(ctx->sliders, ctx->slider_count, ctx->slider_cap, struct mkgui_slider_data);
+			MKGUI_AUX_GROW(&ctx->arenas.sliders, ctx->slider_count, ctx->slider_cap, struct mkgui_slider_data);
 			if(ctx->slider_count < ctx->slider_cap) {
 				struct mkgui_slider_data *sd = &ctx->sliders[ctx->slider_count++];
 				memset(sd, 0, sizeof(*sd));
@@ -3432,7 +3480,7 @@ static void init_widget_aux(struct mkgui_ctx *ctx, struct mkgui_widget *w) {
 		} break;
 
 		case MKGUI_TABS: {
-			MKGUI_AUX_GROW(ctx->tabs, ctx->tab_count, ctx->tab_cap, struct mkgui_tabs_data);
+			MKGUI_AUX_GROW(&ctx->arenas.tabs, ctx->tab_count, ctx->tab_cap, struct mkgui_tabs_data);
 			if(ctx->tab_count < ctx->tab_cap) {
 				struct mkgui_tabs_data *td = &ctx->tabs[ctx->tab_count++];
 				td->widget_id = w->id;
@@ -3448,7 +3496,7 @@ static void init_widget_aux(struct mkgui_ctx *ctx, struct mkgui_widget *w) {
 
 		case MKGUI_VBOX:
 		case MKGUI_HBOX: {
-			MKGUI_AUX_GROW(ctx->box_scrolls, ctx->box_scroll_count, ctx->box_scroll_cap, struct mkgui_box_scroll);
+			MKGUI_AUX_GROW(&ctx->arenas.box_scrolls, ctx->box_scroll_count, ctx->box_scroll_cap, struct mkgui_box_scroll);
 			if(ctx->box_scroll_count < ctx->box_scroll_cap) {
 				struct mkgui_box_scroll *bs = &ctx->box_scrolls[ctx->box_scroll_count++];
 				bs->widget_id = w->id;
@@ -3461,7 +3509,7 @@ static void init_widget_aux(struct mkgui_ctx *ctx, struct mkgui_widget *w) {
 
 		case MKGUI_HSPLIT:
 		case MKGUI_VSPLIT: {
-			MKGUI_AUX_GROW(ctx->splits, ctx->split_count, ctx->split_cap, struct mkgui_split_data);
+			MKGUI_AUX_GROW(&ctx->arenas.splits, ctx->split_count, ctx->split_cap, struct mkgui_split_data);
 			if(ctx->split_count < ctx->split_cap) {
 				struct mkgui_split_data *sd = &ctx->splits[ctx->split_count++];
 				sd->widget_id = w->id;
@@ -3470,7 +3518,7 @@ static void init_widget_aux(struct mkgui_ctx *ctx, struct mkgui_widget *w) {
 		} break;
 
 		case MKGUI_TREEVIEW: {
-			MKGUI_AUX_GROW(ctx->treeviews, ctx->treeview_count, ctx->treeview_cap, struct mkgui_treeview_data);
+			MKGUI_AUX_GROW(&ctx->arenas.treeviews, ctx->treeview_count, ctx->treeview_cap, struct mkgui_treeview_data);
 			if(ctx->treeview_count < ctx->treeview_cap) {
 				struct mkgui_treeview_data *tv = &ctx->treeviews[ctx->treeview_count++];
 				memset(tv, 0, sizeof(*tv));
@@ -3480,7 +3528,7 @@ static void init_widget_aux(struct mkgui_ctx *ctx, struct mkgui_widget *w) {
 		} break;
 
 		case MKGUI_STATUSBAR: {
-			MKGUI_AUX_GROW(ctx->statusbars, ctx->statusbar_count, ctx->statusbar_cap, struct mkgui_statusbar_data);
+			MKGUI_AUX_GROW(&ctx->arenas.statusbars, ctx->statusbar_count, ctx->statusbar_cap, struct mkgui_statusbar_data);
 			if(ctx->statusbar_count < ctx->statusbar_cap) {
 				struct mkgui_statusbar_data *sb = &ctx->statusbars[ctx->statusbar_count++];
 				memset(sb, 0, sizeof(*sb));
@@ -3489,7 +3537,7 @@ static void init_widget_aux(struct mkgui_ctx *ctx, struct mkgui_widget *w) {
 		} break;
 
 		case MKGUI_SPINBOX: {
-			MKGUI_AUX_GROW(ctx->spinboxes, ctx->spinbox_count, ctx->spinbox_cap, struct mkgui_spinbox_data);
+			MKGUI_AUX_GROW(&ctx->arenas.spinboxes, ctx->spinbox_count, ctx->spinbox_cap, struct mkgui_spinbox_data);
 			if(ctx->spinbox_count < ctx->spinbox_cap) {
 				struct mkgui_spinbox_data *sd = &ctx->spinboxes[ctx->spinbox_count++];
 				memset(sd, 0, sizeof(*sd));
@@ -3502,7 +3550,7 @@ static void init_widget_aux(struct mkgui_ctx *ctx, struct mkgui_widget *w) {
 		} break;
 
 		case MKGUI_PROGRESS: {
-			MKGUI_AUX_GROW(ctx->progress, ctx->progress_count, ctx->progress_cap, struct mkgui_progress_data);
+			MKGUI_AUX_GROW(&ctx->arenas.progress, ctx->progress_count, ctx->progress_cap, struct mkgui_progress_data);
 			if(ctx->progress_count < ctx->progress_cap) {
 				struct mkgui_progress_data *pd = &ctx->progress[ctx->progress_count++];
 				memset(pd, 0, sizeof(*pd));
@@ -3512,7 +3560,7 @@ static void init_widget_aux(struct mkgui_ctx *ctx, struct mkgui_widget *w) {
 		} break;
 
 		case MKGUI_METER: {
-			MKGUI_AUX_GROW(ctx->meters, ctx->meter_count, ctx->meter_cap, struct mkgui_meter_data);
+			MKGUI_AUX_GROW(&ctx->arenas.meters, ctx->meter_count, ctx->meter_cap, struct mkgui_meter_data);
 			if(ctx->meter_count < ctx->meter_cap) {
 				struct mkgui_meter_data *md = &ctx->meters[ctx->meter_count++];
 				memset(md, 0, sizeof(*md));
@@ -3527,7 +3575,7 @@ static void init_widget_aux(struct mkgui_ctx *ctx, struct mkgui_widget *w) {
 		} break;
 
 		case MKGUI_TEXTAREA: {
-			MKGUI_AUX_GROW(ctx->textareas, ctx->textarea_count, ctx->textarea_cap, struct mkgui_textarea_data);
+			MKGUI_AUX_GROW(&ctx->arenas.textareas, ctx->textarea_count, ctx->textarea_cap, struct mkgui_textarea_data);
 			if(ctx->textarea_count < ctx->textarea_cap) {
 				struct mkgui_textarea_data *ta = &ctx->textareas[ctx->textarea_count++];
 				memset(ta, 0, sizeof(*ta));
@@ -3542,7 +3590,7 @@ static void init_widget_aux(struct mkgui_ctx *ctx, struct mkgui_widget *w) {
 		} break;
 
 		case MKGUI_LOGVIEW: {
-			MKGUI_AUX_GROW(ctx->logviews, ctx->logview_count, ctx->logview_cap, struct mkgui_logview_data);
+			MKGUI_AUX_GROW(&ctx->arenas.logviews, ctx->logview_count, ctx->logview_cap, struct mkgui_logview_data);
 			if(ctx->logview_count < ctx->logview_cap) {
 				struct mkgui_logview_data *lv = &ctx->logviews[ctx->logview_count++];
 				memset(lv, 0, sizeof(*lv));
@@ -3553,7 +3601,7 @@ static void init_widget_aux(struct mkgui_ctx *ctx, struct mkgui_widget *w) {
 		} break;
 
 		case MKGUI_ITEMVIEW: {
-			MKGUI_AUX_GROW(ctx->itemviews, ctx->itemview_count, ctx->itemview_cap, struct mkgui_itemview_data);
+			MKGUI_AUX_GROW(&ctx->arenas.itemviews, ctx->itemview_count, ctx->itemview_cap, struct mkgui_itemview_data);
 			if(ctx->itemview_count < ctx->itemview_cap) {
 				struct mkgui_itemview_data *iv = &ctx->itemviews[ctx->itemview_count++];
 				memset(iv, 0, sizeof(*iv));
@@ -3563,7 +3611,7 @@ static void init_widget_aux(struct mkgui_ctx *ctx, struct mkgui_widget *w) {
 		} break;
 
 		case MKGUI_CANVAS: {
-			MKGUI_AUX_GROW(ctx->canvases, ctx->canvas_count, ctx->canvas_cap, struct mkgui_canvas_data);
+			MKGUI_AUX_GROW(&ctx->arenas.canvases, ctx->canvas_count, ctx->canvas_cap, struct mkgui_canvas_data);
 			if(ctx->canvas_count < ctx->canvas_cap) {
 				struct mkgui_canvas_data *cd = &ctx->canvases[ctx->canvas_count++];
 				memset(cd, 0, sizeof(*cd));
@@ -3572,7 +3620,7 @@ static void init_widget_aux(struct mkgui_ctx *ctx, struct mkgui_widget *w) {
 		} break;
 
 		case MKGUI_PATHBAR: {
-			MKGUI_AUX_GROW(ctx->pathbars, ctx->pathbar_count, ctx->pathbar_cap, struct mkgui_pathbar_data);
+			MKGUI_AUX_GROW(&ctx->arenas.pathbars, ctx->pathbar_count, ctx->pathbar_cap, struct mkgui_pathbar_data);
 			if(ctx->pathbar_count < ctx->pathbar_cap) {
 				struct mkgui_pathbar_data *pb = &ctx->pathbars[ctx->pathbar_count++];
 				memset(pb, 0, sizeof(*pb));
@@ -3605,29 +3653,15 @@ static void init_aux_data(struct mkgui_ctx *ctx) {
 // [=]===^=[ mkgui_grow_widgets ]=================================[=]
 static uint32_t mkgui_grow_widgets(struct mkgui_ctx *ctx) {
 	uint32_t new_cap = ctx->widget_cap + MKGUI_GROW_WIDGETS;
-	struct mkgui_widget *nw = (struct mkgui_widget *)realloc(ctx->widgets, (size_t)new_cap * sizeof(struct mkgui_widget));
-	struct mkgui_rect *nr = (struct mkgui_rect *)realloc(ctx->rects, (size_t)new_cap * sizeof(struct mkgui_rect));
-	char (*nt)[MKGUI_MAX_TEXT] = (char (*)[MKGUI_MAX_TEXT])realloc(ctx->tooltip_texts, (size_t)new_cap * MKGUI_MAX_TEXT);
-	if(!nw || !nr || !nt) {
-		if(nw) {
-			ctx->widgets = nw;
-		}
-
-		if(nr) {
-			ctx->rects = nr;
-		}
-
-		if(nt) {
-			ctx->tooltip_texts = nt;
-		}
+	if(!vm_arena_ensure(&ctx->arenas.widgets, (size_t)new_cap * sizeof(struct mkgui_widget))) {
 		return 0;
 	}
-	memset(&nw[ctx->widget_cap], 0, (size_t)MKGUI_GROW_WIDGETS * sizeof(struct mkgui_widget));
-	memset(&nr[ctx->widget_cap], 0, (size_t)MKGUI_GROW_WIDGETS * sizeof(struct mkgui_rect));
-	memset(&nt[ctx->widget_cap], 0, (size_t)MKGUI_GROW_WIDGETS * MKGUI_MAX_TEXT);
-	ctx->widgets = nw;
-	ctx->rects = nr;
-	ctx->tooltip_texts = nt;
+	if(!vm_arena_ensure(&ctx->arenas.rects, (size_t)new_cap * sizeof(struct mkgui_rect))) {
+		return 0;
+	}
+	if(!vm_arena_ensure(&ctx->arenas.tooltip_texts, (size_t)new_cap * MKGUI_MAX_TEXT)) {
+		return 0;
+	}
 	ctx->widget_cap = new_cap;
 	return 1;
 }
@@ -4141,109 +4175,156 @@ MKGUI_API uint32_t mkgui_remove_widget(struct mkgui_ctx *ctx, uint32_t id) {
 // Public API
 // ---------------------------------------------------------------------------
 
-// [=]===^=[ mkgui_alloc_arrays ]=================================[=]
-static uint32_t mkgui_alloc_arrays(struct mkgui_ctx *ctx, uint32_t widget_cap) {
-	ctx->widget_cap = widget_cap;
-	ctx->widgets = (struct mkgui_widget *)calloc(widget_cap, sizeof(struct mkgui_widget));
-	ctx->rects = (struct mkgui_rect *)calloc(widget_cap, sizeof(struct mkgui_rect));
-	ctx->tooltip_texts = (char (*)[MKGUI_MAX_TEXT])calloc(widget_cap, MKGUI_MAX_TEXT);
-	if(!ctx->widgets || !ctx->rects || !ctx->tooltip_texts) {
-		free(ctx->widgets);
-		free(ctx->rects);
-		free(ctx->tooltip_texts);
+// Reserve a per-ctx vm_arena large enough for the practical maximum element
+// count of one aux array. The reserve is virtual-only (PROT_NONE on Linux,
+// MEM_RESERVE on Windows) so the cost is address-space, not RAM. Pages get
+// faulted in zero-filled as MKGUI_AUX_GROW bumps the committed footprint.
+// [=]===^=[ mkgui_aux_arena_create ]=============================[=]
+static uint32_t mkgui_aux_arena_create(struct vm_arena *a, size_t elem_size, uint32_t initial_cap) {
+	size_t reserve_bytes = (size_t)MKGUI_VM_MAX_WIDGETS * elem_size;
+	if(!vm_arena_create(a, reserve_bytes)) {
 		return 0;
 	}
+	if(initial_cap > 0) {
+		if(!vm_arena_ensure(a, (size_t)initial_cap * elem_size)) {
+			vm_arena_destroy(a);
+			return 0;
+		}
+	}
+	return 1;
+}
 
-	ctx->listv_cap = 32;
-	ctx->listvs = (struct mkgui_listview_data *)calloc(ctx->listv_cap, sizeof(struct mkgui_listview_data));
-	ctx->input_cap = 64;
-	ctx->inputs = (struct mkgui_input_data *)calloc(ctx->input_cap, sizeof(struct mkgui_input_data));
-	ctx->dropdown_cap = 32;
-	ctx->dropdowns = (struct mkgui_dropdown_data *)calloc(ctx->dropdown_cap, sizeof(struct mkgui_dropdown_data));
-	ctx->slider_cap = 32;
-	ctx->sliders = (struct mkgui_slider_data *)calloc(ctx->slider_cap, sizeof(struct mkgui_slider_data));
-	ctx->tab_cap = 32;
-	ctx->tabs = (struct mkgui_tabs_data *)calloc(ctx->tab_cap, sizeof(struct mkgui_tabs_data));
-	ctx->split_cap = 32;
-	ctx->splits = (struct mkgui_split_data *)calloc(ctx->split_cap, sizeof(struct mkgui_split_data));
-	ctx->treeview_cap = 8;
-	ctx->treeviews = (struct mkgui_treeview_data *)calloc(ctx->treeview_cap, sizeof(struct mkgui_treeview_data));
-	ctx->statusbar_cap = 8;
-	ctx->statusbars = (struct mkgui_statusbar_data *)calloc(ctx->statusbar_cap, sizeof(struct mkgui_statusbar_data));
-	ctx->spinbox_cap = 32;
-	ctx->spinboxes = (struct mkgui_spinbox_data *)calloc(ctx->spinbox_cap, sizeof(struct mkgui_spinbox_data));
-	ctx->progress_cap = 32;
-	ctx->progress = (struct mkgui_progress_data *)calloc(ctx->progress_cap, sizeof(struct mkgui_progress_data));
-	ctx->meter_cap = 32;
-	ctx->meters = (struct mkgui_meter_data *)calloc(ctx->meter_cap, sizeof(struct mkgui_meter_data));
-	ctx->textarea_cap = 16;
-	ctx->textareas = (struct mkgui_textarea_data *)calloc(ctx->textarea_cap, sizeof(struct mkgui_textarea_data));
-	ctx->logview_cap = 8;
-	ctx->logviews = (struct mkgui_logview_data *)calloc(ctx->logview_cap, sizeof(struct mkgui_logview_data));
-	ctx->itemview_cap = 16;
-	ctx->itemviews = (struct mkgui_itemview_data *)calloc(ctx->itemview_cap, sizeof(struct mkgui_itemview_data));
-	ctx->scrollbar_cap = 32;
-	ctx->scrollbars = (struct mkgui_scrollbar_data *)calloc(ctx->scrollbar_cap, sizeof(struct mkgui_scrollbar_data));
+// [=]===^=[ mkgui_alloc_arrays ]=================================[=]
+static uint32_t mkgui_alloc_arrays(struct mkgui_ctx *ctx, uint32_t widget_cap) {
+	if(!mkgui_aux_arena_create(&ctx->arenas.widgets,       sizeof(struct mkgui_widget),        widget_cap)) return 0;
+	if(!mkgui_aux_arena_create(&ctx->arenas.rects,         sizeof(struct mkgui_rect),          widget_cap)) return 0;
+	if(!mkgui_aux_arena_create(&ctx->arenas.tooltip_texts, MKGUI_MAX_TEXT,                     widget_cap)) return 0;
+	ctx->widgets        = (struct mkgui_widget *)ctx->arenas.widgets.base;
+	ctx->rects          = (struct mkgui_rect *)ctx->arenas.rects.base;
+	ctx->tooltip_texts  = (char (*)[MKGUI_MAX_TEXT])ctx->arenas.tooltip_texts.base;
+	ctx->widget_cap = widget_cap;
+
+	ctx->listv_cap      = 32;
+	ctx->input_cap      = 64;
+	ctx->dropdown_cap   = 32;
+	ctx->slider_cap     = 32;
+	ctx->tab_cap        = 32;
+	ctx->split_cap      = 32;
+	ctx->treeview_cap   = 8;
+	ctx->statusbar_cap  = 8;
+	ctx->spinbox_cap    = 32;
+	ctx->progress_cap   = 32;
+	ctx->meter_cap      = 32;
+	ctx->textarea_cap   = 16;
+	ctx->logview_cap    = 8;
+	ctx->itemview_cap   = 16;
+	ctx->scrollbar_cap  = 32;
 	ctx->box_scroll_cap = 32;
-	ctx->box_scrolls = (struct mkgui_box_scroll *)calloc(ctx->box_scroll_cap, sizeof(struct mkgui_box_scroll));
-	ctx->image_cap = 32;
-	ctx->images = (struct mkgui_image_data *)calloc(ctx->image_cap, sizeof(struct mkgui_image_data));
-	ctx->glview_cap = 8;
-	ctx->glviews = (struct mkgui_glview_data *)calloc(ctx->glview_cap, sizeof(struct mkgui_glview_data));
-	ctx->canvas_cap = 16;
-	ctx->canvases = (struct mkgui_canvas_data *)calloc(ctx->canvas_cap, sizeof(struct mkgui_canvas_data));
-	ctx->pathbar_cap = 8;
-	ctx->pathbars = (struct mkgui_pathbar_data *)calloc(ctx->pathbar_cap, sizeof(struct mkgui_pathbar_data));
-	ctx->ipinput_cap = 16;
-	ctx->ipinputs = (struct mkgui_ipinput_data *)calloc(ctx->ipinput_cap, sizeof(struct mkgui_ipinput_data));
-	ctx->toggle_cap = 32;
-	ctx->toggles = (struct mkgui_toggle_data *)calloc(ctx->toggle_cap, sizeof(struct mkgui_toggle_data));
-	ctx->combobox_cap = 16;
-	ctx->comboboxes = (struct mkgui_combobox_data *)calloc(ctx->combobox_cap, sizeof(struct mkgui_combobox_data));
+	ctx->image_cap      = 32;
+	ctx->glview_cap     = 8;
+	ctx->canvas_cap     = 16;
+	ctx->pathbar_cap    = 8;
+	ctx->ipinput_cap    = 16;
+	ctx->toggle_cap     = 32;
+	ctx->combobox_cap   = 16;
 	ctx->datepicker_cap = 16;
-	ctx->datepickers = (struct mkgui_datepicker_data *)calloc(ctx->datepicker_cap, sizeof(struct mkgui_datepicker_data));
-	ctx->gridview_cap = 16;
-	ctx->gridviews = (struct mkgui_gridview_data *)calloc(ctx->gridview_cap, sizeof(struct mkgui_gridview_data));
-	ctx->richlist_cap = 16;
-	ctx->richlists = (struct mkgui_richlist_data *)calloc(ctx->richlist_cap, sizeof(struct mkgui_richlist_data));
+	ctx->gridview_cap   = 16;
+	ctx->richlist_cap   = 16;
+
+	if(!mkgui_aux_arena_create(&ctx->arenas.listvs,      sizeof(struct mkgui_listview_data),   ctx->listv_cap))      return 0;
+	if(!mkgui_aux_arena_create(&ctx->arenas.inputs,      sizeof(struct mkgui_input_data),      ctx->input_cap))      return 0;
+	if(!mkgui_aux_arena_create(&ctx->arenas.dropdowns,   sizeof(struct mkgui_dropdown_data),   ctx->dropdown_cap))   return 0;
+	if(!mkgui_aux_arena_create(&ctx->arenas.sliders,     sizeof(struct mkgui_slider_data),     ctx->slider_cap))     return 0;
+	if(!mkgui_aux_arena_create(&ctx->arenas.tabs,        sizeof(struct mkgui_tabs_data),       ctx->tab_cap))        return 0;
+	if(!mkgui_aux_arena_create(&ctx->arenas.splits,      sizeof(struct mkgui_split_data),      ctx->split_cap))      return 0;
+	if(!mkgui_aux_arena_create(&ctx->arenas.treeviews,   sizeof(struct mkgui_treeview_data),   ctx->treeview_cap))   return 0;
+	if(!mkgui_aux_arena_create(&ctx->arenas.statusbars,  sizeof(struct mkgui_statusbar_data),  ctx->statusbar_cap))  return 0;
+	if(!mkgui_aux_arena_create(&ctx->arenas.spinboxes,   sizeof(struct mkgui_spinbox_data),    ctx->spinbox_cap))    return 0;
+	if(!mkgui_aux_arena_create(&ctx->arenas.progress,    sizeof(struct mkgui_progress_data),   ctx->progress_cap))   return 0;
+	if(!mkgui_aux_arena_create(&ctx->arenas.meters,      sizeof(struct mkgui_meter_data),      ctx->meter_cap))      return 0;
+	if(!mkgui_aux_arena_create(&ctx->arenas.textareas,   sizeof(struct mkgui_textarea_data),   ctx->textarea_cap))   return 0;
+	if(!mkgui_aux_arena_create(&ctx->arenas.logviews,    sizeof(struct mkgui_logview_data),    ctx->logview_cap))    return 0;
+	if(!mkgui_aux_arena_create(&ctx->arenas.itemviews,   sizeof(struct mkgui_itemview_data),   ctx->itemview_cap))   return 0;
+	if(!mkgui_aux_arena_create(&ctx->arenas.scrollbars,  sizeof(struct mkgui_scrollbar_data),  ctx->scrollbar_cap))  return 0;
+	if(!mkgui_aux_arena_create(&ctx->arenas.box_scrolls, sizeof(struct mkgui_box_scroll),      ctx->box_scroll_cap)) return 0;
+	if(!mkgui_aux_arena_create(&ctx->arenas.images,      sizeof(struct mkgui_image_data),      ctx->image_cap))      return 0;
+	if(!mkgui_aux_arena_create(&ctx->arenas.glviews,     sizeof(struct mkgui_glview_data),     ctx->glview_cap))     return 0;
+	if(!mkgui_aux_arena_create(&ctx->arenas.canvases,    sizeof(struct mkgui_canvas_data),     ctx->canvas_cap))     return 0;
+	if(!mkgui_aux_arena_create(&ctx->arenas.pathbars,    sizeof(struct mkgui_pathbar_data),    ctx->pathbar_cap))    return 0;
+	if(!mkgui_aux_arena_create(&ctx->arenas.ipinputs,    sizeof(struct mkgui_ipinput_data),    ctx->ipinput_cap))    return 0;
+	if(!mkgui_aux_arena_create(&ctx->arenas.toggles,     sizeof(struct mkgui_toggle_data),     ctx->toggle_cap))     return 0;
+	if(!mkgui_aux_arena_create(&ctx->arenas.comboboxes,  sizeof(struct mkgui_combobox_data),   ctx->combobox_cap))   return 0;
+	if(!mkgui_aux_arena_create(&ctx->arenas.datepickers, sizeof(struct mkgui_datepicker_data), ctx->datepicker_cap)) return 0;
+	if(!mkgui_aux_arena_create(&ctx->arenas.gridviews,   sizeof(struct mkgui_gridview_data),   ctx->gridview_cap))   return 0;
+	if(!mkgui_aux_arena_create(&ctx->arenas.richlists,   sizeof(struct mkgui_richlist_data),   ctx->richlist_cap))   return 0;
+
+	ctx->listvs      = (struct mkgui_listview_data *)ctx->arenas.listvs.base;
+	ctx->inputs      = (struct mkgui_input_data *)ctx->arenas.inputs.base;
+	ctx->dropdowns   = (struct mkgui_dropdown_data *)ctx->arenas.dropdowns.base;
+	ctx->sliders     = (struct mkgui_slider_data *)ctx->arenas.sliders.base;
+	ctx->tabs        = (struct mkgui_tabs_data *)ctx->arenas.tabs.base;
+	ctx->splits      = (struct mkgui_split_data *)ctx->arenas.splits.base;
+	ctx->treeviews   = (struct mkgui_treeview_data *)ctx->arenas.treeviews.base;
+	ctx->statusbars  = (struct mkgui_statusbar_data *)ctx->arenas.statusbars.base;
+	ctx->spinboxes   = (struct mkgui_spinbox_data *)ctx->arenas.spinboxes.base;
+	ctx->progress    = (struct mkgui_progress_data *)ctx->arenas.progress.base;
+	ctx->meters      = (struct mkgui_meter_data *)ctx->arenas.meters.base;
+	ctx->textareas   = (struct mkgui_textarea_data *)ctx->arenas.textareas.base;
+	ctx->logviews    = (struct mkgui_logview_data *)ctx->arenas.logviews.base;
+	ctx->itemviews   = (struct mkgui_itemview_data *)ctx->arenas.itemviews.base;
+	ctx->scrollbars  = (struct mkgui_scrollbar_data *)ctx->arenas.scrollbars.base;
+	ctx->box_scrolls = (struct mkgui_box_scroll *)ctx->arenas.box_scrolls.base;
+	ctx->images      = (struct mkgui_image_data *)ctx->arenas.images.base;
+	ctx->glviews     = (struct mkgui_glview_data *)ctx->arenas.glviews.base;
+	ctx->canvases    = (struct mkgui_canvas_data *)ctx->arenas.canvases.base;
+	ctx->pathbars    = (struct mkgui_pathbar_data *)ctx->arenas.pathbars.base;
+	ctx->ipinputs    = (struct mkgui_ipinput_data *)ctx->arenas.ipinputs.base;
+	ctx->toggles     = (struct mkgui_toggle_data *)ctx->arenas.toggles.base;
+	ctx->comboboxes  = (struct mkgui_combobox_data *)ctx->arenas.comboboxes.base;
+	ctx->datepickers = (struct mkgui_datepicker_data *)ctx->arenas.datepickers.base;
+	ctx->gridviews   = (struct mkgui_gridview_data *)ctx->arenas.gridviews.base;
+	ctx->richlists   = (struct mkgui_richlist_data *)ctx->arenas.richlists.base;
 
 	return 1;
 }
 
 // [=]===^=[ mkgui_free_arrays ]==================================[=]
 static void mkgui_free_arrays(struct mkgui_ctx *ctx) {
-	free(ctx->widgets);
-	free(ctx->rects);
-	free(ctx->tooltip_texts);
-	free(ctx->listvs);
-	free(ctx->inputs);
-	free(ctx->dropdowns);
-	free(ctx->sliders);
-	free(ctx->tabs);
-	free(ctx->splits);
-	free(ctx->treeviews);
-	free(ctx->statusbars);
-	free(ctx->spinboxes);
-	free(ctx->progress);
-	free(ctx->meters);
-	free(ctx->textareas);
-	free(ctx->logviews);
-	free(ctx->itemviews);
-	free(ctx->scrollbars);
-	free(ctx->box_scrolls);
-	free(ctx->images);
-	free(ctx->glviews);
-	free(ctx->canvases);
-	free(ctx->pathbars);
-	free(ctx->ipinputs);
-	free(ctx->toggles);
-	free(ctx->comboboxes);
-	free(ctx->datepickers);
 	for(uint32_t i = 0; i < ctx->gridview_count; ++i) {
 		free(ctx->gridviews[i].checks);
 	}
-	free(ctx->gridviews);
-	free(ctx->richlists);
+	vm_arena_destroy(&ctx->arenas.widgets);
+	vm_arena_destroy(&ctx->arenas.rects);
+	vm_arena_destroy(&ctx->arenas.tooltip_texts);
+	vm_arena_destroy(&ctx->arenas.listvs);
+	vm_arena_destroy(&ctx->arenas.inputs);
+	vm_arena_destroy(&ctx->arenas.dropdowns);
+	vm_arena_destroy(&ctx->arenas.sliders);
+	vm_arena_destroy(&ctx->arenas.tabs);
+	vm_arena_destroy(&ctx->arenas.splits);
+	vm_arena_destroy(&ctx->arenas.treeviews);
+	vm_arena_destroy(&ctx->arenas.statusbars);
+	vm_arena_destroy(&ctx->arenas.spinboxes);
+	vm_arena_destroy(&ctx->arenas.progress);
+	vm_arena_destroy(&ctx->arenas.meters);
+	vm_arena_destroy(&ctx->arenas.textareas);
+	vm_arena_destroy(&ctx->arenas.logviews);
+	vm_arena_destroy(&ctx->arenas.itemviews);
+	vm_arena_destroy(&ctx->arenas.scrollbars);
+	vm_arena_destroy(&ctx->arenas.box_scrolls);
+	vm_arena_destroy(&ctx->arenas.images);
+	vm_arena_destroy(&ctx->arenas.glviews);
+	vm_arena_destroy(&ctx->arenas.canvases);
+	vm_arena_destroy(&ctx->arenas.pathbars);
+	vm_arena_destroy(&ctx->arenas.ipinputs);
+	vm_arena_destroy(&ctx->arenas.toggles);
+	vm_arena_destroy(&ctx->arenas.comboboxes);
+	vm_arena_destroy(&ctx->arenas.datepickers);
+	vm_arena_destroy(&ctx->arenas.gridviews);
+	vm_arena_destroy(&ctx->arenas.richlists);
+	ctx->widgets = NULL;
+	ctx->rects = NULL;
+	ctx->tooltip_texts = NULL;
 }
 
 // [=]===^=[ mkgui_create ]======================================[=]
