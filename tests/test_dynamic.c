@@ -2,14 +2,10 @@
 // SPDX-License-Identifier: MIT
 //
 // Stress test for dynamic widget add/insert/remove.
-// Exercises realloc boundaries (256, 512, ...) and verifies
+// Exercises vm_arena commit boundaries (256, 512, ...) and verifies
 // widget array integrity after each operation.
-//
-// Build:  gcc -std=c99 -O2 -Wall test_dynamic.c -o test_dynamic $(pkg-config --cflags --libs freetype2) -lX11 -lXext -lm
-// Run:    ./test_dynamic
-//         (needs an X display, creates a hidden window)
 
-#include "mkgui.c"
+#include "../mkgui.c"
 
 static uint32_t fail_count;
 

@@ -152,6 +152,10 @@ if [ "$TARGET" != "editor" ]; then
 		$CC $CFLAGS tests/test_window_visibility.c -o out/linux/test_window_visibility $LINUX_LIBS
 	) &
 
+	(
+		$CC $CFLAGS tests/test_dynamic.c -o out/linux/test_dynamic $LINUX_LIBS
+	) &
+
 	# extract_icons is independent (doesn't use mkgui)
 	(
 		$CC -std=gnu99 -O2 -Wall -Wextra -Wno-stringop-truncation -Wno-format-truncation tools/extract_icons.c -o out/linux/extract_icons
