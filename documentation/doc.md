@@ -116,6 +116,7 @@ struct mkgui_widget {
     uint32_t style;       // per-widget-type flags (MKGUI_LABEL_TRUNCATE, MKGUI_CHECKBOX_CHECKED, etc.)
     uint32_t weight;      // layout weight (0=default flex, >0=explicit proportional)
     int32_t  margin_l, margin_r, margin_t, margin_b; // layout margins
+    int32_t  label_tw;    // cached label text width; leave 0 (mkgui re-measures on first render)
     char     label[256];  // display text
     char     icon[64];    // Freedesktop icon name (e.g. "folder-open")
 };

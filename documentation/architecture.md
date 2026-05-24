@@ -58,7 +58,7 @@ Dependencies:
 | `mkgui_textedit.c` | Shared text-edit primitives (cursor movement, selection, insert/delete, render) used by input/combobox/pathbar/cell edit. |
 | `mkgui_celledit.c` | Inline cell edit overlay used by listview, treeview, gridview, and itemview. F2 / slow-double-click rename. |
 | `mkgui_drop.c` | OS file drag-and-drop (XDnd on Linux, WM_DROPFILES on Windows). |
-| `mkgui_*.c` (~40 files) | One file per widget type. Each contains rendering, event handling, and public API for that widget. |
+| `mkgui_*.c` (~50 files) | One file per widget type, plus a handful of subsystems (accel, ctxmenu, fs, menu, notify, etc.). Each contains rendering, event handling, and public API for that unit. |
 | `mkgui_dialogs.c` | Built-in message box, confirm, and input dialogs. |
 | `mkgui_filedialog.c` | Built-in file open/save dialog. |
 | `mkgui_iconbrowser.c` | Built-in Freedesktop icon theme browser. |
