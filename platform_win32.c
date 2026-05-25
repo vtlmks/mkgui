@@ -538,13 +538,19 @@ static void platform_window_unmap(struct mkgui_window *win) {
 }
 
 // [=]===^=[ platform_init_child ]=================================[=]
-static uint32_t platform_init_child(struct mkgui_window *win, struct mkgui_window *parent, const char *title, int32_t w, int32_t h, uint32_t flags) {
+// `share_from` is the existing window we co-locate against (always non-NULL
+// when this is called; the Win32 backend uses it only for parent_hwnd
+// linkage when a real transient relationship exists). `transient` is the
+// actual parent for owner-window linkage -- NULL when the new window is
+// a second top-level on the same ctx (no parent relationship).
+static uint32_t platform_init_child(struct mkgui_window *win, struct mkgui_window *share_from, struct mkgui_window *transient, const char *title, int32_t w, int32_t h, uint32_t flags) {
 	struct mkgui_platform *plat = &win->plat;
+	(void)share_from;
 	platform_register_class();
 
 	DWORD style = (flags & MKGUI_WINDOW_UNDECORATED) ? WS_POPUP : WS_OVERLAPPEDWINDOW;
 	DWORD exstyle = (flags & MKGUI_WINDOW_UNDECORATED) ? WS_EX_APPWINDOW : 0;
-	HWND owner = (flags & MKGUI_WINDOW_UNDECORATED) ? NULL : parent->plat.hwnd;
+	HWND owner = (transient && !(flags & MKGUI_WINDOW_UNDECORATED)) ? transient->plat.hwnd : NULL;
 	RECT rc = { 0, 0, w, h };
 	AdjustWindowRect(&rc, style, FALSE);
 
@@ -554,8 +560,8 @@ static uint32_t platform_init_child(struct mkgui_window *win, struct mkgui_windo
 		return 0;
 	}
 
-	plat->is_child = 1;
-	plat->parent_hwnd = parent->plat.hwnd;
+	plat->is_child = transient ? 1 : 0;
+	plat->parent_hwnd = transient ? transient->plat.hwnd : NULL;
 
 	win->win_w = w;
 	win->win_h = h;
@@ -572,14 +578,22 @@ static uint32_t platform_init_child(struct mkgui_window *win, struct mkgui_windo
 	return 1;
 }
 
-// [=]===^=[ platform_destroy ]====================================[=]
-static void platform_destroy(struct mkgui_window *win) {
+// [=]===^=[ platform_window_destroy ]==============================[=]
+static void platform_window_destroy(struct mkgui_window *win) {
 	struct mkgui_platform *plat = &win->plat;
 	platform_fb_destroy_dib(&plat->hdc_mem, &plat->hbmp, &plat->hbmp_old);
 	if(plat->hwnd) {
 		DestroyWindow(plat->hwnd);
 		plat->hwnd = NULL;
 	}
+}
+
+// [=]===^=[ platform_ctx_destroy ]=================================[=]
+// On Win32 there is nothing process-shared that needs an explicit close
+// at ctx-destroy time (the message-pump and font handle leak harmlessly
+// until process exit, consistent with prior behaviour).
+static void platform_ctx_destroy(struct mkgui_window *win) {
+	(void)win;
 }
 
 // [=]===^=[ platform_set_cursor ]=================================[=]

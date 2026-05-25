@@ -1875,7 +1875,8 @@ static int32_t natural_height(struct mkgui_window *win, uint32_t widget_type) {
 
 		case MKGUI_IMAGE:
 		case MKGUI_CANVAS:
-		case MKGUI_GLVIEW: {
+		case MKGUI_GLVIEW:
+		case MKGUI_SPINNER: {
 			return sc(win, MKGUI_NAT_CANVAS_H);
 		}
 
@@ -2984,6 +2985,8 @@ static void draw_icon_popup(struct mkgui_popup *p, struct mkgui_icon *icon, int3
 #pragma GCC diagnostic ignored "-Wunused-parameter"
 #pragma GCC diagnostic ignored "-Wsign-compare"
 #pragma GCC diagnostic ignored "-Wmissing-field-initializers"
+#pragma GCC diagnostic ignored "-Wunused-but-set-variable"
+#pragma GCC diagnostic ignored "-Wdiscarded-qualifiers"
 #define PLUTOSVG_BUILD_STATIC
 #define PLUTOSVG_BUILD
 #define PLUTOVG_BUILD_STATIC
@@ -4415,7 +4418,7 @@ MKGUI_API struct mkgui_window *mkgui_window_create(struct mkgui_ctx *ctx, struct
 	if(share_from) {
 		int32_t sw = parent ? sc(win, init_w) : init_w;
 		int32_t sh = parent ? sc(win, init_h) : init_h;
-		plat_ok = platform_init_child(win, share_from, use_title, sw, sh, window_style);
+		plat_ok = platform_init_child(win, share_from, parent, use_title, sw, sh, window_style);
 	} else {
 		// Copy ctx's app_class onto the window so platform_init can read it
 		// from the conventional place; mkgui_ctx_set_app_class keeps the two
@@ -4453,7 +4456,8 @@ MKGUI_API struct mkgui_window *mkgui_window_create(struct mkgui_ctx *ctx, struct
 		if(!text_cmd_arena.base) {
 			if(!text_cmd_init()) {
 				mkgui_free_arrays(win);
-				platform_destroy(win);
+				platform_window_destroy(win);
+				platform_ctx_destroy(win);
 				free(win);
 				return NULL;
 			}
@@ -4461,7 +4465,8 @@ MKGUI_API struct mkgui_window *mkgui_window_create(struct mkgui_ctx *ctx, struct
 
 		if(!layout_arena_init()) {
 			mkgui_free_arrays(win);
-			platform_destroy(win);
+			platform_window_destroy(win);
+			platform_ctx_destroy(win);
 			free(win);
 			return NULL;
 		}
@@ -4818,7 +4823,6 @@ MKGUI_API void mkgui_window_destroy(struct mkgui_window *win) {
 		return;
 	}
 	struct mkgui_ctx *ctx = win->ctx;
-	uint32_t is_owner = !win->plat.is_child;
 	drop_free(win);
 	for(uint32_t i = 0; i < ctx->window_count; ++i) {
 		if(ctx->windows[i] == win) {
@@ -4870,16 +4874,16 @@ MKGUI_API void mkgui_window_destroy(struct mkgui_window *win) {
 	}
 	win->timer_count = 0;
 	mkgui_free_arrays(win);
-	if(is_owner) {
+	platform_window_destroy(win);
+	// Last window on this ctx: tear down ctx-shared resources (font lib,
+	// SVG arenas, text-cmd arena, layout arenas, platform display/IM).
+	// Order independent of which window was created first.
+	if(ctx->window_count == 0) {
 		platform_font_fini(win);
-	}
-	platform_destroy(win);
-	if(is_owner) {
 		svg_cleanup();
-		if(g_ctx->window_count == 0) {
-			text_cmd_fini();
-			layout_arena_fini();
-		}
+		text_cmd_fini();
+		layout_arena_fini();
+		platform_ctx_destroy(win);
 	}
 	free(win);
 }
@@ -5025,6 +5029,14 @@ MKGUI_API uint32_t mkgui_window_poll(struct mkgui_window *win, struct mkgui_even
 		}
 	}
 
+	// widget_visible walks layout_parent[], which is a file-scope scratch
+	// buffer rebuilt per layout pass. If the most recent flush was for a
+	// different window (e.g. parent flushed before we get here, or this is
+	// our first poll), layout_parent indexes refer to that other window
+	// and the visibility walk produces garbage. Rebuild for THIS window
+	// before any widget-visibility check.
+	layout_build_index(win);
+
 	win->anim_active = 0;
 	for(uint32_t i = 0; i < win->widget_count; ++i) {
 		struct mkgui_widget *w = &win->widgets[i];
@@ -5047,10 +5059,6 @@ MKGUI_API uint32_t mkgui_window_poll(struct mkgui_window *win, struct mkgui_even
 		if(win->spinboxes[si].repeat_dir) {
 			win->anim_active = 1;
 		}
-	}
-
-	if(win->parent) {
-		layout_build_index(win);
 	}
 
 	while(platform_pending(win)) {

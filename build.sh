@@ -28,16 +28,18 @@ WINDOWS_LIBS="-lgdi32 -mwindows "
 WINDOWS_DEMO_LIBS="-lopengl32 "
 
 # Each argument is either a build mode or a build target. Defaults: normal mode,
-# core target (library + demo + tests + extract_icons; no editor).
+# all target (library + demo + tests + extract_icons + editor). The editor
+# rebuilds with everything else by default so library changes can't leave a
+# stale editor binary on disk; pass 'core' to skip the editor compile.
 MODE="normal"
-TARGET="core"
+TARGET="all"
 
 for arg in "$@"; do
 	case "$arg" in
 		normal|release|debug|size|asan)
 			MODE="$arg"
 			;;
-		editor|all)
+		core|editor|all)
 			TARGET="$arg"
 			;;
 		clean)
@@ -48,7 +50,7 @@ for arg in "$@"; do
 			echo "Unknown argument: $arg"
 			echo "Usage: $0 [mode] [target]"
 			echo "  modes:   normal (default) | release | debug | size | asan | clean"
-			echo "  targets: core (default)   | editor | all"
+			echo "  targets: all (default)    | core (skip editor) | editor (editor only)"
 			exit 1
 			;;
 	esac
@@ -88,24 +90,40 @@ fi
 # -----------------------------------------------------------------------------
 # Phase 1: static libraries (sequential - this is the heavy compile).
 # Building once and linking everyone else against it avoids saturating a
-# low-core laptop with many simultaneous mkgui.c compilations. Both static
-# libraries share the canonical name libmkgui.a; platform is encoded in the
-# parent directory (out/linux/, out/windows/).
+# laptops; the two libs are independent so they run concurrently. We wait
+# for both before phase 2 because every consumer links against one of them.
+# Both static libraries share the canonical name libmkgui.a; platform is
+# encoded in the parent directory (out/linux/, out/windows/).
 # Editor is special (unity build, uses internals) and does not depend on the
 # library, so we skip this phase when target=editor.
 # -----------------------------------------------------------------------------
 
 if [ "$TARGET" != "editor" ]; then
-	echo "[lib] out/linux/libmkgui.a"
-	$CC $CFLAGS $LIB_DEFINES -c mkgui.c -o out/linux/mkgui.o $LINUX_LIBS
-	ar rcs out/linux/libmkgui.a out/linux/mkgui.o
-	rm -f out/linux/mkgui.o
+	(
+		echo "[lib] out/linux/libmkgui.a"
+		$CC $CFLAGS $LIB_DEFINES -c mkgui.c -o out/linux/mkgui.o $LINUX_LIBS
+		ar rcs out/linux/libmkgui.a out/linux/mkgui.o
+		rm -f out/linux/mkgui.o
+	) &
 
 	if [ "$WIN_ENABLED" -eq 1 ]; then
-		echo "[lib] out/windows/libmkgui.a"
-		$WINCC $CFLAGS $LIB_DEFINES -c mkgui.c -o out/windows/mkgui.o $WINDOWS_LIBS
-		$WINAR rcs out/windows/libmkgui.a out/windows/mkgui.o
-		rm -f out/windows/mkgui.o
+		(
+			echo "[lib] out/windows/libmkgui.a"
+			$WINCC $CFLAGS $LIB_DEFINES -c mkgui.c -o out/windows/mkgui.o $WINDOWS_LIBS
+			$WINAR rcs out/windows/libmkgui.a out/windows/mkgui.o
+			rm -f out/windows/mkgui.o
+		) &
+	fi
+
+	# Block phase 2 until both libraries exist; consumers link against them.
+	LIB_FAIL=0
+	for job in $(jobs -p); do
+		if ! wait "$job"; then
+			LIB_FAIL=1
+		fi
+	done
+	if [ "$LIB_FAIL" -ne 0 ]; then
+		exit 1
 	fi
 fi
 

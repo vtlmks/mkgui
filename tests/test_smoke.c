@@ -984,11 +984,54 @@ static void test_canvas_window_render(void) {
 // Main
 // ---------------------------------------------------------------------------
 
+// [=]===^=[ test_leaf_widget_has_size ]==========================[=]
+// Every visible leaf widget type with default flags and no explicit
+// w/h must lay out to a non-zero rect. A zero-size rect causes
+// dirty_add to silently drop the widget, so animated widgets never
+// redraw and any per-widget invalidation is a no-op. Catches missing
+// cases in natural_height / natural_width.
+static void test_leaf_widget_has_size(void) {
+	uint32_t leaf_types[] = {
+		MKGUI_BUTTON, MKGUI_LABEL, MKGUI_INPUT, MKGUI_CHECKBOX,
+		MKGUI_RADIO, MKGUI_TOGGLE, MKGUI_DROPDOWN, MKGUI_COMBOBOX,
+		MKGUI_SPINBOX, MKGUI_DATEPICKER, MKGUI_IPINPUT, MKGUI_PATHBAR,
+		MKGUI_SLIDER, MKGUI_SCROLLBAR, MKGUI_PROGRESS, MKGUI_METER,
+		MKGUI_SPINNER, MKGUI_DIVIDER, MKGUI_IMAGE, MKGUI_CANVAS,
+		MKGUI_GLVIEW, MKGUI_LISTVIEW, MKGUI_GRIDVIEW, MKGUI_RICHLIST,
+		MKGUI_TREEVIEW, MKGUI_ITEMVIEW, MKGUI_TEXTAREA, MKGUI_LOGVIEW,
+	};
+	uint32_t n = sizeof(leaf_types) / sizeof(leaf_types[0]);
+	for(uint32_t k = 0; k < n; ++k) {
+		TEST_BEGIN("leaf widget has non-zero rect (one type)");
+		enum { WIN = 1, VBOX1 = 2, LEAF = 3 };
+		struct mkgui_widget widgets[] = {
+			MKGUI_W(MKGUI_WINDOW,   WIN,   "Test", "", 0,     400, 300, 0, 0, 0),
+			MKGUI_W(MKGUI_VBOX,     VBOX1, "",     "", WIN,   0,   0,   0, 0, 0),
+			MKGUI_W(leaf_types[k],  LEAF,  "x",    "", VBOX1, 0,   0,   0, 0, 0),
+		};
+		struct mkgui_ctx *ctx = mkgui_ctx_create();
+		struct mkgui_window *win = mkgui_window_create(ctx, NULL, widgets, 3, NULL, 0, 0);
+		if(win) {
+			layout_widgets(win);
+			int32_t idx = find_widget_idx(win, LEAF);
+			CHECK(idx >= 0, "leaf type %u: not found in layout", leaf_types[k]);
+			if(idx >= 0) {
+				CHECK(win->rects[idx].w > 0, "leaf type %u: width = %d (must be > 0)", leaf_types[k], win->rects[idx].w);
+				CHECK(win->rects[idx].h > 0, "leaf type %u: height = %d (must be > 0)", leaf_types[k], win->rects[idx].h);
+			}
+			mkgui_window_destroy(win);
+		}
+		mkgui_ctx_destroy(ctx);
+		TEST_END();
+	}
+}
+
 int main(void) {
 	printf("mkgui smoke + coverage-gap tests\n");
 	printf("=================================\n\n");
 
 	test_smoke_all_widget_types();
+	test_leaf_widget_has_size();
 
 	test_is_shown_basic();
 	test_is_shown_hidden_self();

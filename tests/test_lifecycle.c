@@ -92,6 +92,30 @@ static void test_window_create_top_level(void) {
 	mkgui_ctx_destroy(ctx);
 }
 
+// [=]===^=[ test_two_top_level_windows ]==========================[=]
+// parent=NULL on a ctx that already has windows must produce a true
+// top-level (not transient on the existing window). is_child stays 0.
+static void test_two_top_level_windows(void) {
+	fprintf(stderr, "test_two_top_level_windows...\n");
+
+	struct mkgui_widget pw[] = { MKGUI_W(MKGUI_WINDOW, 1,  "First",  "", 0, 320, 240, 0, 0, 0) };
+	struct mkgui_widget sw[] = { MKGUI_W(MKGUI_WINDOW, 10, "Second", "", 0, 320, 240, 0, 0, 0) };
+
+	struct mkgui_ctx *ctx = mkgui_ctx_create();
+	struct mkgui_window *a = mkgui_window_create(ctx, NULL, pw, 1, NULL, 0, 0);
+	struct mkgui_window *b = mkgui_window_create(ctx, NULL, sw, 1, "Second", 320, 240);
+
+	CHECK(a != NULL && b != NULL, "both windows should create");
+	CHECK(a->plat.is_child == 0, "first window must not be is_child");
+	CHECK(b->plat.is_child == 0, "second top-level (parent=NULL) must not be is_child");
+	CHECK(b->parent == NULL, "second top-level must have NULL parent");
+	CHECK(ctx->window_count == 2, "expected 2 windows");
+
+	mkgui_window_destroy(b);
+	mkgui_window_destroy(a);
+	mkgui_ctx_destroy(ctx);
+}
+
 // [=]===^=[ test_two_windows_with_parent ]=========================[=]
 // Create primary + secondary (transient on primary). Both end up in
 // ctx->windows[] in creation order. Primary stays primary.
@@ -287,6 +311,7 @@ int main(void) {
 	test_ctx_lifecycle_basic();
 	test_set_quit_cancel();
 	test_window_create_top_level();
+	test_two_top_level_windows();
 	test_two_windows_with_parent();
 	test_window_should_close_cancel();
 	test_pump_others();

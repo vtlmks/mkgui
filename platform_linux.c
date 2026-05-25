@@ -195,9 +195,14 @@ static void platform_window_unmap(struct mkgui_window *win) {
 }
 
 // [=]===^=[ platform_init_child ]=================================[=]
-static uint32_t platform_init_child(struct mkgui_window *win, struct mkgui_window *parent, const char *title, int32_t w, int32_t h, uint32_t flags) {
+// `share_from` is the window whose Display/visual/atoms we inherit (always
+// non-NULL). `transient` is the actual parent for the X11 transient-for
+// hint and "dialog" WM_CLASS instance -- NULL when the new window is
+// a second top-level on the same ctx (display-sharing only, no parent
+// relationship).
+static uint32_t platform_init_child(struct mkgui_window *win, struct mkgui_window *share_from, struct mkgui_window *transient, const char *title, int32_t w, int32_t h, uint32_t flags) {
 	struct mkgui_platform *plat = &win->plat;
-	struct mkgui_platform *pplat = &parent->plat;
+	struct mkgui_platform *pplat = &share_from->plat;
 
 	plat->dpy = pplat->dpy;
 	plat->screen = pplat->screen;
@@ -206,7 +211,7 @@ static uint32_t platform_init_child(struct mkgui_window *win, struct mkgui_windo
 	plat->colormap = pplat->colormap;
 	plat->depth = pplat->depth;
 	plat->atoms = pplat->atoms;
-	plat->is_child = 1;
+	plat->is_child = transient ? 1 : 0;
 
 	XSetWindowAttributes wa;
 	wa.background_pixmap = None;
@@ -215,10 +220,10 @@ static uint32_t platform_init_child(struct mkgui_window *win, struct mkgui_windo
 	wa.border_pixel = 0;
 	plat->win = XCreateWindow(plat->dpy, plat->root, 0, 0, (uint32_t)w, (uint32_t)h, 0, (int)plat->depth, InputOutput, plat->visual, CWBackPixmap | CWBitGravity | CWColormap | CWBorderPixel, &wa);
 	XStoreName(plat->dpy, plat->win, title);
-	platform_set_class_hint(plat, "dialog", parent->app_class[0] ? parent->app_class : "mkgui");
+	platform_set_class_hint(plat, transient ? "dialog" : "main", share_from->app_class[0] ? share_from->app_class : "mkgui");
 
-	if(!(flags & MKGUI_WINDOW_UNDECORATED)) {
-		XSetTransientForHint(plat->dpy, plat->win, pplat->win);
+	if(transient && !(flags & MKGUI_WINDOW_UNDECORATED)) {
+		XSetTransientForHint(plat->dpy, plat->win, transient->plat.win);
 	}
 
 	XSetWMProtocols(plat->dpy, plat->win, &plat->atoms.wm_delete, 1);
@@ -271,8 +276,12 @@ static uint32_t platform_init_child(struct mkgui_window *win, struct mkgui_windo
 	return 1;
 }
 
-// [=]===^=[ platform_destroy ]====================================[=]
-static void platform_destroy(struct mkgui_window *win) {
+// [=]===^=[ platform_window_destroy ]==============================[=]
+// Per-window teardown. Safe to call in any order across the windows on a
+// ctx -- only touches resources owned by this window. Shared resources
+// (Display, IM) are cleaned up separately via platform_ctx_destroy when
+// the last window on the ctx goes.
+static void platform_window_destroy(struct mkgui_window *win) {
 	struct mkgui_platform *plat = &win->plat;
 	platform_fb_destroy(plat, &plat->shm, plat->img);
 	plat->img = NULL;
@@ -281,15 +290,26 @@ static void platform_destroy(struct mkgui_window *win) {
 	XFreeCursor(plat->dpy, plat->cursor_v_resize);
 	if(plat->xic) {
 		XDestroyIC(plat->xic);
-	}
-
-	if(plat->xim && !plat->is_child) {
-		XCloseIM(plat->xim);
+		plat->xic = NULL;
 	}
 	XFreeGC(plat->dpy, plat->gc);
 	XDestroyWindow(plat->dpy, plat->win);
-	if(!plat->is_child) {
+}
+
+// [=]===^=[ platform_ctx_destroy ]=================================[=]
+// Ctx-level teardown. Called after the last window on the ctx has been
+// per-window-destroyed; uses one of the now-destroyed windows' plat
+// pointers (still valid pointer values) to close the shared Display and
+// IM. After this returns, no Xlib calls on these handles are valid.
+static void platform_ctx_destroy(struct mkgui_window *win) {
+	struct mkgui_platform *plat = &win->plat;
+	if(plat->xim) {
+		XCloseIM(plat->xim);
+		plat->xim = NULL;
+	}
+	if(plat->dpy) {
 		XCloseDisplay(plat->dpy);
+		plat->dpy = NULL;
 	}
 }
 

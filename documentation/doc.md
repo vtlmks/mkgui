@@ -780,12 +780,15 @@ ctx->perf_blit_us     // framebuffer blit time in microseconds
 ### Utilities
 
 ```c
-void mkgui_sleep_ms(uint32_t ms);
-uint32_t mkgui_time_ms(void);
-double mkgui_time_us(void);
+uint64_t mkgui_now_ns(void);
+void     mkgui_sleep_ns(uint64_t ns);
 ```
 
-`mkgui_sleep_ms` -- cross-platform sleep helper. `mkgui_time_ms` -- monotonic clock in milliseconds (wraps at ~49 days). `mkgui_time_us` -- monotonic clock in microseconds (double precision). Not needed for normal mainloops but available for custom timing.
+`mkgui_now_ns` -- monotonic clock in nanoseconds. Same epoch the library uses internally, so deadlines passed to `mkgui_ctx_wait_until` are commensurable. Effectively never wraps (`uint64_t` ns covers ~584 years).
+
+`mkgui_sleep_ns` -- cross-platform sleep. Linux uses `nanosleep` (ns granularity). Windows uses `Sleep` (ms granularity; the ns argument is ceil-rounded up to the next millisecond).
+
+If you specifically need milliseconds or microseconds, convert at the call site: `(uint32_t)(mkgui_now_ns() / 1000000ull)` for ms, `((double)mkgui_now_ns() * 1e-3)` for us.
 
 ### Base widget properties
 
