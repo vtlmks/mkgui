@@ -22,17 +22,17 @@ static uint32_t meter_dim_color(uint32_t color) {
 }
 
 // [=]===^=[ render_meter ]=========================================[=]
-static void render_meter(struct mkgui_ctx *ctx, uint32_t idx) {
-	struct mkgui_widget *w = &ctx->widgets[idx];
-	int32_t rx = ctx->rects[idx].x;
-	int32_t ry = ctx->rects[idx].y;
-	int32_t rw = ctx->rects[idx].w;
-	int32_t rh = ctx->rects[idx].h;
+static void render_meter(struct mkgui_window *win, uint32_t idx) {
+	struct mkgui_widget *w = &win->widgets[idx];
+	int32_t rx = win->rects[idx].x;
+	int32_t ry = win->rects[idx].y;
+	int32_t rw = win->rects[idx].w;
+	int32_t rh = win->rects[idx].h;
 	uint32_t vertical = w->flags & MKGUI_VERTICAL;
 
-	draw_patch(ctx, MKGUI_STYLE_SUNKEN, rx, ry, rw, rh, ctx->theme.input_bg, ctx->theme.widget_border);
+	draw_patch(win, MKGUI_STYLE_SUNKEN, rx, ry, rw, rh, win->theme.input_bg, win->theme.widget_border);
 
-	struct mkgui_meter_data *md = find_meter_data(ctx, w->id);
+	struct mkgui_meter_data *md = find_meter_data(win, w->id);
 	if(!md || md->max_val <= 0) {
 		return;
 	}
@@ -76,11 +76,11 @@ static void render_meter(struct mkgui_ctx *ctx, uint32_t idx) {
 			int32_t dim_y = zy;
 			int32_t dim_h = lit_y - zy;
 			if(dim_h > 0) {
-				draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, ix, dim_y, iw, dim_h, meter_dim_color(md->zone_c1));
+				draw_rect_fill(win->pixels, win->win_w, win->win_h, ix, dim_y, iw, dim_h, meter_dim_color(md->zone_c1));
 			}
 			int32_t lit_h = zy + zh - lit_y;
 			if(lit_h > 0) {
-				draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, ix, lit_y, iw, lit_h, md->zone_c1);
+				draw_rect_fill(win->pixels, win->win_w, win->win_h, ix, lit_y, iw, lit_h, md->zone_c1);
 			}
 		}
 
@@ -100,11 +100,11 @@ static void render_meter(struct mkgui_ctx *ctx, uint32_t idx) {
 			int32_t dim_y = zy;
 			int32_t dim_h = lit_y - zy;
 			if(dim_h > 0) {
-				draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, ix, dim_y, iw, dim_h, meter_dim_color(md->zone_c2));
+				draw_rect_fill(win->pixels, win->win_w, win->win_h, ix, dim_y, iw, dim_h, meter_dim_color(md->zone_c2));
 			}
 
 			if(lit > 0) {
-				draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, ix, lit_y, iw, lit, md->zone_c2);
+				draw_rect_fill(win->pixels, win->win_w, win->win_h, ix, lit_y, iw, lit, md->zone_c2);
 			}
 		}
 
@@ -124,24 +124,24 @@ static void render_meter(struct mkgui_ctx *ctx, uint32_t idx) {
 			int32_t dim_y = zy;
 			int32_t dim_h = lit_y - zy;
 			if(dim_h > 0) {
-				draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, ix, dim_y, iw, dim_h, meter_dim_color(md->zone_c3));
+				draw_rect_fill(win->pixels, win->win_w, win->win_h, ix, dim_y, iw, dim_h, meter_dim_color(md->zone_c3));
 			}
 
 			if(lit > 0) {
-				draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, ix, lit_y, iw, lit, md->zone_c3);
+				draw_rect_fill(win->pixels, win->win_w, win->win_h, ix, lit_y, iw, lit, md->zone_c3);
 			}
 		}
 
 		// thin fill bar (60% width, centered)
 		int32_t bar_w = iw * 6 / 10;
-		if(bar_w < sc(ctx, 3)) {
-			bar_w = sc(ctx, 3);
+		if(bar_w < sc(win, 3)) {
+			bar_w = sc(win, 3);
 		}
 		int32_t bar_x = ix + (iw - bar_w) / 2;
 		if(fill_h > 0) {
 			int32_t bar_y = iy + ih - fill_h;
 			uint32_t bar_color = meter_zone_color(md, md->value);
-			draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, bar_x, bar_y, bar_w, fill_h, bar_color);
+			draw_rect_fill(win->pixels, win->win_w, win->win_h, bar_x, bar_y, bar_w, fill_h, bar_color);
 		}
 
 		// percentage text
@@ -149,10 +149,10 @@ static void render_meter(struct mkgui_ctx *ctx, uint32_t idx) {
 			char buf[16];
 			int32_t pct = (int32_t)((int64_t)md->value * 100 / md->max_val);
 			snprintf(buf, sizeof(buf), "%d%%", pct);
-			int32_t tw = text_width(ctx, buf);
+			int32_t tw = text_width(win, buf);
 			int32_t tx = rx + (rw - tw) / 2;
-			int32_t ty = ry + (rh - ctx->font_height) / 2;
-			push_text_clip(tx, ty, buf, ctx->theme.text, rx + 1, ry + 1, rx + rw - 1, ry + rh - 1);
+			int32_t ty = ry + (rh - win->font_height) / 2;
+			push_text_clip(tx, ty, buf, win->theme.text, rx + 1, ry + 1, rx + rw - 1, ry + rh - 1);
 		}
 	} else {
 		// horizontal: zones left-to-right (thresholds are 0-100 percent)
@@ -183,11 +183,11 @@ static void render_meter(struct mkgui_ctx *ctx, uint32_t idx) {
 			}
 
 			if(lit > 0) {
-				draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, ix, iy, lit, ih, md->zone_c1);
+				draw_rect_fill(win->pixels, win->win_w, win->win_h, ix, iy, lit, ih, md->zone_c1);
 			}
 			int32_t dim = z1_px - lit;
 			if(dim > 0) {
-				draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, ix + lit, iy, dim, ih, meter_dim_color(md->zone_c1));
+				draw_rect_fill(win->pixels, win->win_w, win->win_h, ix + lit, iy, dim, ih, meter_dim_color(md->zone_c1));
 			}
 		}
 
@@ -204,11 +204,11 @@ static void render_meter(struct mkgui_ctx *ctx, uint32_t idx) {
 			}
 
 			if(lit > 0) {
-				draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, ix + z1_px, iy, lit, ih, md->zone_c2);
+				draw_rect_fill(win->pixels, win->win_w, win->win_h, ix + z1_px, iy, lit, ih, md->zone_c2);
 			}
 			int32_t dim = zh - lit;
 			if(dim > 0) {
-				draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, ix + z1_px + lit, iy, dim, ih, meter_dim_color(md->zone_c2));
+				draw_rect_fill(win->pixels, win->win_w, win->win_h, ix + z1_px + lit, iy, dim, ih, meter_dim_color(md->zone_c2));
 			}
 		}
 
@@ -225,23 +225,23 @@ static void render_meter(struct mkgui_ctx *ctx, uint32_t idx) {
 			}
 
 			if(lit > 0) {
-				draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, ix + z2_px, iy, lit, ih, md->zone_c3);
+				draw_rect_fill(win->pixels, win->win_w, win->win_h, ix + z2_px, iy, lit, ih, md->zone_c3);
 			}
 			int32_t dim = zh - lit;
 			if(dim > 0) {
-				draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, ix + z2_px + lit, iy, dim, ih, meter_dim_color(md->zone_c3));
+				draw_rect_fill(win->pixels, win->win_w, win->win_h, ix + z2_px + lit, iy, dim, ih, meter_dim_color(md->zone_c3));
 			}
 		}
 
 		// thin fill bar (60% height, centered)
 		int32_t bar_h = ih * 6 / 10;
-		if(bar_h < sc(ctx, 3)) {
-			bar_h = sc(ctx, 3);
+		if(bar_h < sc(win, 3)) {
+			bar_h = sc(win, 3);
 		}
 		int32_t bar_y = iy + (ih - bar_h) / 2;
 		if(fill_w > 0) {
 			uint32_t bar_color = meter_zone_color(md, md->value);
-			draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, ix, bar_y, fill_w, bar_h, bar_color);
+			draw_rect_fill(win->pixels, win->win_w, win->win_h, ix, bar_y, fill_w, bar_h, bar_color);
 		}
 
 		// percentage text
@@ -249,31 +249,31 @@ static void render_meter(struct mkgui_ctx *ctx, uint32_t idx) {
 			char buf[16];
 			int32_t pct = (int32_t)((int64_t)md->value * 100 / md->max_val);
 			snprintf(buf, sizeof(buf), "%d%%", pct);
-			int32_t tw = text_width(ctx, buf);
+			int32_t tw = text_width(win, buf);
 			int32_t tx = rx + (rw - tw) / 2;
-			int32_t ty = ry + (rh - ctx->font_height) / 2;
-			push_text_clip(tx, ty, buf, ctx->theme.text, rx + 1, ry + 1, rx + rw - 1, ry + rh - 1);
+			int32_t ty = ry + (rh - win->font_height) / 2;
+			push_text_clip(tx, ty, buf, win->theme.text, rx + 1, ry + 1, rx + rw - 1, ry + rh - 1);
 		}
 	}
 }
 
 // [=]===^=[ mkgui_meter_setup ]===================================[=]
-MKGUI_API void mkgui_meter_setup(struct mkgui_ctx *ctx, uint32_t id, int32_t max_val) {
-	MKGUI_CHECK(ctx);
-	struct mkgui_meter_data *md = find_meter_data(ctx, id);
+MKGUI_API void mkgui_meter_setup(struct mkgui_window *win, uint32_t id, int32_t max_val) {
+	MKGUI_CHECK(win);
+	struct mkgui_meter_data *md = find_meter_data(win, id);
 	if(md) {
 		md->max_val = max_val;
 		md->value = 0;
 		md->zone_t1 = 75;
 		md->zone_t2 = 90;
-		dirty_widget_id(ctx, id);
+		dirty_widget_id(win, id);
 	}
 }
 
 // [=]===^=[ mkgui_meter_set ]=====================================[=]
-MKGUI_API void mkgui_meter_set(struct mkgui_ctx *ctx, uint32_t id, int32_t value) {
-	MKGUI_CHECK(ctx);
-	struct mkgui_meter_data *md = find_meter_data(ctx, id);
+MKGUI_API void mkgui_meter_set(struct mkgui_window *win, uint32_t id, int32_t value) {
+	MKGUI_CHECK(win);
+	struct mkgui_meter_data *md = find_meter_data(win, id);
 	if(md) {
 		md->value = value;
 		if(md->value < 0) {
@@ -283,21 +283,21 @@ MKGUI_API void mkgui_meter_set(struct mkgui_ctx *ctx, uint32_t id, int32_t value
 		if(md->value > md->max_val) {
 			md->value = md->max_val;
 		}
-		dirty_widget_id(ctx, id);
+		dirty_widget_id(win, id);
 	}
 }
 
 // [=]===^=[ mkgui_meter_get ]=====================================[=]
-MKGUI_API int32_t mkgui_meter_get(struct mkgui_ctx *ctx, uint32_t id) {
-	MKGUI_CHECK_VAL(ctx, 0);
-	struct mkgui_meter_data *md = find_meter_data(ctx, id);
+MKGUI_API int32_t mkgui_meter_get(struct mkgui_window *win, uint32_t id) {
+	MKGUI_CHECK_VAL(win, 0);
+	struct mkgui_meter_data *md = find_meter_data(win, id);
 	return md ? md->value : 0;
 }
 
 // [=]===^=[ mkgui_meter_set_range ]================================[=]
-MKGUI_API void mkgui_meter_set_range(struct mkgui_ctx *ctx, uint32_t id, int32_t max_val) {
-	MKGUI_CHECK(ctx);
-	struct mkgui_meter_data *md = find_meter_data(ctx, id);
+MKGUI_API void mkgui_meter_set_range(struct mkgui_window *win, uint32_t id, int32_t max_val) {
+	MKGUI_CHECK(win);
+	struct mkgui_meter_data *md = find_meter_data(win, id);
 	if(!md) {
 		return;
 	}
@@ -305,22 +305,22 @@ MKGUI_API void mkgui_meter_set_range(struct mkgui_ctx *ctx, uint32_t id, int32_t
 	if(md->value > md->max_val) {
 		md->value = md->max_val;
 	}
-	dirty_widget_id(ctx, id);
+	dirty_widget_id(win, id);
 }
 
 // [=]===^=[ mkgui_meter_get_range ]================================[=]
-MKGUI_API void mkgui_meter_get_range(struct mkgui_ctx *ctx, uint32_t id, int32_t *max_val) {
-	MKGUI_CHECK(ctx);
-	struct mkgui_meter_data *md = find_meter_data(ctx, id);
+MKGUI_API void mkgui_meter_get_range(struct mkgui_window *win, uint32_t id, int32_t *max_val) {
+	MKGUI_CHECK(win);
+	struct mkgui_meter_data *md = find_meter_data(win, id);
 	if(max_val) {
 		*max_val = md ? md->max_val : 0;
 	}
 }
 
 // [=]===^=[ mkgui_meter_set_zones ]================================[=]
-MKGUI_API void mkgui_meter_set_zones(struct mkgui_ctx *ctx, uint32_t id, int32_t t1, int32_t t2, uint32_t c1, uint32_t c2, uint32_t c3) {
-	MKGUI_CHECK(ctx);
-	struct mkgui_meter_data *md = find_meter_data(ctx, id);
+MKGUI_API void mkgui_meter_set_zones(struct mkgui_window *win, uint32_t id, int32_t t1, int32_t t2, uint32_t c1, uint32_t c2, uint32_t c3) {
+	MKGUI_CHECK(win);
+	struct mkgui_meter_data *md = find_meter_data(win, id);
 	if(!md) {
 		return;
 	}
@@ -329,5 +329,5 @@ MKGUI_API void mkgui_meter_set_zones(struct mkgui_ctx *ctx, uint32_t id, int32_t
 	md->zone_c1 = c1;
 	md->zone_c2 = c2;
 	md->zone_c3 = c3;
-	dirty_widget_id(ctx, id);
+	dirty_widget_id(win, id);
 }

@@ -81,8 +81,8 @@ static void smoke_itemview_icon_cb(uint32_t item, char *buf, uint32_t buf_size, 
 }
 
 // [=]===^=[ smoke_canvas_cb ]========================================[=]
-static void smoke_canvas_cb(struct mkgui_ctx *ctx, uint32_t id, uint32_t *pixels, int32_t x, int32_t y, int32_t w, int32_t h, void *userdata) {
-	(void)ctx;
+static void smoke_canvas_cb(struct mkgui_window *win, uint32_t id, uint32_t *pixels, int32_t x, int32_t y, int32_t w, int32_t h, void *userdata) {
+	(void)win;
 	(void)id;
 	(void)pixels;
 	(void)x;
@@ -230,9 +230,10 @@ static void test_smoke_all_widget_types(void) {
 	};
 
 	uint32_t count = sizeof(widgets) / sizeof(widgets[0]);
-	struct mkgui_ctx *ctx = mkgui_create(widgets, count);
-	CHECK(ctx, "mkgui_create failed");
-	if(ctx) {
+	struct mkgui_ctx *ctx = mkgui_ctx_create();
+	struct mkgui_window *win = mkgui_window_create(ctx, NULL, widgets, count, NULL, 0, 0);
+	CHECK(win, "mkgui_window_create failed");
+	if(win) {
 	// Minimum setup so the view widgets have something to render
 	struct mkgui_column lv_cols[2] = {
 		{ "Col A", 100, 0 },
@@ -244,39 +245,40 @@ static void test_smoke_all_widget_types(void) {
 	};
 	const char *cb_items[] = { "one", "two", "three" };
 
-	mkgui_listview_setup(ctx, S_LISTVIEW, 5, 2, lv_cols, smoke_row_cb, NULL);
-	mkgui_gridview_setup(ctx, S_GRIDVIEW, 5, 2, gv_cols, smoke_grid_cell_cb, NULL);
-	mkgui_treeview_setup(ctx, S_TREEVIEW);
-	mkgui_treeview_add(ctx, S_TREEVIEW, 1, 0, "root");
-	mkgui_treeview_add(ctx, S_TREEVIEW, 2, 1, "child");
-	mkgui_itemview_setup(ctx, S_ITEMVIEW, 4, MKGUI_VIEW_DETAIL, smoke_itemview_label_cb, smoke_itemview_icon_cb, NULL);
-	mkgui_richlist_setup(ctx, S_RICHLIST, 5, 48, smoke_richlist_cb, NULL);
-	mkgui_canvas_set_callback(ctx, S_CANVAS, smoke_canvas_cb, NULL);
-	mkgui_combobox_setup(ctx, S_COMBOBOX, cb_items, 3);
-	mkgui_pathbar_set(ctx, S_PATHBAR, "/tmp/smoke");
-	mkgui_datepicker_set(ctx, S_DATEPICKER, 2026, 4, 22);
+	mkgui_listview_setup(win, S_LISTVIEW, 5, 2, lv_cols, smoke_row_cb, NULL);
+	mkgui_gridview_setup(win, S_GRIDVIEW, 5, 2, gv_cols, smoke_grid_cell_cb, NULL);
+	mkgui_treeview_setup(win, S_TREEVIEW);
+	mkgui_treeview_add(win, S_TREEVIEW, 1, 0, "root");
+	mkgui_treeview_add(win, S_TREEVIEW, 2, 1, "child");
+	mkgui_itemview_setup(win, S_ITEMVIEW, 4, MKGUI_VIEW_DETAIL, smoke_itemview_label_cb, smoke_itemview_icon_cb, NULL);
+	mkgui_richlist_setup(win, S_RICHLIST, 5, 48, smoke_richlist_cb, NULL);
+	mkgui_canvas_set_callback(win, S_CANVAS, smoke_canvas_cb, NULL);
+	mkgui_combobox_setup(win, S_COMBOBOX, cb_items, 3);
+	mkgui_pathbar_set(win, S_PATHBAR, "/tmp/smoke");
+	mkgui_datepicker_set(win, S_DATEPICKER, 2026, 4, 22);
 
-	layout_widgets(ctx);
+	layout_widgets(win);
 
 	// All expected widgets should have indexed rects.
-	CHECK(ctx->widget_count == count, "widget_count mismatch: got %u want %u", ctx->widget_count, count);
+	CHECK(win->widget_count == count, "widget_count mismatch: got %u want %u", win->widget_count, count);
 	// Layout is allowed to produce negative dims under extreme overflow; only
 	// assert that each widget's id resolves back to a valid index.
-	for(uint32_t i = 0; i < ctx->widget_count; ++i) {
-		int32_t idx = find_widget_idx(ctx, ctx->widgets[i].id);
-		CHECK(idx == (int32_t)i, "find_widget_idx(%u) = %d want %u", ctx->widgets[i].id, idx, i);
+	for(uint32_t i = 0; i < win->widget_count; ++i) {
+		int32_t idx = find_widget_idx(win, win->widgets[i].id);
+		CHECK(idx == (int32_t)i, "find_widget_idx(%u) = %d want %u", win->widgets[i].id, idx, i);
 	}
 
 	// Render pass: force full redraw and render all widgets
-	ctx->dirty_full = 1;
-	render_widgets(ctx);
+	win->dirty_full = 1;
+	render_widgets(win);
 
 	// A second render pass with dirty_full cleared exercises the incremental path
-	ctx->dirty_full = 0;
-	ctx->dirty_count = 0;
-	render_widgets(ctx);
+	win->dirty_full = 0;
+	win->dirty_count = 0;
+	render_widgets(win);
 
-	mkgui_destroy(ctx);
+	mkgui_window_destroy(win);
+	mkgui_ctx_destroy(ctx);
 	}
 	TEST_END();
 }
@@ -294,14 +296,16 @@ static void test_is_shown_basic(void) {
 		MKGUI_W(MKGUI_VBOX,   VBOX1, "",  "", WIN,   0,   0,   0, 0, 0),
 		MKGUI_W(MKGUI_LABEL,  LBL,   "x", "", VBOX1, 0,   0,   0, 0, 0),
 	};
-	struct mkgui_ctx *ctx = mkgui_create(widgets, 3);
-	CHECK(ctx, "create failed");
-	if(ctx) {
-		layout_widgets(ctx);
-		CHECK(mkgui_is_shown(ctx, LBL) == 1, "label should be shown");
-		CHECK(mkgui_is_shown(ctx, WIN) == 1, "window should be shown");
-		CHECK(mkgui_is_shown(ctx, 9999) == 0, "unknown id returns 0");
-		mkgui_destroy(ctx);
+	struct mkgui_ctx *ctx = mkgui_ctx_create();
+	struct mkgui_window *win = mkgui_window_create(ctx, NULL, widgets, 3, NULL, 0, 0);
+	CHECK(win, "create failed");
+	if(win) {
+		layout_widgets(win);
+		CHECK(mkgui_is_shown(win, LBL) == 1, "label should be shown");
+		CHECK(mkgui_is_shown(win, WIN) == 1, "window should be shown");
+		CHECK(mkgui_is_shown(win, 9999) == 0, "unknown id returns 0");
+		mkgui_window_destroy(win);
+		mkgui_ctx_destroy(ctx);
 	}
 	TEST_END();
 }
@@ -315,13 +319,15 @@ static void test_is_shown_hidden_self(void) {
 		MKGUI_W(MKGUI_VBOX,   VBOX1, "",  "", WIN,   0,   0,   0, 0, 0),
 		MKGUI_W(MKGUI_LABEL,  LBL,   "x", "", VBOX1, 0,   0,   MKGUI_HIDDEN, 0, 0),
 	};
-	struct mkgui_ctx *ctx = mkgui_create(widgets, 3);
-	CHECK(ctx, "create failed");
-	if(ctx) {
-		layout_widgets(ctx);
-		CHECK(mkgui_is_shown(ctx, LBL) == 0, "hidden label should not be shown");
-		CHECK(mkgui_is_shown(ctx, VBOX1) == 1, "parent still visible");
-		mkgui_destroy(ctx);
+	struct mkgui_ctx *ctx = mkgui_ctx_create();
+	struct mkgui_window *win = mkgui_window_create(ctx, NULL, widgets, 3, NULL, 0, 0);
+	CHECK(win, "create failed");
+	if(win) {
+		layout_widgets(win);
+		CHECK(mkgui_is_shown(win, LBL) == 0, "hidden label should not be shown");
+		CHECK(mkgui_is_shown(win, VBOX1) == 1, "parent still visible");
+		mkgui_window_destroy(win);
+		mkgui_ctx_destroy(ctx);
 	}
 	TEST_END();
 }
@@ -336,14 +342,16 @@ static void test_is_shown_hidden_ancestor(void) {
 		MKGUI_W(MKGUI_HBOX,   INNER, "",  "", OUTER, 0,   0,   0, 0, 0),
 		MKGUI_W(MKGUI_LABEL,  LBL,   "x", "", INNER, 0,   0,   0, 0, 0),
 	};
-	struct mkgui_ctx *ctx = mkgui_create(widgets, 4);
-	CHECK(ctx, "create failed");
-	if(ctx) {
-		layout_widgets(ctx);
-		CHECK(mkgui_is_shown(ctx, LBL) == 0, "label hidden via ancestor");
-		CHECK(mkgui_is_shown(ctx, INNER) == 0, "inner hidden via ancestor");
-		CHECK(mkgui_is_shown(ctx, OUTER) == 0, "hidden outer itself");
-		mkgui_destroy(ctx);
+	struct mkgui_ctx *ctx = mkgui_ctx_create();
+	struct mkgui_window *win = mkgui_window_create(ctx, NULL, widgets, 4, NULL, 0, 0);
+	CHECK(win, "create failed");
+	if(win) {
+		layout_widgets(win);
+		CHECK(mkgui_is_shown(win, LBL) == 0, "label hidden via ancestor");
+		CHECK(mkgui_is_shown(win, INNER) == 0, "inner hidden via ancestor");
+		CHECK(mkgui_is_shown(win, OUTER) == 0, "hidden outer itself");
+		mkgui_window_destroy(win);
+		mkgui_ctx_destroy(ctx);
 	}
 	TEST_END();
 }
@@ -358,16 +366,18 @@ static void test_is_shown_collapsed_group(void) {
 		MKGUI_W(MKGUI_GROUP,  GRP,   "Group", "", VBOX1, 0,   0,   0, MKGUI_GROUP_COLLAPSED, 0),
 		MKGUI_W(MKGUI_LABEL,  LBL,   "x",     "", GRP,   0,   0,   0, 0, 0),
 	};
-	struct mkgui_ctx *ctx = mkgui_create(widgets, 4);
-	CHECK(ctx, "create failed");
-	if(ctx) {
-		layout_widgets(ctx);
-		CHECK(mkgui_is_shown(ctx, LBL) == 0, "child of collapsed group is hidden");
-		CHECK(mkgui_is_shown(ctx, GRP) == 1, "the group header itself still shows");
-		mkgui_group_set_collapsed(ctx, GRP, 0);
-		layout_widgets(ctx);
-		CHECK(mkgui_is_shown(ctx, LBL) == 1, "expanding the group reveals children");
-		mkgui_destroy(ctx);
+	struct mkgui_ctx *ctx = mkgui_ctx_create();
+	struct mkgui_window *win = mkgui_window_create(ctx, NULL, widgets, 4, NULL, 0, 0);
+	CHECK(win, "create failed");
+	if(win) {
+		layout_widgets(win);
+		CHECK(mkgui_is_shown(win, LBL) == 0, "child of collapsed group is hidden");
+		CHECK(mkgui_is_shown(win, GRP) == 1, "the group header itself still shows");
+		mkgui_group_set_collapsed(win, GRP, 0);
+		layout_widgets(win);
+		CHECK(mkgui_is_shown(win, LBL) == 1, "expanding the group reveals children");
+		mkgui_window_destroy(win);
+		mkgui_ctx_destroy(ctx);
 	}
 	TEST_END();
 }
@@ -384,19 +394,21 @@ static void test_is_shown_inactive_tab(void) {
 		MKGUI_W(MKGUI_TAB,    TB,   "B", "", TABS, 0,   0,   0, 0, 0),
 		MKGUI_W(MKGUI_LABEL,  LB,   "b", "", TB,   0,   0,   0, 0, 0),
 	};
-	struct mkgui_ctx *ctx = mkgui_create(widgets, 6);
-	CHECK(ctx, "create failed");
-	if(ctx) {
-		layout_widgets(ctx);
-		uint32_t current = mkgui_tabs_get_current(ctx, TABS);
+	struct mkgui_ctx *ctx = mkgui_ctx_create();
+	struct mkgui_window *win = mkgui_window_create(ctx, NULL, widgets, 6, NULL, 0, 0);
+	CHECK(win, "create failed");
+	if(win) {
+		layout_widgets(win);
+		uint32_t current = mkgui_tabs_get_current(win, TABS);
 		CHECK(current == TA, "first tab should be active by default (got %u)", current);
-		CHECK(mkgui_is_shown(ctx, LA) == 1, "active tab child shows");
-		CHECK(mkgui_is_shown(ctx, LB) == 0, "inactive tab child hidden");
-		mkgui_tabs_set_current(ctx, TABS, TB);
-		layout_widgets(ctx);
-		CHECK(mkgui_is_shown(ctx, LA) == 0, "old active tab child now hidden");
-		CHECK(mkgui_is_shown(ctx, LB) == 1, "newly active tab child shows");
-		mkgui_destroy(ctx);
+		CHECK(mkgui_is_shown(win, LA) == 1, "active tab child shows");
+		CHECK(mkgui_is_shown(win, LB) == 0, "inactive tab child hidden");
+		mkgui_tabs_set_current(win, TABS, TB);
+		layout_widgets(win);
+		CHECK(mkgui_is_shown(win, LA) == 0, "old active tab child now hidden");
+		CHECK(mkgui_is_shown(win, LB) == 1, "newly active tab child shows");
+		mkgui_window_destroy(win);
+		mkgui_ctx_destroy(ctx);
 	}
 	TEST_END();
 }
@@ -412,18 +424,20 @@ static void test_get_window_size(void) {
 	struct mkgui_widget widgets[] = {
 		MKGUI_W(MKGUI_WINDOW, WIN, "T", "", 0, 640, 480, 0, 0, 0),
 	};
-	struct mkgui_ctx *ctx = mkgui_create(widgets, 1);
-	CHECK(ctx, "create failed");
-	if(ctx) {
+	struct mkgui_ctx *ctx = mkgui_ctx_create();
+	struct mkgui_window *win = mkgui_window_create(ctx, NULL, widgets, 1, NULL, 0, 0);
+	CHECK(win, "create failed");
+	if(win) {
 		int32_t w = 0, h = 0;
-		mkgui_get_window_size(ctx, &w, &h);
+		mkgui_get_window_size(win, &w, &h);
 		CHECK(w == 640, "w expected 640 got %d", w);
 		CHECK(h == 480, "h expected 480 got %d", h);
 		// NULL-out parameters are allowed
-		mkgui_get_window_size(ctx, NULL, NULL);
-		mkgui_get_window_size(ctx, &w, NULL);
+		mkgui_get_window_size(win, NULL, NULL);
+		mkgui_get_window_size(win, &w, NULL);
 		CHECK(w == 640, "w-only readback still works");
-		mkgui_destroy(ctx);
+		mkgui_window_destroy(win);
+		mkgui_ctx_destroy(ctx);
 	}
 	TEST_END();
 }
@@ -435,12 +449,14 @@ static void test_get_anim_time(void) {
 	struct mkgui_widget widgets[] = {
 		MKGUI_W(MKGUI_WINDOW, WIN, "T", "", 0, 200, 100, 0, 0, 0),
 	};
-	struct mkgui_ctx *ctx = mkgui_create(widgets, 1);
-	CHECK(ctx, "create failed");
-	if(ctx) {
-		double t = mkgui_get_anim_time(ctx);
+	struct mkgui_ctx *ctx = mkgui_ctx_create();
+	struct mkgui_window *win = mkgui_window_create(ctx, NULL, widgets, 1, NULL, 0, 0);
+	CHECK(win, "create failed");
+	if(win) {
+		double t = mkgui_get_anim_time(win);
 		CHECK(t >= 0.0, "anim_time should be non-negative, got %f", t);
-		mkgui_destroy(ctx);
+		mkgui_window_destroy(win);
+		mkgui_ctx_destroy(ctx);
 	}
 	TEST_END();
 }
@@ -469,26 +485,28 @@ static void test_listview_col_getters(void) {
 		MKGUI_W(MKGUI_VBOX,     VBOX1, "",  "", WIN,   0,   0,   0, 0, 0),
 		MKGUI_W(MKGUI_LISTVIEW, LV,    "",  "", VBOX1, 0,   100, MKGUI_FIXED, 0, 0),
 	};
-	struct mkgui_ctx *ctx = mkgui_create(widgets, 3);
-	CHECK(ctx, "create failed");
-	if(ctx) {
+	struct mkgui_ctx *ctx = mkgui_ctx_create();
+	struct mkgui_window *win = mkgui_window_create(ctx, NULL, widgets, 3, NULL, 0, 0);
+	CHECK(win, "create failed");
+	if(win) {
 		struct mkgui_column cols[3] = {
 			{ "Name",  100, 0 },
 			{ "Size",  80,  0 },
 			{ "Date",  120, 0 },
 		};
 		// Before setup: count is 0, label is ""
-		CHECK(mkgui_listview_get_col_count(ctx, LV) == 0, "count is 0 pre-setup");
-		CHECK(mkgui_listview_get_col_label(ctx, LV, 0)[0] == '\0', "label empty pre-setup");
+		CHECK(mkgui_listview_get_col_count(win, LV) == 0, "count is 0 pre-setup");
+		CHECK(mkgui_listview_get_col_label(win, LV, 0)[0] == '\0', "label empty pre-setup");
 
-		mkgui_listview_setup(ctx, LV, 10, 3, cols, smoke_row_cb, NULL);
-		CHECK(mkgui_listview_get_col_count(ctx, LV) == 3, "count should be 3");
-		CHECK(strcmp(mkgui_listview_get_col_label(ctx, LV, 0), "Name") == 0, "col 0 label");
-		CHECK(strcmp(mkgui_listview_get_col_label(ctx, LV, 1), "Size") == 0, "col 1 label");
-		CHECK(strcmp(mkgui_listview_get_col_label(ctx, LV, 2), "Date") == 0, "col 2 label");
-		CHECK(mkgui_listview_get_col_label(ctx, LV, 3)[0] == '\0', "out-of-range label is empty");
-		CHECK(mkgui_listview_get_col_count(ctx, 9999) == 0, "unknown id returns 0");
-		mkgui_destroy(ctx);
+		mkgui_listview_setup(win, LV, 10, 3, cols, smoke_row_cb, NULL);
+		CHECK(mkgui_listview_get_col_count(win, LV) == 3, "count should be 3");
+		CHECK(strcmp(mkgui_listview_get_col_label(win, LV, 0), "Name") == 0, "col 0 label");
+		CHECK(strcmp(mkgui_listview_get_col_label(win, LV, 1), "Size") == 0, "col 1 label");
+		CHECK(strcmp(mkgui_listview_get_col_label(win, LV, 2), "Date") == 0, "col 2 label");
+		CHECK(mkgui_listview_get_col_label(win, LV, 3)[0] == '\0', "out-of-range label is empty");
+		CHECK(mkgui_listview_get_col_count(win, 9999) == 0, "unknown id returns 0");
+		mkgui_window_destroy(win);
+		mkgui_ctx_destroy(ctx);
 	}
 	TEST_END();
 }
@@ -502,22 +520,24 @@ static void test_gridview_col_getters(void) {
 		MKGUI_W(MKGUI_VBOX,     VBOX1, "",  "", WIN,   0,   0,   0, 0, 0),
 		MKGUI_W(MKGUI_GRIDVIEW, GV,    "",  "", VBOX1, 0,   100, MKGUI_FIXED, 0, 0),
 	};
-	struct mkgui_ctx *ctx = mkgui_create(widgets, 3);
-	CHECK(ctx, "create failed");
-	if(ctx) {
+	struct mkgui_ctx *ctx = mkgui_ctx_create();
+	struct mkgui_window *win = mkgui_window_create(ctx, NULL, widgets, 3, NULL, 0, 0);
+	CHECK(win, "create failed");
+	if(win) {
 		struct mkgui_grid_column cols[2] = {
 			{ "Key",   80, 0 },
 			{ "Value", 80, 0 },
 		};
-		CHECK(mkgui_gridview_get_col_count(ctx, GV) == 0, "count is 0 pre-setup");
-		CHECK(mkgui_gridview_get_col_label(ctx, GV, 0)[0] == '\0', "label empty pre-setup");
+		CHECK(mkgui_gridview_get_col_count(win, GV) == 0, "count is 0 pre-setup");
+		CHECK(mkgui_gridview_get_col_label(win, GV, 0)[0] == '\0', "label empty pre-setup");
 
-		mkgui_gridview_setup(ctx, GV, 4, 2, cols, smoke_grid_cell_cb, NULL);
-		CHECK(mkgui_gridview_get_col_count(ctx, GV) == 2, "count should be 2");
-		CHECK(strcmp(mkgui_gridview_get_col_label(ctx, GV, 0), "Key") == 0, "col 0 label");
-		CHECK(strcmp(mkgui_gridview_get_col_label(ctx, GV, 1), "Value") == 0, "col 1 label");
-		CHECK(mkgui_gridview_get_col_label(ctx, GV, 7)[0] == '\0', "out-of-range label is empty");
-		mkgui_destroy(ctx);
+		mkgui_gridview_setup(win, GV, 4, 2, cols, smoke_grid_cell_cb, NULL);
+		CHECK(mkgui_gridview_get_col_count(win, GV) == 2, "count should be 2");
+		CHECK(strcmp(mkgui_gridview_get_col_label(win, GV, 0), "Key") == 0, "col 0 label");
+		CHECK(strcmp(mkgui_gridview_get_col_label(win, GV, 1), "Value") == 0, "col 1 label");
+		CHECK(mkgui_gridview_get_col_label(win, GV, 7)[0] == '\0', "out-of-range label is empty");
+		mkgui_window_destroy(win);
+		mkgui_ctx_destroy(ctx);
 	}
 	TEST_END();
 }
@@ -535,23 +555,25 @@ static void test_spinner_instantiate(void) {
 		MKGUI_W(MKGUI_VBOX,    VBOX1, "",  "", WIN,   0,   0,   0, 0, 0),
 		MKGUI_W(MKGUI_SPINNER, SP,    "",  "", VBOX1, 48,  48,  MKGUI_FIXED, 0, 0),
 	};
-	struct mkgui_ctx *ctx = mkgui_create(widgets, 3);
-	CHECK(ctx, "create failed");
-	if(ctx) {
-		layout_widgets(ctx);
-		int32_t idx = find_widget_idx(ctx, SP);
+	struct mkgui_ctx *ctx = mkgui_ctx_create();
+	struct mkgui_window *win = mkgui_window_create(ctx, NULL, widgets, 3, NULL, 0, 0);
+	CHECK(win, "create failed");
+	if(win) {
+		layout_widgets(win);
+		int32_t idx = find_widget_idx(win, SP);
 		CHECK(idx >= 0, "spinner must be findable");
 		if(idx >= 0) {
-			CHECK(ctx->rects[idx].w > 0 && ctx->rects[idx].h > 0, "spinner rect must be non-empty");
+			CHECK(win->rects[idx].w > 0 && win->rects[idx].h > 0, "spinner rect must be non-empty");
 		}
 		// render pass should not crash and should advance via anim_time
-		ctx->anim_time = 0.25;
-		ctx->dirty_full = 1;
-		render_widgets(ctx);
-		ctx->anim_time = 0.75;
-		ctx->dirty_full = 1;
-		render_widgets(ctx);
-		mkgui_destroy(ctx);
+		win->anim_time = 0.25;
+		win->dirty_full = 1;
+		render_widgets(win);
+		win->anim_time = 0.75;
+		win->dirty_full = 1;
+		render_widgets(win);
+		mkgui_window_destroy(win);
+		mkgui_ctx_destroy(ctx);
 	}
 	TEST_END();
 }
@@ -565,33 +587,35 @@ static void test_richlist_setup_get_set(void) {
 		MKGUI_W(MKGUI_VBOX,     VBOX1, "",  "", WIN,   0,   0,   0, 0, 0),
 		MKGUI_W(MKGUI_RICHLIST, RL,    "",  "", VBOX1, 0,   200, MKGUI_FIXED, 0, 0),
 	};
-	struct mkgui_ctx *ctx = mkgui_create(widgets, 3);
-	CHECK(ctx, "create failed");
-	if(ctx) {
+	struct mkgui_ctx *ctx = mkgui_ctx_create();
+	struct mkgui_window *win = mkgui_window_create(ctx, NULL, widgets, 3, NULL, 0, 0);
+	CHECK(win, "create failed");
+	if(win) {
 		// Before setup: -1 selected, set_selected is a no-op (no richlist_data yet)
-		CHECK(mkgui_richlist_get_selected(ctx, RL) == -1, "unset richlist reports -1 selected");
+		CHECK(mkgui_richlist_get_selected(win, RL) == -1, "unset richlist reports -1 selected");
 
-		mkgui_richlist_setup(ctx, RL, 20, 56, smoke_richlist_cb, NULL);
-		CHECK(mkgui_richlist_get_selected(ctx, RL) == -1, "fresh richlist has no selection");
+		mkgui_richlist_setup(win, RL, 20, 56, smoke_richlist_cb, NULL);
+		CHECK(mkgui_richlist_get_selected(win, RL) == -1, "fresh richlist has no selection");
 
-		mkgui_richlist_set_selected(ctx, RL, 7);
-		CHECK(mkgui_richlist_get_selected(ctx, RL) == 7, "set/get roundtrip");
+		mkgui_richlist_set_selected(win, RL, 7);
+		CHECK(mkgui_richlist_get_selected(win, RL) == 7, "set/get roundtrip");
 
-		mkgui_richlist_set_rows(ctx, RL, 5);
+		mkgui_richlist_set_rows(win, RL, 5);
 		// Selection is intentionally not auto-clamped; just check API doesn't crash.
-		mkgui_richlist_scroll_to(ctx, RL, 3);
+		mkgui_richlist_scroll_to(win, RL, 3);
 
 		// NULL callback to setup is a no-op
-		mkgui_richlist_setup(ctx, RL, 10, 56, NULL, NULL);
+		mkgui_richlist_setup(win, RL, 10, 56, NULL, NULL);
 		// The still-valid richlist_data should retain its selection
-		CHECK(mkgui_richlist_get_selected(ctx, RL) == 7, "NULL-cb setup must not clobber state");
+		CHECK(mkgui_richlist_get_selected(win, RL) == 7, "NULL-cb setup must not clobber state");
 
 		// Rendering must still work after API churn
-		layout_widgets(ctx);
-		ctx->dirty_full = 1;
-		render_widgets(ctx);
+		layout_widgets(win);
+		win->dirty_full = 1;
+		render_widgets(win);
 
-		mkgui_destroy(ctx);
+		mkgui_window_destroy(win);
+		mkgui_ctx_destroy(ctx);
 	}
 	TEST_END();
 }
@@ -605,40 +629,42 @@ static void test_glview_setup(void) {
 		MKGUI_W(MKGUI_VBOX,   VBOX1, "",  "", WIN,   0,   0,   0, 0, 0),
 		MKGUI_W(MKGUI_GLVIEW, GV,    "",  "", VBOX1, 0,   120, MKGUI_FIXED, 0, 0),
 	};
-	struct mkgui_ctx *ctx = mkgui_create(widgets, 3);
-	CHECK(ctx, "create failed");
-	if(ctx) {
+	struct mkgui_ctx *ctx = mkgui_ctx_create();
+	struct mkgui_window *win = mkgui_window_create(ctx, NULL, widgets, 3, NULL, 0, 0);
+	CHECK(win, "create failed");
+	if(win) {
 		// get_size before init: both zero
 		int32_t w = -1, h = -1;
-		mkgui_glview_get_size(ctx, GV, &w, &h);
+		mkgui_glview_get_size(win, GV, &w, &h);
 		CHECK(w == 0 && h == 0, "pre-init size should be zero (got %dx%d)", w, h);
 
-		uint32_t ok = mkgui_glview_init(ctx, GV);
+		uint32_t ok = mkgui_glview_init(win, GV);
 		CHECK(ok == 1, "glview_init should succeed on valid widget");
 
 		// Second init returns the existing 'created' flag, not a fresh one
-		uint32_t ok2 = mkgui_glview_init(ctx, GV);
+		uint32_t ok2 = mkgui_glview_init(win, GV);
 		CHECK(ok2 == 1, "glview_init is idempotent");
 
-		mkgui_glview_get_size(ctx, GV, &w, &h);
+		mkgui_glview_get_size(win, GV, &w, &h);
 		CHECK(w > 0 && h > 0, "post-init size should be positive (got %dx%d)", w, h);
 
 		// get_size on unknown id returns zero
 		int32_t uw = -1, uh = -1;
-		mkgui_glview_get_size(ctx, 9999, &uw, &uh);
+		mkgui_glview_get_size(win, 9999, &uw, &uh);
 		CHECK(uw == 0 && uh == 0, "unknown id returns zero size");
 
 		// get_size tolerates NULL out pointers
-		mkgui_glview_get_size(ctx, GV, NULL, NULL);
+		mkgui_glview_get_size(win, GV, NULL, NULL);
 
-		mkgui_glview_destroy(ctx, GV);
-		mkgui_glview_get_size(ctx, GV, &w, &h);
+		mkgui_glview_destroy(win, GV);
+		mkgui_glview_get_size(win, GV, &w, &h);
 		CHECK(w == 0 && h == 0, "post-destroy size should be zero");
 
 		// destroy is idempotent (no-op if already destroyed)
-		mkgui_glview_destroy(ctx, GV);
+		mkgui_glview_destroy(win, GV);
 
-		mkgui_destroy(ctx);
+		mkgui_window_destroy(win);
+		mkgui_ctx_destroy(ctx);
 	}
 	TEST_END();
 }
@@ -654,9 +680,10 @@ static void test_iconbrowser_grid_metrics(void) {
 	struct mkgui_widget widgets[] = {
 		MKGUI_W(MKGUI_WINDOW, WIN, "T", "", 0, 400, 300, 0, 0, 0),
 	};
-	struct mkgui_ctx *ctx = mkgui_create(widgets, 1);
-	CHECK(ctx, "create failed");
-	if(ctx) {
+	struct mkgui_ctx *ctx = mkgui_ctx_create();
+	struct mkgui_window *win = mkgui_window_create(ctx, NULL, widgets, 1, NULL, 0, 0);
+	CHECK(win, "create failed");
+	if(win) {
 		// The function uses the iconbrowser global. Allocate a temporary state
 		// matching what the real dialog uses.
 		struct ib_theme_state *saved = ibt;
@@ -664,12 +691,12 @@ static void test_iconbrowser_grid_metrics(void) {
 		CHECK(ibt != NULL, "calloc ib_theme_state");
 		if(ibt) {
 			int32_t row_h, col_w, rows_per_col, total_cols, total_w;
-			int32_t expect_row_h = sc(ctx, IB_GRID_ROW_H_PX);
-			int32_t expect_col_w = sc(ctx, IB_GRID_COL_W_PX);
+			int32_t expect_row_h = sc(win, IB_GRID_ROW_H_PX);
+			int32_t expect_col_w = sc(win, IB_GRID_COL_W_PX);
 
 			// Case 1: empty filter -> 0 columns, total_w clamps to canvas width
 			ibt->filtered_count = 0;
-			ibt_grid_metrics(ctx, 500, 220, &row_h, &col_w, &rows_per_col, &total_cols, &total_w);
+			ibt_grid_metrics(win, 500, 220, &row_h, &col_w, &rows_per_col, &total_cols, &total_w);
 			CHECK(row_h == expect_row_h, "row_h scaled (got %d, want %d)", row_h, expect_row_h);
 			CHECK(col_w == expect_col_w, "col_w scaled (got %d, want %d)", col_w, expect_col_w);
 			CHECK(rows_per_col == 220 / expect_row_h, "rows_per_col = ca_h/row_h (got %d)", rows_per_col);
@@ -678,7 +705,7 @@ static void test_iconbrowser_grid_metrics(void) {
 
 			// Case 2: skinny canvas forces rows_per_col >= 1 even when h < row_h
 			ibt->filtered_count = 10;
-			ibt_grid_metrics(ctx, 300, 5, &row_h, &col_w, &rows_per_col, &total_cols, &total_w);
+			ibt_grid_metrics(win, 300, 5, &row_h, &col_w, &rows_per_col, &total_cols, &total_w);
 			CHECK(rows_per_col == 1, "rows_per_col floor is 1, got %d", rows_per_col);
 			CHECK(total_cols == 10, "10 items at 1 row/col -> 10 cols");
 			int32_t expect_total_w_2 = 10 * expect_col_w;
@@ -689,19 +716,20 @@ static void test_iconbrowser_grid_metrics(void) {
 
 			// Case 3: ceiling division when items don't fill last column
 			ibt->filtered_count = 11;
-			ibt_grid_metrics(ctx, 200, expect_row_h * 4, &row_h, &col_w, &rows_per_col, &total_cols, &total_w);
+			ibt_grid_metrics(win, 200, expect_row_h * 4, &row_h, &col_w, &rows_per_col, &total_cols, &total_w);
 			CHECK(rows_per_col == 4, "rows_per_col = 4");
 			CHECK(total_cols == 3, "ceil(11 / 4) = 3 cols, got %d", total_cols);
 
 			// Case 4: items fit in a single partial column
 			ibt->filtered_count = 3;
-			ibt_grid_metrics(ctx, 100, expect_row_h * 10, &row_h, &col_w, &rows_per_col, &total_cols, &total_w);
+			ibt_grid_metrics(win, 100, expect_row_h * 10, &row_h, &col_w, &rows_per_col, &total_cols, &total_w);
 			CHECK(total_cols == 1, "3 items fit in 1 col when rows_per_col=10");
 
 			free(ibt);
 		}
 		ibt = saved;
-		mkgui_destroy(ctx);
+		mkgui_window_destroy(win);
+		mkgui_ctx_destroy(ctx);
 	}
 	TEST_END();
 }
@@ -717,32 +745,34 @@ static void test_toast_basic(void) {
 	struct mkgui_widget widgets[] = {
 		MKGUI_W(MKGUI_WINDOW, WIN, "T", "", 0, 400, 300, 0, 0, 0),
 	};
-	struct mkgui_ctx *ctx = mkgui_create(widgets, 1);
-	CHECK(ctx, "create failed");
-	if(ctx) {
-		mkgui_toast(ctx, "hello");
+	struct mkgui_ctx *ctx = mkgui_ctx_create();
+	struct mkgui_window *win = mkgui_window_create(ctx, NULL, widgets, 1, NULL, 0, 0);
+	CHECK(win, "create failed");
+	if(win) {
+		mkgui_toast(win, "hello");
 		uint32_t active = 0;
 		for(uint32_t i = 0; i < MKGUI_MAX_TOASTS; ++i) {
-			if(ctx->toasts[i].active) {
+			if(win->toasts[i].active) {
 				++active;
-				CHECK(ctx->toasts[i].severity == MKGUI_SEVERITY_INFO, "default severity should be INFO");
-				CHECK(ctx->toasts[i].expire_ms != 0, "default duration should not be persistent");
-				CHECK(strcmp(ctx->toasts[i].text, "hello") == 0, "text mismatch: %s", ctx->toasts[i].text);
+				CHECK(win->toasts[i].severity == MKGUI_SEVERITY_INFO, "default severity should be INFO");
+				CHECK(win->toasts[i].expire_ms != 0, "default duration should not be persistent");
+				CHECK(strcmp(win->toasts[i].text, "hello") == 0, "text mismatch: %s", win->toasts[i].text);
 			}
 		}
 
 		CHECK(active == 1, "expected 1 active toast, got %u", active);
 
-		mkgui_toast_clear(ctx);
+		mkgui_toast_clear(win);
 		active = 0;
 		for(uint32_t i = 0; i < MKGUI_MAX_TOASTS; ++i) {
-			if(ctx->toasts[i].active) {
+			if(win->toasts[i].active) {
 				++active;
 			}
 		}
 
 		CHECK(active == 0, "toast_clear should remove all toasts, got %u active", active);
-		mkgui_destroy(ctx);
+		mkgui_window_destroy(win);
+		mkgui_ctx_destroy(ctx);
 	}
 	TEST_END();
 }
@@ -754,12 +784,13 @@ static void test_toast_severity_and_persistent(void) {
 	struct mkgui_widget widgets[] = {
 		MKGUI_W(MKGUI_WINDOW, WIN, "T", "", 0, 400, 300, 0, 0, 0),
 	};
-	struct mkgui_ctx *ctx = mkgui_create(widgets, 1);
-	if(ctx) {
-		mkgui_toast_ex(ctx, MKGUI_SEVERITY_ERROR, "boom", 0);
+	struct mkgui_ctx *ctx = mkgui_ctx_create();
+	struct mkgui_window *win = mkgui_window_create(ctx, NULL, widgets, 1, NULL, 0, 0);
+	if(win) {
+		mkgui_toast_ex(win, MKGUI_SEVERITY_ERROR, "boom", 0);
 		uint32_t found = 0;
 		for(uint32_t i = 0; i < MKGUI_MAX_TOASTS; ++i) {
-			struct mkgui_toast_slot *t = &ctx->toasts[i];
+			struct mkgui_toast_slot *t = &win->toasts[i];
 			if(t->active) {
 				CHECK(t->severity == MKGUI_SEVERITY_ERROR, "severity should be ERROR, got %u", t->severity);
 				CHECK(t->expire_ms == 0, "duration=0 should yield persistent toast");
@@ -769,7 +800,8 @@ static void test_toast_severity_and_persistent(void) {
 		}
 
 		CHECK(found == 1, "expected 1 active toast, got %u", found);
-		mkgui_destroy(ctx);
+		mkgui_window_destroy(win);
+		mkgui_ctx_destroy(ctx);
 	}
 	TEST_END();
 }
@@ -781,16 +813,17 @@ static void test_toast_overflow_evicts_oldest(void) {
 	struct mkgui_widget widgets[] = {
 		MKGUI_W(MKGUI_WINDOW, WIN, "T", "", 0, 400, 300, 0, 0, 0),
 	};
-	struct mkgui_ctx *ctx = mkgui_create(widgets, 1);
-	if(ctx) {
+	struct mkgui_ctx *ctx = mkgui_ctx_create();
+	struct mkgui_window *win = mkgui_window_create(ctx, NULL, widgets, 1, NULL, 0, 0);
+	if(win) {
 		char buf[32];
 		for(uint32_t i = 0; i < MKGUI_MAX_TOASTS; ++i) {
 			snprintf(buf, sizeof(buf), "t%u", i);
-			mkgui_toast(ctx, buf);
+			mkgui_toast(win, buf);
 		}
 		uint32_t active = 0;
 		for(uint32_t i = 0; i < MKGUI_MAX_TOASTS; ++i) {
-			if(ctx->toasts[i].active) {
+			if(win->toasts[i].active) {
 				++active;
 			}
 		}
@@ -798,17 +831,17 @@ static void test_toast_overflow_evicts_oldest(void) {
 		CHECK(active == MKGUI_MAX_TOASTS, "expected all %u slots filled, got %u", MKGUI_MAX_TOASTS, active);
 
 		// One more: oldest (t0) should be dropped, newest ("overflow") should be in last slot
-		mkgui_toast(ctx, "overflow");
+		mkgui_toast(win, "overflow");
 		active = 0;
 		uint32_t has_t0 = 0;
 		uint32_t has_overflow = 0;
 		for(uint32_t i = 0; i < MKGUI_MAX_TOASTS; ++i) {
-			if(ctx->toasts[i].active) {
+			if(win->toasts[i].active) {
 				++active;
-				if(strcmp(ctx->toasts[i].text, "t0") == 0) {
+				if(strcmp(win->toasts[i].text, "t0") == 0) {
 					has_t0 = 1;
 				}
-				if(strcmp(ctx->toasts[i].text, "overflow") == 0) {
+				if(strcmp(win->toasts[i].text, "overflow") == 0) {
 					has_overflow = 1;
 				}
 			}
@@ -817,7 +850,8 @@ static void test_toast_overflow_evicts_oldest(void) {
 		CHECK(active == MKGUI_MAX_TOASTS, "still expected %u active after overflow, got %u", MKGUI_MAX_TOASTS, active);
 		CHECK(!has_t0, "oldest toast t0 should have been evicted");
 		CHECK(has_overflow, "newest toast 'overflow' should be present");
-		mkgui_destroy(ctx);
+		mkgui_window_destroy(win);
+		mkgui_ctx_destroy(ctx);
 	}
 	TEST_END();
 }
@@ -829,27 +863,28 @@ static void test_toast_expiry(void) {
 	struct mkgui_widget widgets[] = {
 		MKGUI_W(MKGUI_WINDOW, WIN, "T", "", 0, 400, 300, 0, 0, 0),
 	};
-	struct mkgui_ctx *ctx = mkgui_create(widgets, 1);
-	if(ctx) {
+	struct mkgui_ctx *ctx = mkgui_ctx_create();
+	struct mkgui_window *win = mkgui_window_create(ctx, NULL, widgets, 1, NULL, 0, 0);
+	if(win) {
 		// Short-lived toast: 1ms
-		mkgui_toast_ex(ctx, MKGUI_SEVERITY_INFO, "short", 1);
+		mkgui_toast_ex(win, MKGUI_SEVERITY_INFO, "short", 1);
 		// Persistent toast: 0ms
-		mkgui_toast_ex(ctx, MKGUI_SEVERITY_INFO, "persist", 0);
+		mkgui_toast_ex(win, MKGUI_SEVERITY_INFO, "persist", 0);
 
 		// Ensure the 1ms one has already expired before calling toasts_expire
 		struct timespec ts;
 		ts.tv_sec = 0;
 		ts.tv_nsec = 5 * 1000 * 1000; // 5ms
 		nanosleep(&ts, NULL);
-		uint32_t removed = toasts_expire(ctx);
+		uint32_t removed = toasts_expire(win);
 		CHECK(removed, "toasts_expire should have removed the short-lived toast");
 
 		uint32_t active = 0;
 		uint32_t has_persist = 0;
 		for(uint32_t i = 0; i < MKGUI_MAX_TOASTS; ++i) {
-			if(ctx->toasts[i].active) {
+			if(win->toasts[i].active) {
 				++active;
-				if(strcmp(ctx->toasts[i].text, "persist") == 0) {
+				if(strcmp(win->toasts[i].text, "persist") == 0) {
 					has_persist = 1;
 				}
 			}
@@ -857,7 +892,8 @@ static void test_toast_expiry(void) {
 
 		CHECK(active == 1, "expected 1 surviving toast, got %u", active);
 		CHECK(has_persist, "persistent toast should still be active");
-		mkgui_destroy(ctx);
+		mkgui_window_destroy(win);
+		mkgui_ctx_destroy(ctx);
 	}
 	TEST_END();
 }
@@ -869,24 +905,26 @@ static void test_banner_set_clear(void) {
 	struct mkgui_widget widgets[] = {
 		MKGUI_W(MKGUI_WINDOW, WIN, "T", "", 0, 400, 300, 0, 0, 0),
 	};
-	struct mkgui_ctx *ctx = mkgui_create(widgets, 1);
-	if(ctx) {
-		CHECK(!mkgui_banner_active(ctx), "banner should start inactive");
+	struct mkgui_ctx *ctx = mkgui_ctx_create();
+	struct mkgui_window *win = mkgui_window_create(ctx, NULL, widgets, 1, NULL, 0, 0);
+	if(win) {
+		CHECK(!mkgui_banner_active(win), "banner should start inactive");
 
-		mkgui_banner_set(ctx, MKGUI_SEVERITY_WARNING, "unsaved");
-		CHECK(mkgui_banner_active(ctx), "banner should be active after set");
-		CHECK(ctx->banner.severity == MKGUI_SEVERITY_WARNING, "severity mismatch: %u", ctx->banner.severity);
-		CHECK(strcmp(ctx->banner.text, "unsaved") == 0, "text mismatch: %s", ctx->banner.text);
+		mkgui_banner_set(win, MKGUI_SEVERITY_WARNING, "unsaved");
+		CHECK(mkgui_banner_active(win), "banner should be active after set");
+		CHECK(win->banner.severity == MKGUI_SEVERITY_WARNING, "severity mismatch: %u", win->banner.severity);
+		CHECK(strcmp(win->banner.text, "unsaved") == 0, "text mismatch: %s", win->banner.text);
 
 		// Replace
-		mkgui_banner_set(ctx, MKGUI_SEVERITY_ERROR, "offline");
-		CHECK(mkgui_banner_active(ctx), "banner should still be active after replace");
-		CHECK(ctx->banner.severity == MKGUI_SEVERITY_ERROR, "severity after replace mismatch");
-		CHECK(strcmp(ctx->banner.text, "offline") == 0, "text after replace mismatch");
+		mkgui_banner_set(win, MKGUI_SEVERITY_ERROR, "offline");
+		CHECK(mkgui_banner_active(win), "banner should still be active after replace");
+		CHECK(win->banner.severity == MKGUI_SEVERITY_ERROR, "severity after replace mismatch");
+		CHECK(strcmp(win->banner.text, "offline") == 0, "text after replace mismatch");
 
-		mkgui_banner_clear(ctx);
-		CHECK(!mkgui_banner_active(ctx), "banner should be inactive after clear");
-		mkgui_destroy(ctx);
+		mkgui_banner_clear(win);
+		CHECK(!mkgui_banner_active(win), "banner should be inactive after clear");
+		mkgui_window_destroy(win);
+		mkgui_ctx_destroy(ctx);
 	}
 	TEST_END();
 }
@@ -899,8 +937,8 @@ static int32_t cw_cb_x, cw_cb_y, cw_cb_w, cw_cb_h;
 static uint32_t cw_cb_called;
 
 // [=]===^=[ canvas_window_draw_cb ]==================================[=]
-static void canvas_window_draw_cb(struct mkgui_ctx *ctx, uint32_t id, uint32_t *pixels, int32_t x, int32_t y, int32_t w, int32_t h, void *userdata) {
-	(void)ctx; (void)id; (void)pixels; (void)userdata;
+static void canvas_window_draw_cb(struct mkgui_window *win, uint32_t id, uint32_t *pixels, int32_t x, int32_t y, int32_t w, int32_t h, void *userdata) {
+	(void)win; (void)id; (void)pixels; (void)userdata;
 	cw_cb_x = x;
 	cw_cb_y = y;
 	cw_cb_w = w;
@@ -916,26 +954,28 @@ static void test_canvas_window_render(void) {
 		MKGUI_W(MKGUI_WINDOW, WIN, "T", "", 0, 275, 116, 0, MKGUI_WINDOW_UNDECORATED | MKGUI_WINDOW_CANVAS | MKGUI_WINDOW_HIDDEN, 0),
 		MKGUI_W(MKGUI_CANVAS, CANVAS, "", "", WIN, 0, 0, 0, 0, 1),
 	};
-	struct mkgui_ctx *ctx = mkgui_create(widgets, 2);
-	CHECK(ctx, "mkgui_create failed");
-	if(ctx) {
-		CHECK(ctx->canvas_window == 1, "canvas_window flag set");
-		CHECK(ctx->undecorated == 1, "undecorated flag set");
+	struct mkgui_ctx *ctx = mkgui_ctx_create();
+	struct mkgui_window *win = mkgui_window_create(ctx, NULL, widgets, 2, NULL, 0, 0);
+	CHECK(win, "mkgui_window_create failed");
+	if(win) {
+		CHECK(win->canvas_window == 1, "canvas_window flag set");
+		CHECK(win->undecorated == 1, "undecorated flag set");
 
-		mkgui_canvas_set_callback(ctx, CANVAS, canvas_window_draw_cb, NULL);
+		mkgui_canvas_set_callback(win, CANVAS, canvas_window_draw_cb, NULL);
 
 		cw_cb_called = 0;
-		layout_widgets(ctx);
-		ctx->dirty_full = 1;
-		render_widgets(ctx);
+		layout_widgets(win);
+		win->dirty_full = 1;
+		render_widgets(win);
 
 		CHECK(cw_cb_called == 1, "canvas callback was invoked");
 		CHECK(cw_cb_x == 0, "callback x == 0, got %d", cw_cb_x);
 		CHECK(cw_cb_y == 0, "callback y == 0, got %d", cw_cb_y);
-		CHECK(cw_cb_w == ctx->win_w, "callback w == win_w (%d), got %d", ctx->win_w, cw_cb_w);
-		CHECK(cw_cb_h == ctx->win_h, "callback h == win_h (%d), got %d", ctx->win_h, cw_cb_h);
+		CHECK(cw_cb_w == win->win_w, "callback w == win_w (%d), got %d", win->win_w, cw_cb_w);
+		CHECK(cw_cb_h == win->win_h, "callback h == win_h (%d), got %d", win->win_h, cw_cb_h);
 
-		mkgui_destroy(ctx);
+		mkgui_window_destroy(win);
+		mkgui_ctx_destroy(ctx);
 	}
 	TEST_END();
 }

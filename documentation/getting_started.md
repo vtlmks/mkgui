@@ -62,9 +62,9 @@ Link your application against `libmkgui.a` and include `mkgui.h`.
 
 enum { ID_WINDOW = 1, ID_VBOX, ID_LABEL, ID_BUTTON };
 
-static void on_event(struct mkgui_ctx *ctx, struct mkgui_event *ev, void *userdata) {
+static void on_event(struct mkgui_window *win, struct mkgui_event *ev, void *userdata) {
 	if(ev->type == MKGUI_EVENT_CLICK && ev->id == ID_BUTTON) {
-		mkgui_label_set(ctx, ID_LABEL, "Clicked!");
+		mkgui_label_set(win, ID_LABEL, "Clicked!");
 	}
 }
 
@@ -75,11 +75,13 @@ int main(void) {
 		MKGUI_W(MKGUI_LABEL,  ID_LABEL,  "Hello",     "", ID_VBOX,   0, 0, 0, 0, 0),
 		MKGUI_W(MKGUI_BUTTON, ID_BUTTON, "Click me",  "edit-find", ID_VBOX, 120, 0, MKGUI_FIXED, 0, 0),
 	};
-	struct mkgui_ctx *ctx = mkgui_create(widgets, 4);
-	mkgui_set_app_class(ctx, "myapp");
-	mkgui_icon_load_app_icons(ctx, "myapp");
-	mkgui_run(ctx, on_event, NULL);
-	mkgui_destroy(ctx);
+	struct mkgui_ctx *ctx = mkgui_ctx_create();
+	mkgui_ctx_set_app_class(ctx, "myapp");
+	struct mkgui_window *win = mkgui_window_create(ctx, NULL, widgets, 4, NULL, 0, 0);
+	mkgui_icon_load_app_icons(win, "myapp");
+	mkgui_ctx_run(ctx, on_event, NULL);
+	mkgui_window_destroy(win);
+	mkgui_ctx_destroy(ctx);
 	return 0;
 }
 ```
@@ -150,9 +152,10 @@ This file is never touched by the editor, so your additions are safe across re-e
 
 5. **Load icons** at startup:
 ```c
-struct mkgui_ctx *ctx = mkgui_create(widgets, count);
-mkgui_set_app_class(ctx, "myapp");
-mkgui_icon_load_app_icons(ctx, "myapp");
+struct mkgui_ctx *ctx = mkgui_ctx_create();
+mkgui_ctx_set_app_class(ctx, "myapp");
+struct mkgui_window *win = mkgui_window_create(ctx, NULL, widgets, count, NULL, 0, 0);
+mkgui_icon_load_app_icons(win, "myapp");
 ```
 
 On Linux, this searches the following paths in order:
@@ -206,14 +209,14 @@ Freedesktop icon themes often use symlinks for icon aliases (e.g., `media-floppy
 
 ### Theme compatibility
 
-Icons adapt to the active theme. Monochrome icons using `currentColor` (like Papirus action icons) automatically follow `ctx->theme.text` -- they're light on dark themes, dark on light themes, and update when you call `mkgui_set_theme()`.
+Icons adapt to the active theme. Monochrome icons using `currentColor` (like Papirus action icons) automatically follow the active theme's `text` colour -- they're light on dark themes, dark on light themes, and update when you call `mkgui_ctx_set_theme()`.
 
 ## DPI scaling
 
 mkgui auto-detects display DPI on startup (via Xft.dpi on Linux, GetDpiForWindow on Windows). Override with:
 
 ```c
-mkgui_set_scale(ctx, 2.0f);  // 2x scale for HiDPI displays
+mkgui_ctx_set_scale(ctx, 2.0f);  // 2x scale for HiDPI displays
 ```
 
 Or set the `MKGUI_SCALE` environment variable before launching: `MKGUI_SCALE=1.5`, `MKGUI_SCALE=150%`, or `MKGUI_SCALE=144dpi`. The env var takes precedence over auto-detection.
@@ -254,7 +257,7 @@ The visual designer lets you create widget layouts interactively:
 - Generate C code with File > Generate Code
 - Test your layout with the Test button
 
-The editor outputs a complete `.c` file with widget array, event handler stubs, and an `mkgui_run()` loop.
+The editor outputs a complete `.c` file with widget array, event handler stubs, and an `mkgui_ctx_run()` loop.
 
 ## Cross-platform
 

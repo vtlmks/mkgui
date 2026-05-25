@@ -53,17 +53,17 @@ static void accel_format_text(uint32_t keymod, uint32_t keysym, char *buf, uint3
 }
 
 // [=]===^=[ accel_find_for_widget ]==============================[=]
-static struct mkgui_accel *accel_find_for_widget(struct mkgui_ctx *ctx, uint32_t id) {
-	for(uint32_t i = 0; i < ctx->accel_count; ++i) {
-		if(ctx->accels[i].id == id) {
-			return &ctx->accels[i];
+static struct mkgui_accel *accel_find_for_widget(struct mkgui_window *win, uint32_t id) {
+	for(uint32_t i = 0; i < win->accel_count; ++i) {
+		if(win->accels[i].id == id) {
+			return &win->accels[i];
 		}
 	}
 	return NULL;
 }
 
 // [=]===^=[ accel_dispatch ]=====================================[=]
-static uint32_t accel_dispatch(struct mkgui_ctx *ctx, uint32_t keysym, uint32_t keymod, struct mkgui_event *ev) {
+static uint32_t accel_dispatch(struct mkgui_window *win, uint32_t keysym, uint32_t keymod, struct mkgui_event *ev) {
 	uint32_t mod = keymod & (MKGUI_MOD_CONTROL | MKGUI_MOD_ALT | MKGUI_MOD_SHIFT);
 	if(!mod) {
 		return 0;
@@ -72,11 +72,11 @@ static uint32_t accel_dispatch(struct mkgui_ctx *ctx, uint32_t keysym, uint32_t 
 	if(ks_lower >= 'A' && ks_lower <= 'Z') {
 		ks_lower += 32;
 	}
-	for(uint32_t i = 0; i < ctx->accel_count; ++i) {
-		struct mkgui_accel *a = &ctx->accels[i];
+	for(uint32_t i = 0; i < win->accel_count; ++i) {
+		struct mkgui_accel *a = &win->accels[i];
 		uint32_t need = a->keymod & (MKGUI_MOD_CONTROL | MKGUI_MOD_ALT | MKGUI_MOD_SHIFT);
 		if(ks_lower == a->keysym && mod == need) {
-			struct mkgui_widget *w = find_widget(ctx, a->id);
+			struct mkgui_widget *w = find_widget(win, a->id);
 			if(w && w->type == MKGUI_MENUITEM) {
 				ev->type = MKGUI_EVENT_MENU;
 			} else {
@@ -92,27 +92,27 @@ static uint32_t accel_dispatch(struct mkgui_ctx *ctx, uint32_t keysym, uint32_t 
 }
 
 // [=]===^=[ mkgui_accel_add ]====================================[=]
-MKGUI_API void mkgui_accel_add(struct mkgui_ctx *ctx, uint32_t id, uint32_t keymod, uint32_t keysym) {
-	MKGUI_CHECK(ctx);
-	if(ctx->accel_count >= MKGUI_MAX_ACCELS) {
+MKGUI_API void mkgui_accel_add(struct mkgui_window *win, uint32_t id, uint32_t keymod, uint32_t keysym) {
+	MKGUI_CHECK(win);
+	if(win->accel_count >= MKGUI_MAX_ACCELS) {
 		return;
 	}
 
 	if(keysym >= 'A' && keysym <= 'Z') {
 		keysym = keysym + 32;
 	}
-	struct mkgui_accel *a = &ctx->accels[ctx->accel_count++];
+	struct mkgui_accel *a = &win->accels[win->accel_count++];
 	a->keysym = keysym;
 	a->keymod = keymod;
 	a->id = id;
 }
 
 // [=]===^=[ mkgui_accel_remove ]=================================[=]
-MKGUI_API void mkgui_accel_remove(struct mkgui_ctx *ctx, uint32_t id) {
-	MKGUI_CHECK(ctx);
-	for(uint32_t i = 0; i < ctx->accel_count; ) {
-		if(ctx->accels[i].id == id) {
-			ctx->accels[i] = ctx->accels[--ctx->accel_count];
+MKGUI_API void mkgui_accel_remove(struct mkgui_window *win, uint32_t id) {
+	MKGUI_CHECK(win);
+	for(uint32_t i = 0; i < win->accel_count; ) {
+		if(win->accels[i].id == id) {
+			win->accels[i] = win->accels[--win->accel_count];
 		} else {
 			++i;
 		}
@@ -120,7 +120,7 @@ MKGUI_API void mkgui_accel_remove(struct mkgui_ctx *ctx, uint32_t id) {
 }
 
 // [=]===^=[ mkgui_accel_clear ]==================================[=]
-MKGUI_API void mkgui_accel_clear(struct mkgui_ctx *ctx) {
-	MKGUI_CHECK(ctx);
-	ctx->accel_count = 0;
+MKGUI_API void mkgui_accel_clear(struct mkgui_window *win) {
+	MKGUI_CHECK(win);
+	win->accel_count = 0;
 }

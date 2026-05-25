@@ -51,11 +51,11 @@ static uint32_t isqrt_u32(uint32_t n) {
 }
 
 // [=]===^=[ render_spinner ]=======================================[=]
-static void render_spinner(struct mkgui_ctx *ctx, uint32_t idx) {
-	int32_t rx = ctx->rects[idx].x;
-	int32_t ry = ctx->rects[idx].y;
-	int32_t rw = ctx->rects[idx].w;
-	int32_t rh = ctx->rects[idx].h;
+static void render_spinner(struct mkgui_window *win, uint32_t idx) {
+	int32_t rx = win->rects[idx].x;
+	int32_t ry = win->rects[idx].y;
+	int32_t rw = win->rects[idx].w;
+	int32_t rh = win->rects[idx].h;
 
 	int32_t size = rw < rh ? rw : rh;
 	int32_t outer_r = size / 2 - 1;
@@ -66,7 +66,7 @@ static void render_spinner(struct mkgui_ctx *ctx, uint32_t idx) {
 	int32_t cx = rx + rw / 2;
 	int32_t cy = ry + rh / 2;
 
-	double phase = ctx->anim_time * MKGUI_SPINNER_SPEED;
+	double phase = win->anim_time * MKGUI_SPINNER_SPEED;
 	phase -= (double)(int32_t)phase;
 	int32_t ang_start = (int32_t)(phase * 3600.0) % 3600;
 	int32_t arc_len = MKGUI_SPINNER_ARC * 10;
@@ -93,16 +93,16 @@ static void render_spinner(struct mkgui_ctx *ctx, uint32_t idx) {
 		dy0 = -cy;
 	}
 
-	if(cy + dy1 >= ctx->win_h) {
-		dy1 = ctx->win_h - 1 - cy;
+	if(cy + dy1 >= win->win_h) {
+		dy1 = win->win_h - 1 - cy;
 	}
 
 	if(cx + dx0 < 0) {
 		dx0 = -cx;
 	}
 
-	if(cx + dx1 >= ctx->win_w) {
-		dx1 = ctx->win_w - 1 - cx;
+	if(cx + dx1 >= win->win_w) {
+		dx1 = win->win_w - 1 - cx;
 	}
 
 	if(cy + dy0 < render_clip_y1) {
@@ -121,7 +121,7 @@ static void render_spinner(struct mkgui_ctx *ctx, uint32_t idx) {
 		dx1 = render_clip_x2 - 1 - cx;
 	}
 
-	uint32_t accent = ctx->theme.accent;
+	uint32_t accent = win->theme.accent;
 	for(int32_t dy = dy0; dy <= dy1; ++dy) {
 		int32_t dy2 = dy * dy;
 		int32_t rem_out = outer_sq - dy2;
@@ -131,7 +131,7 @@ static void render_spinner(struct mkgui_ctx *ctx, uint32_t idx) {
 		int32_t x_out = (int32_t)isqrt_u32((uint32_t)rem_out);
 		int32_t rem_in = inner_sq - dy2;
 		int32_t py = cy + dy;
-		uint32_t *row = &ctx->pixels[py * ctx->win_w];
+		uint32_t *row = &win->pixels[py * win->win_w];
 
 		int32_t ra0 = -x_out;
 		int32_t ra1 = x_out;

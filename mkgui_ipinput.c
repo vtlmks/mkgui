@@ -5,25 +5,25 @@
 #define IPINPUT_DOT_W_PX  6
 
 // [=]===^=[ ipinput_field_x ]=====================================[=]
-static int32_t ipinput_field_x(struct mkgui_ctx *ctx, int32_t rx, int32_t rw, uint32_t field) {
-	int32_t pad = sc(ctx, IPINPUT_PAD_PX);
-	int32_t dot_w = sc(ctx, IPINPUT_DOT_W_PX);
+static int32_t ipinput_field_x(struct mkgui_window *win, int32_t rx, int32_t rw, uint32_t field) {
+	int32_t pad = sc(win, IPINPUT_PAD_PX);
+	int32_t dot_w = sc(win, IPINPUT_DOT_W_PX);
 	int32_t field_w = (rw - pad * 2 - dot_w * 3) / 4;
 	return rx + pad + (int32_t)field * (field_w + dot_w);
 }
 
 // [=]===^=[ ipinput_field_w ]=====================================[=]
-static int32_t ipinput_field_w(struct mkgui_ctx *ctx, int32_t rw) {
-	int32_t pad = sc(ctx, IPINPUT_PAD_PX);
-	int32_t dot_w = sc(ctx, IPINPUT_DOT_W_PX);
+static int32_t ipinput_field_w(struct mkgui_window *win, int32_t rw) {
+	int32_t pad = sc(win, IPINPUT_PAD_PX);
+	int32_t dot_w = sc(win, IPINPUT_DOT_W_PX);
 	return (rw - pad * 2 - dot_w * 3) / 4;
 }
 
 // [=]===^=[ ipinput_hit_field ]===================================[=]
-static int32_t ipinput_hit_field(struct mkgui_ctx *ctx, int32_t rx, int32_t rw, int32_t mx) {
-	int32_t fw = ipinput_field_w(ctx, rw);
+static int32_t ipinput_hit_field(struct mkgui_window *win, int32_t rx, int32_t rw, int32_t mx) {
+	int32_t fw = ipinput_field_w(win, rw);
 	for(uint32_t i = 0; i < 4; ++i) {
-		int32_t fx = ipinput_field_x(ctx, rx, rw, i);
+		int32_t fx = ipinput_field_x(win, rx, rw, i);
 		if(mx >= fx && mx < fx + fw) {
 			return (int32_t)i;
 		}
@@ -46,51 +46,51 @@ static void ipinput_format(struct mkgui_ipinput_data *ip, char *buf, uint32_t bu
 }
 
 // [=]===^=[ render_ipinput ]======================================[=]
-static void render_ipinput(struct mkgui_ctx *ctx, uint32_t idx) {
-	struct mkgui_widget *w = &ctx->widgets[idx];
-	int32_t rx = ctx->rects[idx].x;
-	int32_t ry = ctx->rects[idx].y;
-	int32_t rw = ctx->rects[idx].w;
-	int32_t rh = ctx->rects[idx].h;
+static void render_ipinput(struct mkgui_window *win, uint32_t idx) {
+	struct mkgui_widget *w = &win->widgets[idx];
+	int32_t rx = win->rects[idx].x;
+	int32_t ry = win->rects[idx].y;
+	int32_t rw = win->rects[idx].w;
+	int32_t rh = win->rects[idx].h;
 
 	uint32_t disabled = (w->flags & MKGUI_DISABLED);
-	uint32_t focused = (ctx->focus_id == w->id);
-	uint32_t input_bg = disabled_blend(ctx->theme.input_bg, ctx->theme.bg, disabled);
-	uint32_t border_color = disabled_blend(focused ? ctx->theme.highlight : ctx->theme.widget_border, ctx->theme.bg, disabled);
-	draw_patch(ctx, MKGUI_STYLE_SUNKEN, rx, ry, rw, rh, input_bg, border_color);
+	uint32_t focused = (win->focus_id == w->id);
+	uint32_t input_bg = disabled_blend(win->theme.input_bg, win->theme.bg, disabled);
+	uint32_t border_color = disabled_blend(focused ? win->theme.highlight : win->theme.widget_border, win->theme.bg, disabled);
+	draw_patch(win, MKGUI_STYLE_SUNKEN, rx, ry, rw, rh, input_bg, border_color);
 
-	struct mkgui_ipinput_data *ip = find_ipinput_data(ctx, w->id);
+	struct mkgui_ipinput_data *ip = find_ipinput_data(win, w->id);
 	if(!ip) {
 		return;
 	}
 
-	int32_t ty = ry + (rh - ctx->font_height) / 2;
-	int32_t fw = ipinput_field_w(ctx, rw);
-	uint32_t tc = disabled ? ctx->theme.text_disabled : ctx->theme.text;
-	int32_t inset = sc(ctx, 2);
+	int32_t ty = ry + (rh - win->font_height) / 2;
+	int32_t fw = ipinput_field_w(win, rw);
+	uint32_t tc = disabled ? win->theme.text_disabled : win->theme.text;
+	int32_t inset = sc(win, 2);
 
 	for(uint32_t i = 0; i < 4; ++i) {
-		int32_t fx = ipinput_field_x(ctx, rx, rw, i);
+		int32_t fx = ipinput_field_x(win, rx, rw, i);
 		char buf[4];
 		ipinput_octet_str(ip->octets[i], buf);
 
 		if(focused && ip->active_field == i && ip->sel_all) {
-			int32_t tw = text_width(ctx, buf);
+			int32_t tw = text_width(win, buf);
 			int32_t sx = fx + (fw - tw) / 2;
 			int32_t sel_x = sx < fx ? fx : sx;
 			int32_t sel_w = tw < fw ? tw : fw;
-			draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, sel_x, ry + inset, sel_w, rh - inset * 2, ctx->theme.selection);
-			push_text_clip(sx, ty, buf, ctx->theme.sel_text, fx, ry + 1, fx + fw, ry + rh - 1);
+			draw_rect_fill(win->pixels, win->win_w, win->win_h, sel_x, ry + inset, sel_w, rh - inset * 2, win->theme.selection);
+			push_text_clip(sx, ty, buf, win->theme.sel_text, fx, ry + 1, fx + fw, ry + rh - 1);
 		} else if(focused && ip->active_field == i) {
 			char edit[4];
 			snprintf(edit, sizeof(edit), "%s", ip->edit_buf);
-			int32_t tw = text_width(ctx, edit);
+			int32_t tw = text_width(win, edit);
 			int32_t sx = fx + (fw - tw) / 2;
 			push_text_clip(sx, ty, edit, tc, fx, ry + 1, fx + fw, ry + rh - 1);
 			int32_t cx = sx + tw;
-			draw_vline(ctx->pixels, ctx->win_w, ctx->win_h, cx, ry + inset, rh - inset * 2, ctx->theme.text);
+			draw_vline(win->pixels, win->win_w, win->win_h, cx, ry + inset, rh - inset * 2, win->theme.text);
 		} else {
-			int32_t tw = text_width(ctx, buf);
+			int32_t tw = text_width(win, buf);
 			int32_t sx = fx + (fw - tw) / 2;
 			push_text_clip(sx, ty, buf, tc, fx, ry + 1, fx + fw, ry + rh - 1);
 		}
@@ -137,27 +137,27 @@ static void ipinput_select_field(struct mkgui_ipinput_data *ip, uint32_t field) 
 }
 
 // [=]===^=[ handle_ipinput_click ]================================[=]
-static void handle_ipinput_click(struct mkgui_ctx *ctx, uint32_t widget_id, int32_t mx) {
-	struct mkgui_ipinput_data *ip = find_ipinput_data(ctx, widget_id);
+static void handle_ipinput_click(struct mkgui_window *win, uint32_t widget_id, int32_t mx) {
+	struct mkgui_ipinput_data *ip = find_ipinput_data(win, widget_id);
 	if(!ip) {
 		return;
 	}
-	uint32_t widx = (uint32_t)find_widget_idx(ctx, widget_id);
-	if(widx >= ctx->widget_count) {
+	uint32_t widx = (uint32_t)find_widget_idx(win, widget_id);
+	if(widx >= win->widget_count) {
 		return;
 	}
-	int32_t rx = ctx->rects[widx].x;
-	int32_t rw = ctx->rects[widx].w;
-	int32_t field = ipinput_hit_field(ctx, rx, rw, mx);
+	int32_t rx = win->rects[widx].x;
+	int32_t rw = win->rects[widx].w;
+	int32_t field = ipinput_hit_field(win, rx, rw, mx);
 	if(field >= 0 && field < 4) {
 		ipinput_select_field(ip, (uint32_t)field);
 	}
-	dirty_all(ctx);
+	dirty_all(win);
 }
 
 // [=]===^=[ handle_ipinput_key ]==================================[=]
-static uint32_t handle_ipinput_key(struct mkgui_ctx *ctx, struct mkgui_event *ev, uint32_t ks, uint32_t keymod, char *buf, int32_t len) {
-	struct mkgui_ipinput_data *ip = find_ipinput_data(ctx, ctx->focus_id);
+static uint32_t handle_ipinput_key(struct mkgui_window *win, struct mkgui_event *ev, uint32_t ks, uint32_t keymod, char *buf, int32_t len) {
+	struct mkgui_ipinput_data *ip = find_ipinput_data(win, win->focus_id);
 	if(!ip) {
 		return 0;
 	}
@@ -168,14 +168,14 @@ static uint32_t handle_ipinput_key(struct mkgui_ctx *ctx, struct mkgui_event *ev
 		if(keymod & MKGUI_MOD_SHIFT) {
 			if(ip->active_field > 0) {
 				ipinput_select_field(ip, ip->active_field - 1);
-				dirty_all(ctx);
+				dirty_all(win);
 				return 1;
 			}
 			return 0;
 		} else {
 			if(ip->active_field < 3) {
 				ipinput_select_field(ip, ip->active_field + 1);
-				dirty_all(ctx);
+				dirty_all(win);
 				return 1;
 			}
 			return 0;
@@ -186,13 +186,13 @@ static uint32_t handle_ipinput_key(struct mkgui_ctx *ctx, struct mkgui_event *ev
 		if(ip->editing) {
 			ipinput_commit_edit(ip);
 			ev->type = MKGUI_EVENT_IPINPUT_CHANGED;
-			ev->id = ctx->focus_id;
+			ev->id = win->focus_id;
 		}
 
 		if(ip->active_field > 0) {
 			ipinput_select_field(ip, ip->active_field - 1);
 		}
-		dirty_all(ctx);
+		dirty_all(win);
 		return 1;
 	}
 
@@ -200,13 +200,13 @@ static uint32_t handle_ipinput_key(struct mkgui_ctx *ctx, struct mkgui_event *ev
 		if(ip->editing) {
 			ipinput_commit_edit(ip);
 			ev->type = MKGUI_EVENT_IPINPUT_CHANGED;
-			ev->id = ctx->focus_id;
+			ev->id = win->focus_id;
 		}
 
 		if(ip->active_field < 3) {
 			ipinput_select_field(ip, ip->active_field + 1);
 		}
-		dirty_all(ctx);
+		dirty_all(win);
 		return 1;
 	}
 
@@ -215,21 +215,21 @@ static uint32_t handle_ipinput_key(struct mkgui_ctx *ctx, struct mkgui_event *ev
 			ip->octets[ip->active_field] = 0;
 			ipinput_start_edit(ip);
 			ev->type = MKGUI_EVENT_IPINPUT_CHANGED;
-			ev->id = ctx->focus_id;
-			dirty_all(ctx);
+			ev->id = win->focus_id;
+			dirty_all(win);
 			return 1;
 		}
 
 		if(ip->editing && ip->edit_len > 0) {
 			--ip->edit_len;
 			ip->edit_buf[ip->edit_len] = '\0';
-			dirty_all(ctx);
+			dirty_all(win);
 			return 1;
 		}
 
 		if(ip->active_field > 0) {
 			ipinput_select_field(ip, ip->active_field - 1);
-			dirty_all(ctx);
+			dirty_all(win);
 			return 1;
 		}
 		return 1;
@@ -238,8 +238,8 @@ static uint32_t handle_ipinput_key(struct mkgui_ctx *ctx, struct mkgui_event *ev
 	case MKGUI_KEY_RETURN: {
 		ipinput_commit_edit(ip);
 		ev->type = MKGUI_EVENT_IPINPUT_CHANGED;
-		ev->id = ctx->focus_id;
-		dirty_all(ctx);
+		ev->id = win->focus_id;
+		dirty_all(win);
 		return 1;
 	}
 
@@ -250,8 +250,8 @@ static uint32_t handle_ipinput_key(struct mkgui_ctx *ctx, struct mkgui_event *ev
 				ipinput_select_field(ip, ip->active_field + 1);
 			}
 			ev->type = MKGUI_EVENT_IPINPUT_CHANGED;
-			ev->id = ctx->focus_id;
-			dirty_all(ctx);
+			ev->id = win->focus_id;
+			dirty_all(win);
 			return 1;
 		}
 
@@ -288,11 +288,11 @@ static uint32_t handle_ipinput_key(struct mkgui_ctx *ctx, struct mkgui_event *ev
 						ipinput_select_field(ip, ip->active_field + 1);
 					}
 					ev->type = MKGUI_EVENT_IPINPUT_CHANGED;
-					ev->id = ctx->focus_id;
-					dirty_all(ctx);
+					ev->id = win->focus_id;
+					dirty_all(win);
 					return 1;
 				}
-				dirty_all(ctx);
+				dirty_all(win);
 				return 1;
 			}
 			return 1;
@@ -303,12 +303,12 @@ static uint32_t handle_ipinput_key(struct mkgui_ctx *ctx, struct mkgui_event *ev
 }
 
 // [=]===^=[ mkgui_ipinput_set ]===================================[=]
-MKGUI_API void mkgui_ipinput_set(struct mkgui_ctx *ctx, uint32_t id, const char *ip_string) {
-	MKGUI_CHECK(ctx);
+MKGUI_API void mkgui_ipinput_set(struct mkgui_window *win, uint32_t id, const char *ip_string) {
+	MKGUI_CHECK(win);
 	if(!ip_string) {
 		ip_string = "";
 	}
-	struct mkgui_ipinput_data *ip = find_ipinput_data(ctx, id);
+	struct mkgui_ipinput_data *ip = find_ipinput_data(win, id);
 	if(!ip) {
 		return;
 	}
@@ -320,14 +320,14 @@ MKGUI_API void mkgui_ipinput_set(struct mkgui_ctx *ctx, uint32_t id, const char 
 	ip->octets[3] = (uint8_t)(d > 255 ? 255 : d);
 	ip->editing = 0;
 	ip->sel_all = 0;
-	dirty_all(ctx);
+	dirty_all(win);
 }
 
 // [=]===^=[ mkgui_ipinput_get ]===================================[=]
-MKGUI_API const char *mkgui_ipinput_get(struct mkgui_ctx *ctx, uint32_t id) {
-	MKGUI_CHECK_VAL(ctx, "");
+MKGUI_API const char *mkgui_ipinput_get(struct mkgui_window *win, uint32_t id) {
+	MKGUI_CHECK_VAL(win, "");
 	static char ipinput_buf[16];
-	struct mkgui_ipinput_data *ip = find_ipinput_data(ctx, id);
+	struct mkgui_ipinput_data *ip = find_ipinput_data(win, id);
 	if(!ip) {
 		snprintf(ipinput_buf, sizeof(ipinput_buf), "0.0.0.0");
 		return ipinput_buf;
@@ -337,9 +337,9 @@ MKGUI_API const char *mkgui_ipinput_get(struct mkgui_ctx *ctx, uint32_t id) {
 }
 
 // [=]===^=[ mkgui_ipinput_get_u32 ]===============================[=]
-MKGUI_API uint32_t mkgui_ipinput_get_u32(struct mkgui_ctx *ctx, uint32_t id) {
-	MKGUI_CHECK_VAL(ctx, 0);
-	struct mkgui_ipinput_data *ip = find_ipinput_data(ctx, id);
+MKGUI_API uint32_t mkgui_ipinput_get_u32(struct mkgui_window *win, uint32_t id) {
+	MKGUI_CHECK_VAL(win, 0);
+	struct mkgui_ipinput_data *ip = find_ipinput_data(win, id);
 	if(!ip) {
 		return 0;
 	}

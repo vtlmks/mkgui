@@ -438,10 +438,10 @@ static void ibt_load_theme(uint32_t theme_idx) {
 }
 
 // [=]===^=[ ibt_rebuild_tabs ]=======================================[=]
-static void ibt_rebuild_tabs(struct mkgui_ctx *dlg) {
+static void ibt_rebuild_tabs(struct mkgui_window *dlg) {
 	// remove old category tabs (not the "All" tab)
 	for(uint32_t i = 0; i < IB_MAX_CATS; ++i) {
-		mkgui_remove_widget(dlg, IB_TH_TAB_FIRST + i);
+		mkgui_widget_remove(dlg, IB_TH_TAB_FIRST + i);
 	}
 	// add new tabs for discovered categories
 	for(uint32_t ci = 0; ci < ibt->cat_count; ++ci) {
@@ -453,7 +453,7 @@ static void ibt_rebuild_tabs(struct mkgui_ctx *dlg) {
 		}
 		struct mkgui_widget tw = MKGUI_W(MKGUI_TAB, IB_TH_TAB_FIRST + ci, "", "", IB_TH_TABS, 0, 0, 0, 0, 0);
 		strncpy(tw.label, label, MKGUI_MAX_TEXT - 1);
-		mkgui_add_widget(dlg, tw, 0);
+		mkgui_widget_add(dlg, tw, 0);
 	}
 }
 
@@ -510,7 +510,7 @@ static void ibt_filter(const char *search) {
 // Caller owns the returned buffer. Never touches the main icon system.
 
 // [=]===^=[ ibt_rasterize ]==========================================[=]
-static uint32_t *ibt_rasterize(struct mkgui_ctx *ctx, const char *path, int32_t size) {
+static uint32_t *ibt_rasterize(struct mkgui_window *win, const char *path, int32_t size) {
 	uint32_t svg_len = 0;
 	char *svg_data = svg_read_file(path, &svg_len);
 	if(!svg_data) {
@@ -525,7 +525,7 @@ static uint32_t *ibt_rasterize(struct mkgui_ctx *ctx, const char *path, int32_t 
 	}
 
 	plutovg_color_t color;
-	uint32_t text = ctx->theme.text & 0x00ffffff;
+	uint32_t text = win->theme.text & 0x00ffffff;
 	color.r = (float)((text >> 16) & 0xff) / 255.0f;
 	color.g = (float)((text >> 8) & 0xff) / 255.0f;
 	color.b = (float)(text & 0xff) / 255.0f;
@@ -560,13 +560,13 @@ static uint32_t *ibt_rasterize(struct mkgui_ctx *ctx, const char *path, int32_t 
 // system is never touched.
 
 // [=]===^=[ ibt_preload_filtered ]===================================[=]
-static void ibt_preload_filtered(struct mkgui_ctx *ctx) {
+static void ibt_preload_filtered(struct mkgui_window *win) {
 	for(uint32_t i = 0; i < ibt->filtered_count; ++i) {
 		uint32_t idx = ibt->filtered_idx[i];
 		if(ibt->thumb[idx]) {
 			continue;
 		}
-		ibt->thumb[idx] = ibt_rasterize(ctx, ibt->paths[idx], ibt->size);
+		ibt->thumb[idx] = ibt_rasterize(win, ibt->paths[idx], ibt->size);
 	}
 }
 
@@ -578,9 +578,9 @@ static void ibt_preload_filtered(struct mkgui_ctx *ctx) {
 #define IB_GRID_PAD_PX   4
 
 // [=]===^=[ ibt_grid_metrics ]=======================================[=]
-static void ibt_grid_metrics(struct mkgui_ctx *ctx, int32_t ca_w, int32_t ca_h, int32_t *out_row_h, int32_t *out_col_w, int32_t *out_rows_per_col, int32_t *out_total_cols, int32_t *out_total_w) {
-	int32_t row_h = sc(ctx, IB_GRID_ROW_H_PX);
-	int32_t col_w = sc(ctx, IB_GRID_COL_W_PX);
+static void ibt_grid_metrics(struct mkgui_window *win, int32_t ca_w, int32_t ca_h, int32_t *out_row_h, int32_t *out_col_w, int32_t *out_rows_per_col, int32_t *out_total_cols, int32_t *out_total_w) {
+	int32_t row_h = sc(win, IB_GRID_ROW_H_PX);
+	int32_t col_w = sc(win, IB_GRID_COL_W_PX);
 	int32_t rows_per_col = ca_h / row_h;
 	if(rows_per_col < 1) {
 		rows_per_col = 1;
@@ -598,17 +598,17 @@ static void ibt_grid_metrics(struct mkgui_ctx *ctx, int32_t ca_w, int32_t ca_h, 
 }
 
 // [=]===^=[ ibt_canvas_cb ]==========================================[=]
-static void ibt_canvas_cb(struct mkgui_ctx *ctx, uint32_t id, uint32_t *pixels, int32_t x, int32_t y, int32_t w, int32_t h, void *userdata) {
+static void ibt_canvas_cb(struct mkgui_window *win, uint32_t id, uint32_t *pixels, int32_t x, int32_t y, int32_t w, int32_t h, void *userdata) {
 	(void)id;
 	(void)pixels;
 	(void)userdata;
 
 	int32_t row_h, col_w, rows_per_col, total_cols, total_w;
-	ibt_grid_metrics(ctx, w, h, &row_h, &col_w, &rows_per_col, &total_cols, &total_w);
+	ibt_grid_metrics(win, w, h, &row_h, &col_w, &rows_per_col, &total_cols, &total_w);
 	(void)total_cols;
 	(void)total_w;
 
-	int32_t pad = sc(ctx, IB_GRID_PAD_PX);
+	int32_t pad = sc(win, IB_GRID_PAD_PX);
 	int32_t clip_x2 = x + w;
 	int32_t clip_y2 = y + h;
 
@@ -638,7 +638,7 @@ static void ibt_canvas_cb(struct mkgui_ctx *ctx, uint32_t id, uint32_t *pixels, 
 			int32_t cy = y + r * row_h;
 
 			if(item == ibt->selected) {
-				draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, col_x, cy, col_w, row_h, ctx->theme.selection);
+				draw_rect_fill(win->pixels, win->win_w, win->win_h, col_x, cy, col_w, row_h, win->theme.selection);
 			}
 
 			uint32_t theme_idx = ibt->filtered_idx[item];
@@ -648,28 +648,28 @@ static void ibt_canvas_cb(struct mkgui_ctx *ctx, uint32_t id, uint32_t *pixels, 
 			if(src) {
 				for(int32_t py = 0; py < ts; ++py) {
 					int32_t dy = iy + py;
-					if(dy < y || dy >= clip_y2 || dy < 0 || dy >= ctx->win_h) {
+					if(dy < y || dy >= clip_y2 || dy < 0 || dy >= win->win_h) {
 						continue;
 					}
 					for(int32_t px = 0; px < ts; ++px) {
 						int32_t dx = ix + px;
-						if(dx < x || dx >= clip_x2 || dx < 0 || dx >= ctx->win_w) {
+						if(dx < x || dx >= clip_x2 || dx < 0 || dx >= win->win_w) {
 							continue;
 						}
 						uint32_t spx = src[py * ts + px];
 						uint32_t alpha = (spx >> 24) & 0xff;
 						if(alpha == 255) {
-							ctx->pixels[(uint32_t)dy * (uint32_t)ctx->win_w + (uint32_t)dx] = spx;
+							win->pixels[(uint32_t)dy * (uint32_t)win->win_w + (uint32_t)dx] = spx;
 						} else if(alpha > 0) {
-							ctx->pixels[(uint32_t)dy * (uint32_t)ctx->win_w + (uint32_t)dx] = blend_pixel(ctx->pixels[(uint32_t)dy * (uint32_t)ctx->win_w + (uint32_t)dx], spx, (uint8_t)alpha);
+							win->pixels[(uint32_t)dy * (uint32_t)win->win_w + (uint32_t)dx] = blend_pixel(win->pixels[(uint32_t)dy * (uint32_t)win->win_w + (uint32_t)dx], spx, (uint8_t)alpha);
 						}
 					}
 				}
 			}
 
 			int32_t tx = ix + ts + pad;
-			int32_t ty = cy + (row_h - ctx->font_height) / 2;
-			uint32_t tc = (item == ibt->selected) ? ctx->theme.sel_text : ctx->theme.text;
+			int32_t ty = cy + (row_h - win->font_height) / 2;
+			uint32_t tc = (item == ibt->selected) ? win->theme.sel_text : win->theme.text;
 			int32_t col_clip_r = col_x + col_w < clip_x2 ? col_x + col_w : clip_x2;
 			int32_t col_clip_l = col_x > x ? col_x : x;
 			push_text_clip(tx, ty, ibt->names[theme_idx], tc, col_clip_l, y, col_clip_r, clip_y2);
@@ -678,7 +678,7 @@ static void ibt_canvas_cb(struct mkgui_ctx *ctx, uint32_t id, uint32_t *pixels, 
 }
 
 // [=]===^=[ ibt_hit_test ]===========================================[=]
-static int32_t ibt_hit_test(struct mkgui_ctx *dlg, int32_t mx, int32_t my, uint32_t grid_id) {
+static int32_t ibt_hit_test(struct mkgui_window *dlg, int32_t mx, int32_t my, uint32_t grid_id) {
 	int32_t gi = find_widget_idx(dlg, grid_id);
 	if(gi < 0) {
 		return -1;
@@ -718,7 +718,7 @@ static int32_t ibt_hit_test(struct mkgui_ctx *dlg, int32_t mx, int32_t my, uint3
 // visible portion; max scroll position is max_value - page_size.
 
 // [=]===^=[ ibt_update_scroll_range ]================================[=]
-static void ibt_update_scroll_range(struct mkgui_ctx *dlg, uint32_t grid_id, uint32_t scroll_id) {
+static void ibt_update_scroll_range(struct mkgui_window *dlg, uint32_t grid_id, uint32_t scroll_id) {
 	int32_t gi = find_widget_idx(dlg, grid_id);
 	if(gi < 0) {
 		return;
@@ -778,27 +778,27 @@ static void ibt_free_thumbs(void) {
 }
 
 // [=]===^=[ ibt_cleanup ]============================================[=]
-static void ibt_cleanup(struct mkgui_ctx *ctx) {
+static void ibt_cleanup(struct mkgui_window *win) {
 	ibt_free_thumbs();
 	free(ibt);
 	ibt = NULL;
-	dirty_all(ctx);
+	dirty_all(win);
 }
 
 // [=]===^=[ mkgui_icon_browser_theme ]===============================[=]
-MKGUI_API uint32_t mkgui_icon_browser_theme(struct mkgui_ctx *ctx, const char *theme_dir, int32_t size, char *out, uint32_t out_size) {
-	MKGUI_CHECK_VAL(ctx, 0);
+MKGUI_API uint32_t mkgui_icon_browser_theme(struct mkgui_window *win, const char *theme_dir, int32_t size, char *out, uint32_t out_size) {
+	MKGUI_CHECK_VAL(win, 0);
 	if(!out || out_size == 0 || !theme_dir) {
 		return 0;
 	}
 	char path_buf[1024];
-	uint32_t result = mkgui_icon_browser(ctx, size, out, out_size, path_buf, sizeof(path_buf));
+	uint32_t result = mkgui_icon_browser(win, size, out, out_size, path_buf, sizeof(path_buf));
 	return result;
 }
 
 // [=]===^=[ mkgui_icon_browser ]=====================================[=]
-MKGUI_API uint32_t mkgui_icon_browser(struct mkgui_ctx *ctx, int32_t size, char *out_name, uint32_t name_size, char *out_path, uint32_t path_size) {
-	MKGUI_CHECK_VAL(ctx, 0);
+MKGUI_API uint32_t mkgui_icon_browser(struct mkgui_window *win, int32_t size, char *out_name, uint32_t name_size, char *out_path, uint32_t path_size) {
+	MKGUI_CHECK_VAL(win, 0);
 	if(!out_name || name_size == 0) {
 		return 0;
 	}
@@ -821,7 +821,7 @@ MKGUI_API uint32_t mkgui_icon_browser(struct mkgui_ctx *ctx, int32_t size, char 
 
 	ibt_load_theme(0);
 
-	popup_destroy_all(ctx);
+	popup_destroy_all(win);
 
 	uint32_t wcount = 9;
 	struct mkgui_widget widgets[9] = {
@@ -836,11 +836,11 @@ MKGUI_API uint32_t mkgui_icon_browser(struct mkgui_ctx *ctx, int32_t size, char 
 		MKGUI_W(MKGUI_SCROLLBAR, IB_TH_HSCROLL,    "",             "",          IB_TH_VBOX,     0,        14,       MKGUI_FIXED, 0, 0),
 	};
 
-	struct mkgui_ctx *dlg = mkgui_create_child(ctx, widgets, wcount, "Icon Browser", IB_WIN_W, IB_WIN_H);
+	struct mkgui_window *dlg = mkgui_window_create(win->ctx, win, widgets, wcount, "Icon Browser", IB_WIN_W, IB_WIN_H);
 	if(!dlg) {
 		return 0;
 	}
-	mkgui_set_window_instance(dlg, "iconbrowser");
+	mkgui_window_set_instance(dlg, "iconbrowser");
 	mkgui_canvas_set_callback(dlg, IB_TH_GRID, ibt_canvas_cb, NULL);
 
 	for(uint32_t i = 0; i < ibt->theme_count; ++i) {
@@ -866,7 +866,7 @@ MKGUI_API uint32_t mkgui_icon_browser(struct mkgui_ctx *ctx, int32_t size, char 
 	uint32_t was_press = 0;
 	struct mkgui_event ev;
 	while(running) {
-		while(mkgui_poll(dlg, &ev)) {
+		while(mkgui_window_poll(dlg, &ev)) {
 			switch(ev.type) {
 				case MKGUI_EVENT_CLOSE: {
 					running = 0;
@@ -939,12 +939,12 @@ MKGUI_API uint32_t mkgui_icon_browser(struct mkgui_ctx *ctx, int32_t size, char 
 		}
 
 		// Detect press on the grid canvas: select on first click, confirm on
-		// double-click. ctx->press_id is set by mkgui_poll; we only act on
+		// double-click. win->press_id is set by mkgui_window_poll; we only act on
 		// the rising edge (new press this frame).
 		if(dlg->press_id == IB_TH_GRID && !was_press) {
 			int32_t item = ibt_hit_test(dlg, dlg->mouse_x, dlg->mouse_y, IB_TH_GRID);
 			if(item >= 0) {
-				uint32_t now = mkgui_time_ms();
+				uint32_t now = (uint32_t)(mkgui_now_ns() / 1000000ull);
 				if(ibt->last_click_item == item && (now - ibt->last_click_time) < 400) {
 					ibt_confirm_selection((uint32_t)item);
 					running = 0;
@@ -981,10 +981,10 @@ MKGUI_API uint32_t mkgui_icon_browser(struct mkgui_ctx *ctx, int32_t size, char 
 		}
 		last_sb_value = ibt->scroll_x;
 
-		mkgui_wait(dlg);
+		mkgui_ctx_wait(dlg->ctx);
 	}
 
-	mkgui_destroy_child(dlg);
+	mkgui_window_destroy(dlg);
 
 	char confirmed_name[IB_ICON_NAME] = {0};
 	char confirmed_path[1024] = {0};
@@ -993,10 +993,10 @@ MKGUI_API uint32_t mkgui_icon_browser(struct mkgui_ctx *ctx, int32_t size, char 
 		strncpy(confirmed_path, ibt->result_path, sizeof(confirmed_path) - 1);
 	}
 
-	ibt_cleanup(ctx);
+	ibt_cleanup(win);
 
 	if(confirmed_name[0] != '\0') {
-		mkgui_icon_load_svg(ctx, confirmed_name, confirmed_path);
+		mkgui_icon_load_svg(win, confirmed_name, confirmed_path);
 		strncpy(out_name, confirmed_name, name_size - 1);
 		out_name[name_size - 1] = '\0';
 		if(out_path && path_size > 0) {

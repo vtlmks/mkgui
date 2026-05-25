@@ -2,12 +2,12 @@
 // SPDX-License-Identifier: MIT
 
 // [=]===^=[ spinbox_btn_hit ]====================================[=]
-static int32_t spinbox_btn_hit(struct mkgui_ctx *ctx, uint32_t idx, int32_t mx, int32_t my) {
-	int32_t btn_w = sc(ctx, 20);
-	int32_t rx = ctx->rects[idx].x;
-	int32_t ry = ctx->rects[idx].y;
-	int32_t rw = ctx->rects[idx].w;
-	int32_t rh = ctx->rects[idx].h;
+static int32_t spinbox_btn_hit(struct mkgui_window *win, uint32_t idx, int32_t mx, int32_t my) {
+	int32_t btn_w = sc(win, 20);
+	int32_t rx = win->rects[idx].x;
+	int32_t ry = win->rects[idx].y;
+	int32_t rw = win->rects[idx].w;
+	int32_t rh = win->rects[idx].h;
 	int32_t bx = rx + rw - btn_w;
 
 	if(mx < bx || mx >= rx + rw) {
@@ -56,37 +56,37 @@ static void spinbox_commit_edit(struct mkgui_spinbox_data *sd) {
 }
 
 // [=]===^=[ spinbox_focus_lost ]===================================[=]
-static void spinbox_focus_lost(struct mkgui_ctx *ctx) {
-	if(!ctx->focus_id) {
+static void spinbox_focus_lost(struct mkgui_window *win) {
+	if(!win->focus_id) {
 		return;
 	}
-	struct mkgui_spinbox_data *sd = find_spinbox_data(ctx, ctx->focus_id);
+	struct mkgui_spinbox_data *sd = find_spinbox_data(win, win->focus_id);
 	if(sd && sd->editing) {
 		spinbox_commit_edit(sd);
 	}
 }
 
 // [=]===^=[ render_spinbox ]=====================================[=]
-static void render_spinbox(struct mkgui_ctx *ctx, uint32_t idx) {
-	struct mkgui_widget *w = &ctx->widgets[idx];
-	int32_t rx = ctx->rects[idx].x;
-	int32_t ry = ctx->rects[idx].y;
-	int32_t rw = ctx->rects[idx].w;
-	int32_t rh = ctx->rects[idx].h;
+static void render_spinbox(struct mkgui_window *win, uint32_t idx) {
+	struct mkgui_widget *w = &win->widgets[idx];
+	int32_t rx = win->rects[idx].x;
+	int32_t ry = win->rects[idx].y;
+	int32_t rw = win->rects[idx].w;
+	int32_t rh = win->rects[idx].h;
 
 	uint32_t disabled = (w->flags & MKGUI_DISABLED);
-	uint32_t focused = (ctx->focus_id == w->id);
-	uint32_t input_bg = disabled_blend(ctx->theme.input_bg, ctx->theme.bg, disabled);
-	uint32_t border_color = disabled_blend(focused ? ctx->theme.highlight : ctx->theme.widget_border, ctx->theme.bg, disabled);
-	draw_patch(ctx, MKGUI_STYLE_SUNKEN, rx, ry, rw, rh, input_bg, border_color);
+	uint32_t focused = (win->focus_id == w->id);
+	uint32_t input_bg = disabled_blend(win->theme.input_bg, win->theme.bg, disabled);
+	uint32_t border_color = disabled_blend(focused ? win->theme.highlight : win->theme.widget_border, win->theme.bg, disabled);
+	draw_patch(win, MKGUI_STYLE_SUNKEN, rx, ry, rw, rh, input_bg, border_color);
 
-	int32_t btn_w = sc(ctx, 20);
-	int32_t text_pad = sc(ctx, 4);
-	int32_t inset2 = sc(ctx, 2);
-	int32_t inset3 = sc(ctx, 3);
+	int32_t btn_w = sc(win, 20);
+	int32_t text_pad = sc(win, 4);
+	int32_t inset2 = sc(win, 2);
+	int32_t inset3 = sc(win, 3);
 
-	struct mkgui_spinbox_data *sd = find_spinbox_data(ctx, w->id);
-	uint32_t tc = disabled ? ctx->theme.text_disabled : ctx->theme.text;
+	struct mkgui_spinbox_data *sd = find_spinbox_data(win, w->id);
+	uint32_t tc = disabled ? win->theme.text_disabled : win->theme.text;
 	if(sd) {
 		char *display;
 		char val_buf[64];
@@ -97,55 +97,55 @@ static void render_spinbox(struct mkgui_ctx *ctx, uint32_t idx) {
 			snprintf(val_buf, sizeof(val_buf), "%d", sd->value);
 			display = val_buf;
 		}
-		int32_t ty = ry + (rh - ctx->font_height) / 2;
+		int32_t ty = ry + (rh - win->font_height) / 2;
 		int32_t text_right = rx + rw - btn_w;
 		if(sd->editing && focused && sd->select_all && sd->edit_len > 0) {
-			int32_t sel_w = text_width(ctx, display);
+			int32_t sel_w = text_width(win, display);
 			if(rx + text_pad + sel_w > text_right) {
 				sel_w = text_right - rx - text_pad;
 			}
 
 			if(sel_w > 0) {
-				draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, rx + text_pad, ry + inset2, sel_w, rh - inset2 * 2, ctx->theme.selection);
-				push_text_clip(rx + text_pad, ty, display, ctx->theme.sel_text, rx + 1, ry + 1, text_right, ry + rh - 1);
+				draw_rect_fill(win->pixels, win->win_w, win->win_h, rx + text_pad, ry + inset2, sel_w, rh - inset2 * 2, win->theme.selection);
+				push_text_clip(rx + text_pad, ty, display, win->theme.sel_text, rx + 1, ry + 1, text_right, ry + rh - 1);
 			}
 		} else {
 			push_text_clip(rx + text_pad, ty, display, tc, rx + 1, ry + 1, text_right, ry + rh - 1);
 		}
 
 		if(sd->editing && focused && !sd->select_all) {
-			int32_t cur_x = rx + text_pad + text_width(ctx, display);
+			int32_t cur_x = rx + text_pad + text_width(win, display);
 			if(cur_x < text_right) {
-				draw_vline(ctx->pixels, ctx->win_w, ctx->win_h, cur_x, ry + inset3, rh - inset3 * 2, tc);
+				draw_vline(win->pixels, win->win_w, win->win_h, cur_x, ry + inset3, rh - inset3 * 2, tc);
 			}
 		}
 	}
 
 	int32_t bx = rx + rw - btn_w;
 	int32_t half = rh / 2;
-	int32_t hover_btn = (!disabled && ctx->hover_id == w->id && sd) ? sd->hover_btn : 0;
+	int32_t hover_btn = (!disabled && win->hover_id == w->id && sd) ? sd->hover_btn : 0;
 
-	uint32_t btn_border = disabled_blend(ctx->theme.widget_border, ctx->theme.bg, disabled);
-	uint32_t up_bg = (hover_btn == 1) ? ctx->theme.widget_hover : ctx->theme.widget_bg;
-	up_bg = disabled_blend(up_bg, ctx->theme.bg, disabled);
-	draw_patch(ctx, MKGUI_STYLE_RAISED, bx, ry, btn_w, half, up_bg, btn_border);
+	uint32_t btn_border = disabled_blend(win->theme.widget_border, win->theme.bg, disabled);
+	uint32_t up_bg = (hover_btn == 1) ? win->theme.widget_hover : win->theme.widget_bg;
+	up_bg = disabled_blend(up_bg, win->theme.bg, disabled);
+	draw_patch(win, MKGUI_STYLE_RAISED, bx, ry, btn_w, half, up_bg, btn_border);
 
-	int32_t as = sc(ctx, 3);
+	int32_t as = sc(win, 3);
 	int32_t acx = bx + btn_w / 2;
 	int32_t acy = ry + half / 2;
-	draw_triangle_aa(ctx->pixels, ctx->win_w, ctx->win_h, acx, acy - as / 2, acx - as, acy + as / 2, acx + as, acy + as / 2, tc);
+	draw_triangle_aa(win->pixels, win->win_w, win->win_h, acx, acy - as / 2, acx - as, acy + as / 2, acx + as, acy + as / 2, tc);
 
-	uint32_t dn_bg = (hover_btn == -1) ? ctx->theme.widget_hover : ctx->theme.widget_bg;
-	dn_bg = disabled_blend(dn_bg, ctx->theme.bg, disabled);
-	draw_patch(ctx, MKGUI_STYLE_RAISED, bx, ry + half, btn_w, rh - half, dn_bg, btn_border);
+	uint32_t dn_bg = (hover_btn == -1) ? win->theme.widget_hover : win->theme.widget_bg;
+	dn_bg = disabled_blend(dn_bg, win->theme.bg, disabled);
+	draw_patch(win, MKGUI_STYLE_RAISED, bx, ry + half, btn_w, rh - half, dn_bg, btn_border);
 
 	int32_t acy2 = ry + half + (rh - half) / 2;
-	draw_triangle_aa(ctx->pixels, ctx->win_w, ctx->win_h, acx - as, acy2 - as / 2, acx + as, acy2 - as / 2, acx, acy2 + as / 2, tc);
+	draw_triangle_aa(win->pixels, win->win_w, win->win_h, acx - as, acy2 - as / 2, acx + as, acy2 - as / 2, acx, acy2 + as / 2, tc);
 }
 
 // [=]===^=[ spinbox_adjust ]=====================================[=]
-static uint32_t spinbox_adjust(struct mkgui_ctx *ctx, struct mkgui_event *ev, uint32_t widget_id, int32_t delta) {
-	struct mkgui_spinbox_data *sd = find_spinbox_data(ctx, widget_id);
+static uint32_t spinbox_adjust(struct mkgui_window *win, struct mkgui_event *ev, uint32_t widget_id, int32_t delta) {
+	struct mkgui_spinbox_data *sd = find_spinbox_data(win, widget_id);
 	if(!sd) {
 		return 0;
 	}
@@ -160,7 +160,7 @@ static uint32_t spinbox_adjust(struct mkgui_ctx *ctx, struct mkgui_event *ev, ui
 
 	if(new_val != sd->value) {
 		sd->value = new_val;
-		dirty_all(ctx);
+		dirty_all(win);
 		ev->type = MKGUI_EVENT_SPINBOX_CHANGED;
 		ev->id = widget_id;
 		ev->value = new_val;
@@ -170,8 +170,8 @@ static uint32_t spinbox_adjust(struct mkgui_ctx *ctx, struct mkgui_event *ev, ui
 }
 
 // [=]===^=[ handle_spinbox_key ]=================================[=]
-static uint32_t handle_spinbox_key(struct mkgui_ctx *ctx, struct mkgui_event *ev, uint32_t ks, char *text, int32_t text_len) {
-	struct mkgui_spinbox_data *sd = find_spinbox_data(ctx, ctx->focus_id);
+static uint32_t handle_spinbox_key(struct mkgui_window *win, struct mkgui_event *ev, uint32_t ks, char *text, int32_t text_len) {
+	struct mkgui_spinbox_data *sd = find_spinbox_data(win, win->focus_id);
 	if(!sd) {
 		return 0;
 	}
@@ -179,7 +179,7 @@ static uint32_t handle_spinbox_key(struct mkgui_ctx *ctx, struct mkgui_event *ev
 	if(ks == MKGUI_KEY_LEFT || ks == MKGUI_KEY_RIGHT) {
 		if(sd->select_all) {
 			sd->select_all = 0;
-			dirty_all(ctx);
+			dirty_all(win);
 			return 1;
 		}
 	}
@@ -187,7 +187,7 @@ static uint32_t handle_spinbox_key(struct mkgui_ctx *ctx, struct mkgui_event *ev
 	switch(ks) {
 	case MKGUI_KEY_ESCAPE: {
 		sd->editing = 0;
-		dirty_all(ctx);
+		dirty_all(win);
 		return 1;
 	}
 
@@ -197,11 +197,11 @@ static uint32_t handle_spinbox_key(struct mkgui_ctx *ctx, struct mkgui_event *ev
 			spinbox_commit_edit(sd);
 			sd->select_all = 0;
 			ev->type = MKGUI_EVENT_SPINBOX_CHANGED;
-			ev->id = ctx->focus_id;
+			ev->id = win->focus_id;
 			ev->value = sd->value;
 		}
-		ctx->focus_id = 0;
-		dirty_all(ctx);
+		win->focus_id = 0;
+		dirty_all(win);
 		return 1;
 	}
 
@@ -222,12 +222,12 @@ static uint32_t handle_spinbox_key(struct mkgui_ctx *ctx, struct mkgui_event *ev
 		} else {
 			delta = sd->max_val - sd->value;
 		}
-		uint32_t r = spinbox_adjust(ctx, ev, ctx->focus_id, delta);
+		uint32_t r = spinbox_adjust(win, ev, win->focus_id, delta);
 		sd->editing = 1;
 		sd->select_all = 1;
 		snprintf(sd->edit_buf, sizeof(sd->edit_buf), "%d", sd->value);
 		sd->edit_len = (uint32_t)strlen(sd->edit_buf);
-		dirty_all(ctx);
+		dirty_all(win);
 		return r ? r : 1;
 	}
 
@@ -239,7 +239,7 @@ static uint32_t handle_spinbox_key(struct mkgui_ctx *ctx, struct mkgui_event *ev
 			} else if(sd->edit_len > 0) {
 				--sd->edit_len;
 			}
-			dirty_all(ctx);
+			dirty_all(win);
 			return 1;
 		}
 		return 0;
@@ -276,7 +276,7 @@ static uint32_t handle_spinbox_key(struct mkgui_ctx *ctx, struct mkgui_event *ev
 					}
 				}
 			}
-			dirty_all(ctx);
+			dirty_all(win);
 			return 1;
 		}
 		return 0;
@@ -287,9 +287,9 @@ static uint32_t handle_spinbox_key(struct mkgui_ctx *ctx, struct mkgui_event *ev
 }
 
 // [=]===^=[ mkgui_spinbox_setup ]================================[=]
-MKGUI_API void mkgui_spinbox_setup(struct mkgui_ctx *ctx, uint32_t id, int32_t min_val, int32_t max_val, int32_t value, int32_t step) {
-	MKGUI_CHECK(ctx);
-	struct mkgui_spinbox_data *sd = find_spinbox_data(ctx, id);
+MKGUI_API void mkgui_spinbox_setup(struct mkgui_window *win, uint32_t id, int32_t min_val, int32_t max_val, int32_t value, int32_t step) {
+	MKGUI_CHECK(win);
+	struct mkgui_spinbox_data *sd = find_spinbox_data(win, id);
 	if(sd) {
 		sd->min_val = min_val;
 		sd->max_val = max_val;
@@ -302,21 +302,21 @@ MKGUI_API void mkgui_spinbox_setup(struct mkgui_ctx *ctx, uint32_t id, int32_t m
 			sd->value = sd->max_val;
 		}
 		sd->step = step > 0 ? step : 1;
-		dirty_all(ctx);
+		dirty_all(win);
 	}
 }
 
 // [=]===^=[ mkgui_spinbox_get ]=================================[=]
-MKGUI_API int32_t mkgui_spinbox_get(struct mkgui_ctx *ctx, uint32_t id) {
-	MKGUI_CHECK_VAL(ctx, 0);
-	struct mkgui_spinbox_data *sd = find_spinbox_data(ctx, id);
+MKGUI_API int32_t mkgui_spinbox_get(struct mkgui_window *win, uint32_t id) {
+	MKGUI_CHECK_VAL(win, 0);
+	struct mkgui_spinbox_data *sd = find_spinbox_data(win, id);
 	return sd ? sd->value : 0;
 }
 
 // [=]===^=[ mkgui_spinbox_set ]=================================[=]
-MKGUI_API void mkgui_spinbox_set(struct mkgui_ctx *ctx, uint32_t id, int32_t value) {
-	MKGUI_CHECK(ctx);
-	struct mkgui_spinbox_data *sd = find_spinbox_data(ctx, id);
+MKGUI_API void mkgui_spinbox_set(struct mkgui_window *win, uint32_t id, int32_t value) {
+	MKGUI_CHECK(win);
+	struct mkgui_spinbox_data *sd = find_spinbox_data(win, id);
 	if(sd) {
 		sd->value = value;
 		if(sd->value < sd->min_val) {
@@ -326,14 +326,14 @@ MKGUI_API void mkgui_spinbox_set(struct mkgui_ctx *ctx, uint32_t id, int32_t val
 		if(sd->value > sd->max_val) {
 			sd->value = sd->max_val;
 		}
-		dirty_all(ctx);
+		dirty_all(win);
 	}
 }
 
 // [=]===^=[ mkgui_spinbox_set_range ]==============================[=]
-MKGUI_API void mkgui_spinbox_set_range(struct mkgui_ctx *ctx, uint32_t id, int32_t min_val, int32_t max_val) {
-	MKGUI_CHECK(ctx);
-	struct mkgui_spinbox_data *sd = find_spinbox_data(ctx, id);
+MKGUI_API void mkgui_spinbox_set_range(struct mkgui_window *win, uint32_t id, int32_t min_val, int32_t max_val) {
+	MKGUI_CHECK(win);
+	struct mkgui_spinbox_data *sd = find_spinbox_data(win, id);
 	if(!sd) {
 		return;
 	}
@@ -346,22 +346,22 @@ MKGUI_API void mkgui_spinbox_set_range(struct mkgui_ctx *ctx, uint32_t id, int32
 	if(sd->value > sd->max_val) {
 		sd->value = sd->max_val;
 	}
-	dirty_all(ctx);
+	dirty_all(win);
 }
 
 // [=]===^=[ mkgui_spinbox_set_step ]===============================[=]
-MKGUI_API void mkgui_spinbox_set_step(struct mkgui_ctx *ctx, uint32_t id, int32_t step) {
-	MKGUI_CHECK(ctx);
-	struct mkgui_spinbox_data *sd = find_spinbox_data(ctx, id);
+MKGUI_API void mkgui_spinbox_set_step(struct mkgui_window *win, uint32_t id, int32_t step) {
+	MKGUI_CHECK(win);
+	struct mkgui_spinbox_data *sd = find_spinbox_data(win, id);
 	if(sd) {
 		sd->step = step;
 	}
 }
 
 // [=]===^=[ mkgui_spinbox_get_range ]==============================[=]
-MKGUI_API void mkgui_spinbox_get_range(struct mkgui_ctx *ctx, uint32_t id, int32_t *min_val, int32_t *max_val) {
-	MKGUI_CHECK(ctx);
-	struct mkgui_spinbox_data *sd = find_spinbox_data(ctx, id);
+MKGUI_API void mkgui_spinbox_get_range(struct mkgui_window *win, uint32_t id, int32_t *min_val, int32_t *max_val) {
+	MKGUI_CHECK(win);
+	struct mkgui_spinbox_data *sd = find_spinbox_data(win, id);
 	if(!sd) {
 		if(min_val) { *min_val = 0; }
 		if(max_val) { *max_val = 0; }

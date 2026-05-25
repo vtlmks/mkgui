@@ -72,60 +72,60 @@ static void draw_aa_line(uint32_t *buf, int32_t bw, int32_t bh, int32_t x0, int3
 }
 
 // [=]===^=[ render_checkbox ]===================================[=]
-static void render_checkbox(struct mkgui_ctx *ctx, uint32_t idx) {
-	struct mkgui_widget *w = &ctx->widgets[idx];
-	int32_t rx = ctx->rects[idx].x;
-	int32_t ry = ctx->rects[idx].y;
-	int32_t rh = ctx->rects[idx].h;
+static void render_checkbox(struct mkgui_window *win, uint32_t idx) {
+	struct mkgui_widget *w = &win->widgets[idx];
+	int32_t rx = win->rects[idx].x;
+	int32_t ry = win->rects[idx].y;
+	int32_t rh = win->rects[idx].h;
 
-	int32_t box_size = sc(ctx, 16);
+	int32_t box_size = sc(win, 16);
 	int32_t by = ry + (rh - box_size) / 2;
 
 	uint32_t disabled = (w->flags & MKGUI_DISABLED);
-	uint32_t focused = (ctx->focus_id == w->id);
-	uint32_t hovered = (!disabled && ctx->hover_id == w->id);
-	uint32_t pressed = (!disabled && ctx->press_id == w->id);
-	uint32_t bg = (w->style & MKGUI_CHECKBOX_CHECKED) ? ctx->theme.highlight : (pressed ? ctx->theme.widget_press : ctx->theme.input_bg);
-	uint32_t border = (focused || hovered) ? ctx->theme.highlight : ctx->theme.widget_border;
-	bg = disabled_blend(bg, ctx->theme.bg, disabled);
-	border = disabled_blend(border, ctx->theme.bg, disabled);
-	draw_patch(ctx, MKGUI_STYLE_SUNKEN, rx, by, box_size, box_size, bg, border);
+	uint32_t focused = (win->focus_id == w->id);
+	uint32_t hovered = (!disabled && win->hover_id == w->id);
+	uint32_t pressed = (!disabled && win->press_id == w->id);
+	uint32_t bg = (w->style & MKGUI_CHECKBOX_CHECKED) ? win->theme.highlight : (pressed ? win->theme.widget_press : win->theme.input_bg);
+	uint32_t border = (focused || hovered) ? win->theme.highlight : win->theme.widget_border;
+	bg = disabled_blend(bg, win->theme.bg, disabled);
+	border = disabled_blend(border, win->theme.bg, disabled);
+	draw_patch(win, MKGUI_STYLE_SUNKEN, rx, by, box_size, box_size, bg, border);
 
 	if(w->style & MKGUI_CHECKBOX_CHECKED) {
 		int32_t cx = rx + box_size / 2;
 		int32_t cy = by + box_size / 2;
-		uint32_t check_color = disabled ? ctx->theme.text_disabled : ctx->theme.sel_text;
-		draw_aa_line(ctx->pixels, ctx->win_w, ctx->win_h, cx - sc(ctx, 4), cy - sc(ctx, 1), cx - sc(ctx, 1), cy + sc(ctx, 3), check_color, sc(ctx, 2));
-		draw_aa_line(ctx->pixels, ctx->win_w, ctx->win_h, cx - sc(ctx, 1), cy + sc(ctx, 3), cx + sc(ctx, 5), cy - sc(ctx, 4), check_color, sc(ctx, 2));
+		uint32_t check_color = disabled ? win->theme.text_disabled : win->theme.sel_text;
+		draw_aa_line(win->pixels, win->win_w, win->win_h, cx - sc(win, 4), cy - sc(win, 1), cx - sc(win, 1), cy + sc(win, 3), check_color, sc(win, 2));
+		draw_aa_line(win->pixels, win->win_w, win->win_h, cx - sc(win, 1), cy + sc(win, 3), cx + sc(win, 5), cy - sc(win, 4), check_color, sc(win, 2));
 	}
 
-	int32_t rw = ctx->rects[idx].w;
-	int32_t ty = ry + (rh - ctx->font_height) / 2;
-	uint32_t tc = disabled ? ctx->theme.text_disabled : ctx->theme.text;
-	push_text_clip(rx + box_size + sc(ctx, 6), ty, w->label, tc, rx, ry, rx + rw, ry + rh);
+	int32_t rw = win->rects[idx].w;
+	int32_t ty = ry + (rh - win->font_height) / 2;
+	uint32_t tc = disabled ? win->theme.text_disabled : win->theme.text;
+	push_text_clip(rx + box_size + sc(win, 6), ty, w->label, tc, rx, ry, rx + rw, ry + rh);
 }
 
 // [=]===^=[ handle_checkbox_key ]===============================[=]
-static uint32_t handle_checkbox_key(struct mkgui_ctx *ctx, struct mkgui_event *ev, uint32_t ks) {
+static uint32_t handle_checkbox_key(struct mkgui_window *win, struct mkgui_event *ev, uint32_t ks) {
 	if(ks == MKGUI_KEY_SPACE) {
-		struct mkgui_widget *w = find_widget(ctx, ctx->focus_id);
+		struct mkgui_widget *w = find_widget(win, win->focus_id);
 		if(!w) {
 			return 0;
 		}
 		w->style ^= MKGUI_CHECKBOX_CHECKED;
 		ev->type = MKGUI_EVENT_CHECKBOX_CHANGED;
-		ev->id = ctx->focus_id;
+		ev->id = win->focus_id;
 		ev->value = (w->style & MKGUI_CHECKBOX_CHECKED) ? 1 : 0;
-		dirty_all(ctx);
+		dirty_all(win);
 		return 1;
 	}
 	return 0;
 }
 
 // [=]===^=[ mkgui_checkbox_get ]================================[=]
-MKGUI_API uint32_t mkgui_checkbox_get(struct mkgui_ctx *ctx, uint32_t id) {
-	MKGUI_CHECK_VAL(ctx, 0);
-	struct mkgui_widget *w = find_widget(ctx, id);
+MKGUI_API uint32_t mkgui_checkbox_get(struct mkgui_window *win, uint32_t id) {
+	MKGUI_CHECK_VAL(win, 0);
+	struct mkgui_widget *w = find_widget(win, id);
 	if(!w) {
 		return 0;
 	}
@@ -133,9 +133,9 @@ MKGUI_API uint32_t mkgui_checkbox_get(struct mkgui_ctx *ctx, uint32_t id) {
 }
 
 // [=]===^=[ mkgui_checkbox_set ]================================[=]
-MKGUI_API void mkgui_checkbox_set(struct mkgui_ctx *ctx, uint32_t id, uint32_t checked) {
-	MKGUI_CHECK(ctx);
-	struct mkgui_widget *w = find_widget(ctx, id);
+MKGUI_API void mkgui_checkbox_set(struct mkgui_window *win, uint32_t id, uint32_t checked) {
+	MKGUI_CHECK(win);
+	struct mkgui_widget *w = find_widget(win, id);
 	if(!w) {
 		return;
 	}
@@ -146,5 +146,5 @@ MKGUI_API void mkgui_checkbox_set(struct mkgui_ctx *ctx, uint32_t id, uint32_t c
 	} else {
 		w->style &= ~MKGUI_CHECKBOX_CHECKED;
 	}
-	dirty_all(ctx);
+	dirty_all(win);
 }

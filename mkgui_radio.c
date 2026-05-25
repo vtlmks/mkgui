@@ -133,47 +133,47 @@ static void draw_aa_circle_ring(uint32_t *buf, int32_t bw, int32_t bh, int32_t c
 }
 
 // [=]===^=[ render_radio ]======================================[=]
-static void render_radio(struct mkgui_ctx *ctx, uint32_t idx) {
-	struct mkgui_widget *w = &ctx->widgets[idx];
-	int32_t rx = ctx->rects[idx].x;
-	int32_t ry = ctx->rects[idx].y;
-	int32_t rh = ctx->rects[idx].h;
+static void render_radio(struct mkgui_window *win, uint32_t idx) {
+	struct mkgui_widget *w = &win->widgets[idx];
+	int32_t rx = win->rects[idx].x;
+	int32_t ry = win->rects[idx].y;
+	int32_t rh = win->rects[idx].h;
 
 	int32_t cy = ry + rh / 2;
-	int32_t cx = rx + sc(ctx, 9);
-	int32_t outer_r = sc(ctx, 7);
-	int32_t inner_r = sc(ctx, 6);
+	int32_t cx = rx + sc(win, 9);
+	int32_t outer_r = sc(win, 7);
+	int32_t inner_r = sc(win, 6);
 
 	uint32_t disabled = (w->flags & MKGUI_DISABLED);
-	uint32_t hovered = (!disabled && ctx->hover_id == w->id);
-	uint32_t pressed = (!disabled && ctx->press_id == w->id);
-	uint32_t border = (ctx->focus_id == w->id || hovered) ? ctx->theme.highlight : ctx->theme.widget_border;
-	uint32_t fill = pressed ? ctx->theme.widget_press : ctx->theme.widget_bg;
-	border = disabled_blend(border, ctx->theme.bg, disabled);
-	fill = disabled_blend(fill, ctx->theme.bg, disabled);
-	draw_aa_circle_ring(ctx->pixels, ctx->win_w, ctx->win_h, cx, cy, outer_r, inner_r, fill, border);
+	uint32_t hovered = (!disabled && win->hover_id == w->id);
+	uint32_t pressed = (!disabled && win->press_id == w->id);
+	uint32_t border = (win->focus_id == w->id || hovered) ? win->theme.highlight : win->theme.widget_border;
+	uint32_t fill = pressed ? win->theme.widget_press : win->theme.widget_bg;
+	border = disabled_blend(border, win->theme.bg, disabled);
+	fill = disabled_blend(fill, win->theme.bg, disabled);
+	draw_aa_circle_ring(win->pixels, win->win_w, win->win_h, cx, cy, outer_r, inner_r, fill, border);
 
 	if(w->style & MKGUI_RADIO_CHECKED) {
-		uint32_t dot_color = disabled_blend(ctx->theme.highlight, ctx->theme.bg, disabled);
-		draw_aa_circle_fill(ctx->pixels, ctx->win_w, ctx->win_h, cx, cy, sc(ctx, 4), dot_color);
+		uint32_t dot_color = disabled_blend(win->theme.highlight, win->theme.bg, disabled);
+		draw_aa_circle_fill(win->pixels, win->win_w, win->win_h, cx, cy, sc(win, 4), dot_color);
 	}
 
-	int32_t rw = ctx->rects[idx].w;
-	int32_t ty = ry + (rh - ctx->font_height) / 2;
-	uint32_t tc = disabled ? ctx->theme.text_disabled : ctx->theme.text;
-	push_text_clip(rx + sc(ctx, 22), ty, w->label, tc, rx, ry, rx + rw, ry + rh);
+	int32_t rw = win->rects[idx].w;
+	int32_t ty = ry + (rh - win->font_height) / 2;
+	uint32_t tc = disabled ? win->theme.text_disabled : win->theme.text;
+	push_text_clip(rx + sc(win, 22), ty, w->label, tc, rx, ry, rx + rw, ry + rh);
 }
 
 // [=]===^=[ handle_radio_click ]=================================[=]
-static uint32_t handle_radio_click(struct mkgui_ctx *ctx, struct mkgui_event *ev, struct mkgui_widget *w) {
-	for(uint32_t i = 0; i < ctx->widget_count; ++i) {
-		struct mkgui_widget *rw = &ctx->widgets[i];
+static uint32_t handle_radio_click(struct mkgui_window *win, struct mkgui_event *ev, struct mkgui_widget *w) {
+	for(uint32_t i = 0; i < win->widget_count; ++i) {
+		struct mkgui_widget *rw = &win->widgets[i];
 		if(rw->type == MKGUI_RADIO && rw->parent_id == w->parent_id) {
 			rw->style &= ~MKGUI_RADIO_CHECKED;
 		}
 	}
 	w->style |= MKGUI_RADIO_CHECKED;
-	dirty_all(ctx);
+	dirty_all(win);
 	ev->type = MKGUI_EVENT_RADIO_CHANGED;
 	ev->id = w->id;
 	ev->value = 1;
@@ -181,34 +181,34 @@ static uint32_t handle_radio_click(struct mkgui_ctx *ctx, struct mkgui_event *ev
 }
 
 // [=]===^=[ handle_radio_key ]===================================[=]
-static uint32_t handle_radio_key(struct mkgui_ctx *ctx, struct mkgui_event *ev, uint32_t ks) {
+static uint32_t handle_radio_key(struct mkgui_window *win, struct mkgui_event *ev, uint32_t ks) {
 	if(ks == MKGUI_KEY_SPACE || ks == MKGUI_KEY_RETURN) {
-		struct mkgui_widget *w = find_widget(ctx, ctx->focus_id);
+		struct mkgui_widget *w = find_widget(win, win->focus_id);
 		if(w) {
-			return handle_radio_click(ctx, ev, w);
+			return handle_radio_click(win, ev, w);
 		}
 	}
 	return 0;
 }
 
 // [=]===^=[ mkgui_radio_get ]====================================[=]
-MKGUI_API uint32_t mkgui_radio_get(struct mkgui_ctx *ctx, uint32_t id) {
-	MKGUI_CHECK_VAL(ctx, 0);
-	struct mkgui_widget *w = find_widget(ctx, id);
+MKGUI_API uint32_t mkgui_radio_get(struct mkgui_window *win, uint32_t id) {
+	MKGUI_CHECK_VAL(win, 0);
+	struct mkgui_widget *w = find_widget(win, id);
 	return (w && (w->style & MKGUI_RADIO_CHECKED)) ? 1 : 0;
 }
 
 // [=]===^=[ mkgui_radio_set ]======================================[=]
-MKGUI_API void mkgui_radio_set(struct mkgui_ctx *ctx, uint32_t id, uint32_t checked) {
-	MKGUI_CHECK(ctx);
-	struct mkgui_widget *w = find_widget(ctx, id);
+MKGUI_API void mkgui_radio_set(struct mkgui_window *win, uint32_t id, uint32_t checked) {
+	MKGUI_CHECK(win);
+	struct mkgui_widget *w = find_widget(win, id);
 	if(!w || w->type != MKGUI_RADIO) {
 		return;
 	}
 
 	if(checked) {
-		for(uint32_t i = 0; i < ctx->widget_count; ++i) {
-			struct mkgui_widget *s = &ctx->widgets[i];
+		for(uint32_t i = 0; i < win->widget_count; ++i) {
+			struct mkgui_widget *s = &win->widgets[i];
 			if(s->type == MKGUI_RADIO && s->parent_id == w->parent_id && s->id != id) {
 				s->style &= ~MKGUI_RADIO_CHECKED;
 			}
@@ -218,13 +218,13 @@ MKGUI_API void mkgui_radio_set(struct mkgui_ctx *ctx, uint32_t id, uint32_t chec
 	} else {
 		w->style &= ~MKGUI_RADIO_CHECKED;
 	}
-	dirty_all(ctx);
+	dirty_all(win);
 }
 
 // [=]===^=[ mkgui_radio_get_selected ]============================[=]
-static uint32_t mkgui_radio_get_selected(struct mkgui_ctx *ctx, uint32_t group_parent_id) {
-	for(uint32_t i = 0; i < ctx->widget_count; ++i) {
-		struct mkgui_widget *w = &ctx->widgets[i];
+static uint32_t mkgui_radio_get_selected(struct mkgui_window *win, uint32_t group_parent_id) {
+	for(uint32_t i = 0; i < win->widget_count; ++i) {
+		struct mkgui_widget *w = &win->widgets[i];
 		if(w->type == MKGUI_RADIO && w->parent_id == group_parent_id && (w->style & MKGUI_RADIO_CHECKED)) {
 			return w->id;
 		}

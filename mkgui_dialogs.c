@@ -75,18 +75,18 @@ static struct dlg_btn_def dlg_button_defs[5][3] = {
 };
 
 // [=]===^=[ dlg_render ]=============================================[=]
-static void dlg_render(struct mkgui_ctx *ctx, void *userdata) {
+static void dlg_render(struct mkgui_window *win, void *userdata) {
 	(void)userdata;
 	if(dlg_rs.icon_idx >= 0) {
-		int32_t ii = find_widget_idx(ctx, MKGUI_DLG_ICON_PANEL);
+		int32_t ii = find_widget_idx(win, MKGUI_DLG_ICON_PANEL);
 		if(ii >= 0) {
-			int32_t rx = ctx->rects[ii].x;
-			int32_t ry = ctx->rects[ii].y;
-			int32_t rw = ctx->rects[ii].w;
-			int32_t rh = ctx->rects[ii].h;
+			int32_t rx = win->rects[ii].x;
+			int32_t ry = win->rects[ii].y;
+			int32_t rw = win->rects[ii].w;
+			int32_t rh = win->rects[ii].h;
 			int32_t ix = rx + (rw - icons[dlg_rs.icon_idx].w) / 2;
 			int32_t iy = ry + (rh - icons[dlg_rs.icon_idx].h) / 2;
-			draw_icon(ctx->pixels, ctx->win_w, ctx->win_h, &icons[dlg_rs.icon_idx], ix, iy, 0, 0, ctx->win_w, ctx->win_h);
+			draw_icon(win->pixels, win->win_w, win->win_h, &icons[dlg_rs.icon_idx], ix, iy, 0, 0, win->win_w, win->win_h);
 		}
 	}
 }
@@ -96,7 +96,7 @@ static void dlg_render(struct mkgui_ctx *ctx, void *userdata) {
 // rasterised at dialog_icon_size with a brand-coloured currentColor. The
 // "dlg:" prefix keeps the coloured variant in its own icons[] slot so
 // later widget uses of the same name render with the theme colour.
-static int32_t dlg_icon_resolve(struct mkgui_ctx *ctx, uint32_t icon_type) {
+static int32_t dlg_icon_resolve(struct mkgui_window *win, uint32_t icon_type) {
 	if(icon_type == 0 || icon_type >= sizeof(dlg_icon_defs) / sizeof(dlg_icon_defs[0])) {
 		return -1;
 	}
@@ -105,7 +105,7 @@ static int32_t dlg_icon_resolve(struct mkgui_ctx *ctx, uint32_t icon_type) {
 	char cache_name[MKGUI_ICON_NAME_LEN];
 	snprintf(cache_name, sizeof(cache_name), "dlg:%s", name);
 
-	int32_t idx = icon_find_idx_at(cache_name, ctx->dialog_icon_size);
+	int32_t idx = icon_find_idx_at(cache_name, win->dialog_icon_size);
 	if(idx >= 0) {
 		return idx;
 	}
@@ -114,15 +114,15 @@ static int32_t dlg_icon_resolve(struct mkgui_ctx *ctx, uint32_t icon_type) {
 	// same data backs both the dialog-coloured and the theme-coloured
 	// variants.
 	uint32_t src_idx = svg_find_source_idx(name);
-	if(src_idx == UINT32_MAX && ctx->system_theme_count > 0) {
-		src_idx = icon_lazy_load_system(ctx, name);
+	if(src_idx == UINT32_MAX && win->system_theme_count > 0) {
+		src_idx = icon_lazy_load_system(win, name);
 	}
 	if(src_idx == UINT32_MAX) {
 		return icon_find_idx_any(name);
 	}
 
 	struct mkgui_svg_source *src = &svg_sources[src_idx];
-	idx = svg_rasterize_icon_ex(cache_name, src->svg_data, src->svg_len, ctx->dialog_icon_size, color, 0, src_idx);
+	idx = svg_rasterize_icon_ex(cache_name, src->svg_data, src->svg_len, win->dialog_icon_size, color, 0, src_idx);
 	if(idx >= 0) {
 		icon_atlas_rebuild();
 	}
@@ -130,7 +130,7 @@ static int32_t dlg_icon_resolve(struct mkgui_ctx *ctx, uint32_t icon_type) {
 }
 
 // [=]===^=[ dlg_wrap_text ]==========================================[=]
-static uint32_t dlg_wrap_text(struct mkgui_ctx *ctx, const char *text, int32_t max_w, char lines[][DLG_LINE_LEN], uint32_t max_lines) {
+static uint32_t dlg_wrap_text(struct mkgui_window *win, const char *text, int32_t max_w, char lines[][DLG_LINE_LEN], uint32_t max_lines) {
 	uint32_t lc = 0;
 	const char *p = text;
 
@@ -146,7 +146,7 @@ static uint32_t dlg_wrap_text(struct mkgui_ctx *ctx, const char *text, int32_t m
 			uint32_t ch = (uint8_t)*s;
 			int32_t cw = 0;
 			if(ch >= MKGUI_GLYPH_FIRST && ch <= MKGUI_GLYPH_LAST) {
-				cw = ctx->glyphs[ch - MKGUI_GLYPH_FIRST].advance;
+				cw = win->glyphs[ch - MKGUI_GLYPH_FIRST].advance;
 			}
 
 			if(w + cw > max_w && li > 0) {
@@ -225,12 +225,12 @@ static uint32_t dlg_setup_buttons(uint32_t buttons) {
 }
 
 // [=]===^=[ dlg_run ]================================================[=]
-static uint32_t dlg_run(struct mkgui_ctx *parent, struct mkgui_widget *widgets, uint32_t count, const char *title, int32_t w, int32_t h) {
-	struct mkgui_ctx *dlg = mkgui_create_child(parent, widgets, count, title, w, h);
+static uint32_t dlg_run(struct mkgui_window *parent, struct mkgui_widget *widgets, uint32_t count, const char *title, int32_t w, int32_t h) {
+	struct mkgui_window *dlg = mkgui_window_create(parent->ctx, parent, widgets, count, title, w, h);
 	if(!dlg) {
 		return MKGUI_DLG_RESULT_NONE;
 	}
-	mkgui_set_window_instance(dlg, "dialog");
+	mkgui_window_set_instance(dlg, "dialog");
 
 	dlg->render_cb = dlg_render;
 
@@ -238,7 +238,7 @@ static uint32_t dlg_run(struct mkgui_ctx *parent, struct mkgui_widget *widgets, 
 	struct mkgui_event ev;
 	uint32_t running = 1;
 	while(running) {
-		while(mkgui_poll(dlg, &ev)) {
+		while(mkgui_window_poll(dlg, &ev)) {
 			switch(ev.type) {
 				case MKGUI_EVENT_CLOSE: {
 					running = 0;
@@ -273,17 +273,17 @@ static uint32_t dlg_run(struct mkgui_ctx *parent, struct mkgui_widget *widgets, 
 				default: break;
 			}
 		}
-		mkgui_wait(dlg);
+		mkgui_ctx_wait(parent->ctx);
 	}
 
-	mkgui_destroy_child(dlg);
+	mkgui_window_destroy(dlg);
 	dirty_all(parent);
 	return result;
 }
 
-// [=]===^=[ mkgui_message_box ]======================================[=]
-MKGUI_API uint32_t mkgui_message_box(struct mkgui_ctx *ctx, const char *title, const char *message, uint32_t icon_type, uint32_t buttons) {
-	MKGUI_CHECK_VAL(ctx, 0);
+// [=]===^=[ mkgui_dialog_message ]======================================[=]
+MKGUI_API uint32_t mkgui_dialog_message(struct mkgui_window *win, const char *title, const char *message, uint32_t icon_type, uint32_t buttons) {
+	MKGUI_CHECK_VAL(win, 0);
 	if(!title) {
 		title = "";
 	}
@@ -291,7 +291,7 @@ MKGUI_API uint32_t mkgui_message_box(struct mkgui_ctx *ctx, const char *title, c
 	if(!message) {
 		message = "";
 	}
-	int32_t icon_idx = dlg_icon_resolve(ctx, icon_type);
+	int32_t icon_idx = dlg_icon_resolve(win, icon_type);
 	int32_t icon_w = 0;
 	int32_t icon_h = 0;
 	if(icon_idx >= 0) {
@@ -303,11 +303,11 @@ MKGUI_API uint32_t mkgui_message_box(struct mkgui_ctx *ctx, const char *title, c
 	int32_t text_max_w = DLG_MAX_W - DLG_PAD * 2 - icon_area;
 
 	char lines[DLG_MAX_LINES][DLG_LINE_LEN];
-	uint32_t line_count = dlg_wrap_text(ctx, message, text_max_w, lines, DLG_MAX_LINES);
+	uint32_t line_count = dlg_wrap_text(win, message, text_max_w, lines, DLG_MAX_LINES);
 
 	int32_t max_line_w = 0;
 	for(uint32_t i = 0; i < line_count; ++i) {
-		int32_t lw = text_width(ctx, lines[i]);
+		int32_t lw = text_width(win, lines[i]);
 		if(lw > max_line_w) {
 			max_line_w = lw;
 		}
@@ -330,7 +330,7 @@ MKGUI_API uint32_t mkgui_message_box(struct mkgui_ctx *ctx, const char *title, c
 		dw = DLG_MAX_W;
 	}
 
-	int32_t text_h = (int32_t)line_count * (ctx->font_height + DLG_LINE_GAP) - DLG_LINE_GAP;
+	int32_t text_h = (int32_t)line_count * (win->font_height + DLG_LINE_GAP) - DLG_LINE_GAP;
 	int32_t content_h = (icon_h > text_h) ? icon_h : text_h;
 	int32_t dh = DLG_PAD + content_h + DLG_TEXT_BTN_GAP + DLG_BTN_H + DLG_PAD;
 
@@ -356,7 +356,7 @@ MKGUI_API uint32_t mkgui_message_box(struct mkgui_ctx *ctx, const char *title, c
 	++wi;
 
 	for(uint32_t i = 0; i < line_count; ++i) {
-		widgets[wi] = (struct mkgui_widget)MKGUI_W(MKGUI_LABEL, MKGUI_DLG_LABEL_BASE + i, "", "", MKGUI_DLG_TEXT_VBOX, 0, ctx->font_height, MKGUI_FIXED, 0, 0);
+		widgets[wi] = (struct mkgui_widget)MKGUI_W(MKGUI_LABEL, MKGUI_DLG_LABEL_BASE + i, "", "", MKGUI_DLG_TEXT_VBOX, 0, win->font_height, MKGUI_FIXED, 0, 0);
 		strncpy(widgets[wi].label, lines[i], MKGUI_MAX_TEXT - 1);
 		++wi;
 	}
@@ -378,12 +378,12 @@ MKGUI_API uint32_t mkgui_message_box(struct mkgui_ctx *ctx, const char *title, c
 
 	dlg_rs.icon_idx = icon_idx;
 
-	return dlg_run(ctx, widgets, wi, title, dw, dh);
+	return dlg_run(win, widgets, wi, title, dw, dh);
 }
 
-// [=]===^=[ mkgui_confirm_dialog ]==================================[=]
-MKGUI_API uint32_t mkgui_confirm_dialog(struct mkgui_ctx *ctx, const char *title, const char *message) {
-	MKGUI_CHECK_VAL(ctx, 0);
+// [=]===^=[ mkgui_dialog_confirm ]==================================[=]
+MKGUI_API uint32_t mkgui_dialog_confirm(struct mkgui_window *win, const char *title, const char *message) {
+	MKGUI_CHECK_VAL(win, 0);
 	if(!title) {
 		title = "";
 	}
@@ -391,13 +391,13 @@ MKGUI_API uint32_t mkgui_confirm_dialog(struct mkgui_ctx *ctx, const char *title
 	if(!message) {
 		message = "";
 	}
-	uint32_t result = mkgui_message_box(ctx, title, message, MKGUI_DLG_ICON_QUESTION, MKGUI_DLG_BUTTONS_YES_NO);
+	uint32_t result = mkgui_dialog_message(win, title, message, MKGUI_DLG_ICON_QUESTION, MKGUI_DLG_BUTTONS_YES_NO);
 	return (result == MKGUI_DLG_RESULT_YES) ? 1 : 0;
 }
 
-// [=]===^=[ mkgui_input_dialog ]====================================[=]
-MKGUI_API uint32_t mkgui_input_dialog(struct mkgui_ctx *ctx, const char *title, const char *prompt, const char *default_text, char *out, uint32_t out_size) {
-	MKGUI_CHECK_VAL(ctx, 0);
+// [=]===^=[ mkgui_dialog_input ]====================================[=]
+MKGUI_API uint32_t mkgui_dialog_input(struct mkgui_window *win, const char *title, const char *prompt, const char *default_text, char *out, uint32_t out_size) {
+	MKGUI_CHECK_VAL(win, 0);
 	if(!title) {
 		title = "";
 	}
@@ -409,7 +409,7 @@ MKGUI_API uint32_t mkgui_input_dialog(struct mkgui_ctx *ctx, const char *title, 
 	if(!out || out_size == 0) {
 		return 0;
 	}
-	int32_t icon_idx = dlg_icon_resolve(ctx, MKGUI_DLG_ICON_QUESTION);
+	int32_t icon_idx = dlg_icon_resolve(win, MKGUI_DLG_ICON_QUESTION);
 	int32_t icon_w = 0;
 	int32_t icon_h = 0;
 	if(icon_idx >= 0) {
@@ -421,17 +421,17 @@ MKGUI_API uint32_t mkgui_input_dialog(struct mkgui_ctx *ctx, const char *title, 
 	int32_t text_max_w = DLG_MAX_W - DLG_PAD * 2 - icon_area;
 
 	char lines[DLG_MAX_LINES][DLG_LINE_LEN];
-	uint32_t line_count = dlg_wrap_text(ctx, prompt, text_max_w, lines, DLG_MAX_LINES);
+	uint32_t line_count = dlg_wrap_text(win, prompt, text_max_w, lines, DLG_MAX_LINES);
 
 	int32_t max_line_w = 0;
 	for(uint32_t i = 0; i < line_count; ++i) {
-		int32_t lw = text_width(ctx, lines[i]);
+		int32_t lw = text_width(win, lines[i]);
 		if(lw > max_line_w) {
 			max_line_w = lw;
 		}
 	}
 
-	int32_t text_h = (int32_t)line_count * (ctx->font_height + DLG_LINE_GAP) - DLG_LINE_GAP;
+	int32_t text_h = (int32_t)line_count * (win->font_height + DLG_LINE_GAP) - DLG_LINE_GAP;
 	int32_t text_icon_h = (icon_h > text_h) ? icon_h : text_h;
 	int32_t content_h = text_icon_h + DLG_INPUT_GAP + DLG_INPUT_H;
 
@@ -474,7 +474,7 @@ MKGUI_API uint32_t mkgui_input_dialog(struct mkgui_ctx *ctx, const char *title, 
 	++wi;
 
 	for(uint32_t i = 0; i < line_count; ++i) {
-		widgets[wi] = (struct mkgui_widget)MKGUI_W(MKGUI_LABEL, MKGUI_DLG_LABEL_BASE + i, "", "", MKGUI_DLG_TEXT_VBOX, 0, ctx->font_height, MKGUI_FIXED, 0, 0);
+		widgets[wi] = (struct mkgui_widget)MKGUI_W(MKGUI_LABEL, MKGUI_DLG_LABEL_BASE + i, "", "", MKGUI_DLG_TEXT_VBOX, 0, win->font_height, MKGUI_FIXED, 0, 0);
 		strncpy(widgets[wi].label, lines[i], MKGUI_MAX_TEXT - 1);
 		++wi;
 	}
@@ -499,11 +499,11 @@ MKGUI_API uint32_t mkgui_input_dialog(struct mkgui_ctx *ctx, const char *title, 
 
 	dlg_rs.icon_idx = icon_idx;
 
-	struct mkgui_ctx *dlg = mkgui_create_child(ctx, widgets, wi, title, dw, dh);
+	struct mkgui_window *dlg = mkgui_window_create(win->ctx, win, widgets, wi, title, dw, dh);
 	if(!dlg) {
 		return 0;
 	}
-	mkgui_set_window_instance(dlg, "dialog");
+	mkgui_window_set_instance(dlg, "dialog");
 
 	dlg->render_cb = dlg_render;
 
@@ -516,7 +516,7 @@ MKGUI_API uint32_t mkgui_input_dialog(struct mkgui_ctx *ctx, const char *title, 
 	struct mkgui_event ev;
 	uint32_t running = 1;
 	while(running) {
-		while(mkgui_poll(dlg, &ev)) {
+		while(mkgui_window_poll(dlg, &ev)) {
 			switch(ev.type) {
 				case MKGUI_EVENT_CLOSE: {
 					running = 0;
@@ -550,7 +550,7 @@ MKGUI_API uint32_t mkgui_input_dialog(struct mkgui_ctx *ctx, const char *title, 
 				default: break;
 			}
 		}
-		mkgui_wait(dlg);
+		mkgui_ctx_wait(win->ctx);
 	}
 
 	if(result) {
@@ -561,7 +561,7 @@ MKGUI_API uint32_t mkgui_input_dialog(struct mkgui_ctx *ctx, const char *title, 
 		}
 	}
 
-	mkgui_destroy_child(dlg);
-	dirty_all(ctx);
+	mkgui_window_destroy(dlg);
+	dirty_all(win);
 	return result;
 }

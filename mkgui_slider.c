@@ -80,14 +80,14 @@ static void slider_draw_wedge_h(uint32_t *buf, int32_t bw, int32_t bh, int32_t x
 }
 
 // [=]===^=[ render_slider ]=====================================[=]
-static void render_slider(struct mkgui_ctx *ctx, uint32_t idx) {
-	struct mkgui_widget *w = &ctx->widgets[idx];
-	int32_t rx = ctx->rects[idx].x;
-	int32_t ry = ctx->rects[idx].y;
-	int32_t rw = ctx->rects[idx].w;
-	int32_t rh = ctx->rects[idx].h;
+static void render_slider(struct mkgui_window *win, uint32_t idx) {
+	struct mkgui_widget *w = &win->widgets[idx];
+	int32_t rx = win->rects[idx].x;
+	int32_t ry = win->rects[idx].y;
+	int32_t rw = win->rects[idx].w;
+	int32_t rh = win->rects[idx].h;
 
-	struct mkgui_slider_data *sd = find_slider_data(ctx, w->id);
+	struct mkgui_slider_data *sd = find_slider_data(win, w->id);
 	if(!sd) {
 		return;
 	}
@@ -96,31 +96,31 @@ static void render_slider(struct mkgui_ctx *ctx, uint32_t idx) {
 	uint32_t vertical = (w->flags & MKGUI_VERTICAL);
 	uint32_t mixer = (w->style & MKGUI_SLIDER_MIXER);
 
-	int32_t track_size = sc(ctx, 4);
-	int32_t meter_track_size = sc(ctx, 8);
-	int32_t thumb_size = sc(ctx, 10);
-	int32_t wedge_max_w = sc(ctx, 10);
+	int32_t track_size = sc(win, 4);
+	int32_t meter_track_size = sc(win, 8);
+	int32_t thumb_size = sc(win, 10);
+	int32_t wedge_max_w = sc(win, 10);
 
 	int32_t range = sd->max_val - sd->min_val;
 	if(range <= 0) {
 		range = 1;
 	}
 
-	uint32_t thumb_color = (ctx->focus_id == w->id) ? ctx->theme.sel_text : ctx->theme.highlight;
-	uint32_t thumb_border = ctx->theme.highlight;
-	uint32_t track_color = ctx->theme.widget_border;
-	uint32_t wedge_color = blend_pixel(ctx->theme.bg, ctx->theme.widget_border, 128);
-	thumb_color = disabled_blend(thumb_color, ctx->theme.bg, disabled);
-	thumb_border = disabled_blend(thumb_border, ctx->theme.bg, disabled);
-	track_color = disabled_blend(track_color, ctx->theme.bg, disabled);
-	wedge_color = disabled_blend(wedge_color, ctx->theme.bg, disabled);
-	uint32_t meter_pre_color = disabled_blend(sd->meter_pre_color, ctx->theme.bg, disabled);
-	uint32_t meter_post_color = disabled_blend(sd->meter_post_color, ctx->theme.bg, disabled);
+	uint32_t thumb_color = (win->focus_id == w->id) ? win->theme.sel_text : win->theme.highlight;
+	uint32_t thumb_border = win->theme.highlight;
+	uint32_t track_color = win->theme.widget_border;
+	uint32_t wedge_color = blend_pixel(win->theme.bg, win->theme.widget_border, 128);
+	thumb_color = disabled_blend(thumb_color, win->theme.bg, disabled);
+	thumb_border = disabled_blend(thumb_border, win->theme.bg, disabled);
+	track_color = disabled_blend(track_color, win->theme.bg, disabled);
+	wedge_color = disabled_blend(wedge_color, win->theme.bg, disabled);
+	uint32_t meter_pre_color = disabled_blend(sd->meter_pre_color, win->theme.bg, disabled);
+	uint32_t meter_post_color = disabled_blend(sd->meter_post_color, win->theme.bg, disabled);
 
 	if(vertical) {
 		int32_t track_w = mixer ? meter_track_size : track_size;
 		int32_t track_x = rx + rw / 2 - track_w / 2;
-		draw_rounded_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, track_x, ry, track_w, rh, track_color, 2);
+		draw_rounded_rect_fill(win->pixels, win->win_w, win->win_h, track_x, ry, track_w, rh, track_color, 2);
 
 		if(mixer) {
 			int32_t meter_x = track_x + 1;
@@ -131,7 +131,7 @@ static void render_slider(struct mkgui_ctx *ctx, uint32_t idx) {
 				float pre = sd->meter_pre > 1.0f ? 1.0f : sd->meter_pre;
 				int32_t ph = (int32_t)(pre * (float)meter_h);
 				if(ph > 0) {
-					draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, meter_x, meter_y + meter_h - ph, meter_w, ph, meter_pre_color);
+					draw_rect_fill(win->pixels, win->win_w, win->win_h, meter_x, meter_y + meter_h - ph, meter_w, ph, meter_pre_color);
 				}
 			}
 
@@ -139,21 +139,21 @@ static void render_slider(struct mkgui_ctx *ctx, uint32_t idx) {
 				float post = sd->meter_post > 1.0f ? 1.0f : sd->meter_post;
 				int32_t ph = (int32_t)(post * (float)meter_h);
 				if(ph > 0) {
-					draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, meter_x, meter_y + meter_h - ph, meter_w, ph, meter_post_color);
+					draw_rect_fill(win->pixels, win->win_w, win->win_h, meter_x, meter_y + meter_h - ph, meter_w, ph, meter_post_color);
 				}
 			}
 
 			int32_t wedge_x = track_x + track_w + 1;
-			slider_draw_wedge_v(ctx->pixels, ctx->win_w, ctx->win_h, wedge_x, ry, rh, 0, rh, wedge_max_w, wedge_color);
+			slider_draw_wedge_v(win->pixels, win->win_w, win->win_h, wedge_x, ry, rh, 0, rh, wedge_max_w, wedge_color);
 		}
 
 		int32_t thumb_y = ry + rh - thumb_size - (int32_t)((int64_t)(sd->value - sd->min_val) * (rh - thumb_size) / range);
-		draw_patch(ctx, MKGUI_STYLE_RAISED, rx + sc(ctx, 2), thumb_y, rw - sc(ctx, 4), thumb_size, thumb_color, thumb_border);
+		draw_patch(win, MKGUI_STYLE_RAISED, rx + sc(win, 2), thumb_y, rw - sc(win, 4), thumb_size, thumb_color, thumb_border);
 
 	} else {
 		int32_t track_h = mixer ? meter_track_size : track_size;
 		int32_t track_y = ry + rh / 2 - track_h / 2;
-		draw_rounded_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, rx, track_y, rw, track_h, track_color, 2);
+		draw_rounded_rect_fill(win->pixels, win->win_w, win->win_h, rx, track_y, rw, track_h, track_color, 2);
 
 		if(mixer) {
 			int32_t meter_x = rx + 1;
@@ -164,7 +164,7 @@ static void render_slider(struct mkgui_ctx *ctx, uint32_t idx) {
 				float pre = sd->meter_pre > 1.0f ? 1.0f : sd->meter_pre;
 				int32_t pw = (int32_t)(pre * (float)meter_w);
 				if(pw > 0) {
-					draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, meter_x, meter_y, pw, meter_h, meter_pre_color);
+					draw_rect_fill(win->pixels, win->win_w, win->win_h, meter_x, meter_y, pw, meter_h, meter_pre_color);
 				}
 			}
 
@@ -172,27 +172,27 @@ static void render_slider(struct mkgui_ctx *ctx, uint32_t idx) {
 				float post = sd->meter_post > 1.0f ? 1.0f : sd->meter_post;
 				int32_t pw = (int32_t)(post * (float)meter_w);
 				if(pw > 0) {
-					draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, meter_x, meter_y, pw, meter_h, meter_post_color);
+					draw_rect_fill(win->pixels, win->win_w, win->win_h, meter_x, meter_y, pw, meter_h, meter_post_color);
 				}
 			}
 
 			int32_t wedge_y = track_y + track_h + 1;
-			slider_draw_wedge_h(ctx->pixels, ctx->win_w, ctx->win_h, rx, wedge_y, rw, 0, rw, wedge_max_w, wedge_color);
+			slider_draw_wedge_h(win->pixels, win->win_w, win->win_h, rx, wedge_y, rw, 0, rw, wedge_max_w, wedge_color);
 		}
 
 		int32_t thumb_x = rx + (int32_t)((int64_t)(sd->value - sd->min_val) * (rw - thumb_size) / range);
-		draw_patch(ctx, MKGUI_STYLE_RAISED, thumb_x, ry + sc(ctx, 2), thumb_size, rh - sc(ctx, 4), thumb_color, thumb_border);
+		draw_patch(win, MKGUI_STYLE_RAISED, thumb_x, ry + sc(win, 2), thumb_size, rh - sc(win, 4), thumb_color, thumb_border);
 	}
 }
 
 // [=]===^=[ handle_slider_key ]=================================[=]
-static uint32_t handle_slider_key(struct mkgui_ctx *ctx, struct mkgui_event *ev, uint32_t ks) {
-	struct mkgui_slider_data *sd = find_slider_data(ctx, ctx->focus_id);
+static uint32_t handle_slider_key(struct mkgui_window *win, struct mkgui_event *ev, uint32_t ks) {
+	struct mkgui_slider_data *sd = find_slider_data(win, win->focus_id);
 	if(!sd) {
 		return 0;
 	}
 
-	struct mkgui_widget *fw = find_widget(ctx, ctx->focus_id);
+	struct mkgui_widget *fw = find_widget(win, win->focus_id);
 	uint32_t vertical = (fw && (fw->flags & MKGUI_VERTICAL));
 
 	int32_t range = sd->max_val - sd->min_val;
@@ -223,17 +223,17 @@ static uint32_t handle_slider_key(struct mkgui_ctx *ctx, struct mkgui_event *ev,
 		return 0;
 	}
 
-	dirty_widget_id(ctx, ctx->focus_id);
+	dirty_widget_id(win, win->focus_id);
 	ev->type = MKGUI_EVENT_SLIDER_CHANGED;
-	ev->id = ctx->focus_id;
+	ev->id = win->focus_id;
 	ev->value = sd->value;
 	return 1;
 }
 
 // [=]===^=[ mkgui_slider_setup ]================================[=]
-MKGUI_API void mkgui_slider_setup(struct mkgui_ctx *ctx, uint32_t id, int32_t min_val, int32_t max_val, int32_t value) {
-	MKGUI_CHECK(ctx);
-	struct mkgui_slider_data *sd = find_slider_data(ctx, id);
+MKGUI_API void mkgui_slider_setup(struct mkgui_window *win, uint32_t id, int32_t min_val, int32_t max_val, int32_t value) {
+	MKGUI_CHECK(win);
+	struct mkgui_slider_data *sd = find_slider_data(win, id);
 	if(!sd) {
 		return;
 	}
@@ -247,20 +247,20 @@ MKGUI_API void mkgui_slider_setup(struct mkgui_ctx *ctx, uint32_t id, int32_t mi
 	if(sd->value > sd->max_val) {
 		sd->value = sd->max_val;
 	}
-	dirty_widget_id(ctx, id);
+	dirty_widget_id(win, id);
 }
 
 // [=]===^=[ mkgui_slider_get ]=================================[=]
-MKGUI_API int32_t mkgui_slider_get(struct mkgui_ctx *ctx, uint32_t id) {
-	MKGUI_CHECK_VAL(ctx, 0);
-	struct mkgui_slider_data *sd = find_slider_data(ctx, id);
+MKGUI_API int32_t mkgui_slider_get(struct mkgui_window *win, uint32_t id) {
+	MKGUI_CHECK_VAL(win, 0);
+	struct mkgui_slider_data *sd = find_slider_data(win, id);
 	return sd ? sd->value : 0;
 }
 
 // [=]===^=[ mkgui_slider_set ]====================================[=]
-MKGUI_API void mkgui_slider_set(struct mkgui_ctx *ctx, uint32_t id, int32_t value) {
-	MKGUI_CHECK(ctx);
-	struct mkgui_slider_data *sd = find_slider_data(ctx, id);
+MKGUI_API void mkgui_slider_set(struct mkgui_window *win, uint32_t id, int32_t value) {
+	MKGUI_CHECK(win);
+	struct mkgui_slider_data *sd = find_slider_data(win, id);
 	if(!sd) {
 		return;
 	}
@@ -273,13 +273,13 @@ MKGUI_API void mkgui_slider_set(struct mkgui_ctx *ctx, uint32_t id, int32_t valu
 		value = sd->max_val;
 	}
 	sd->value = value;
-	dirty_widget_id(ctx, id);
+	dirty_widget_id(win, id);
 }
 
 // [=]===^=[ mkgui_slider_get_range ]===============================[=]
-MKGUI_API void mkgui_slider_get_range(struct mkgui_ctx *ctx, uint32_t id, int32_t *min_val, int32_t *max_val) {
-	MKGUI_CHECK(ctx);
-	struct mkgui_slider_data *sd = find_slider_data(ctx, id);
+MKGUI_API void mkgui_slider_get_range(struct mkgui_window *win, uint32_t id, int32_t *min_val, int32_t *max_val) {
+	MKGUI_CHECK(win);
+	struct mkgui_slider_data *sd = find_slider_data(win, id);
 	if(!sd) {
 		if(min_val) { *min_val = 0; }
 		if(max_val) { *max_val = 0; }
@@ -291,9 +291,9 @@ MKGUI_API void mkgui_slider_get_range(struct mkgui_ctx *ctx, uint32_t id, int32_
 }
 
 // [=]===^=[ mkgui_slider_set_range ]===============================[=]
-MKGUI_API void mkgui_slider_set_range(struct mkgui_ctx *ctx, uint32_t id, int32_t min_val, int32_t max_val) {
-	MKGUI_CHECK(ctx);
-	struct mkgui_slider_data *sd = find_slider_data(ctx, id);
+MKGUI_API void mkgui_slider_set_range(struct mkgui_window *win, uint32_t id, int32_t min_val, int32_t max_val) {
+	MKGUI_CHECK(win);
+	struct mkgui_slider_data *sd = find_slider_data(win, id);
 	if(!sd) {
 		return;
 	}
@@ -306,13 +306,13 @@ MKGUI_API void mkgui_slider_set_range(struct mkgui_ctx *ctx, uint32_t id, int32_
 	if(sd->value > sd->max_val) {
 		sd->value = sd->max_val;
 	}
-	dirty_widget_id(ctx, id);
+	dirty_widget_id(win, id);
 }
 
 // [=]===^=[ mkgui_slider_set_meter ]=============================[=]
-MKGUI_API void mkgui_slider_set_meter(struct mkgui_ctx *ctx, uint32_t id, float pre, float post, uint32_t pre_color, uint32_t post_color) {
-	MKGUI_CHECK(ctx);
-	struct mkgui_slider_data *sd = find_slider_data(ctx, id);
+MKGUI_API void mkgui_slider_set_meter(struct mkgui_window *win, uint32_t id, float pre, float post, uint32_t pre_color, uint32_t post_color) {
+	MKGUI_CHECK(win);
+	struct mkgui_slider_data *sd = find_slider_data(win, id);
 	if(!sd) {
 		return;
 	}
@@ -320,5 +320,5 @@ MKGUI_API void mkgui_slider_set_meter(struct mkgui_ctx *ctx, uint32_t id, float 
 	sd->meter_post = post;
 	sd->meter_pre_color = pre_color;
 	sd->meter_post_color = post_color;
-	dirty_widget_id(ctx, id);
+	dirty_widget_id(win, id);
 }

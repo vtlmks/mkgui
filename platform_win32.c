@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 // ---------------------------------------------------------------------------
-// Per-ctx event queue helpers
+// Per-win event queue helpers
 // ---------------------------------------------------------------------------
 
 // [=]===^=[ evq_push_ctx ]========================================[=]
@@ -72,10 +72,10 @@ static uint32_t platform_get_keymod(void) {
 // ---------------------------------------------------------------------------
 
 // [=]===^=[ wndproc_find_owner ]===================================[=]
-static struct mkgui_ctx *wndproc_find_owner(HWND hwnd, int32_t *popup_idx) {
+static struct mkgui_window *wndproc_find_owner(HWND hwnd, int32_t *popup_idx) {
 	*popup_idx = -1;
-	for(uint32_t i = 0; i < window_registry_count; ++i) {
-		struct mkgui_ctx *c = window_registry[i];
+	for(uint32_t i = 0; i < g_ctx->window_count; ++i) {
+		struct mkgui_window *c = g_ctx->windows[i];
 		if(c->plat.hwnd == hwnd) {
 			return c;
 		}
@@ -92,7 +92,7 @@ static struct mkgui_ctx *wndproc_find_owner(HWND hwnd, int32_t *popup_idx) {
 // [=]===^=[ mkgui_wndproc ]=======================================[=]
 static LRESULT CALLBACK mkgui_wndproc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
 	int32_t popup_idx = -1;
-	struct mkgui_ctx *owner = wndproc_find_owner(hwnd, &popup_idx);
+	struct mkgui_window *owner = wndproc_find_owner(hwnd, &popup_idx);
 
 	if(!owner) {
 		return DefWindowProcA(hwnd, msg, wp, lp);
@@ -496,8 +496,8 @@ static void platform_set_window_icon(struct mkgui_platform *plat, const struct m
 }
 
 // [=]===^=[ platform_init ]=======================================[=]
-static uint32_t platform_init(struct mkgui_ctx *ctx, const char *title, int32_t w, int32_t h, uint32_t flags) {
-	struct mkgui_platform *plat = &ctx->plat;
+static uint32_t platform_init(struct mkgui_window *win, const char *title, int32_t w, int32_t h, uint32_t flags) {
+	struct mkgui_platform *plat = &win->plat;
 	platform_register_class();
 
 	DWORD style = (flags & MKGUI_WINDOW_UNDECORATED) ? WS_POPUP : WS_OVERLAPPEDWINDOW;
@@ -511,11 +511,11 @@ static uint32_t platform_init(struct mkgui_ctx *ctx, const char *title, int32_t 
 		return 0;
 	}
 
-	ctx->win_w = w;
-	ctx->win_h = h;
+	win->win_w = w;
+	win->win_h = h;
 
 	HDC hdc = GetDC(plat->hwnd);
-	platform_fb_create_dib(hdc, &plat->hdc_mem, &plat->hbmp, &plat->hbmp_old, &ctx->pixels, w, h);
+	platform_fb_create_dib(hdc, &plat->hdc_mem, &plat->hbmp, &plat->hbmp_old, &win->pixels, w, h);
 	ReleaseDC(plat->hwnd, hdc);
 
 	plat->cursor_default = LoadCursorA(NULL, IDC_ARROW);
@@ -527,19 +527,19 @@ static uint32_t platform_init(struct mkgui_ctx *ctx, const char *title, int32_t 
 }
 
 // [=]===^=[ platform_window_map ]==================================[=]
-static void platform_window_map(struct mkgui_ctx *ctx) {
-	ShowWindow(ctx->plat.hwnd, SW_SHOW);
-	UpdateWindow(ctx->plat.hwnd);
+static void platform_window_map(struct mkgui_window *win) {
+	ShowWindow(win->plat.hwnd, SW_SHOW);
+	UpdateWindow(win->plat.hwnd);
 }
 
 // [=]===^=[ platform_window_unmap ]================================[=]
-static void platform_window_unmap(struct mkgui_ctx *ctx) {
-	ShowWindow(ctx->plat.hwnd, SW_HIDE);
+static void platform_window_unmap(struct mkgui_window *win) {
+	ShowWindow(win->plat.hwnd, SW_HIDE);
 }
 
 // [=]===^=[ platform_init_child ]=================================[=]
-static uint32_t platform_init_child(struct mkgui_ctx *ctx, struct mkgui_ctx *parent, const char *title, int32_t w, int32_t h, uint32_t flags) {
-	struct mkgui_platform *plat = &ctx->plat;
+static uint32_t platform_init_child(struct mkgui_window *win, struct mkgui_window *parent, const char *title, int32_t w, int32_t h, uint32_t flags) {
+	struct mkgui_platform *plat = &win->plat;
 	platform_register_class();
 
 	DWORD style = (flags & MKGUI_WINDOW_UNDECORATED) ? WS_POPUP : WS_OVERLAPPEDWINDOW;
@@ -557,11 +557,11 @@ static uint32_t platform_init_child(struct mkgui_ctx *ctx, struct mkgui_ctx *par
 	plat->is_child = 1;
 	plat->parent_hwnd = parent->plat.hwnd;
 
-	ctx->win_w = w;
-	ctx->win_h = h;
+	win->win_w = w;
+	win->win_h = h;
 
 	HDC hdc = GetDC(plat->hwnd);
-	platform_fb_create_dib(hdc, &plat->hdc_mem, &plat->hbmp, &plat->hbmp_old, &ctx->pixels, w, h);
+	platform_fb_create_dib(hdc, &plat->hdc_mem, &plat->hbmp, &plat->hbmp_old, &win->pixels, w, h);
 	ReleaseDC(plat->hwnd, hdc);
 
 	plat->cursor_default = LoadCursorA(NULL, IDC_ARROW);
@@ -573,8 +573,8 @@ static uint32_t platform_init_child(struct mkgui_ctx *ctx, struct mkgui_ctx *par
 }
 
 // [=]===^=[ platform_destroy ]====================================[=]
-static void platform_destroy(struct mkgui_ctx *ctx) {
-	struct mkgui_platform *plat = &ctx->plat;
+static void platform_destroy(struct mkgui_window *win) {
+	struct mkgui_platform *plat = &win->plat;
 	platform_fb_destroy_dib(&plat->hdc_mem, &plat->hbmp, &plat->hbmp_old);
 	if(plat->hwnd) {
 		DestroyWindow(plat->hwnd);
@@ -583,8 +583,8 @@ static void platform_destroy(struct mkgui_ctx *ctx) {
 }
 
 // [=]===^=[ platform_set_cursor ]=================================[=]
-static void platform_set_cursor(struct mkgui_ctx *ctx, uint32_t cursor_type) {
-	struct mkgui_platform *plat = &ctx->plat;
+static void platform_set_cursor(struct mkgui_window *win, uint32_t cursor_type) {
+	struct mkgui_platform *plat = &win->plat;
 	if(plat->cursor_active == cursor_type) {
 		return;
 	}
@@ -611,24 +611,24 @@ static void platform_set_cursor(struct mkgui_ctx *ctx, uint32_t cursor_type) {
 // ---------------------------------------------------------------------------
 
 // [=]===^=[ platform_fb_resize ]==================================[=]
-static void platform_fb_resize(struct mkgui_ctx *ctx) {
-	if(ctx->win_w <= 0 || ctx->win_h <= 0) {
+static void platform_fb_resize(struct mkgui_window *win) {
+	if(win->win_w <= 0 || win->win_h <= 0) {
 		return;
 	}
-	struct mkgui_platform *plat = &ctx->plat;
+	struct mkgui_platform *plat = &win->plat;
 	platform_fb_destroy_dib(&plat->hdc_mem, &plat->hbmp, &plat->hbmp_old);
 	HDC hdc = GetDC(plat->hwnd);
-	platform_fb_create_dib(hdc, &plat->hdc_mem, &plat->hbmp, &plat->hbmp_old, &ctx->pixels, ctx->win_w, ctx->win_h);
+	platform_fb_create_dib(hdc, &plat->hdc_mem, &plat->hbmp, &plat->hbmp_old, &win->pixels, win->win_w, win->win_h);
 	ReleaseDC(plat->hwnd, hdc);
 }
 
 // [=]===^=[ platform_drop_enable ]================================[=]
-static void platform_drop_enable(struct mkgui_ctx *ctx) {
-	DragAcceptFiles(ctx->plat.hwnd, TRUE);
+static void platform_drop_enable(struct mkgui_window *win) {
+	DragAcceptFiles(win->plat.hwnd, TRUE);
 }
 
 // [=]===^=[ platform_detect_scale ]================================[=]
-static float platform_detect_scale(struct mkgui_ctx *ctx) {
+static float platform_detect_scale(struct mkgui_window *win) {
 	char *env = getenv("MKGUI_SCALE");
 	if(env) {
 		char *end = NULL;
@@ -651,7 +651,7 @@ static float platform_detect_scale(struct mkgui_ctx *ctx) {
 	if(user32) {
 		GetDpiForWindow_t fn = (GetDpiForWindow_t)(void *)GetProcAddress(user32, "GetDpiForWindow");
 		if(fn) {
-			UINT dpi = fn(ctx->plat.hwnd);
+			UINT dpi = fn(win->plat.hwnd);
 			if(dpi > 0) {
 				return (float)dpi / 96.0f;
 			}
@@ -671,41 +671,41 @@ static float platform_detect_scale(struct mkgui_ctx *ctx) {
 }
 
 // [=]===^=[ platform_resize_window ]===============================[=]
-static void platform_resize_window(struct mkgui_ctx *ctx, int32_t w, int32_t h) {
+static void platform_resize_window(struct mkgui_window *win, int32_t w, int32_t h) {
 	RECT rc = { 0, 0, w, h };
-	DWORD style = ctx->undecorated ? WS_POPUP : WS_OVERLAPPEDWINDOW;
+	DWORD style = win->undecorated ? WS_POPUP : WS_OVERLAPPEDWINDOW;
 	AdjustWindowRect(&rc, style, FALSE);
-	SetWindowPos(ctx->plat.hwnd, NULL, 0, 0, rc.right - rc.left, rc.bottom - rc.top, SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
+	SetWindowPos(win->plat.hwnd, NULL, 0, 0, rc.right - rc.left, rc.bottom - rc.top, SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
 }
 
 // [=]===^=[ platform_move_window ]=================================[=]
-static void platform_move_window(struct mkgui_ctx *ctx, int32_t x, int32_t y) {
-	SetWindowPos(ctx->plat.hwnd, NULL, x, y, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+static void platform_move_window(struct mkgui_window *win, int32_t x, int32_t y) {
+	SetWindowPos(win->plat.hwnd, NULL, x, y, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
 }
 
 // [=]===^=[ platform_get_window_position ]=========================[=]
-static void platform_get_window_position(struct mkgui_ctx *ctx, int32_t *out_x, int32_t *out_y) {
+static void platform_get_window_position(struct mkgui_window *win, int32_t *out_x, int32_t *out_y) {
 	RECT rc;
-	GetWindowRect(ctx->plat.hwnd, &rc);
+	GetWindowRect(win->plat.hwnd, &rc);
 	*out_x = rc.left;
 	*out_y = rc.top;
 }
 
 // [=]===^=[ platform_begin_drag ]==================================[=]
-static void platform_begin_drag(struct mkgui_ctx *ctx) {
+static void platform_begin_drag(struct mkgui_window *win) {
 	ReleaseCapture();
-	SendMessageA(ctx->plat.hwnd, WM_NCLBUTTONDOWN, HTCAPTION, 0);
+	SendMessageA(win->plat.hwnd, WM_NCLBUTTONDOWN, HTCAPTION, 0);
 }
 
 // [=]===^=[ platform_set_shape ]====================================[=]
-static void platform_set_shape(struct mkgui_ctx *ctx, const POINT *points, int32_t count) {
+static void platform_set_shape(struct mkgui_window *win, const POINT *points, int32_t count) {
 	HRGN rgn = CreatePolygonRgn(points, count, WINDING);
-	SetWindowRgn(ctx->plat.hwnd, rgn, TRUE);
+	SetWindowRgn(win->plat.hwnd, rgn, TRUE);
 }
 
 // [=]===^=[ platform_clear_shape ]==================================[=]
-static void platform_clear_shape(struct mkgui_ctx *ctx) {
-	SetWindowRgn(ctx->plat.hwnd, NULL, TRUE);
+static void platform_clear_shape(struct mkgui_window *win) {
+	SetWindowRgn(win->plat.hwnd, NULL, TRUE);
 }
 
 // ---------------------------------------------------------------------------
@@ -713,25 +713,25 @@ static void platform_clear_shape(struct mkgui_ctx *ctx) {
 // ---------------------------------------------------------------------------
 
 // [=]===^=[ platform_blit ]=======================================[=]
-static void platform_blit(struct mkgui_ctx *ctx) {
-	struct mkgui_platform *plat = &ctx->plat;
+static void platform_blit(struct mkgui_window *win) {
+	struct mkgui_platform *plat = &win->plat;
 	HDC hdc = GetDC(plat->hwnd);
 	SelectClipRgn(hdc, NULL);
-	for(uint32_t i = 0; i < ctx->glview_count; ++i) {
-		if(ctx->glviews[i].plat.hwnd && ctx->glviews[i].visible) {
-			int32_t gx = ctx->glviews[i].last_x;
-			int32_t gy = ctx->glviews[i].last_y;
-			int32_t gw = ctx->glviews[i].last_w;
-			int32_t gh = ctx->glviews[i].last_h;
+	for(uint32_t i = 0; i < win->glview_count; ++i) {
+		if(win->glviews[i].plat.hwnd && win->glviews[i].visible) {
+			int32_t gx = win->glviews[i].last_x;
+			int32_t gy = win->glviews[i].last_y;
+			int32_t gw = win->glviews[i].last_w;
+			int32_t gh = win->glviews[i].last_h;
 			ExcludeClipRect(hdc, gx, gy, gx + gw, gy + gh);
 		}
 	}
-	BitBlt(hdc, 0, 0, ctx->win_w, ctx->win_h, plat->hdc_mem, 0, 0, SRCCOPY);
+	BitBlt(hdc, 0, 0, win->win_w, win->win_h, plat->hdc_mem, 0, 0, SRCCOPY);
 	ReleaseDC(plat->hwnd, hdc);
 }
 
 // [=]===^=[ platform_blit_region ]================================[=]
-static void platform_blit_region(struct mkgui_ctx *ctx, int32_t x, int32_t y, int32_t w, int32_t h) {
+static void platform_blit_region(struct mkgui_window *win, int32_t x, int32_t y, int32_t w, int32_t h) {
 	if(x < 0) {
 		w += x;
 		x = 0;
@@ -740,24 +740,24 @@ static void platform_blit_region(struct mkgui_ctx *ctx, int32_t x, int32_t y, in
 		h += y;
 		y = 0;
 	}
-	if(x + w > ctx->win_w) {
-		w = ctx->win_w - x;
+	if(x + w > win->win_w) {
+		w = win->win_w - x;
 	}
-	if(y + h > ctx->win_h) {
-		h = ctx->win_h - y;
+	if(y + h > win->win_h) {
+		h = win->win_h - y;
 	}
 	if(w <= 0 || h <= 0) {
 		return;
 	}
-	struct mkgui_platform *plat = &ctx->plat;
+	struct mkgui_platform *plat = &win->plat;
 	HDC hdc = GetDC(plat->hwnd);
 	SelectClipRgn(hdc, NULL);
-	for(uint32_t i = 0; i < ctx->glview_count; ++i) {
-		if(ctx->glviews[i].plat.hwnd && ctx->glviews[i].visible) {
-			int32_t gx = ctx->glviews[i].last_x;
-			int32_t gy = ctx->glviews[i].last_y;
-			int32_t gw = ctx->glviews[i].last_w;
-			int32_t gh = ctx->glviews[i].last_h;
+	for(uint32_t i = 0; i < win->glview_count; ++i) {
+		if(win->glviews[i].plat.hwnd && win->glviews[i].visible) {
+			int32_t gx = win->glviews[i].last_x;
+			int32_t gy = win->glviews[i].last_y;
+			int32_t gw = win->glviews[i].last_w;
+			int32_t gh = win->glviews[i].last_h;
 			ExcludeClipRect(hdc, gx, gy, gx + gw, gy + gh);
 		}
 	}
@@ -766,16 +766,16 @@ static void platform_blit_region(struct mkgui_ctx *ctx, int32_t x, int32_t y, in
 }
 
 // [=]===^=[ platform_popup_blit ]=================================[=]
-static void platform_popup_blit(struct mkgui_ctx *ctx, struct mkgui_popup *p) {
-	(void)ctx;
+static void platform_popup_blit(struct mkgui_window *win, struct mkgui_popup *p) {
+	(void)win;
 	HDC hdc = GetDC(p->plat.hwnd);
 	BitBlt(hdc, 0, 0, p->w, p->h, p->plat.hdc_mem, 0, 0, SRCCOPY);
 	ReleaseDC(p->plat.hwnd, hdc);
 }
 
 // [=]===^=[ platform_flush ]======================================[=]
-static void platform_flush(struct mkgui_ctx *ctx) {
-	(void)ctx;
+static void platform_flush(struct mkgui_window *win) {
+	(void)win;
 	GdiFlush();
 }
 
@@ -784,8 +784,8 @@ static void platform_flush(struct mkgui_ctx *ctx) {
 // ---------------------------------------------------------------------------
 
 // [=]===^=[ platform_popup_init ]=================================[=]
-static uint32_t platform_popup_init(struct mkgui_ctx *ctx, struct mkgui_popup *p, int32_t x, int32_t y, int32_t w, int32_t h) {
-	struct mkgui_platform *plat = &ctx->plat;
+static uint32_t platform_popup_init(struct mkgui_window *win, struct mkgui_popup *p, int32_t x, int32_t y, int32_t w, int32_t h) {
+	struct mkgui_platform *plat = &win->plat;
 
 	p->plat.hwnd = CreateWindowExA(WS_EX_TOPMOST | WS_EX_TOOLWINDOW, "mkgui", "", WS_POPUP | WS_VISIBLE, x, y, w, h, plat->hwnd, NULL, GetModuleHandleA(NULL), NULL);
 
@@ -801,8 +801,8 @@ static uint32_t platform_popup_init(struct mkgui_ctx *ctx, struct mkgui_popup *p
 }
 
 // [=]===^=[ platform_popup_fini ]=================================[=]
-static void platform_popup_fini(struct mkgui_ctx *ctx, struct mkgui_popup *p) {
-	(void)ctx;
+static void platform_popup_fini(struct mkgui_window *win, struct mkgui_popup *p) {
+	(void)win;
 	platform_fb_destroy_dib(&p->plat.hdc_mem, &p->plat.hbmp, &p->plat.hbmp_old);
 	if(p->plat.hwnd) {
 		DestroyWindow(p->plat.hwnd);
@@ -815,16 +815,16 @@ static void platform_popup_fini(struct mkgui_ctx *ctx, struct mkgui_popup *p) {
 // ---------------------------------------------------------------------------
 
 // [=]===^=[ platform_screen_size ]================================[=]
-static void platform_screen_size(struct mkgui_ctx *ctx, int32_t *sw, int32_t *sh) {
-	(void)ctx;
+static void platform_screen_size(struct mkgui_window *win, int32_t *sw, int32_t *sh) {
+	(void)win;
 	*sw = GetSystemMetrics(SM_CXSCREEN);
 	*sh = GetSystemMetrics(SM_CYSCREEN);
 }
 
 // [=]===^=[ platform_set_min_size ]================================[=]
-static void platform_set_min_size(struct mkgui_ctx *ctx, int32_t min_w, int32_t min_h) {
-	ctx->plat.min_w = min_w;
-	ctx->plat.min_h = min_h;
+static void platform_set_min_size(struct mkgui_window *win, int32_t min_w, int32_t min_h) {
+	win->plat.min_w = min_w;
+	win->plat.min_h = min_h;
 }
 
 // ---------------------------------------------------------------------------
@@ -832,9 +832,9 @@ static void platform_set_min_size(struct mkgui_ctx *ctx, int32_t min_w, int32_t 
 // ---------------------------------------------------------------------------
 
 // [=]===^=[ platform_translate_coords ]===========================[=]
-static void platform_translate_coords(struct mkgui_ctx *ctx, int32_t lx, int32_t ly, int32_t *sx, int32_t *sy) {
+static void platform_translate_coords(struct mkgui_window *win, int32_t lx, int32_t ly, int32_t *sx, int32_t *sy) {
 	POINT pt = { lx, ly };
-	ClientToScreen(ctx->plat.hwnd, &pt);
+	ClientToScreen(win->plat.hwnd, &pt);
 	*sx = pt.x;
 	*sy = pt.y;
 }
@@ -853,24 +853,35 @@ static void platform_pump_messages(void) {
 }
 
 // [=]===^=[ platform_wait_event ]=================================[=]
-static void platform_wait_event(struct mkgui_ctx *ctx, int32_t timeout_ms) {
-	if(timeout_ms == 0 || ctx->plat.evq_head != ctx->plat.evq_tail) {
+// timeout_ns < 0: block indefinitely. == 0: poll once. > 0: wait up to ns.
+// MsgWaitForMultipleObjects is ms-granular, so we ceil-round when converting.
+static void platform_wait_event(struct mkgui_window *win, int64_t timeout_ns) {
+	if(timeout_ns == 0 || win->plat.evq_head != win->plat.evq_tail) {
 		return;
 	}
 	platform_pump_messages();
-	if(ctx->plat.evq_head != ctx->plat.evq_tail) {
+	if(win->plat.evq_head != win->plat.evq_tail) {
 		return;
 	}
-	DWORD wait_ms = (DWORD)timeout_ms;
-	for(uint32_t i = 0; i < ctx->timer_count; ++i) {
-		if(ctx->timers[i].active) {
-			DWORD timer_ms = (DWORD)(ctx->timers[i].interval_ns / 1000000);
+	DWORD wait_ms;
+	if(timeout_ns < 0) {
+		wait_ms = INFINITE;
+	} else {
+		uint64_t ms = ((uint64_t)timeout_ns + 999999ull) / 1000000ull;
+		if(ms > 0xfffffffeull) {
+			ms = 0xfffffffeull;
+		}
+		wait_ms = (DWORD)ms;
+	}
+	for(uint32_t i = 0; i < win->timer_count; ++i) {
+		if(win->timers[i].active) {
+			uint64_t timer_ms = win->timers[i].interval_ns / 1000000ull;
 			if(timer_ms < 1) {
 				timer_ms = 1;
 			}
 
-			if(timer_ms < wait_ms) {
-				wait_ms = timer_ms;
+			if(wait_ms == INFINITE || timer_ms < wait_ms) {
+				wait_ms = (DWORD)timer_ms;
 			}
 		}
 	}
@@ -878,14 +889,14 @@ static void platform_wait_event(struct mkgui_ctx *ctx, int32_t timeout_ms) {
 }
 
 // [=]===^=[ platform_pending ]====================================[=]
-static uint32_t platform_pending(struct mkgui_ctx *ctx) {
+static uint32_t platform_pending(struct mkgui_window *win) {
 	platform_pump_messages();
-	return ctx->plat.evq_head != ctx->plat.evq_tail;
+	return win->plat.evq_head != win->plat.evq_tail;
 }
 
 // [=]===^=[ platform_next_event ]=================================[=]
-static void platform_next_event(struct mkgui_ctx *ctx, struct mkgui_plat_event *pev) {
-	if(!evq_pop_ctx(&ctx->plat, pev)) {
+static void platform_next_event(struct mkgui_window *win, struct mkgui_plat_event *pev) {
+	if(!evq_pop_ctx(&win->plat, pev)) {
 		memset(pev, 0, sizeof(*pev));
 		pev->popup_idx = -1;
 		pev->type = MKGUI_PLAT_NONE;
@@ -900,7 +911,7 @@ static HDC plat_font_dc;
 static HFONT plat_font_handle;
 
 // [=]===^=[ platform_font_rasterize ]==============================[=]
-static void platform_font_rasterize(struct mkgui_ctx *ctx, int32_t pixel_size) {
+static void platform_font_rasterize(struct mkgui_window *win, int32_t pixel_size) {
 	if(!plat_font_dc) {
 		return;
 	}
@@ -916,9 +927,9 @@ static void platform_font_rasterize(struct mkgui_ctx *ctx, int32_t pixel_size) {
 	}
 
 	if(!plat_font_handle) {
-		ctx->font_ascent = sc(ctx, 11);
-		ctx->font_height = sc(ctx, 13);
-		ctx->char_width = sc(ctx, 7);
+		win->font_ascent = sc(win, 11);
+		win->font_height = sc(win, 13);
+		win->char_width = sc(win, 7);
 		return;
 	}
 
@@ -926,8 +937,8 @@ static void platform_font_rasterize(struct mkgui_ctx *ctx, int32_t pixel_size) {
 
 	TEXTMETRICA tm;
 	GetTextMetricsA(plat_font_dc, &tm);
-	ctx->font_ascent = tm.tmAscent;
-	ctx->font_height = tm.tmAscent + tm.tmDescent;
+	win->font_ascent = tm.tmAscent;
+	win->font_height = tm.tmAscent + tm.tmDescent;
 
 	MAT2 mat = { {0,1}, {0,0}, {0,0}, {0,1} };
 
@@ -935,12 +946,12 @@ static void platform_font_rasterize(struct mkgui_ctx *ctx, int32_t pixel_size) {
 		GLYPHMETRICS gm;
 		DWORD buf_size = GetGlyphOutlineA(plat_font_dc, c, GGO_GRAY8_BITMAP, &gm, 0, NULL, &mat);
 		if(buf_size == GDI_ERROR || buf_size == 0) {
-			struct mkgui_glyph *g = &ctx->glyphs[c - MKGUI_GLYPH_FIRST];
+			struct mkgui_glyph *g = &win->glyphs[c - MKGUI_GLYPH_FIRST];
 			ABC abc;
 			if(GetCharABCWidthsA(plat_font_dc, c, c, &abc)) {
 				g->advance = abc.abcA + (int32_t)abc.abcB + abc.abcC;
 			} else {
-				g->advance = sc(ctx, 7);
+				g->advance = sc(win, 7);
 			}
 			continue;
 		}
@@ -951,7 +962,7 @@ static void platform_font_rasterize(struct mkgui_ctx *ctx, int32_t pixel_size) {
 		}
 		GetGlyphOutlineA(plat_font_dc, c, GGO_GRAY8_BITMAP, &gm, buf_size, tmp, &mat);
 
-		struct mkgui_glyph *g = &ctx->glyphs[c - MKGUI_GLYPH_FIRST];
+		struct mkgui_glyph *g = &win->glyphs[c - MKGUI_GLYPH_FIRST];
 		g->width = (int32_t)gm.gmBlackBoxX;
 		g->height = (int32_t)gm.gmBlackBoxY;
 		g->bearing_x = gm.gmptGlyphOrigin.x;
@@ -980,35 +991,35 @@ static void platform_font_rasterize(struct mkgui_ctx *ctx, int32_t pixel_size) {
 		free(tmp);
 	}
 
-	ctx->char_width = ctx->glyphs['M' - MKGUI_GLYPH_FIRST].advance;
-	if(ctx->char_width == 0) {
-		ctx->char_width = sc(ctx, 7);
+	win->char_width = win->glyphs['M' - MKGUI_GLYPH_FIRST].advance;
+	if(win->char_width == 0) {
+		win->char_width = sc(win, 7);
 	}
-	glyph_atlas_build(ctx);
+	glyph_atlas_build(win);
 }
 
 // [=]===^=[ platform_font_init ]==================================[=]
-static void platform_font_init(struct mkgui_ctx *ctx) {
+static void platform_font_init(struct mkgui_window *win) {
 	plat_font_dc = CreateCompatibleDC(NULL);
 	if(!plat_font_dc) {
-		ctx->font_ascent = sc(ctx, 11);
-		ctx->font_height = sc(ctx, 13);
-		ctx->char_width = sc(ctx, 7);
+		win->font_ascent = sc(win, 11);
+		win->font_height = sc(win, 13);
+		win->char_width = sc(win, 7);
 		return;
 	}
 
-	int32_t font_px = (int32_t)(13.0f * ctx->scale + 0.5f);
-	platform_font_rasterize(ctx, font_px);
+	int32_t font_px = (int32_t)(13.0f * win->scale + 0.5f);
+	platform_font_rasterize(win, font_px);
 }
 
 // [=]===^=[ platform_font_set_size ]===============================[=]
-static void platform_font_set_size(struct mkgui_ctx *ctx, int32_t pixel_size) {
-	platform_font_rasterize(ctx, pixel_size);
+static void platform_font_set_size(struct mkgui_window *win, int32_t pixel_size) {
+	platform_font_rasterize(win, pixel_size);
 }
 
 // [=]===^=[ platform_font_fini ]==================================[=]
-static void platform_font_fini(struct mkgui_ctx *ctx) {
-	(void)ctx;
+static void platform_font_fini(struct mkgui_window *win) {
+	(void)win;
 	if(plat_font_handle) {
 		DeleteObject(plat_font_handle);
 		plat_font_handle = NULL;
@@ -1025,15 +1036,15 @@ static void platform_font_fini(struct mkgui_ctx *ctx) {
 // ---------------------------------------------------------------------------
 
 // [=]===^=[ platform_clipboard_set ]==============================[=]
-static void platform_clipboard_set(struct mkgui_ctx *ctx, const char *text, uint32_t len) {
+static void platform_clipboard_set(struct mkgui_window *win, const char *text, uint32_t len) {
 	if(len >= MKGUI_CLIP_MAX) {
 		len = MKGUI_CLIP_MAX - 1;
 	}
-	memcpy(ctx->clip_text, text, len);
-	ctx->clip_text[len] = '\0';
-	ctx->clip_len = len;
+	memcpy(win->clip_text, text, len);
+	win->clip_text[len] = '\0';
+	win->clip_len = len;
 
-	if(!OpenClipboard(ctx->plat.hwnd)) {
+	if(!OpenClipboard(win->plat.hwnd)) {
 		return;
 	}
 	EmptyClipboard();
@@ -1049,8 +1060,8 @@ static void platform_clipboard_set(struct mkgui_ctx *ctx, const char *text, uint
 }
 
 // [=]===^=[ platform_clipboard_get ]==============================[=]
-static uint32_t platform_clipboard_get(struct mkgui_ctx *ctx, char *buf, uint32_t buf_size) {
-	if(!OpenClipboard(ctx->plat.hwnd)) {
+static uint32_t platform_clipboard_get(struct mkgui_window *win, char *buf, uint32_t buf_size) {
+	if(!OpenClipboard(win->plat.hwnd)) {
 		return 0;
 	}
 	HANDLE h = GetClipboardData(CF_TEXT);
@@ -1075,9 +1086,9 @@ static uint32_t platform_clipboard_get(struct mkgui_ctx *ctx, char *buf, uint32_
 }
 
 // [=]===^=[ platform_clipboard_get_alloc ]========================[=]
-static char *platform_clipboard_get_alloc(struct mkgui_ctx *ctx, uint32_t *out_len) {
+static char *platform_clipboard_get_alloc(struct mkgui_window *win, uint32_t *out_len) {
 	*out_len = 0;
-	if(!OpenClipboard(ctx->plat.hwnd)) {
+	if(!OpenClipboard(win->plat.hwnd)) {
 		return NULL;
 	}
 	HANDLE h = GetClipboardData(CF_TEXT);
@@ -1120,7 +1131,7 @@ static LRESULT CALLBACK glview_wndproc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp
 }
 
 // [=]===^=[ platform_glview_create ]==============================[=]
-static uint32_t platform_glview_create(struct mkgui_ctx *ctx, struct mkgui_glview_data *gv, int32_t x, int32_t y, int32_t w, int32_t h) {
+static uint32_t platform_glview_create(struct mkgui_window *win, struct mkgui_glview_data *gv, int32_t x, int32_t y, int32_t w, int32_t h) {
 	if(!glview_wc_registered) {
 		WNDCLASSEXA wc;
 		memset(&wc, 0, sizeof(wc));
@@ -1131,7 +1142,7 @@ static uint32_t platform_glview_create(struct mkgui_ctx *ctx, struct mkgui_glvie
 		RegisterClassExA(&wc);
 		glview_wc_registered = 1;
 	}
-	gv->plat.hwnd = CreateWindowExA(0, "mkgui_glview", "", WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS, x, y, w, h, ctx->plat.hwnd, NULL, GetModuleHandle(NULL), NULL);
+	gv->plat.hwnd = CreateWindowExA(0, "mkgui_glview", "", WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS, x, y, w, h, win->plat.hwnd, NULL, GetModuleHandle(NULL), NULL);
 	if(!gv->plat.hwnd) {
 		return 0;
 	}
@@ -1139,8 +1150,8 @@ static uint32_t platform_glview_create(struct mkgui_ctx *ctx, struct mkgui_glvie
 }
 
 // [=]===^=[ platform_glview_destroy ]=============================[=]
-static void platform_glview_destroy(struct mkgui_ctx *ctx, struct mkgui_glview_data *gv) {
-	(void)ctx;
+static void platform_glview_destroy(struct mkgui_window *win, struct mkgui_glview_data *gv) {
+	(void)win;
 	if(gv->plat.hwnd) {
 		DestroyWindow(gv->plat.hwnd);
 		gv->plat.hwnd = NULL;
@@ -1148,8 +1159,8 @@ static void platform_glview_destroy(struct mkgui_ctx *ctx, struct mkgui_glview_d
 }
 
 // [=]===^=[ platform_glview_reposition ]==========================[=]
-static void platform_glview_reposition(struct mkgui_ctx *ctx, struct mkgui_glview_data *gv, int32_t x, int32_t y, int32_t w, int32_t h) {
-	(void)ctx;
+static void platform_glview_reposition(struct mkgui_window *win, struct mkgui_glview_data *gv, int32_t x, int32_t y, int32_t w, int32_t h) {
+	(void)win;
 	if(!gv->plat.hwnd) {
 		return;
 	}
@@ -1157,8 +1168,8 @@ static void platform_glview_reposition(struct mkgui_ctx *ctx, struct mkgui_glvie
 }
 
 // [=]===^=[ platform_glview_show ]================================[=]
-static void platform_glview_show(struct mkgui_ctx *ctx, struct mkgui_glview_data *gv, uint32_t visible) {
-	(void)ctx;
+static void platform_glview_show(struct mkgui_window *win, struct mkgui_glview_data *gv, uint32_t visible) {
+	(void)win;
 	if(!gv->plat.hwnd) {
 		return;
 	}

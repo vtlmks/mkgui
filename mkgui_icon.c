@@ -24,8 +24,8 @@ static int32_t icon_find_idx_any(const char *name) {
 	return icon_hash_lookup_any(name);
 }
 
-// ctx used by icon_resolve for system theme lazy-load (set once at init)
-static struct mkgui_ctx *icon_lazy_ctx;
+// win used by icon_resolve for system theme lazy-load (set once at init)
+static struct mkgui_window *icon_lazy_ctx;
 
 // ---------------------------------------------------------------------------
 // SVG icon support (forward declarations for resolve functions)
@@ -552,8 +552,8 @@ static void icon_read_inherits(const char *theme_dir, char *out, uint32_t out_si
 // Also adds the base variant for -Dark/-Light themes (e.g. Papirus for Papirus-Dark).
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wformat-truncation"
-static void icon_build_theme_chain(struct mkgui_ctx *ctx, const char *theme_name) {
-	ctx->system_theme_count = 0;
+static void icon_build_theme_chain(struct mkgui_window *win, const char *theme_name) {
+	win->system_theme_count = 0;
 
 	// queue for BFS through inheritance
 	char queue[MKGUI_THEME_CHAIN_MAX][256];
@@ -580,7 +580,7 @@ static void icon_build_theme_chain(struct mkgui_ctx *ctx, const char *theme_name
 		snprintf(queue[qtail++], sizeof(queue[0]), "hicolor");
 	}
 
-	while(qhead < qtail && ctx->system_theme_count < MKGUI_THEME_CHAIN_MAX) {
+	while(qhead < qtail && win->system_theme_count < MKGUI_THEME_CHAIN_MAX) {
 		char *name = queue[qhead++];
 
 		// resolve all paths for this theme name (user + system)
@@ -592,10 +592,10 @@ static void icon_build_theme_chain(struct mkgui_ctx *ctx, const char *theme_name
 
 		// skip paths already in the chain, add new ones
 		uint32_t first_added = UINT32_MAX;
-		for(uint32_t r = 0; r < resolved_count && ctx->system_theme_count < MKGUI_THEME_CHAIN_MAX; ++r) {
+		for(uint32_t r = 0; r < resolved_count && win->system_theme_count < MKGUI_THEME_CHAIN_MAX; ++r) {
 			uint32_t dup = 0;
-			for(uint32_t i = 0; i < ctx->system_theme_count; ++i) {
-				if(strcmp(ctx->system_theme_dirs[i], resolved[r]) == 0) {
+			for(uint32_t i = 0; i < win->system_theme_count; ++i) {
+				if(strcmp(win->system_theme_dirs[i], resolved[r]) == 0) {
 					dup = 1;
 					break;
 				}
@@ -606,10 +606,10 @@ static void icon_build_theme_chain(struct mkgui_ctx *ctx, const char *theme_name
 			}
 
 			if(first_added == UINT32_MAX) {
-				first_added = ctx->system_theme_count;
+				first_added = win->system_theme_count;
 			}
-			snprintf(ctx->system_theme_dirs[ctx->system_theme_count], sizeof(ctx->system_theme_dirs[0]), "%s", resolved[r]);
-			++ctx->system_theme_count;
+			snprintf(win->system_theme_dirs[win->system_theme_count], sizeof(win->system_theme_dirs[0]), "%s", resolved[r]);
+			++win->system_theme_count;
 		}
 
 		if(first_added == UINT32_MAX) {
@@ -618,7 +618,7 @@ static void icon_build_theme_chain(struct mkgui_ctx *ctx, const char *theme_name
 
 		// read Inherits= from the first located path for parent queueing
 		char inherits[1024];
-		icon_read_inherits(ctx->system_theme_dirs[first_added], inherits, sizeof(inherits));
+		icon_read_inherits(win->system_theme_dirs[first_added], inherits, sizeof(inherits));
 		if(inherits[0]) {
 			char *p = inherits;
 			while(*p && qtail < MKGUI_THEME_CHAIN_MAX) {
@@ -729,8 +729,8 @@ static void icon_neg_cache_add(const char *name) {
 // Pull an icon's SVG source from the system theme chain and register it
 // in svg_sources. Returns the source index, or UINT32_MAX if the icon is
 // not in any theme (caches the miss to avoid re-scanning on every call).
-static uint32_t icon_lazy_load_system(struct mkgui_ctx *ctx, const char *name) {
-	if(!ctx || ctx->system_theme_count == 0) {
+static uint32_t icon_lazy_load_system(struct mkgui_window *win, const char *name) {
+	if(!win || win->system_theme_count == 0) {
 		return UINT32_MAX;
 	}
 
@@ -740,8 +740,8 @@ static uint32_t icon_lazy_load_system(struct mkgui_ctx *ctx, const char *name) {
 
 	char svg_path[4096];
 	uint32_t found = 0;
-	for(uint32_t ti = 0; ti < ctx->system_theme_count; ++ti) {
-		if(icon_find_in_system_theme(ctx->system_theme_dirs[ti], name, svg_path, sizeof(svg_path))) {
+	for(uint32_t ti = 0; ti < win->system_theme_count; ++ti) {
+		if(icon_find_in_system_theme(win->system_theme_dirs[ti], name, svg_path, sizeof(svg_path))) {
 			found = 1;
 			break;
 		}
@@ -879,16 +879,16 @@ static void icon_scan_local_themes(icon_theme_visitor visit, void *userdata) {
 }
 
 // [=]===^=[ icon_runtime_visit_theme ]===============================[=]
-// Visitor used by the runtime to populate ctx->system_theme_dirs[]. Saves
+// Visitor used by the runtime to populate win->system_theme_dirs[]. Saves
 // "hicolor" for last per Freedesktop fallback semantics.
 struct icon_runtime_scan {
-	struct mkgui_ctx *ctx;
+	struct mkgui_window *win;
 	char hicolor_path[4096];
 };
 
 static void icon_runtime_visit_theme(const char *theme_dir, const char *theme_name, void *userdata) {
 	struct icon_runtime_scan *s = (struct icon_runtime_scan *)userdata;
-	if(s->ctx->system_theme_count >= MKGUI_THEME_CHAIN_MAX) {
+	if(s->win->system_theme_count >= MKGUI_THEME_CHAIN_MAX) {
 		return;
 	}
 	if(strcmp(theme_name, "hicolor") == 0) {
@@ -897,8 +897,8 @@ static void icon_runtime_visit_theme(const char *theme_dir, const char *theme_na
 		}
 		return;
 	}
-	snprintf(s->ctx->system_theme_dirs[s->ctx->system_theme_count], sizeof(s->ctx->system_theme_dirs[0]), "%s", theme_dir);
-	++s->ctx->system_theme_count;
+	snprintf(s->win->system_theme_dirs[s->win->system_theme_count], sizeof(s->win->system_theme_dirs[0]), "%s", theme_dir);
+	++s->win->system_theme_count;
 }
 
 // [=]===^=[ icon_resolve_at ]========================================[=]
@@ -907,13 +907,13 @@ static void icon_runtime_visit_theme(const char *theme_dir, const char *theme_na
 //   2. re-rasterise from an already-loaded SVG source at the new size
 //   3. lazy-load the SVG from the system theme then rasterise
 // Returns -1 if no variant can be produced.
-static int32_t icon_resolve_at(struct mkgui_ctx *ctx, const char *name, int32_t size) {
+static int32_t icon_resolve_at(struct mkgui_window *win, const char *name, int32_t size) {
 	int32_t idx = icon_find_idx_at(name, size);
 	if(idx >= 0) {
 		return idx;
 	}
 
-	struct mkgui_ctx *effective = ctx;
+	struct mkgui_window *effective = win;
 	if(!effective) {
 		effective = icon_lazy_ctx;
 	}
@@ -940,12 +940,12 @@ static int32_t icon_resolve_at(struct mkgui_ctx *ctx, const char *name, int32_t 
 }
 
 // [=]===^=[ icon_resolve ]===========================================[=]
-// Convenience wrapper that resolves at ctx->icon_size. If ctx is NULL,
-// falls back to the lazy ctx (used by internal paths that don't plumb a
-// ctx through). Returns any existing entry at ctx->icon_size, or lazy-
+// Convenience wrapper that resolves at win->icon_size. If win is NULL,
+// falls back to the lazy win (used by internal paths that don't plumb a
+// win through). Returns any existing entry at win->icon_size, or lazy-
 // loads one from the system theme.
-static int32_t icon_resolve(struct mkgui_ctx *ctx, const char *name) {
-	struct mkgui_ctx *effective = ctx;
+static int32_t icon_resolve(struct mkgui_window *win, const char *name) {
+	struct mkgui_window *effective = win;
 	if(!effective) {
 		effective = icon_lazy_ctx;
 	}
@@ -959,14 +959,14 @@ static int32_t icon_resolve(struct mkgui_ctx *ctx, const char *name) {
 }
 
 // [=]===^=[ widget_icon_idx ]========================================[=]
-// Resolve a widget's icon at ctx->icon_size. Fallback to the _missing
+// Resolve a widget's icon at win->icon_size. Fallback to the _missing
 // placeholder (raster icon, any size) so the user can see that an icon
 // failed to load rather than getting nothing.
-static int32_t widget_icon_idx(struct mkgui_ctx *ctx, struct mkgui_widget *w) {
+static int32_t widget_icon_idx(struct mkgui_window *win, struct mkgui_widget *w) {
 	if(w->icon[0] == '\0') {
 		return -1;
 	}
-	int32_t idx = icon_resolve(ctx, w->icon);
+	int32_t idx = icon_resolve(win, w->icon);
 	if(idx < 0) {
 		return icon_find_idx_any("_missing");
 	}
@@ -976,12 +976,12 @@ static int32_t widget_icon_idx(struct mkgui_ctx *ctx, struct mkgui_widget *w) {
 // [=]===^=[ widget_icon_idx_at ]=====================================[=]
 // Resolve a widget's icon at an explicit size. Used by views (itemview
 // icon mode, file dialog thumbnails) that render at sizes other than
-// ctx->icon_size.
-static int32_t widget_icon_idx_at(struct mkgui_ctx *ctx, struct mkgui_widget *w, int32_t size) {
+// win->icon_size.
+static int32_t widget_icon_idx_at(struct mkgui_window *win, struct mkgui_widget *w, int32_t size) {
 	if(w->icon[0] == '\0') {
 		return -1;
 	}
-	int32_t idx = icon_resolve_at(ctx, w->icon, size);
+	int32_t idx = icon_resolve_at(win, w->icon, size);
 	if(idx < 0) {
 		return icon_find_idx_any("_missing");
 	}
@@ -989,12 +989,12 @@ static int32_t widget_icon_idx_at(struct mkgui_ctx *ctx, struct mkgui_widget *w,
 }
 
 // [=]===^=[ mkgui_icon_at_size ]=====================================[=]
-MKGUI_API int32_t mkgui_icon_at_size(struct mkgui_ctx *ctx, const char *name, int32_t size) {
-	MKGUI_CHECK_VAL(ctx, -1);
+MKGUI_API int32_t mkgui_icon_at_size(struct mkgui_window *win, const char *name, int32_t size) {
+	MKGUI_CHECK_VAL(win, -1);
 	if(!name || !name[0] || size <= 0) {
 		return -1;
 	}
-	return icon_resolve_at(ctx, name, size);
+	return icon_resolve_at(win, name, size);
 }
 
 // [=]===^=[ icon_generate_missing ]=================================[=]
@@ -1033,10 +1033,10 @@ static void mkgui_icon_init(void) {
 }
 
 // [=]===^=[ icon_load_from_widgets ]=================================[=]
-static void icon_load_from_widgets(struct mkgui_ctx *ctx) {
-	for(uint32_t i = 0; i < ctx->widget_count; ++i) {
-		if(ctx->widgets[i].icon[0] != '\0') {
-			icon_resolve(ctx, ctx->widgets[i].icon);
+static void icon_load_from_widgets(struct mkgui_window *win) {
+	for(uint32_t i = 0; i < win->widget_count; ++i) {
+		if(win->widgets[i].icon[0] != '\0') {
+			icon_resolve(win, win->widgets[i].icon);
 		}
 	}
 }
@@ -1096,35 +1096,35 @@ MKGUI_API int32_t mkgui_icon_add(const char *name, const uint32_t *pixels, int32
 }
 
 // [=]===^=[ mkgui_set_icon ]=========================================[=]
-MKGUI_API void mkgui_set_icon(struct mkgui_ctx *ctx, uint32_t widget_id, const char *icon_name) {
-	MKGUI_CHECK(ctx);
-	struct mkgui_widget *w = find_widget(ctx, widget_id);
+MKGUI_API void mkgui_set_icon(struct mkgui_window *win, uint32_t widget_id, const char *icon_name) {
+	MKGUI_CHECK(win);
+	struct mkgui_widget *w = find_widget(win, widget_id);
 	if(!w) {
 		return;
 	}
 
 	if(!icon_name) {
 		w->icon[0] = '\0';
-		dirty_all(ctx);
+		dirty_all(win);
 		return;
 	}
 	snprintf(w->icon, MKGUI_ICON_NAME_LEN, "%s", icon_name);
-	icon_resolve(ctx, icon_name);
-	dirty_all(ctx);
+	icon_resolve(win, icon_name);
+	dirty_all(win);
 }
 
 // [=]===^=[ mkgui_set_treenode_icon ]================================[=]
-MKGUI_API void mkgui_set_treenode_icon(struct mkgui_ctx *ctx, uint32_t widget_id, uint32_t node_id, const char *icon_name) {
-	MKGUI_CHECK(ctx);
-	struct mkgui_treeview_data *tv = find_treeview_data(ctx, widget_id);
+MKGUI_API void mkgui_set_treenode_icon(struct mkgui_window *win, uint32_t widget_id, uint32_t node_id, const char *icon_name) {
+	MKGUI_CHECK(win);
+	struct mkgui_treeview_data *tv = find_treeview_data(win, widget_id);
 	if(!tv) {
 		return;
 	}
-	int32_t idx = icon_resolve(ctx, icon_name);
+	int32_t idx = icon_resolve(win, icon_name);
 	for(uint32_t i = 0; i < tv->node_count; ++i) {
 		if(tv->nodes[i].id == node_id) {
 			tv->nodes[i].icon_idx = idx;
-			dirty_all(ctx);
+			dirty_all(win);
 			return;
 		}
 	}
@@ -1133,8 +1133,8 @@ MKGUI_API void mkgui_set_treenode_icon(struct mkgui_ctx *ctx, uint32_t widget_id
 
 
 // [=]===^=[ mkgui_icon_load_svg ]====================================[=]
-MKGUI_API int32_t mkgui_icon_load_svg(struct mkgui_ctx *ctx, const char *name, const char *path) {
-	MKGUI_CHECK_VAL(ctx, -1);
+MKGUI_API int32_t mkgui_icon_load_svg(struct mkgui_window *win, const char *name, const char *path) {
+	MKGUI_CHECK_VAL(win, -1);
 	if(!name || !path || name[0] == '\0') {
 		return -1;
 	}
@@ -1149,8 +1149,8 @@ MKGUI_API int32_t mkgui_icon_load_svg(struct mkgui_ctx *ctx, const char *name, c
 	// icon entry at it. On svg_sources overflow we still rasterise once but
 	// the icon becomes orphaned (no source for future re-rasterisation).
 	uint32_t src_idx = svg_source_add(name, svg_data, svg_len);
-	int32_t target_size = ctx->icon_size;
-	uint32_t theme_color = ctx->theme.text & 0x00ffffff;
+	int32_t target_size = win->icon_size;
+	uint32_t theme_color = win->theme.text & 0x00ffffff;
 	int32_t idx = svg_rasterize_icon_ex(name, svg_data, svg_len, target_size, theme_color, 1, src_idx);
 
 	if(idx < 0) {
@@ -1167,26 +1167,26 @@ MKGUI_API int32_t mkgui_icon_load_svg(struct mkgui_ctx *ctx, const char *name, c
 }
 
 // [=]===^=[ mkgui_icon_load_svg_dir ]================================[=]
-MKGUI_API uint32_t mkgui_icon_load_svg_dir(struct mkgui_ctx *ctx, const char *dir_path) {
-	MKGUI_CHECK_VAL(ctx, 0);
-	if(ctx->system_theme_count == 0) {
+MKGUI_API uint32_t mkgui_icon_load_svg_dir(struct mkgui_window *win, const char *dir_path) {
+	MKGUI_CHECK_VAL(win, 0);
+	if(win->system_theme_count == 0) {
 #ifndef _WIN32
 		char theme_name[256];
 		icon_detect_theme_name(theme_name, sizeof(theme_name));
-		icon_build_theme_chain(ctx, theme_name);
+		icon_build_theme_chain(win, theme_name);
 #else
-		struct icon_runtime_scan s = { .ctx = ctx };
+		struct icon_runtime_scan s = { .win = win };
 		icon_scan_local_themes(icon_runtime_visit_theme, &s);
-		if(s.hicolor_path[0] && ctx->system_theme_count < MKGUI_THEME_CHAIN_MAX) {
-			snprintf(ctx->system_theme_dirs[ctx->system_theme_count], sizeof(ctx->system_theme_dirs[0]), "%s", s.hicolor_path);
-			++ctx->system_theme_count;
+		if(s.hicolor_path[0] && win->system_theme_count < MKGUI_THEME_CHAIN_MAX) {
+			snprintf(win->system_theme_dirs[win->system_theme_count], sizeof(win->system_theme_dirs[0]), "%s", s.hicolor_path);
+			++win->system_theme_count;
 		}
 #endif
-		icon_lazy_ctx = ctx;
-		if(ctx->system_theme_count > 0) {
+		icon_lazy_ctx = win;
+		if(win->system_theme_count > 0) {
 			fprintf(stderr, "mkgui: system icon theme chain:");
-			for(uint32_t i = 0; i < ctx->system_theme_count; ++i) {
-				fprintf(stderr, " %s", ctx->system_theme_dirs[i]);
+			for(uint32_t i = 0; i < win->system_theme_count; ++i) {
+				fprintf(stderr, " %s", win->system_theme_dirs[i]);
 			}
 			fprintf(stderr, "\n");
 		}
@@ -1217,7 +1217,7 @@ MKGUI_API uint32_t mkgui_icon_load_svg_dir(struct mkgui_ctx *ctx, const char *di
 		memcpy(name, fname, name_len);
 		name[name_len] = '\0';
 
-		if(icon_find_idx_at(name, ctx->icon_size) >= 0) {
+		if(icon_find_idx_at(name, win->icon_size) >= 0) {
 			continue;
 		}
 
@@ -1237,8 +1237,8 @@ MKGUI_API uint32_t mkgui_icon_load_svg_dir(struct mkgui_ctx *ctx, const char *di
 		}
 
 		uint32_t src_idx = svg_source_add(name, svg_data, svg_len);
-		int32_t target_size = ctx->icon_size;
-		uint32_t theme_color = ctx->theme.text & 0x00ffffff;
+		int32_t target_size = win->icon_size;
+		uint32_t theme_color = win->theme.text & 0x00ffffff;
 		int32_t idx = svg_rasterize_icon_ex(name, svg_data, svg_len, target_size, theme_color, 1, src_idx);
 		if(idx >= 0) {
 			++loaded;
@@ -1265,11 +1265,11 @@ MKGUI_API uint32_t mkgui_icon_load_svg_dir(struct mkgui_ctx *ctx, const char *di
 //   - coloured variants whose name differs from the source (dialog dlg:
 //     icons keep their brand colour and re-resolve when the dialog next
 //     opens, because this code path uses the theme colour)
-static void svg_rerasterize_all(struct mkgui_ctx *ctx, float size_ratio) {
+static void svg_rerasterize_all(struct mkgui_window *win, float size_ratio) {
 	if(icon_count == 0) {
 		return;
 	}
-	uint32_t theme_color = ctx->theme.text & 0x00ffffff;
+	uint32_t theme_color = win->theme.text & 0x00ffffff;
 	for(uint32_t i = 0; i < icon_count; ++i) {
 		struct mkgui_icon *ic = &icons[i];
 		if(ic->requested_size <= 0 || ic->source_idx == UINT32_MAX) {
@@ -1465,31 +1465,31 @@ static uint32_t icon_resolve_dir(const char *app_name, char *out, uint32_t out_s
 }
 
 // [=]===^=[ mkgui_icon_load_app_icons ]==============================[=]
-MKGUI_API uint32_t mkgui_icon_load_app_icons(struct mkgui_ctx *ctx, const char *app_name) {
-	MKGUI_CHECK_VAL(ctx, 0);
+MKGUI_API uint32_t mkgui_icon_load_app_icons(struct mkgui_window *win, const char *app_name) {
+	MKGUI_CHECK_VAL(win, 0);
 	if(!app_name || !app_name[0]) {
 		return 0;
 	}
 
-	if(ctx->system_theme_count == 0) {
+	if(win->system_theme_count == 0) {
 #ifndef _WIN32
 		char theme_name[256];
 		icon_detect_theme_name(theme_name, sizeof(theme_name));
-		icon_build_theme_chain(ctx, theme_name);
+		icon_build_theme_chain(win, theme_name);
 #else
-		struct icon_runtime_scan s = { .ctx = ctx };
+		struct icon_runtime_scan s = { .win = win };
 		icon_scan_local_themes(icon_runtime_visit_theme, &s);
-		if(s.hicolor_path[0] && ctx->system_theme_count < MKGUI_THEME_CHAIN_MAX) {
-			snprintf(ctx->system_theme_dirs[ctx->system_theme_count], sizeof(ctx->system_theme_dirs[0]), "%s", s.hicolor_path);
-			++ctx->system_theme_count;
+		if(s.hicolor_path[0] && win->system_theme_count < MKGUI_THEME_CHAIN_MAX) {
+			snprintf(win->system_theme_dirs[win->system_theme_count], sizeof(win->system_theme_dirs[0]), "%s", s.hicolor_path);
+			++win->system_theme_count;
 		}
 #endif
-		icon_lazy_ctx = ctx;
+		icon_lazy_ctx = win;
 	}
 
 	char resolved[4096];
 	if(!icon_resolve_dir(app_name, resolved, sizeof(resolved))) {
-		if(ctx->system_theme_count > 0) {
+		if(win->system_theme_count > 0) {
 			fprintf(stderr, "mkgui: no bundled icon directory for '%s', using system theme fallback\n", app_name);
 			return 0;
 		}
@@ -1509,13 +1509,13 @@ MKGUI_API uint32_t mkgui_icon_load_app_icons(struct mkgui_ctx *ctx, const char *
 		return 0;
 	}
 
-	snprintf(ctx->icon_dir, sizeof(ctx->icon_dir), "%s", resolved);
+	snprintf(win->icon_dir, sizeof(win->icon_dir), "%s", resolved);
 	fprintf(stderr, "mkgui: resolved icon directory: %s\n", resolved);
-	return mkgui_icon_load_svg_dir(ctx, resolved);
+	return mkgui_icon_load_svg_dir(win, resolved);
 }
 
 // [=]===^=[ mkgui_icon_get_dir ]=====================================[=]
-MKGUI_API const char *mkgui_icon_get_dir(struct mkgui_ctx *ctx) {
-	MKGUI_CHECK_VAL(ctx, NULL);
-	return ctx->icon_dir[0] ? ctx->icon_dir : NULL;
+MKGUI_API const char *mkgui_icon_get_dir(struct mkgui_window *win) {
+	MKGUI_CHECK_VAL(win, NULL);
+	return win->icon_dir[0] ? win->icon_dir : NULL;
 }

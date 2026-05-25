@@ -73,74 +73,74 @@ static void combobox_select_all(struct mkgui_combobox_data *cb) {
 }
 
 // [=]===^=[ combobox_hit_cursor ]=================================[=]
-static uint32_t combobox_hit_cursor(struct mkgui_ctx *ctx, struct mkgui_combobox_data *cb, int32_t rx, int32_t mx) {
-	return textedit_hit_cursor(ctx, cb->text, rx + sc(ctx, 4) - cb->scroll_x, mx);
+static uint32_t combobox_hit_cursor(struct mkgui_window *win, struct mkgui_combobox_data *cb, int32_t rx, int32_t mx) {
+	return textedit_hit_cursor(win, cb->text, rx + sc(win, 4) - cb->scroll_x, mx);
 }
 
 // [=]===^=[ combobox_scroll_to_cursor ]============================[=]
-static void combobox_scroll_to_cursor(struct mkgui_ctx *ctx, uint32_t widget_id) {
-	struct mkgui_combobox_data *cb = find_combobox_data(ctx, widget_id);
+static void combobox_scroll_to_cursor(struct mkgui_window *win, uint32_t widget_id) {
+	struct mkgui_combobox_data *cb = find_combobox_data(win, widget_id);
 	if(!cb) {
 		return;
 	}
-	int32_t widx = find_widget_idx(ctx, widget_id);
+	int32_t widx = find_widget_idx(win, widget_id);
 	if(widx < 0) {
 		return;
 	}
-	int32_t pad = sc(ctx, 4);
-	int32_t visible = ctx->rects[widx].w - sc(ctx, 24) - pad * 2;
+	int32_t pad = sc(win, 4);
+	int32_t visible = win->rects[widx].w - sc(win, 24) - pad * 2;
 
 	struct mkgui_text_edit te = {cb->text, MKGUI_MAX_TEXT, cb->cursor, cb->sel_start, cb->sel_end, cb->scroll_x};
-	textedit_scroll_to_cursor(ctx, &te, cb->text, visible);
+	textedit_scroll_to_cursor(win, &te, cb->text, visible);
 	cb->scroll_x = te.scroll_x;
 }
 
 // [=]===^=[ render_combobox ]=====================================[=]
-static void render_combobox(struct mkgui_ctx *ctx, uint32_t idx) {
-	struct mkgui_widget *w = &ctx->widgets[idx];
-	int32_t rx = ctx->rects[idx].x;
-	int32_t ry = ctx->rects[idx].y;
-	int32_t rw = ctx->rects[idx].w;
-	int32_t rh = ctx->rects[idx].h;
+static void render_combobox(struct mkgui_window *win, uint32_t idx) {
+	struct mkgui_widget *w = &win->widgets[idx];
+	int32_t rx = win->rects[idx].x;
+	int32_t ry = win->rects[idx].y;
+	int32_t rw = win->rects[idx].w;
+	int32_t rh = win->rects[idx].h;
 
-	int32_t btn_w = sc(ctx, 24);
-	int32_t text_pad = sc(ctx, 4);
-	int32_t inset2 = sc(ctx, 2);
+	int32_t btn_w = sc(win, 24);
+	int32_t text_pad = sc(win, 4);
+	int32_t inset2 = sc(win, 2);
 
 	uint32_t disabled = (w->flags & MKGUI_DISABLED);
-	uint32_t focused = (ctx->focus_id == w->id);
-	uint32_t border = focused ? ctx->theme.highlight : ctx->theme.widget_border;
-	uint32_t input_bg = disabled_blend(ctx->theme.input_bg, ctx->theme.bg, disabled);
-	border = disabled_blend(border, ctx->theme.bg, disabled);
+	uint32_t focused = (win->focus_id == w->id);
+	uint32_t border = focused ? win->theme.highlight : win->theme.widget_border;
+	uint32_t input_bg = disabled_blend(win->theme.input_bg, win->theme.bg, disabled);
+	border = disabled_blend(border, win->theme.bg, disabled);
 
 	int32_t text_w = rw - btn_w;
-	draw_patch(ctx, MKGUI_STYLE_SUNKEN, rx, ry, text_w, rh, input_bg, border);
+	draw_patch(win, MKGUI_STYLE_SUNKEN, rx, ry, text_w, rh, input_bg, border);
 
-	uint32_t hovered = (!disabled && ctx->hover_id == w->id);
-	uint32_t btn_bg = hovered ? ctx->theme.widget_hover : ctx->theme.widget_bg;
-	btn_bg = disabled_blend(btn_bg, ctx->theme.bg, disabled);
-	draw_patch(ctx, MKGUI_STYLE_RAISED, rx + text_w, ry, btn_w, rh, btn_bg, border);
+	uint32_t hovered = (!disabled && win->hover_id == w->id);
+	uint32_t btn_bg = hovered ? win->theme.widget_hover : win->theme.widget_bg;
+	btn_bg = disabled_blend(btn_bg, win->theme.bg, disabled);
+	draw_patch(win, MKGUI_STYLE_RAISED, rx + text_w, ry, btn_w, rh, btn_bg, border);
 
-	uint32_t tc = disabled ? ctx->theme.text_disabled : ctx->theme.text;
-	int32_t as = sc(ctx, 4);
+	uint32_t tc = disabled ? win->theme.text_disabled : win->theme.text;
+	int32_t as = sc(win, 4);
 	int32_t acx = rx + text_w + btn_w / 2;
 	int32_t acy = ry + rh / 2;
-	draw_triangle_aa(ctx->pixels, ctx->win_w, ctx->win_h, acx - as, acy - as / 2, acx + as, acy - as / 2, acx, acy + as / 2, tc);
+	draw_triangle_aa(win->pixels, win->win_w, win->win_h, acx - as, acy - as / 2, acx + as, acy - as / 2, acx, acy + as / 2, tc);
 
-	struct mkgui_combobox_data *cb = find_combobox_data(ctx, w->id);
+	struct mkgui_combobox_data *cb = find_combobox_data(win, w->id);
 	if(!cb) {
 		return;
 	}
 
-	int32_t ty = ry + (rh - ctx->font_height) / 2;
+	int32_t ty = ry + (rh - win->font_height) / 2;
 	int32_t tx = rx + text_pad - cb->scroll_x;
 
 	struct mkgui_text_edit te = {cb->text, MKGUI_MAX_TEXT, cb->cursor, cb->sel_start, cb->sel_end, cb->scroll_x};
-	textedit_render(ctx, &te, cb->text, tx, ty, ry + inset2, rh - inset2 * 2, rx + 1, ry + 1, rx + text_w - 1, ry + rh - 1, tc, focused);
+	textedit_render(win, &te, cb->text, tx, ty, ry + inset2, rh - inset2 * 2, rx + 1, ry + 1, rx + text_w - 1, ry + rh - 1, tc, focused);
 }
 
 // [=]===^=[ render_combobox_popup ]===============================[=]
-static void render_combobox_popup(struct mkgui_ctx *ctx, struct mkgui_popup *p, struct mkgui_combobox_data *cb, int32_t hover_item) {
+static void render_combobox_popup(struct mkgui_window *win, struct mkgui_popup *p, struct mkgui_combobox_data *cb, int32_t hover_item) {
 	int32_t saved_clip_x1 = render_clip_x1;
 	int32_t saved_clip_y1 = render_clip_y1;
 	int32_t saved_clip_x2 = render_clip_x2;
@@ -150,26 +150,26 @@ static void render_combobox_popup(struct mkgui_ctx *ctx, struct mkgui_popup *p, 
 	render_clip_x2 = INT32_MAX;
 	render_clip_y2 = INT32_MAX;
 
-	draw_rounded_rect(p->pixels, p->w, p->h, 0, 0, p->w, p->h, ctx->theme.menu_bg, ctx->theme.widget_border, ctx->theme.corner_radius);
+	draw_rounded_rect(p->pixels, p->w, p->h, 0, 0, p->w, p->h, win->theme.menu_bg, win->theme.widget_border, win->theme.corner_radius);
 
 	for(uint32_t i = 0; i < cb->filter_count; ++i) {
-		int32_t iy = 1 + (int32_t)i * ctx->row_height - cb->scroll_y;
-		if(iy + ctx->row_height <= 0 || iy >= p->h) {
+		int32_t iy = 1 + (int32_t)i * win->row_height - cb->scroll_y;
+		if(iy + win->row_height <= 0 || iy >= p->h) {
 			continue;
 		}
 		uint32_t bg;
 		if((int32_t)i == hover_item) {
-			bg = ctx->theme.highlight;
+			bg = win->theme.highlight;
 		} else if((int32_t)i == cb->highlight) {
-			bg = ctx->theme.selection;
+			bg = win->theme.selection;
 		} else {
-			bg = ctx->theme.menu_bg;
+			bg = win->theme.menu_bg;
 		}
-		draw_rect_fill(p->pixels, p->w, p->h, 1, iy, p->w - 2, ctx->row_height, bg);
-		int32_t ty = iy + (ctx->row_height - ctx->font_height) / 2;
-		uint32_t tc = ((int32_t)i == cb->highlight) ? ctx->theme.sel_text : ctx->theme.text;
+		draw_rect_fill(p->pixels, p->w, p->h, 1, iy, p->w - 2, win->row_height, bg);
+		int32_t ty = iy + (win->row_height - win->font_height) / 2;
+		uint32_t tc = ((int32_t)i == cb->highlight) ? win->theme.sel_text : win->theme.text;
 		uint32_t real_idx = cb->filter_map[i];
-		push_text_clip(p->x + sc(ctx, 5), ty + p->y, cb->items[real_idx], tc, p->x + 1, p->y + 1, p->x + p->w - 1, p->y + p->h - 1);
+		push_text_clip(p->x + sc(win, 5), ty + p->y, cb->items[real_idx], tc, p->x + 1, p->y + 1, p->x + p->w - 1, p->y + p->h - 1);
 	}
 
 	render_clip_x1 = saved_clip_x1;
@@ -179,8 +179,8 @@ static void render_combobox_popup(struct mkgui_ctx *ctx, struct mkgui_popup *p, 
 }
 
 // [=]===^=[ combobox_open_popup ]=================================[=]
-static void combobox_open_popup(struct mkgui_ctx *ctx, uint32_t widget_id, uint32_t filtered) {
-	struct mkgui_combobox_data *cb = find_combobox_data(ctx, widget_id);
+static void combobox_open_popup(struct mkgui_window *win, uint32_t widget_id, uint32_t filtered) {
+	struct mkgui_combobox_data *cb = find_combobox_data(win, widget_id);
 	if(!cb) {
 		return;
 	}
@@ -195,7 +195,7 @@ static void combobox_open_popup(struct mkgui_ctx *ctx, uint32_t widget_id, uint3
 	}
 
 	if(cb->filter_count == 0) {
-		popup_destroy_all(ctx);
+		popup_destroy_all(win);
 		return;
 	}
 
@@ -203,75 +203,75 @@ static void combobox_open_popup(struct mkgui_ctx *ctx, uint32_t widget_id, uint3
 	cb->scroll_y = 0;
 	cb->popup_open = 1;
 
-	uint32_t widx = (uint32_t)find_widget_idx(ctx, widget_id);
-	if(widx >= ctx->widget_count) {
+	uint32_t widx = (uint32_t)find_widget_idx(win, widget_id);
+	if(widx >= win->widget_count) {
 		return;
 	}
 
 	int32_t abs_x, abs_y;
-	platform_translate_coords(ctx, ctx->rects[widx].x, ctx->rects[widx].y + ctx->rects[widx].h, &abs_x, &abs_y);
+	platform_translate_coords(win, win->rects[widx].x, win->rects[widx].y + win->rects[widx].h, &abs_x, &abs_y);
 
-	int32_t pw = ctx->rects[widx].w;
-	int32_t ph = (int32_t)cb->filter_count * ctx->row_height + 2;
-	int32_t max_ph = MKGUI_COMBOBOX_MAX_VISIBLE * ctx->row_height + 2;
+	int32_t pw = win->rects[widx].w;
+	int32_t ph = (int32_t)cb->filter_count * win->row_height + 2;
+	int32_t max_ph = MKGUI_COMBOBOX_MAX_VISIBLE * win->row_height + 2;
 	if(ph > max_ph) {
 		ph = max_ph;
 	}
 
-	popup_destroy_all(ctx);
-	struct mkgui_popup *p = popup_create(ctx, abs_x, abs_y, pw, ph, widget_id);
+	popup_destroy_all(win);
+	struct mkgui_popup *p = popup_create(win, abs_x, abs_y, pw, ph, widget_id);
 	if(p) {
-		render_combobox_popup(ctx, p, cb, -1);
-		flush_text_popup(ctx, p);
-		platform_popup_blit(ctx, p);
-		platform_flush(ctx);
+		render_combobox_popup(win, p, cb, -1);
+		flush_text_popup(win, p);
+		platform_popup_blit(win, p);
+		platform_flush(win);
 	}
 }
 
 // [=]===^=[ combobox_close_popup ]================================[=]
-static void combobox_close_popup(struct mkgui_ctx *ctx, struct mkgui_combobox_data *cb) {
+static void combobox_close_popup(struct mkgui_window *win, struct mkgui_combobox_data *cb) {
 	cb->popup_open = 0;
-	popup_destroy_all(ctx);
+	popup_destroy_all(win);
 }
 
 // [=]===^=[ handle_combobox_click ]===============================[=]
-static void handle_combobox_click(struct mkgui_ctx *ctx, struct mkgui_event *ev, uint32_t widget_id) {
-	struct mkgui_combobox_data *cb = find_combobox_data(ctx, widget_id);
+static void handle_combobox_click(struct mkgui_window *win, struct mkgui_event *ev, uint32_t widget_id) {
+	struct mkgui_combobox_data *cb = find_combobox_data(win, widget_id);
 	if(!cb) {
 		return;
 	}
 
-	uint32_t widx = (uint32_t)find_widget_idx(ctx, widget_id);
-	if(widx >= ctx->widget_count) {
+	uint32_t widx = (uint32_t)find_widget_idx(win, widget_id);
+	if(widx >= win->widget_count) {
 		return;
 	}
-	int32_t rx = ctx->rects[widx].x;
-	int32_t rw = ctx->rects[widx].w;
-	int32_t btn_x = rx + rw - sc(ctx, 24);
+	int32_t rx = win->rects[widx].x;
+	int32_t rw = win->rects[widx].w;
+	int32_t btn_x = rx + rw - sc(win, 24);
 
-	if(ctx->mouse_x >= btn_x) {
+	if(win->mouse_x >= btn_x) {
 		if(cb->popup_open) {
-			combobox_close_popup(ctx, cb);
+			combobox_close_popup(win, cb);
 		} else {
-			combobox_open_popup(ctx, widget_id, 0);
+			combobox_open_popup(win, widget_id, 0);
 		}
 	} else {
-		if(ctx->focus_id != widget_id) {
+		if(win->focus_id != widget_id) {
 			combobox_select_all(cb);
 		} else {
-			cb->cursor = combobox_hit_cursor(ctx, cb, rx, ctx->mouse_x);
+			cb->cursor = combobox_hit_cursor(win, cb, rx, win->mouse_x);
 			combobox_clear_selection(cb);
-			ctx->drag_select_id = widget_id;
+			win->drag_select_id = widget_id;
 		}
 	}
-	dirty_all(ctx);
-	combobox_scroll_to_cursor(ctx, widget_id);
+	dirty_all(win);
+	combobox_scroll_to_cursor(win, widget_id);
 	(void)ev;
 }
 
 // [=]===^=[ handle_combobox_key ]=================================[=]
-static uint32_t handle_combobox_key(struct mkgui_ctx *ctx, struct mkgui_event *ev, uint32_t ks, uint32_t keymod, char *buf, int32_t len) {
-	struct mkgui_combobox_data *cb = find_combobox_data(ctx, ctx->focus_id);
+static uint32_t handle_combobox_key(struct mkgui_window *win, struct mkgui_event *ev, uint32_t ks, uint32_t keymod, char *buf, int32_t len) {
+	struct mkgui_combobox_data *cb = find_combobox_data(win, win->focus_id);
 	if(!cb) {
 		return 0;
 	}
@@ -283,8 +283,8 @@ static uint32_t handle_combobox_key(struct mkgui_ctx *ctx, struct mkgui_event *e
 			{ size_t _l = strlen(cb->prev_text); if(_l >= MKGUI_MAX_TEXT) { _l = MKGUI_MAX_TEXT - 1; } memcpy(cb->text, cb->prev_text, _l); cb->text[_l] = '\0'; }
 			cb->cursor = (uint32_t)strlen(cb->text);
 			combobox_clear_selection(cb);
-			combobox_close_popup(ctx, cb);
-			dirty_all(ctx);
+			combobox_close_popup(win, cb);
+			dirty_all(win);
 			return 1;
 		}
 		return 0;
@@ -297,17 +297,17 @@ static uint32_t handle_combobox_key(struct mkgui_ctx *ctx, struct mkgui_event *e
 			cb->selected = (int32_t)real_idx;
 			cb->cursor = (uint32_t)strlen(cb->text);
 			combobox_clear_selection(cb);
-			combobox_close_popup(ctx, cb);
+			combobox_close_popup(win, cb);
 			ev->type = MKGUI_EVENT_COMBOBOX_CHANGED;
-			ev->id = ctx->focus_id;
+			ev->id = win->focus_id;
 			ev->value = cb->selected;
-			dirty_all(ctx);
+			dirty_all(win);
 			return 1;
 		}
-		combobox_close_popup(ctx, cb);
+		combobox_close_popup(win, cb);
 		ev->type = MKGUI_EVENT_COMBOBOX_SUBMIT;
-		ev->id = ctx->focus_id;
-		dirty_all(ctx);
+		ev->id = win->focus_id;
+		dirty_all(win);
 		return 1;
 	}
 
@@ -316,10 +316,10 @@ static uint32_t handle_combobox_key(struct mkgui_ctx *ctx, struct mkgui_event *e
 			if(cb->highlight > 0) {
 				--cb->highlight;
 			}
-			for(uint32_t pi = 0; pi < ctx->popup_count; ++pi) {
-				ctx->popups[pi].dirty = 1;
+			for(uint32_t pi = 0; pi < win->popup_count; ++pi) {
+				win->popups[pi].dirty = 1;
 			}
-			dirty_all(ctx);
+			dirty_all(win);
 			return 1;
 		}
 
@@ -328,9 +328,9 @@ static uint32_t handle_combobox_key(struct mkgui_ctx *ctx, struct mkgui_event *e
 			{ size_t _l = strlen(cb->items[cb->selected]); if(_l >= MKGUI_MAX_TEXT) { _l = MKGUI_MAX_TEXT - 1; } memcpy(cb->text, cb->items[cb->selected], _l); cb->text[_l] = '\0'; }
 			combobox_select_all(cb);
 			ev->type = MKGUI_EVENT_COMBOBOX_CHANGED;
-			ev->id = ctx->focus_id;
+			ev->id = win->focus_id;
 			ev->value = cb->selected;
-			dirty_all(ctx);
+			dirty_all(win);
 			return 1;
 		}
 		return 1;
@@ -341,10 +341,10 @@ static uint32_t handle_combobox_key(struct mkgui_ctx *ctx, struct mkgui_event *e
 			if(cb->highlight < (int32_t)cb->filter_count - 1) {
 				++cb->highlight;
 			}
-			for(uint32_t pi = 0; pi < ctx->popup_count; ++pi) {
-				ctx->popups[pi].dirty = 1;
+			for(uint32_t pi = 0; pi < win->popup_count; ++pi) {
+				win->popups[pi].dirty = 1;
 			}
-			dirty_all(ctx);
+			dirty_all(win);
 			return 1;
 		}
 
@@ -353,9 +353,9 @@ static uint32_t handle_combobox_key(struct mkgui_ctx *ctx, struct mkgui_event *e
 			{ size_t _l = strlen(cb->items[cb->selected]); if(_l >= MKGUI_MAX_TEXT) { _l = MKGUI_MAX_TEXT - 1; } memcpy(cb->text, cb->items[cb->selected], _l); cb->text[_l] = '\0'; }
 			combobox_select_all(cb);
 			ev->type = MKGUI_EVENT_COMBOBOX_CHANGED;
-			ev->id = ctx->focus_id;
+			ev->id = win->focus_id;
 			ev->value = cb->selected;
-			dirty_all(ctx);
+			dirty_all(win);
 			return 1;
 		}
 		return 1;
@@ -367,8 +367,8 @@ static uint32_t handle_combobox_key(struct mkgui_ctx *ctx, struct mkgui_event *e
 		cb->cursor = te.cursor;
 		cb->sel_start = te.sel_start;
 		cb->sel_end = te.sel_end;
-		dirty_all(ctx);
-		combobox_scroll_to_cursor(ctx, ctx->focus_id);
+		dirty_all(win);
+		combobox_scroll_to_cursor(win, win->focus_id);
 		return 1;
 	}
 
@@ -378,8 +378,8 @@ static uint32_t handle_combobox_key(struct mkgui_ctx *ctx, struct mkgui_event *e
 		cb->cursor = te.cursor;
 		cb->sel_start = te.sel_start;
 		cb->sel_end = te.sel_end;
-		dirty_all(ctx);
-		combobox_scroll_to_cursor(ctx, ctx->focus_id);
+		dirty_all(win);
+		combobox_scroll_to_cursor(win, win->focus_id);
 		return 1;
 	}
 
@@ -389,8 +389,8 @@ static uint32_t handle_combobox_key(struct mkgui_ctx *ctx, struct mkgui_event *e
 		cb->cursor = te.cursor;
 		cb->sel_start = te.sel_start;
 		cb->sel_end = te.sel_end;
-		dirty_all(ctx);
-		combobox_scroll_to_cursor(ctx, ctx->focus_id);
+		dirty_all(win);
+		combobox_scroll_to_cursor(win, win->focus_id);
 		return 1;
 	}
 
@@ -400,8 +400,8 @@ static uint32_t handle_combobox_key(struct mkgui_ctx *ctx, struct mkgui_event *e
 		cb->cursor = te.cursor;
 		cb->sel_start = te.sel_start;
 		cb->sel_end = te.sel_end;
-		dirty_all(ctx);
-		combobox_scroll_to_cursor(ctx, ctx->focus_id);
+		dirty_all(win);
+		combobox_scroll_to_cursor(win, win->focus_id);
 		return 1;
 	}
 
@@ -413,11 +413,11 @@ static uint32_t handle_combobox_key(struct mkgui_ctx *ctx, struct mkgui_event *e
 			cb->sel_end = te.sel_end;
 			cb->selected = -1;
 			{ size_t _l = strlen(cb->text); if(_l >= MKGUI_MAX_TEXT) { _l = MKGUI_MAX_TEXT - 1; } memcpy(cb->prev_text, cb->text, _l); cb->prev_text[_l] = '\0'; }
-			combobox_open_popup(ctx, ctx->focus_id, 1);
+			combobox_open_popup(win, win->focus_id, 1);
 			ev->type = MKGUI_EVENT_COMBOBOX_CHANGED;
-			ev->id = ctx->focus_id;
-			dirty_all(ctx);
-			combobox_scroll_to_cursor(ctx, ctx->focus_id);
+			ev->id = win->focus_id;
+			dirty_all(win);
+			combobox_scroll_to_cursor(win, win->focus_id);
 			return 1;
 		}
 		return 1;
@@ -431,11 +431,11 @@ static uint32_t handle_combobox_key(struct mkgui_ctx *ctx, struct mkgui_event *e
 			cb->sel_end = te.sel_end;
 			cb->selected = -1;
 			{ size_t _l = strlen(cb->text); if(_l >= MKGUI_MAX_TEXT) { _l = MKGUI_MAX_TEXT - 1; } memcpy(cb->prev_text, cb->text, _l); cb->prev_text[_l] = '\0'; }
-			combobox_open_popup(ctx, ctx->focus_id, 1);
+			combobox_open_popup(win, win->focus_id, 1);
 			ev->type = MKGUI_EVENT_COMBOBOX_CHANGED;
-			ev->id = ctx->focus_id;
-			dirty_all(ctx);
-			combobox_scroll_to_cursor(ctx, ctx->focus_id);
+			ev->id = win->focus_id;
+			dirty_all(win);
+			combobox_scroll_to_cursor(win, win->focus_id);
 			return 1;
 		}
 		return 1;
@@ -450,11 +450,11 @@ static uint32_t handle_combobox_key(struct mkgui_ctx *ctx, struct mkgui_event *e
 				cb->sel_end = te.sel_end;
 				cb->selected = -1;
 				{ size_t _l = strlen(cb->text); if(_l >= MKGUI_MAX_TEXT) { _l = MKGUI_MAX_TEXT - 1; } memcpy(cb->prev_text, cb->text, _l); cb->prev_text[_l] = '\0'; }
-				combobox_open_popup(ctx, ctx->focus_id, 1);
+				combobox_open_popup(win, win->focus_id, 1);
 				ev->type = MKGUI_EVENT_COMBOBOX_CHANGED;
-				ev->id = ctx->focus_id;
-				dirty_all(ctx);
-				combobox_scroll_to_cursor(ctx, ctx->focus_id);
+				ev->id = win->focus_id;
+				dirty_all(win);
+				combobox_scroll_to_cursor(win, win->focus_id);
 				return 1;
 			}
 		}
@@ -465,12 +465,12 @@ static uint32_t handle_combobox_key(struct mkgui_ctx *ctx, struct mkgui_event *e
 }
 
 // [=]===^=[ mkgui_combobox_setup ]================================[=]
-MKGUI_API void mkgui_combobox_setup(struct mkgui_ctx *ctx, uint32_t id, const char *const *items, uint32_t count) {
-	MKGUI_CHECK(ctx);
+MKGUI_API void mkgui_combobox_setup(struct mkgui_window *win, uint32_t id, const char *const *items, uint32_t count) {
+	MKGUI_CHECK(win);
 	if(!items && count > 0) {
 		return;
 	}
-	struct mkgui_combobox_data *cb = find_combobox_data(ctx, id);
+	struct mkgui_combobox_data *cb = find_combobox_data(win, id);
 	if(!cb) {
 		return;
 	}
@@ -485,27 +485,27 @@ MKGUI_API void mkgui_combobox_setup(struct mkgui_ctx *ctx, uint32_t id, const ch
 	}
 	cb->cursor = (uint32_t)strlen(cb->text);
 	cb->scroll_y = 0;
-	dirty_all(ctx);
+	dirty_all(win);
 }
 
 // [=]===^=[ mkgui_combobox_get ]=================================[=]
-MKGUI_API int32_t mkgui_combobox_get(struct mkgui_ctx *ctx, uint32_t id) {
-	MKGUI_CHECK_VAL(ctx, -1);
-	struct mkgui_combobox_data *cb = find_combobox_data(ctx, id);
+MKGUI_API int32_t mkgui_combobox_get(struct mkgui_window *win, uint32_t id) {
+	MKGUI_CHECK_VAL(win, -1);
+	struct mkgui_combobox_data *cb = find_combobox_data(win, id);
 	return cb ? cb->selected : -1;
 }
 
 // [=]===^=[ mkgui_combobox_get_text ]=============================[=]
-MKGUI_API const char *mkgui_combobox_get_text(struct mkgui_ctx *ctx, uint32_t id) {
-	MKGUI_CHECK_VAL(ctx, "");
-	struct mkgui_combobox_data *cb = find_combobox_data(ctx, id);
+MKGUI_API const char *mkgui_combobox_get_text(struct mkgui_window *win, uint32_t id) {
+	MKGUI_CHECK_VAL(win, "");
+	struct mkgui_combobox_data *cb = find_combobox_data(win, id);
 	return cb ? cb->text : "";
 }
 
 // [=]===^=[ mkgui_combobox_set ]=================================[=]
-MKGUI_API void mkgui_combobox_set(struct mkgui_ctx *ctx, uint32_t id, int32_t index) {
-	MKGUI_CHECK(ctx);
-	struct mkgui_combobox_data *cb = find_combobox_data(ctx, id);
+MKGUI_API void mkgui_combobox_set(struct mkgui_window *win, uint32_t id, int32_t index) {
+	MKGUI_CHECK(win);
+	struct mkgui_combobox_data *cb = find_combobox_data(win, id);
 	if(!cb) {
 		return;
 	}
@@ -521,16 +521,16 @@ MKGUI_API void mkgui_combobox_set(struct mkgui_ctx *ctx, uint32_t id, int32_t in
 	}
 	cb->cursor = (uint32_t)strlen(cb->text);
 	combobox_clear_selection(cb);
-	dirty_all(ctx);
+	dirty_all(win);
 }
 
 // [=]===^=[ mkgui_combobox_set_text ]==============================[=]
-MKGUI_API void mkgui_combobox_set_text(struct mkgui_ctx *ctx, uint32_t id, const char *text) {
-	MKGUI_CHECK(ctx);
+MKGUI_API void mkgui_combobox_set_text(struct mkgui_window *win, uint32_t id, const char *text) {
+	MKGUI_CHECK(win);
 	if(!text) {
 		text = "";
 	}
-	struct mkgui_combobox_data *cb = find_combobox_data(ctx, id);
+	struct mkgui_combobox_data *cb = find_combobox_data(win, id);
 	if(!cb) {
 		return;
 	}
@@ -545,20 +545,20 @@ MKGUI_API void mkgui_combobox_set_text(struct mkgui_ctx *ctx, uint32_t id, const
 		}
 	}
 	combobox_clear_selection(cb);
-	dirty_all(ctx);
+	dirty_all(win);
 }
 
 // [=]===^=[ mkgui_combobox_get_count ]=============================[=]
-MKGUI_API uint32_t mkgui_combobox_get_count(struct mkgui_ctx *ctx, uint32_t id) {
-	MKGUI_CHECK_VAL(ctx, 0);
-	struct mkgui_combobox_data *cb = find_combobox_data(ctx, id);
+MKGUI_API uint32_t mkgui_combobox_get_count(struct mkgui_window *win, uint32_t id) {
+	MKGUI_CHECK_VAL(win, 0);
+	struct mkgui_combobox_data *cb = find_combobox_data(win, id);
 	return cb ? cb->item_count : 0;
 }
 
 // [=]===^=[ mkgui_combobox_get_item_text ]=========================[=]
-MKGUI_API const char *mkgui_combobox_get_item_text(struct mkgui_ctx *ctx, uint32_t id, uint32_t index) {
-	MKGUI_CHECK_VAL(ctx, "");
-	struct mkgui_combobox_data *cb = find_combobox_data(ctx, id);
+MKGUI_API const char *mkgui_combobox_get_item_text(struct mkgui_window *win, uint32_t id, uint32_t index) {
+	MKGUI_CHECK_VAL(win, "");
+	struct mkgui_combobox_data *cb = find_combobox_data(win, id);
 	if(!cb || index >= cb->item_count) {
 		return "";
 	}
@@ -566,25 +566,25 @@ MKGUI_API const char *mkgui_combobox_get_item_text(struct mkgui_ctx *ctx, uint32
 }
 
 // [=]===^=[ mkgui_combobox_add ]=================================[=]
-MKGUI_API void mkgui_combobox_add(struct mkgui_ctx *ctx, uint32_t id, const char *text) {
-	MKGUI_CHECK(ctx);
+MKGUI_API void mkgui_combobox_add(struct mkgui_window *win, uint32_t id, const char *text) {
+	MKGUI_CHECK(win);
 	if(!text) {
 		return;
 	}
-	struct mkgui_combobox_data *cb = find_combobox_data(ctx, id);
+	struct mkgui_combobox_data *cb = find_combobox_data(win, id);
 	if(!cb || cb->item_count >= MKGUI_MAX_DROPDOWN) {
 		return;
 	}
 	strncpy(cb->items[cb->item_count], text, MKGUI_MAX_TEXT - 1);
 	cb->items[cb->item_count][MKGUI_MAX_TEXT - 1] = '\0';
 	++cb->item_count;
-	dirty_all(ctx);
+	dirty_all(win);
 }
 
 // [=]===^=[ mkgui_combobox_remove ]================================[=]
-MKGUI_API void mkgui_combobox_remove(struct mkgui_ctx *ctx, uint32_t id, uint32_t index) {
-	MKGUI_CHECK(ctx);
-	struct mkgui_combobox_data *cb = find_combobox_data(ctx, id);
+MKGUI_API void mkgui_combobox_remove(struct mkgui_window *win, uint32_t id, uint32_t index) {
+	MKGUI_CHECK(win);
+	struct mkgui_combobox_data *cb = find_combobox_data(win, id);
 	if(!cb || index >= cb->item_count) {
 		return;
 	}
@@ -595,13 +595,13 @@ MKGUI_API void mkgui_combobox_remove(struct mkgui_ctx *ctx, uint32_t id, uint32_
 	if(cb->selected >= (int32_t)cb->item_count) {
 		cb->selected = (int32_t)cb->item_count - 1;
 	}
-	dirty_all(ctx);
+	dirty_all(win);
 }
 
 // [=]===^=[ mkgui_combobox_clear ]=================================[=]
-MKGUI_API void mkgui_combobox_clear(struct mkgui_ctx *ctx, uint32_t id) {
-	MKGUI_CHECK(ctx);
-	struct mkgui_combobox_data *cb = find_combobox_data(ctx, id);
+MKGUI_API void mkgui_combobox_clear(struct mkgui_window *win, uint32_t id) {
+	MKGUI_CHECK(win);
+	struct mkgui_combobox_data *cb = find_combobox_data(win, id);
 	if(!cb) {
 		return;
 	}
@@ -610,5 +610,5 @@ MKGUI_API void mkgui_combobox_clear(struct mkgui_ctx *ctx, uint32_t id) {
 	cb->text[0] = '\0';
 	cb->cursor = 0;
 	cb->scroll_y = 0;
-	dirty_all(ctx);
+	dirty_all(win);
 }

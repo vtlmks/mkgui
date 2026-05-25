@@ -422,9 +422,9 @@ static void logview_feed(struct mkgui_logview_data *lv, const char *text, uint32
 // [=]===^=[ logview_wrap_width ]================================[=]
 // Inner content width available for text after subtracting borders, padding,
 // and the vertical scrollbar.
-static int32_t logview_wrap_width(struct mkgui_ctx *ctx, int32_t rw) {
-	int32_t pad = sc(ctx, 4);
-	return rw - 2 - pad * 2 - ctx->scrollbar_w;
+static int32_t logview_wrap_width(struct mkgui_window *win, int32_t rw) {
+	int32_t pad = sc(win, 4);
+	return rw - 2 - pad * 2 - win->scrollbar_w;
 }
 
 // [=]===^=[ logview_vline_push ]================================[=]
@@ -447,7 +447,7 @@ static void logview_vline_push(struct mkgui_logview_data *lv, uint64_t seq, uint
 // [=]===^=[ logview_wrap_line ]=================================[=]
 // Append visual lines for one source line. When wrap is disabled, emits a
 // single visual line spanning the whole source line.
-static void logview_wrap_line(struct mkgui_ctx *ctx, struct mkgui_logview_data *lv, uint64_t seq, int32_t avail_w, uint32_t nowrap) {
+static void logview_wrap_line(struct mkgui_window *win, struct mkgui_logview_data *lv, uint64_t seq, int32_t avail_w, uint32_t nowrap) {
 	struct mkgui_logview_line *line = logview_get_line(lv, seq);
 	if(!line) {
 		return;
@@ -477,7 +477,7 @@ static void logview_wrap_line(struct mkgui_ctx *ctx, struct mkgui_logview_data *
 			uint32_t mid = lo + (hi - lo + 1) / 2;
 			char save = text[mid];
 			text[mid] = '\0';
-			int32_t w = text_width(ctx, &text[start]);
+			int32_t w = text_width(win, &text[start]);
 			text[mid] = save;
 			if(w <= avail_w) {
 				fit = mid;
@@ -510,28 +510,28 @@ static void logview_wrap_line(struct mkgui_ctx *ctx, struct mkgui_logview_data *
 // [=]===^=[ logview_rebuild_wrap ]==============================[=]
 // Recompute the visual-line cache when the inner width or row height changed.
 // Appended-but-not-yet-cached lines are also covered by this.
-static void logview_rebuild_wrap(struct mkgui_ctx *ctx, struct mkgui_logview_data *lv, int32_t rw, uint32_t nowrap) {
-	int32_t avail = nowrap ? 0 : logview_wrap_width(ctx, rw);
-	if(lv->cached_width != avail || lv->cached_row_h != ctx->row_height || lv->vline_seq_tail != lv->line_seq_tail) {
+static void logview_rebuild_wrap(struct mkgui_window *win, struct mkgui_logview_data *lv, int32_t rw, uint32_t nowrap) {
+	int32_t avail = nowrap ? 0 : logview_wrap_width(win, rw);
+	if(lv->cached_width != avail || lv->cached_row_h != win->row_height || lv->vline_seq_tail != lv->line_seq_tail) {
 		lv->vline_count = 0;
 		lv->vline_seq_tail = lv->line_seq_tail;
 		for(uint64_t s = lv->line_seq_tail; s < lv->line_seq_head; ++s) {
-			logview_wrap_line(ctx, lv, s, avail, nowrap);
+			logview_wrap_line(win, lv, s, avail, nowrap);
 		}
 		lv->cached_width = avail;
-		lv->cached_row_h = ctx->row_height;
+		lv->cached_row_h = win->row_height;
 		return;
 	}
 	uint64_t last_cached = lv->vline_count > 0 ? lv->vlines[lv->vline_count - 1].line_seq : (lv->line_seq_tail - 1);
 	uint64_t start_seq = lv->vline_count > 0 ? last_cached + 1 : lv->line_seq_tail;
 	for(uint64_t s = start_seq; s < lv->line_seq_head; ++s) {
-		logview_wrap_line(ctx, lv, s, avail, nowrap);
+		logview_wrap_line(win, lv, s, avail, nowrap);
 	}
 }
 
 // [=]===^=[ logview_total_content_h ]===========================[=]
-static int32_t logview_total_content_h(struct mkgui_ctx *ctx, struct mkgui_logview_data *lv) {
-	return (int32_t)lv->vline_count * ctx->row_height;
+static int32_t logview_total_content_h(struct mkgui_window *win, struct mkgui_logview_data *lv) {
+	return (int32_t)lv->vline_count * win->row_height;
 }
 
 // [=]===^=[ logview_clamp_scroll ]==============================[=]
@@ -552,9 +552,9 @@ static void logview_clamp_scroll(struct mkgui_logview_data *lv, int32_t content_
 
 // [=]===^=[ logview_apply_stick ]===============================[=]
 // Snap scroll to the bottom when the user was already there before an append.
-static void logview_apply_stick(struct mkgui_ctx *ctx, struct mkgui_logview_data *lv, int32_t view_h) {
+static void logview_apply_stick(struct mkgui_window *win, struct mkgui_logview_data *lv, int32_t view_h) {
 	if(lv->stuck_to_end) {
-		int32_t content_h = logview_total_content_h(ctx, lv);
+		int32_t content_h = logview_total_content_h(win, lv);
 		int32_t max_scroll = content_h - view_h;
 		lv->scroll_y = max_scroll < 0 ? 0 : max_scroll;
 	}
@@ -565,14 +565,14 @@ static void logview_apply_stick(struct mkgui_ctx *ctx, struct mkgui_logview_data
 // authoritatively maintained by user-scroll handlers, so applying it on every
 // recompute is safe: it's a no-op when the flag is 0, and snaps to bottom
 // when 1 -- which is exactly what we want both after appends and on resize.
-static void logview_recompute(struct mkgui_ctx *ctx, struct mkgui_logview_data *lv, int32_t idx) {
-	int32_t rw = ctx->rects[idx].w;
-	int32_t rh = ctx->rects[idx].h;
-	uint32_t nowrap = (ctx->widgets[idx].style & MKGUI_LOGVIEW_NOWRAP) ? 1 : 0;
-	logview_rebuild_wrap(ctx, lv, rw, nowrap);
-	int32_t content_h = logview_total_content_h(ctx, lv);
+static void logview_recompute(struct mkgui_window *win, struct mkgui_logview_data *lv, int32_t idx) {
+	int32_t rw = win->rects[idx].w;
+	int32_t rh = win->rects[idx].h;
+	uint32_t nowrap = (win->widgets[idx].style & MKGUI_LOGVIEW_NOWRAP) ? 1 : 0;
+	logview_rebuild_wrap(win, lv, rw, nowrap);
+	int32_t content_h = logview_total_content_h(win, lv);
 	int32_t view_h = rh - 2;
-	logview_apply_stick(ctx, lv, view_h);
+	logview_apply_stick(win, lv, view_h);
 	logview_clamp_scroll(lv, content_h, view_h);
 }
 
@@ -591,7 +591,7 @@ static uint32_t logview_first_visible_vline(struct mkgui_logview_data *lv, int32
 // [=]===^=[ logview_hit_vline ]=================================[=]
 // Translate a (mouse_x, mouse_y) coord to a visual-line index + byte offset
 // inside that visual line.
-static void logview_hit_vline(struct mkgui_ctx *ctx, struct mkgui_logview_data *lv, int32_t rx, int32_t ry, int32_t my, int32_t mx, uint32_t *out_vline, uint32_t *out_off) {
+static void logview_hit_vline(struct mkgui_window *win, struct mkgui_logview_data *lv, int32_t rx, int32_t ry, int32_t my, int32_t mx, uint32_t *out_vline, uint32_t *out_off) {
 	*out_vline = 0;
 	*out_off = 0;
 
@@ -599,7 +599,7 @@ static void logview_hit_vline(struct mkgui_ctx *ctx, struct mkgui_logview_data *
 		return;
 	}
 	int32_t local_y = my - (ry + 1) + lv->scroll_y;
-	int32_t row_height = ctx->row_height;
+	int32_t row_height = win->row_height;
 	int32_t hit = local_y / row_height;
 
 	if(hit < 0) {
@@ -621,7 +621,7 @@ static void logview_hit_vline(struct mkgui_ctx *ctx, struct mkgui_logview_data *
 	}
 	char scratch[2048];
 	char *src = logview_text_at(lv, line, scratch, sizeof(scratch));
-	int32_t text_pad = sc(ctx, 4);
+	int32_t text_pad = sc(win, 4);
 	int32_t base_x = rx + text_pad - lv->scroll_x;
 	uint32_t off = vl->src_off;
 	uint32_t end = off + vl->len;
@@ -634,7 +634,7 @@ static void logview_hit_vline(struct mkgui_ctx *ctx, struct mkgui_logview_data *
 	for(uint32_t j = off; j <= end; ++j) {
 		char save = src[j];
 		src[j] = '\0';
-		int32_t w = text_width(ctx, &src[off]);
+		int32_t w = text_width(win, &src[off]);
 		src[j] = save;
 		int32_t cx = base_x + w;
 
@@ -655,28 +655,28 @@ static void logview_hit_vline(struct mkgui_ctx *ctx, struct mkgui_logview_data *
 }
 
 // [=]===^=[ logview_has_scrollbar ]==============================[=]
-static uint32_t logview_has_scrollbar(struct mkgui_ctx *ctx, uint32_t idx, struct mkgui_logview_data *lv) {
-	int32_t rh = ctx->rects[idx].h;
-	int32_t content_h = logview_total_content_h(ctx, lv);
+static uint32_t logview_has_scrollbar(struct mkgui_window *win, uint32_t idx, struct mkgui_logview_data *lv) {
+	int32_t rh = win->rects[idx].h;
+	int32_t content_h = logview_total_content_h(win, lv);
 	return content_h > rh - 2;
 }
 
 // [=]===^=[ logview_sb_hit ]=====================================[=]
-static int32_t logview_sb_hit(struct mkgui_ctx *ctx, uint32_t idx, struct mkgui_logview_data *lv, int32_t mx, int32_t my) {
-	int32_t rx = ctx->rects[idx].x;
-	int32_t ry = ctx->rects[idx].y;
-	int32_t rw = ctx->rects[idx].w;
-	int32_t rh = ctx->rects[idx].h;
-	int32_t sb_x = rx + rw - ctx->scrollbar_w;
+static int32_t logview_sb_hit(struct mkgui_window *win, uint32_t idx, struct mkgui_logview_data *lv, int32_t mx, int32_t my) {
+	int32_t rx = win->rects[idx].x;
+	int32_t ry = win->rects[idx].y;
+	int32_t rw = win->rects[idx].w;
+	int32_t rh = win->rects[idx].h;
+	int32_t sb_x = rx + rw - win->scrollbar_w;
 	if(mx < sb_x || mx >= rx + rw) {
 		return -1;
 	}
-	int32_t content_h = logview_total_content_h(ctx, lv);
+	int32_t content_h = logview_total_content_h(win, lv);
 	int32_t view_h = rh - 2;
 	if(content_h <= view_h) {
 		return -1;
 	}
-	int32_t min_thumb = sc(ctx, 20);
+	int32_t min_thumb = sc(win, 20);
 	int32_t thumb_h = (int32_t)((int64_t)view_h * view_h / content_h);
 
 	if(thumb_h < min_thumb) {
@@ -688,15 +688,15 @@ static int32_t logview_sb_hit(struct mkgui_ctx *ctx, uint32_t idx, struct mkgui_
 }
 
 // [=]===^=[ logview_sb_drag ]====================================[=]
-static void logview_sb_drag(struct mkgui_ctx *ctx, uint32_t idx, struct mkgui_logview_data *lv, int32_t my, int32_t offset) {
-	int32_t ry = ctx->rects[idx].y;
-	int32_t rh = ctx->rects[idx].h;
-	int32_t content_h = logview_total_content_h(ctx, lv);
+static void logview_sb_drag(struct mkgui_window *win, uint32_t idx, struct mkgui_logview_data *lv, int32_t my, int32_t offset) {
+	int32_t ry = win->rects[idx].y;
+	int32_t rh = win->rects[idx].h;
+	int32_t content_h = logview_total_content_h(win, lv);
 	int32_t view_h = rh - 2;
 	if(content_h <= view_h) {
 		return;
 	}
-	int32_t min_thumb = sc(ctx, 20);
+	int32_t min_thumb = sc(win, 20);
 	int32_t thumb_h = (int32_t)((int64_t)view_h * view_h / content_h);
 
 	if(thumb_h < min_thumb) {
@@ -711,7 +711,7 @@ static void logview_sb_drag(struct mkgui_ctx *ctx, uint32_t idx, struct mkgui_lo
 	lv->scroll_y = (int32_t)((int64_t)thumb_pos * max_scroll / track);
 	logview_clamp_scroll(lv, content_h, view_h);
 	lv->stuck_to_end = (lv->scroll_y >= max_scroll) ? 1 : 0;
-	dirty_widget(ctx, idx);
+	dirty_widget(win, idx);
 }
 
 // [=]===^=[ logview_sel_range ]==================================[=]
@@ -764,51 +764,51 @@ static void logview_vline_to_pos(struct mkgui_logview_data *lv, uint32_t vidx, u
 }
 
 // [=]===^=[ render_logview ]=====================================[=]
-static void render_logview(struct mkgui_ctx *ctx, uint32_t idx) {
-	struct mkgui_widget *w = &ctx->widgets[idx];
-	int32_t rx = ctx->rects[idx].x;
-	int32_t ry = ctx->rects[idx].y;
-	int32_t rw = ctx->rects[idx].w;
-	int32_t rh = ctx->rects[idx].h;
+static void render_logview(struct mkgui_window *win, uint32_t idx) {
+	struct mkgui_widget *w = &win->widgets[idx];
+	int32_t rx = win->rects[idx].x;
+	int32_t ry = win->rects[idx].y;
+	int32_t rw = win->rects[idx].w;
+	int32_t rh = win->rects[idx].h;
 
 	uint32_t disabled = (w->flags & MKGUI_DISABLED);
-	uint32_t focused = (ctx->focus_id == w->id);
-	uint32_t input_bg = disabled_blend(ctx->theme.input_bg, ctx->theme.bg, disabled);
-	uint32_t border_color = disabled_blend(focused ? ctx->theme.highlight : ctx->theme.widget_border, ctx->theme.bg, disabled);
-	draw_patch(ctx, MKGUI_STYLE_SUNKEN, rx, ry, rw, rh, input_bg, border_color);
+	uint32_t focused = (win->focus_id == w->id);
+	uint32_t input_bg = disabled_blend(win->theme.input_bg, win->theme.bg, disabled);
+	uint32_t border_color = disabled_blend(focused ? win->theme.highlight : win->theme.widget_border, win->theme.bg, disabled);
+	draw_patch(win, MKGUI_STYLE_SUNKEN, rx, ry, rw, rh, input_bg, border_color);
 
-	struct mkgui_logview_data *lv = find_logview_data(ctx, w->id);
+	struct mkgui_logview_data *lv = find_logview_data(win, w->id);
 	if(!lv || lv->max_lines == 0) {
 		return;
 	}
-	logview_recompute(ctx, lv, (int32_t)idx);
+	logview_recompute(win, lv, (int32_t)idx);
 
 	int32_t clip_top = ry + 1;
 	int32_t clip_bottom = ry + rh - 1;
 	int32_t clip_left = rx + 1;
-	int32_t clip_right = rx + rw - 1 - (logview_has_scrollbar(ctx, idx, lv) ? ctx->scrollbar_w : 0);
+	int32_t clip_right = rx + rw - 1 - (logview_has_scrollbar(win, idx, lv) ? win->scrollbar_w : 0);
 
-	uint32_t default_fg = disabled ? ctx->theme.text_disabled : ctx->theme.text;
-	int32_t text_pad = sc(ctx, 4);
+	uint32_t default_fg = disabled ? win->theme.text_disabled : win->theme.text;
+	int32_t text_pad = sc(win, 4);
 
 	uint64_t sel_lo_seq = 0, sel_hi_seq = 0;
 	uint32_t sel_lo_off = 0, sel_hi_off = 0;
 	uint32_t has_sel = logview_sel_range(lv, &sel_lo_seq, &sel_lo_off, &sel_hi_seq, &sel_hi_off);
 
-	uint32_t first = logview_first_visible_vline(lv, ctx->row_height);
-	int32_t y = ry + 1 + (int32_t)first * ctx->row_height - lv->scroll_y;
+	uint32_t first = logview_first_visible_vline(lv, win->row_height);
+	int32_t y = ry + 1 + (int32_t)first * win->row_height - lv->scroll_y;
 
 	for(uint32_t vi = first; vi < lv->vline_count && y < clip_bottom; ++vi) {
 		struct mkgui_logview_vline *vl = &lv->vlines[vi];
 		struct mkgui_logview_line *line = logview_get_line(lv, vl->line_seq);
 
 		if(!line) {
-			y += ctx->row_height;
+			y += win->row_height;
 			continue;
 		}
 		char scratch[2048];
 		char *src = logview_text_at(lv, line, scratch, sizeof(scratch));
-		int32_t ty = y + (ctx->row_height - ctx->font_height) / 2;
+		int32_t ty = y + (win->row_height - win->font_height) / 2;
 		int32_t base_x = rx + text_pad - lv->scroll_x;
 
 		uint32_t voff = vl->src_off;
@@ -838,7 +838,7 @@ static void render_logview(struct mkgui_ctx *ctx, uint32_t idx) {
 			if(s0 < s1 || (vl->line_seq < sel_hi_seq && s0 == vend)) {
 				char save_a = src[s0];
 				src[s0] = '\0';
-				int32_t sx1 = base_x + text_width(ctx, &src[voff]);
+				int32_t sx1 = base_x + text_width(win, &src[voff]);
 				src[s0] = save_a;
 				int32_t sx2;
 				if(vl->line_seq < sel_hi_seq && s1 == vend) {
@@ -847,13 +847,13 @@ static void render_logview(struct mkgui_ctx *ctx, uint32_t idx) {
 				} else {
 					char save_b = src[s1];
 					src[s1] = '\0';
-					sx2 = base_x + text_width(ctx, &src[voff]);
+					sx2 = base_x + text_width(win, &src[voff]);
 					src[s1] = save_b;
 				}
 				int32_t cx1 = sx1 < clip_left ? clip_left : sx1;
 				int32_t cx2 = sx2 > clip_right ? clip_right : sx2;
 				if(cx2 > cx1) {
-					draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, cx1, y, cx2 - cx1, ctx->row_height, ctx->theme.selection);
+					draw_rect_fill(win->pixels, win->win_w, win->win_h, cx1, y, cx2 - cx1, win->row_height, win->theme.selection);
 				}
 			}
 		}
@@ -880,22 +880,22 @@ static void render_logview(struct mkgui_ctx *ctx, uint32_t idx) {
 				}
 				char save_a = src[rs];
 				src[rs] = '\0';
-				int32_t bx1 = base_x + text_width(ctx, &src[voff]);
+				int32_t bx1 = base_x + text_width(win, &src[voff]);
 				src[rs] = save_a;
 				char save_b = src[re];
 				src[re] = '\0';
-				int32_t bx2 = base_x + text_width(ctx, &src[voff]);
+				int32_t bx2 = base_x + text_width(win, &src[voff]);
 				src[re] = save_b;
 				int32_t cx1 = bx1 < clip_left ? clip_left : bx1;
 				int32_t cx2 = bx2 > clip_right ? clip_right : bx2;
 				if(cx2 > cx1) {
-					draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, cx1, y, cx2 - cx1, ctx->row_height, run->bg);
+					draw_rect_fill(win->pixels, win->win_w, win->win_h, cx1, y, cx2 - cx1, win->row_height, run->bg);
 				}
 			}
 		}
 
 		// Foreground text by run, falling back to default color when no runs.
-		if(ty >= clip_top && ty + ctx->font_height <= clip_bottom) {
+		if(ty >= clip_top && ty + win->font_height <= clip_bottom) {
 			if(line->runs_count == 0) {
 				char tmp[2048];
 				uint32_t len = vend - voff;
@@ -928,7 +928,7 @@ static void render_logview(struct mkgui_ctx *ctx, uint32_t idx) {
 					}
 					char save_a = src[rs];
 					src[rs] = '\0';
-					int32_t tx = base_x + text_width(ctx, &src[voff]);
+					int32_t tx = base_x + text_width(win, &src[voff]);
 					src[rs] = save_a;
 					char tmp[2048];
 					uint32_t len = re - rs;
@@ -943,23 +943,23 @@ static void render_logview(struct mkgui_ctx *ctx, uint32_t idx) {
 				}
 			}
 		}
-		y += ctx->row_height;
+		y += win->row_height;
 	}
 
-	if(logview_has_scrollbar(ctx, idx, lv)) {
-		int32_t sb_x = rx + rw - ctx->scrollbar_w;
-		draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, sb_x, ry + 1, ctx->scrollbar_w - 1, rh - 2, ctx->theme.scrollbar_bg);
-		int32_t content_h = logview_total_content_h(ctx, lv);
+	if(logview_has_scrollbar(win, idx, lv)) {
+		int32_t sb_x = rx + rw - win->scrollbar_w;
+		draw_rect_fill(win->pixels, win->win_w, win->win_h, sb_x, ry + 1, win->scrollbar_w - 1, rh - 2, win->theme.scrollbar_bg);
+		int32_t content_h = logview_total_content_h(win, lv);
 		int32_t view_h = rh - 2;
-		int32_t min_thumb = sc(ctx, 20);
-		int32_t sb_inset = sc(ctx, 2);
+		int32_t min_thumb = sc(win, 20);
+		int32_t sb_inset = sc(win, 2);
 		int32_t thumb_h = (int32_t)((int64_t)view_h * view_h / content_h);
 
 		if(thumb_h < min_thumb) {
 			thumb_h = min_thumb;
 		}
 		int32_t thumb_y = ry + 1 + (int32_t)((int64_t)lv->scroll_y * (view_h - thumb_h) / (content_h - view_h));
-		draw_rounded_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, sb_x + sb_inset, thumb_y, ctx->scrollbar_w - sb_inset * 2 - 1, thumb_h, ctx->theme.scrollbar_thumb, ctx->theme.corner_radius);
+		draw_rounded_rect_fill(win->pixels, win->win_w, win->win_h, sb_x + sb_inset, thumb_y, win->scrollbar_w - sb_inset * 2 - 1, thumb_h, win->theme.scrollbar_thumb, win->theme.corner_radius);
 	}
 }
 
@@ -985,9 +985,9 @@ static void logview_free_buffers(struct mkgui_logview_data *lv) {
 }
 
 // [=]===^=[ mkgui_logview_setup ]================================[=]
-MKGUI_API void mkgui_logview_setup(struct mkgui_ctx *ctx, uint32_t id, uint32_t max_lines, uint32_t arena_bytes) {
-	MKGUI_CHECK(ctx);
-	struct mkgui_logview_data *lv = find_logview_data(ctx, id);
+MKGUI_API void mkgui_logview_setup(struct mkgui_window *win, uint32_t id, uint32_t max_lines, uint32_t arena_bytes) {
+	MKGUI_CHECK(win);
+	struct mkgui_logview_data *lv = find_logview_data(win, id);
 	if(!lv) {
 		return;
 	}
@@ -1023,37 +1023,37 @@ MKGUI_API void mkgui_logview_setup(struct mkgui_ctx *ctx, uint32_t id, uint32_t 
 	lv->scroll_x = 0;
 	lv->stuck_to_end = 1;
 	lv->has_selection = 0;
-	dirty_widget_id(ctx, id);
+	dirty_widget_id(win, id);
 }
 
 // [=]===^=[ mkgui_logview_append_n ]=============================[=]
-MKGUI_API void mkgui_logview_append_n(struct mkgui_ctx *ctx, uint32_t id, const char *text, uint32_t len) {
-	MKGUI_CHECK(ctx);
+MKGUI_API void mkgui_logview_append_n(struct mkgui_window *win, uint32_t id, const char *text, uint32_t len) {
+	MKGUI_CHECK(win);
 	if(!text || len == 0) {
 		return;
 	}
-	struct mkgui_logview_data *lv = find_logview_data(ctx, id);
+	struct mkgui_logview_data *lv = find_logview_data(win, id);
 	if(!lv || lv->max_lines == 0) {
 		return;
 	}
 	logview_feed(lv, text, len);
 	logview_invalidate_wrap(lv);
-	dirty_widget_id(ctx, id);
+	dirty_widget_id(win, id);
 }
 
 // [=]===^=[ mkgui_logview_append ]===============================[=]
-MKGUI_API void mkgui_logview_append(struct mkgui_ctx *ctx, uint32_t id, const char *text) {
-	MKGUI_CHECK(ctx);
+MKGUI_API void mkgui_logview_append(struct mkgui_window *win, uint32_t id, const char *text) {
+	MKGUI_CHECK(win);
 	if(!text) {
 		return;
 	}
-	mkgui_logview_append_n(ctx, id, text, (uint32_t)strlen(text));
+	mkgui_logview_append_n(win, id, text, (uint32_t)strlen(text));
 }
 
 // [=]===^=[ mkgui_logview_clear ]================================[=]
-MKGUI_API void mkgui_logview_clear(struct mkgui_ctx *ctx, uint32_t id) {
-	MKGUI_CHECK(ctx);
-	struct mkgui_logview_data *lv = find_logview_data(ctx, id);
+MKGUI_API void mkgui_logview_clear(struct mkgui_window *win, uint32_t id) {
+	MKGUI_CHECK(win);
+	struct mkgui_logview_data *lv = find_logview_data(win, id);
 	if(!lv) {
 		return;
 	}
@@ -1074,13 +1074,13 @@ MKGUI_API void mkgui_logview_clear(struct mkgui_ctx *ctx, uint32_t id) {
 	lv->esc_state = 0;
 	lv->cur_fg = MKGUI_LOGVIEW_DEFAULT_FG;
 	lv->cur_bg = MKGUI_LOGVIEW_DEFAULT_BG;
-	dirty_widget_id(ctx, id);
+	dirty_widget_id(win, id);
 }
 
 // [=]===^=[ mkgui_logview_get_line_count ]=======================[=]
-MKGUI_API uint32_t mkgui_logview_get_line_count(struct mkgui_ctx *ctx, uint32_t id) {
-	MKGUI_CHECK_VAL(ctx, 0);
-	struct mkgui_logview_data *lv = find_logview_data(ctx, id);
+MKGUI_API uint32_t mkgui_logview_get_line_count(struct mkgui_window *win, uint32_t id) {
+	MKGUI_CHECK_VAL(win, 0);
+	struct mkgui_logview_data *lv = find_logview_data(win, id);
 	if(!lv) {
 		return 0;
 	}
@@ -1088,25 +1088,25 @@ MKGUI_API uint32_t mkgui_logview_get_line_count(struct mkgui_ctx *ctx, uint32_t 
 }
 
 // [=]===^=[ mkgui_logview_scroll_to_end ]========================[=]
-MKGUI_API void mkgui_logview_scroll_to_end(struct mkgui_ctx *ctx, uint32_t id) {
-	MKGUI_CHECK(ctx);
-	struct mkgui_logview_data *lv = find_logview_data(ctx, id);
+MKGUI_API void mkgui_logview_scroll_to_end(struct mkgui_window *win, uint32_t id) {
+	MKGUI_CHECK(win);
+	struct mkgui_logview_data *lv = find_logview_data(win, id);
 	if(!lv) {
 		return;
 	}
 	lv->stuck_to_end = 1;
-	int32_t idx = find_widget_idx(ctx, id);
+	int32_t idx = find_widget_idx(win, id);
 	if(idx < 0) {
 		return;
 	}
-	logview_recompute(ctx, lv, idx);
-	dirty_widget_id(ctx, id);
+	logview_recompute(win, lv, idx);
+	dirty_widget_id(win, id);
 }
 
 // [=]===^=[ mkgui_logview_is_at_end ]=============================[=]
-MKGUI_API uint32_t mkgui_logview_is_at_end(struct mkgui_ctx *ctx, uint32_t id) {
-	MKGUI_CHECK_VAL(ctx, 1);
-	struct mkgui_logview_data *lv = find_logview_data(ctx, id);
+MKGUI_API uint32_t mkgui_logview_is_at_end(struct mkgui_window *win, uint32_t id) {
+	MKGUI_CHECK_VAL(win, 1);
+	struct mkgui_logview_data *lv = find_logview_data(win, id);
 	if(!lv) {
 		return 1;
 	}
@@ -1114,13 +1114,13 @@ MKGUI_API uint32_t mkgui_logview_is_at_end(struct mkgui_ctx *ctx, uint32_t id) {
 }
 
 // [=]===^=[ mkgui_logview_get_selection_text ]====================[=]
-MKGUI_API uint32_t mkgui_logview_get_selection_text(struct mkgui_ctx *ctx, uint32_t id, char *out, uint32_t out_size) {
-	MKGUI_CHECK_VAL(ctx, 0);
+MKGUI_API uint32_t mkgui_logview_get_selection_text(struct mkgui_window *win, uint32_t id, char *out, uint32_t out_size) {
+	MKGUI_CHECK_VAL(win, 0);
 	if(!out || out_size == 0) {
 		return 0;
 	}
 	out[0] = '\0';
-	struct mkgui_logview_data *lv = find_logview_data(ctx, id);
+	struct mkgui_logview_data *lv = find_logview_data(win, id);
 	if(!lv) {
 		return 0;
 	}

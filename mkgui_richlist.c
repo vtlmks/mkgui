@@ -21,23 +21,23 @@ static void richlist_clamp_scroll(struct mkgui_richlist_data *rl, int32_t conten
 }
 
 // [=]===^=[ richlist_scrollbar_hit ]==============================[=]
-static uint32_t richlist_scrollbar_hit(struct mkgui_ctx *ctx, uint32_t idx, int32_t mx, int32_t my) {
-	struct mkgui_widget *w = &ctx->widgets[idx];
-	struct mkgui_richlist_data *rl = find_richlist_data(ctx, w->id);
+static uint32_t richlist_scrollbar_hit(struct mkgui_window *win, uint32_t idx, int32_t mx, int32_t my) {
+	struct mkgui_widget *w = &win->widgets[idx];
+	struct mkgui_richlist_data *rl = find_richlist_data(win, w->id);
 	if(!rl || rl->row_count == 0) {
 		return 0;
 	}
 
-	int32_t rx = ctx->rects[idx].x;
-	int32_t ry = ctx->rects[idx].y;
-	int32_t rw = ctx->rects[idx].w;
-	int32_t rh = ctx->rects[idx].h;
+	int32_t rx = win->rects[idx].x;
+	int32_t ry = win->rects[idx].y;
+	int32_t rw = win->rects[idx].w;
+	int32_t rh = win->rects[idx].h;
 
-	int32_t sb_x = rx + rw - ctx->scrollbar_w - 1;
+	int32_t sb_x = rx + rw - win->scrollbar_w - 1;
 	int32_t sb_y = ry + 1;
 	int32_t sb_h = rh - 2;
 
-	if(mx < sb_x || mx >= sb_x + ctx->scrollbar_w || my < sb_y || my >= sb_y + sb_h) {
+	if(mx < sb_x || mx >= sb_x + win->scrollbar_w || my < sb_y || my >= sb_y + sb_h) {
 		return 0;
 	}
 
@@ -46,7 +46,7 @@ static uint32_t richlist_scrollbar_hit(struct mkgui_ctx *ctx, uint32_t idx, int3
 		return 0;
 	}
 
-	int32_t min_thumb = sc(ctx, 20);
+	int32_t min_thumb = sc(win, 20);
 	int32_t thumb_h = sb_h * sb_h / total_h;
 	if(thumb_h < min_thumb) {
 		thumb_h = min_thumb;
@@ -60,20 +60,20 @@ static uint32_t richlist_scrollbar_hit(struct mkgui_ctx *ctx, uint32_t idx, int3
 }
 
 // [=]===^=[ richlist_thumb_offset ]===============================[=]
-static int32_t richlist_thumb_offset(struct mkgui_ctx *ctx, uint32_t idx, int32_t my) {
-	struct mkgui_widget *w = &ctx->widgets[idx];
-	struct mkgui_richlist_data *rl = find_richlist_data(ctx, w->id);
+static int32_t richlist_thumb_offset(struct mkgui_window *win, uint32_t idx, int32_t my) {
+	struct mkgui_widget *w = &win->widgets[idx];
+	struct mkgui_richlist_data *rl = find_richlist_data(win, w->id);
 	if(!rl) {
 		return 0;
 	}
 
-	int32_t ry = ctx->rects[idx].y;
-	int32_t rh = ctx->rects[idx].h;
+	int32_t ry = win->rects[idx].y;
+	int32_t rh = win->rects[idx].h;
 	int32_t sb_y = ry + 1;
 	int32_t sb_h = rh - 2;
 
 	int32_t total_h = (int32_t)rl->row_count * rl->row_height;
-	int32_t min_thumb = sc(ctx, 20);
+	int32_t min_thumb = sc(win, 20);
 	int32_t thumb_h = sb_h * sb_h / total_h;
 	if(thumb_h < min_thumb) {
 		thumb_h = min_thumb;
@@ -83,18 +83,18 @@ static int32_t richlist_thumb_offset(struct mkgui_ctx *ctx, uint32_t idx, int32_
 }
 
 // [=]===^=[ richlist_scroll_to_y ]================================[=]
-static void richlist_scroll_to_y(struct mkgui_ctx *ctx, uint32_t id, int32_t my) {
-	int32_t idx = find_widget_idx(ctx, id);
+static void richlist_scroll_to_y(struct mkgui_window *win, uint32_t id, int32_t my) {
+	int32_t idx = find_widget_idx(win, id);
 	if(idx < 0) {
 		return;
 	}
-	struct mkgui_richlist_data *rl = find_richlist_data(ctx, id);
+	struct mkgui_richlist_data *rl = find_richlist_data(win, id);
 	if(!rl) {
 		return;
 	}
 
-	int32_t ry = ctx->rects[idx].y;
-	int32_t rh = ctx->rects[idx].h;
+	int32_t ry = win->rects[idx].y;
+	int32_t rh = win->rects[idx].h;
 	int32_t sb_y = ry + 1;
 	int32_t sb_h = rh - 2;
 
@@ -102,7 +102,7 @@ static void richlist_scroll_to_y(struct mkgui_ctx *ctx, uint32_t id, int32_t my)
 	if(total_h <= sb_h) {
 		return;
 	}
-	int32_t min_thumb = sc(ctx, 20);
+	int32_t min_thumb = sc(win, 20);
 	int32_t thumb_h = sb_h * sb_h / total_h;
 	if(thumb_h < min_thumb) {
 		thumb_h = min_thumb;
@@ -113,7 +113,7 @@ static void richlist_scroll_to_y(struct mkgui_ctx *ctx, uint32_t id, int32_t my)
 		return;
 	}
 
-	float frac = (float)(my - sb_y - ctx->drag_scrollbar_offset) / (float)usable;
+	float frac = (float)(my - sb_y - win->drag_scrollbar_offset) / (float)usable;
 	if(frac < 0.0f) {
 		frac = 0.0f;
 	}
@@ -123,15 +123,15 @@ static void richlist_scroll_to_y(struct mkgui_ctx *ctx, uint32_t id, int32_t my)
 	}
 
 	rl->scroll_y = (int32_t)(frac * (float)(total_h - sb_h));
-	dirty_all(ctx);
+	dirty_all(win);
 }
 
 // [=]===^=[ richlist_row_hit ]====================================[=]
-static int32_t richlist_row_hit(struct mkgui_ctx *ctx, uint32_t idx, int32_t my) {
-	int32_t ry = ctx->rects[idx].y;
-	int32_t rh = ctx->rects[idx].h;
+static int32_t richlist_row_hit(struct mkgui_window *win, uint32_t idx, int32_t my) {
+	int32_t ry = win->rects[idx].y;
+	int32_t rh = win->rects[idx].h;
 
-	struct mkgui_richlist_data *rl = find_richlist_data(ctx, ctx->widgets[idx].id);
+	struct mkgui_richlist_data *rl = find_richlist_data(win, win->widgets[idx].id);
 	if(!rl) {
 		return -1;
 	}
@@ -143,8 +143,8 @@ static int32_t richlist_row_hit(struct mkgui_ctx *ctx, uint32_t idx, int32_t my)
 		return -1;
 	}
 
-	int32_t sb_x = ctx->rects[idx].x + ctx->rects[idx].w - ctx->scrollbar_w - 1;
-	if(ctx->mouse_x >= sb_x) {
+	int32_t sb_x = win->rects[idx].x + win->rects[idx].w - win->scrollbar_w - 1;
+	if(win->mouse_x >= sb_x) {
 		return -1;
 	}
 
@@ -156,22 +156,22 @@ static int32_t richlist_row_hit(struct mkgui_ctx *ctx, uint32_t idx, int32_t my)
 }
 
 // [=]===^=[ render_richlist ]=====================================[=]
-static void render_richlist(struct mkgui_ctx *ctx, uint32_t idx) {
-	struct mkgui_widget *w = &ctx->widgets[idx];
-	int32_t rx = ctx->rects[idx].x;
-	int32_t ry = ctx->rects[idx].y;
-	int32_t rw = ctx->rects[idx].w;
-	int32_t rh = ctx->rects[idx].h;
+static void render_richlist(struct mkgui_window *win, uint32_t idx) {
+	struct mkgui_widget *w = &win->widgets[idx];
+	int32_t rx = win->rects[idx].x;
+	int32_t ry = win->rects[idx].y;
+	int32_t rw = win->rects[idx].w;
+	int32_t rh = win->rects[idx].h;
 
-	struct mkgui_richlist_data *rl = find_richlist_data(ctx, w->id);
+	struct mkgui_richlist_data *rl = find_richlist_data(win, w->id);
 	if(!rl) {
 		return;
 	}
 
-	uint32_t focused = (ctx->focus_id == w->id);
-	draw_patch(ctx, MKGUI_STYLE_SUNKEN, rx, ry, rw, rh, ctx->theme.input_bg, focused ? ctx->theme.highlight : ctx->theme.widget_border);
+	uint32_t focused = (win->focus_id == w->id);
+	draw_patch(win, MKGUI_STYLE_SUNKEN, rx, ry, rw, rh, win->theme.input_bg, focused ? win->theme.highlight : win->theme.widget_border);
 
-	int32_t content_w = rw - 2 - ctx->scrollbar_w;
+	int32_t content_w = rw - 2 - win->scrollbar_w;
 	int32_t content_y = ry + 1;
 	int32_t content_h = rh - 2;
 
@@ -205,16 +205,16 @@ static void render_richlist(struct mkgui_ctx *ctx, uint32_t idx) {
 	int32_t visible_rows = content_h / rl->row_height + 2;
 	int32_t first_row = rl->scroll_y / rl->row_height;
 
-	int32_t thumb_pad = sc(ctx, 4);
-	int32_t text_pad = sc(ctx, 6);
-	int32_t right_pad = sc(ctx, 8);
+	int32_t thumb_pad = sc(win, 4);
+	int32_t text_pad = sc(win, 6);
+	int32_t right_pad = sc(win, 8);
 	int32_t thumb_size = rl->row_height - thumb_pad * 2;
-	if(thumb_size < sc(ctx, 4)) {
-		thumb_size = sc(ctx, 4);
+	if(thumb_size < sc(win, 4)) {
+		thumb_size = sc(win, 4);
 	}
 
 	struct mkgui_richlist_row row_data;
-	uint32_t sep_color = blend_pixel(ctx->theme.input_bg, ctx->theme.widget_border, 60);
+	uint32_t sep_color = blend_pixel(win->theme.input_bg, win->theme.widget_border, 60);
 
 	for(int32_t r = 0; r < visible_rows && (first_row + r) < (int32_t)rl->row_count; ++r) {
 		int32_t row_idx = first_row + r;
@@ -232,11 +232,11 @@ static void render_richlist(struct mkgui_ctx *ctx, uint32_t idx) {
 		int32_t draw_h = draw_end - draw_y;
 
 		uint32_t is_selected = (row_idx == rl->selected_row);
-		uint32_t row_bg = (row_idx & 1) ? ctx->theme.listview_alt : ctx->theme.input_bg;
+		uint32_t row_bg = (row_idx & 1) ? win->theme.listview_alt : win->theme.input_bg;
 		if(is_selected) {
-			row_bg = ctx->theme.selection;
+			row_bg = win->theme.selection;
 		}
-		draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, rx + 1, draw_y, content_w, draw_h, row_bg);
+		draw_rect_fill(win->pixels, win->win_w, win->win_h, rx + 1, draw_y, content_w, draw_h, row_bg);
 
 		memset(&row_data, 0, sizeof(row_data));
 		if(rl->row_cb) {
@@ -268,9 +268,9 @@ static void render_richlist(struct mkgui_ctx *ctx, uint32_t idx) {
 						uint32_t src = row_data.thumbnail[sy * row_data.thumb_w + sx];
 						uint8_t sa = (uint8_t)(src >> 24);
 						if(sa == 255) {
-							ctx->pixels[dy * ctx->win_w + dx] = src;
+							win->pixels[dy * win->win_w + dx] = src;
 						} else if(sa > 0) {
-							ctx->pixels[dy * ctx->win_w + dx] = blend_pixel(ctx->pixels[dy * ctx->win_w + dx], src, sa);
+							win->pixels[dy * win->win_w + dx] = blend_pixel(win->pixels[dy * win->win_w + dx], src, sa);
 						}
 					}
 				}
@@ -288,9 +288,9 @@ static void render_richlist(struct mkgui_ctx *ctx, uint32_t idx) {
 						uint32_t src = row_data.thumbnail[py * tw + px];
 						uint8_t sa = (uint8_t)(src >> 24);
 						if(sa == 255) {
-							ctx->pixels[dy * ctx->win_w + dx] = src;
+							win->pixels[dy * win->win_w + dx] = src;
 						} else if(sa > 0) {
-							ctx->pixels[dy * ctx->win_w + dx] = blend_pixel(ctx->pixels[dy * ctx->win_w + dx], src, sa);
+							win->pixels[dy * win->win_w + dx] = blend_pixel(win->pixels[dy * win->win_w + dx], src, sa);
 						}
 					}
 				}
@@ -298,12 +298,12 @@ static void render_richlist(struct mkgui_ctx *ctx, uint32_t idx) {
 			text_x = clip_left + thumb_pad + thumb_size + text_pad;
 		}
 
-		uint32_t tc_title = is_selected ? ctx->theme.sel_text : ctx->theme.text;
-		uint32_t tc_sub = is_selected ? ctx->theme.sel_text : ctx->theme.text_disabled;
+		uint32_t tc_title = is_selected ? win->theme.sel_text : win->theme.text;
+		uint32_t tc_sub = is_selected ? win->theme.sel_text : win->theme.text_disabled;
 
 		int32_t right_w = 0;
 		if(row_data.right_text[0]) {
-			right_w = text_width(ctx, row_data.right_text) + right_pad;
+			right_w = text_width(win, row_data.right_text) + right_pad;
 		}
 
 		int32_t text_right = clip_right - right_w;
@@ -311,28 +311,28 @@ static void render_richlist(struct mkgui_ctx *ctx, uint32_t idx) {
 		if(row_data.title[0]) {
 			int32_t ty;
 			if(row_data.subtitle[0]) {
-				ty = row_y + rl->row_height / 2 - ctx->font_height - 1;
+				ty = row_y + rl->row_height / 2 - win->font_height - 1;
 			} else {
-				ty = row_y + (rl->row_height - ctx->font_height) / 2;
+				ty = row_y + (rl->row_height - win->font_height) / 2;
 			}
 			push_text_clip(text_x, ty, row_data.title, tc_title, text_x, clip_top, text_right, clip_bottom);
 		}
 
 		if(row_data.subtitle[0]) {
-			int32_t ty = row_y + rl->row_height / 2 + sc(ctx, 2);
+			int32_t ty = row_y + rl->row_height / 2 + sc(win, 2);
 			push_text_clip(text_x, ty, row_data.subtitle, tc_sub, text_x, clip_top, text_right, clip_bottom);
 		}
 
 		if(row_data.right_text[0]) {
-			int32_t rtw = text_width(ctx, row_data.right_text);
+			int32_t rtw = text_width(win, row_data.right_text);
 			int32_t rtx = clip_right - rtw - right_pad;
-			int32_t rty = row_y + (rl->row_height - ctx->font_height) / 2;
+			int32_t rty = row_y + (rl->row_height - win->font_height) / 2;
 			push_text_clip(rtx, rty, row_data.right_text, tc_sub, rtx, clip_top, clip_right, clip_bottom);
 		}
 
 		int32_t sep_y = row_y + rl->row_height - 1;
 		if(sep_y >= clip_top && sep_y < clip_bottom) {
-			draw_hline(ctx->pixels, ctx->win_w, ctx->win_h, rx + 1, sep_y, content_w, sep_color);
+			draw_hline(win->pixels, win->win_w, win->win_h, rx + 1, sep_y, content_w, sep_color);
 		}
 	}
 
@@ -342,38 +342,38 @@ static void render_richlist(struct mkgui_ctx *ctx, uint32_t idx) {
 	render_clip_y2 = saved_clip_y2;
 
 	if(rl->row_count > 0) {
-		int32_t sb_x = rx + rw - ctx->scrollbar_w - 1;
+		int32_t sb_x = rx + rw - win->scrollbar_w - 1;
 		int32_t sb_y = content_y;
 		int32_t sb_h = content_h;
-		draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, sb_x, sb_y, ctx->scrollbar_w, sb_h, ctx->theme.scrollbar_bg);
+		draw_rect_fill(win->pixels, win->win_w, win->win_h, sb_x, sb_y, win->scrollbar_w, sb_h, win->theme.scrollbar_bg);
 
 		int32_t total_h = (int32_t)rl->row_count * rl->row_height;
 		if(total_h > sb_h) {
-			int32_t min_th = sc(ctx, 20);
+			int32_t min_th = sc(win, 20);
 			int32_t thumb_h = sb_h * sb_h / total_h;
 			if(thumb_h < min_th) {
 				thumb_h = min_th;
 			}
 			int32_t thumb_y = sb_y + (int32_t)((int64_t)rl->scroll_y * (sb_h - thumb_h) / (total_h - sb_h));
-			uint32_t thumb_color = (ctx->drag_scrollbar_id == w->id) ? ctx->theme.widget_hover : ctx->theme.scrollbar_thumb;
-			int32_t sb_inset = sc(ctx, 2);
-			draw_rounded_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, sb_x + sb_inset, thumb_y, ctx->scrollbar_w - sb_inset * 2, thumb_h, thumb_color, ctx->theme.corner_radius);
+			uint32_t thumb_color = (win->drag_scrollbar_id == w->id) ? win->theme.widget_hover : win->theme.scrollbar_thumb;
+			int32_t sb_inset = sc(win, 2);
+			draw_rounded_rect_fill(win->pixels, win->win_w, win->win_h, sb_x + sb_inset, thumb_y, win->scrollbar_w - sb_inset * 2, thumb_h, thumb_color, win->theme.corner_radius);
 		}
 	}
 }
 
 // [=]===^=[ handle_richlist_key ]=================================[=]
-static uint32_t handle_richlist_key(struct mkgui_ctx *ctx, struct mkgui_event *ev, uint32_t ks) {
-	struct mkgui_richlist_data *rl = find_richlist_data(ctx, ctx->focus_id);
+static uint32_t handle_richlist_key(struct mkgui_window *win, struct mkgui_event *ev, uint32_t ks) {
+	struct mkgui_richlist_data *rl = find_richlist_data(win, win->focus_id);
 	if(!rl || rl->row_count == 0) {
 		return 0;
 	}
 
-	int32_t idx = find_widget_idx(ctx, ctx->focus_id);
+	int32_t idx = find_widget_idx(win, win->focus_id);
 	if(idx < 0) {
 		return 0;
 	}
-	int32_t rh = ctx->rects[idx].h;
+	int32_t rh = win->rects[idx].h;
 	int32_t content_h = rh - 2;
 	int32_t page = content_h / rl->row_height;
 	if(page < 1) {
@@ -429,78 +429,78 @@ static uint32_t handle_richlist_key(struct mkgui_ctx *ctx, struct mkgui_event *e
 		rl->scroll_y = row_y + rl->row_height - content_h;
 	}
 	richlist_clamp_scroll(rl, content_h);
-	dirty_all(ctx);
+	dirty_all(win);
 	ev->type = MKGUI_EVENT_RICHLIST_SELECT;
-	ev->id = ctx->focus_id;
+	ev->id = win->focus_id;
 	ev->value = rl->selected_row;
 	return 1;
 }
 
 // [=]===^=[ mkgui_richlist_setup ]================================[=]
-MKGUI_API void mkgui_richlist_setup(struct mkgui_ctx *ctx, uint32_t id, uint32_t row_count, int32_t row_height, mkgui_richlist_cb cb, void *userdata) {
-	MKGUI_CHECK(ctx);
+MKGUI_API void mkgui_richlist_setup(struct mkgui_window *win, uint32_t id, uint32_t row_count, int32_t row_height, mkgui_richlist_cb cb, void *userdata) {
+	MKGUI_CHECK(win);
 	if(!cb) {
 		return;
 	}
-	struct mkgui_richlist_data *rl = find_richlist_data(ctx, id);
+	struct mkgui_richlist_data *rl = find_richlist_data(win, id);
 	if(!rl) {
-		MKGUI_AUX_GROW(&ctx->arenas.richlists, ctx->richlist_count, ctx->richlist_cap, struct mkgui_richlist_data);
-		if(ctx->richlist_count >= ctx->richlist_cap) {
+		MKGUI_AUX_GROW(&win->arenas.richlists, win->richlist_count, win->richlist_cap, struct mkgui_richlist_data);
+		if(win->richlist_count >= win->richlist_cap) {
 			return;
 		}
-		rl = &ctx->richlists[ctx->richlist_count++];
+		rl = &win->richlists[win->richlist_count++];
 		memset(rl, 0, sizeof(*rl));
 		rl->widget_id = id;
 		rl->selected_row = -1;
 	}
 	rl->row_count = row_count;
-	rl->row_height = row_height > 0 ? sc(ctx, row_height) : sc(ctx, MKGUI_RICHLIST_DEFAULT_ROW_HEIGHT);
+	rl->row_height = row_height > 0 ? sc(win, row_height) : sc(win, MKGUI_RICHLIST_DEFAULT_ROW_HEIGHT);
 	rl->row_cb = cb;
 	rl->userdata = userdata;
 	rl->scroll_y = 0;
-	dirty_all(ctx);
+	dirty_all(win);
 }
 
 // [=]===^=[ mkgui_richlist_set_rows ]=============================[=]
-MKGUI_API void mkgui_richlist_set_rows(struct mkgui_ctx *ctx, uint32_t id, uint32_t row_count) {
-	MKGUI_CHECK(ctx);
-	struct mkgui_richlist_data *rl = find_richlist_data(ctx, id);
+MKGUI_API void mkgui_richlist_set_rows(struct mkgui_window *win, uint32_t id, uint32_t row_count) {
+	MKGUI_CHECK(win);
+	struct mkgui_richlist_data *rl = find_richlist_data(win, id);
 	if(!rl) {
 		return;
 	}
 	rl->row_count = row_count;
-	dirty_all(ctx);
+	dirty_all(win);
 }
 
 // [=]===^=[ mkgui_richlist_get_selected ]==========================[=]
-MKGUI_API int32_t mkgui_richlist_get_selected(struct mkgui_ctx *ctx, uint32_t id) {
-	MKGUI_CHECK_VAL(ctx, -1);
-	struct mkgui_richlist_data *rl = find_richlist_data(ctx, id);
+MKGUI_API int32_t mkgui_richlist_get_selected(struct mkgui_window *win, uint32_t id) {
+	MKGUI_CHECK_VAL(win, -1);
+	struct mkgui_richlist_data *rl = find_richlist_data(win, id);
 	return rl ? rl->selected_row : -1;
 }
 
 // [=]===^=[ mkgui_richlist_set_selected ]==========================[=]
-MKGUI_API void mkgui_richlist_set_selected(struct mkgui_ctx *ctx, uint32_t id, int32_t row) {
-	MKGUI_CHECK(ctx);
-	struct mkgui_richlist_data *rl = find_richlist_data(ctx, id);
+MKGUI_API void mkgui_richlist_set_selected(struct mkgui_window *win, uint32_t id, int32_t row) {
+	MKGUI_CHECK(win);
+	struct mkgui_richlist_data *rl = find_richlist_data(win, id);
 	if(rl) {
 		rl->selected_row = row;
-		dirty_all(ctx);
+		dirty_all(win);
 	}
 }
 
 // [=]===^=[ mkgui_richlist_scroll_to ]=============================[=]
-MKGUI_API void mkgui_richlist_scroll_to(struct mkgui_ctx *ctx, uint32_t id, int32_t row) {
-	MKGUI_CHECK(ctx);
-	struct mkgui_richlist_data *rl = find_richlist_data(ctx, id);
+MKGUI_API void mkgui_richlist_scroll_to(struct mkgui_window *win, uint32_t id, int32_t row) {
+	MKGUI_CHECK(win);
+	struct mkgui_richlist_data *rl = find_richlist_data(win, id);
 	if(!rl) {
 		return;
 	}
-	int32_t idx = find_widget_idx(ctx, id);
+	int32_t idx = find_widget_idx(win, id);
 	if(idx < 0) {
 		return;
 	}
-	int32_t rh = ctx->rects[idx].h;
+	int32_t rh = win->rects[idx].h;
 	int32_t content_h = rh - 2;
 	int32_t row_y = row * rl->row_height;
 	if(row_y < rl->scroll_y) {
@@ -514,5 +514,5 @@ MKGUI_API void mkgui_richlist_scroll_to(struct mkgui_ctx *ctx, uint32_t id, int3
 	if(rl->scroll_y < 0) {
 		rl->scroll_y = 0;
 	}
-	dirty_all(ctx);
+	dirty_all(win);
 }

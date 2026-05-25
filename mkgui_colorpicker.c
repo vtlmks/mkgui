@@ -114,17 +114,17 @@ static uint32_t cp_current_rgb(void) {
 }
 
 // [=]===^=[ cp_sync_controls ]=====================================[=]
-static void cp_sync_controls(struct mkgui_ctx *ctx) {
+static void cp_sync_controls(struct mkgui_window *win) {
 	uint32_t rgb = cp_current_rgb();
 	uint32_t r = (rgb >> 16) & 0xff;
 	uint32_t g = (rgb >> 8) & 0xff;
 	uint32_t b = rgb & 0xff;
-	mkgui_spinbox_set(ctx, CP_R_SPN, (int32_t)r);
-	mkgui_spinbox_set(ctx, CP_G_SPN, (int32_t)g);
-	mkgui_spinbox_set(ctx, CP_B_SPN, (int32_t)b);
+	mkgui_spinbox_set(win, CP_R_SPN, (int32_t)r);
+	mkgui_spinbox_set(win, CP_G_SPN, (int32_t)g);
+	mkgui_spinbox_set(win, CP_B_SPN, (int32_t)b);
 	char hex[8];
 	snprintf(hex, sizeof(hex), "%02x%02x%02x", r, g, b);
-	mkgui_input_set(ctx, CP_HEX_INPUT, hex);
+	mkgui_input_set(win, CP_HEX_INPUT, hex);
 }
 
 // [=]===^=[ cp_cache_realloc ]=====================================[=]
@@ -341,16 +341,16 @@ static void cp_render_rgb_bars(uint32_t *pixels, int32_t bw, int32_t bh, int32_t
 }
 
 // [=]===^=[ cp_render_cb ]=========================================[=]
-static void cp_render_cb(struct mkgui_ctx *ctx, void *userdata) {
+static void cp_render_cb(struct mkgui_window *win, void *userdata) {
 	(void)userdata;
-	struct mkgui_tabs_data *td = find_tabs_data(ctx, CP_TABS);
+	struct mkgui_tabs_data *td = find_tabs_data(win, CP_TABS);
 	uint32_t active = td ? td->active_tab : CP_TAB_SV;
 
 	if(active == CP_TAB_SV) {
-		int32_t si = find_widget_idx(ctx, CP_SV_CANVAS);
-		int32_t hi = find_widget_idx(ctx, CP_HUE_CANVAS);
+		int32_t si = find_widget_idx(win, CP_SV_CANVAS);
+		int32_t hi = find_widget_idx(win, CP_HUE_CANVAS);
 		if(si >= 0) {
-			struct mkgui_rect *r = &ctx->rects[si];
+			struct mkgui_rect *r = &win->rects[si];
 			int32_t prev_sw = cp_state.sv_w;
 			int32_t prev_sh = cp_state.sv_h;
 			cp_state.sv_cache = cp_cache_realloc(cp_state.sv_cache, &cp_state.sv_w, &cp_state.sv_h, r->w, r->h);
@@ -360,13 +360,13 @@ static void cp_render_cb(struct mkgui_ctx *ctx, void *userdata) {
 			}
 
 			if(cp_state.sv_cache) {
-				cp_cache_blit(ctx->pixels, ctx->win_w, ctx->win_h, r->x, r->y, cp_state.sv_cache, r->w, r->h);
+				cp_cache_blit(win->pixels, win->win_w, win->win_h, r->x, r->y, cp_state.sv_cache, r->w, r->h);
 			}
-			cp_render_sv_cursor(ctx->pixels, ctx->win_w, ctx->win_h, r->x, r->y, r->w, r->h);
+			cp_render_sv_cursor(win->pixels, win->win_w, win->win_h, r->x, r->y, r->w, r->h);
 		}
 
 		if(hi >= 0) {
-			struct mkgui_rect *r = &ctx->rects[hi];
+			struct mkgui_rect *r = &win->rects[hi];
 			int32_t prev_hw = cp_state.hue_w;
 			int32_t prev_hh = cp_state.hue_h;
 			cp_state.hue_cache = cp_cache_realloc(cp_state.hue_cache, &cp_state.hue_w, &cp_state.hue_h, r->w, r->h);
@@ -375,45 +375,45 @@ static void cp_render_cb(struct mkgui_ctx *ctx, void *userdata) {
 			}
 
 			if(cp_state.hue_cache) {
-				cp_cache_blit(ctx->pixels, ctx->win_w, ctx->win_h, r->x, r->y, cp_state.hue_cache, r->w, r->h);
+				cp_cache_blit(win->pixels, win->win_w, win->win_h, r->x, r->y, cp_state.hue_cache, r->w, r->h);
 			}
-			cp_render_hue_cursor(ctx->pixels, ctx->win_w, ctx->win_h, r->x, r->y, r->w, r->h);
+			cp_render_hue_cursor(win->pixels, win->win_w, win->win_h, r->x, r->y, r->w, r->h);
 		}
 	} else if(active == CP_TAB_WHEEL) {
-		int32_t wi = find_widget_idx(ctx, CP_WH_CANVAS);
+		int32_t wi = find_widget_idx(win, CP_WH_CANVAS);
 		if(wi >= 0) {
-			struct mkgui_rect *r = &ctx->rects[wi];
+			struct mkgui_rect *r = &win->rects[wi];
 			int32_t ww = r->w - 2;
 			int32_t wh = r->h - 2;
 			int32_t prev_ww = cp_state.wheel_w;
 			int32_t prev_wh = cp_state.wheel_h;
 			cp_state.wheel_cache = cp_cache_realloc(cp_state.wheel_cache, &cp_state.wheel_w, &cp_state.wheel_h, ww, wh);
 			if(cp_state.wheel_cache && (prev_ww != ww || prev_wh != wh || cp_state.wheel_hue != cp_state.h)) {
-				cp_render_wheel_base(cp_state.wheel_cache, ww, wh, ctx->theme.bg);
+				cp_render_wheel_base(cp_state.wheel_cache, ww, wh, win->theme.bg);
 				cp_state.wheel_hue = cp_state.h;
 			}
 
 			if(cp_state.wheel_cache) {
-				cp_cache_blit(ctx->pixels, ctx->win_w, ctx->win_h, r->x + 1, r->y + 1, cp_state.wheel_cache, ww, wh);
+				cp_cache_blit(win->pixels, win->win_w, win->win_h, r->x + 1, r->y + 1, cp_state.wheel_cache, ww, wh);
 			}
-			cp_render_wheel_cursor(ctx->pixels, ctx->win_w, ctx->win_h, r->x + 1, r->y + 1, ww, wh);
+			cp_render_wheel_cursor(win->pixels, win->win_w, win->win_h, r->x + 1, r->y + 1, ww, wh);
 		}
 	} else if(active == CP_TAB_RGB) {
-		int32_t ri = find_widget_idx(ctx, CP_RGB_CANVAS);
+		int32_t ri = find_widget_idx(win, CP_RGB_CANVAS);
 		if(ri >= 0) {
-			struct mkgui_rect *r = &ctx->rects[ri];
-			cp_render_rgb_bars(ctx->pixels, ctx->win_w, ctx->win_h, r->x + 1, r->y + 1, r->w - 2, r->h - 2);
+			struct mkgui_rect *r = &win->rects[ri];
+			cp_render_rgb_bars(win->pixels, win->win_w, win->win_h, r->x + 1, r->y + 1, r->w - 2, r->h - 2);
 		}
 	}
 
-	int32_t pi = find_widget_idx(ctx, CP_PREVIEW);
+	int32_t pi = find_widget_idx(win, CP_PREVIEW);
 	if(pi >= 0) {
-		struct mkgui_rect *r = &ctx->rects[pi];
+		struct mkgui_rect *r = &win->rects[pi];
 		uint32_t c = cp_current_rgb();
-		for(int32_t y = r->y + 1; y < r->y + r->h - 1 && y < ctx->win_h; ++y) {
-			for(int32_t x = r->x + 1; x < r->x + r->w - 1 && x < ctx->win_w; ++x) {
+		for(int32_t y = r->y + 1; y < r->y + r->h - 1 && y < win->win_h; ++y) {
+			for(int32_t x = r->x + 1; x < r->x + r->w - 1 && x < win->win_w; ++x) {
 				if(x >= 0 && y >= 0) {
-					ctx->pixels[y * ctx->win_w + x] = c;
+					win->pixels[y * win->win_w + x] = c;
 				}
 			}
 		}
@@ -421,39 +421,39 @@ static void cp_render_cb(struct mkgui_ctx *ctx, void *userdata) {
 }
 
 // [=]===^=[ cp_handle_mouse ]======================================[=]
-static void cp_handle_mouse(struct mkgui_ctx *ctx) {
-	int32_t mx = ctx->mouse_x;
-	int32_t my = ctx->mouse_y;
-	struct mkgui_tabs_data *td = find_tabs_data(ctx, CP_TABS);
+static void cp_handle_mouse(struct mkgui_window *win) {
+	int32_t mx = win->mouse_x;
+	int32_t my = win->mouse_y;
+	struct mkgui_tabs_data *td = find_tabs_data(win, CP_TABS);
 	uint32_t active = td ? td->active_tab : CP_TAB_SV;
 
 	if(cp_state.drag_target == CP_SV_CANVAS && active == CP_TAB_SV) {
-		int32_t idx = find_widget_idx(ctx, CP_SV_CANVAS);
+		int32_t idx = find_widget_idx(win, CP_SV_CANVAS);
 		if(idx >= 0) {
-			struct mkgui_rect *r = &ctx->rects[idx];
+			struct mkgui_rect *r = &win->rects[idx];
 			float s = (float)(mx - r->x) / (float)(r->w - 1);
 			float v = 1.0f - (float)(my - r->y) / (float)(r->h - 1);
 			if(s < 0.0f) { s = 0.0f; } if(s > 1.0f) { s = 1.0f; }
 			if(v < 0.0f) { v = 0.0f; } if(v > 1.0f) { v = 1.0f; }
 			cp_state.s = s;
 			cp_state.v = v;
-			cp_sync_controls(ctx);
-			dirty_all(ctx);
+			cp_sync_controls(win);
+			dirty_all(win);
 		}
 	} else if(cp_state.drag_target == CP_HUE_CANVAS && active == CP_TAB_SV) {
-		int32_t idx = find_widget_idx(ctx, CP_HUE_CANVAS);
+		int32_t idx = find_widget_idx(win, CP_HUE_CANVAS);
 		if(idx >= 0) {
-			struct mkgui_rect *r = &ctx->rects[idx];
+			struct mkgui_rect *r = &win->rects[idx];
 			float h = (float)(my - r->y) / (float)(r->h - 1) * 360.0f;
 			if(h < 0.0f) { h = 0.0f; } if(h > 359.99f) { h = 359.99f; }
 			cp_state.h = h;
-			cp_sync_controls(ctx);
-			dirty_all(ctx);
+			cp_sync_controls(win);
+			dirty_all(win);
 		}
 	} else if(cp_state.drag_target == CP_WH_CANVAS && active == CP_TAB_WHEEL) {
-		int32_t idx = find_widget_idx(ctx, CP_WH_CANVAS);
+		int32_t idx = find_widget_idx(win, CP_WH_CANVAS);
 		if(idx >= 0) {
-			struct mkgui_rect *r = &ctx->rects[idx];
+			struct mkgui_rect *r = &win->rects[idx];
 			int32_t sz = r->w < r->h ? r->w : r->h;
 			float cx = (float)r->x + (float)r->w * 0.5f;
 			float cy = (float)r->y + (float)r->h * 0.5f;
@@ -477,13 +477,13 @@ static void cp_handle_mouse(struct mkgui_ctx *ctx) {
 				cp_state.s = s;
 				cp_state.v = v;
 			}
-			cp_sync_controls(ctx);
-			dirty_all(ctx);
+			cp_sync_controls(win);
+			dirty_all(win);
 		}
 	} else if(cp_state.drag_target == CP_RGB_CANVAS && active == CP_TAB_RGB) {
-		int32_t idx = find_widget_idx(ctx, CP_RGB_CANVAS);
+		int32_t idx = find_widget_idx(win, CP_RGB_CANVAS);
 		if(idx >= 0) {
-			struct mkgui_rect *r = &ctx->rects[idx];
+			struct mkgui_rect *r = &win->rects[idx];
 			int32_t bar_h = 24, gap = 8;
 			int32_t total = bar_h * 3 + gap * 2;
 			int32_t y0 = r->y + (r->h - total) / 2;
@@ -498,24 +498,24 @@ static void cp_handle_mouse(struct mkgui_ctx *ctx) {
 			else if(my < y0 + bar_h * 2 + gap + gap / 2) { cg = val; }
 			else { cb = val; }
 			cp_rgb_to_hsv((cr << 16) | (cg << 8) | cb, &cp_state.h, &cp_state.s, &cp_state.v);
-			cp_sync_controls(ctx);
-			dirty_all(ctx);
+			cp_sync_controls(win);
+			dirty_all(win);
 		}
 	}
 }
 
 // [=]===^=[ cp_begin_drag ]========================================[=]
-static void cp_begin_drag(struct mkgui_ctx *ctx) {
-	uint32_t pid = ctx->press_id;
+static void cp_begin_drag(struct mkgui_window *win) {
+	uint32_t pid = win->press_id;
 	if(pid == CP_SV_CANVAS || pid == CP_HUE_CANVAS || pid == CP_WH_CANVAS || pid == CP_RGB_CANVAS) {
 		cp_state.drag_target = pid;
-		cp_handle_mouse(ctx);
+		cp_handle_mouse(win);
 	}
 }
 
-// [=]===^=[ mkgui_color_dialog ]====================================[=]
-MKGUI_API uint32_t mkgui_color_dialog(struct mkgui_ctx *ctx, uint32_t initial_color, uint32_t *out_color) {
-	MKGUI_CHECK_VAL(ctx, 0);
+// [=]===^=[ mkgui_dialog_color ]====================================[=]
+MKGUI_API uint32_t mkgui_dialog_color(struct mkgui_window *win, uint32_t initial_color, uint32_t *out_color) {
+	MKGUI_CHECK_VAL(win, 0);
 
 	cp_rgb_to_hsv(initial_color, &cp_state.h, &cp_state.s, &cp_state.v);
 	cp_state.drag_target = 0;
@@ -559,11 +559,11 @@ MKGUI_API uint32_t mkgui_color_dialog(struct mkgui_ctx *ctx, uint32_t initial_co
 	};
 	uint32_t wcount = sizeof(widgets) / sizeof(widgets[0]);
 
-	struct mkgui_ctx *dlg = mkgui_create_child(ctx, widgets, wcount, "Color Picker", dw, dh);
+	struct mkgui_window *dlg = mkgui_window_create(win->ctx, win, widgets, wcount, "Color Picker", dw, dh);
 	if(!dlg) {
 		return 0;
 	}
-	mkgui_set_window_instance(dlg, "colorpicker");
+	mkgui_window_set_instance(dlg, "colorpicker");
 	dlg->render_cb = cp_render_cb;
 
 	mkgui_spinbox_setup(dlg, CP_R_SPN, 0, 255, 0, 1);
@@ -577,7 +577,7 @@ MKGUI_API uint32_t mkgui_color_dialog(struct mkgui_ctx *ctx, uint32_t initial_co
 	uint32_t was_press = 0;
 
 	while(running) {
-		while(mkgui_poll(dlg, &ev)) {
+		while(mkgui_window_poll(dlg, &ev)) {
 			switch(ev.type) {
 				case MKGUI_EVENT_CLOSE: {
 					running = 0;
@@ -629,13 +629,13 @@ MKGUI_API uint32_t mkgui_color_dialog(struct mkgui_ctx *ctx, uint32_t initial_co
 			cp_state.drag_target = 0;
 		}
 		was_press = (dlg->press_id != 0);
-		mkgui_wait(dlg);
+		mkgui_ctx_wait(dlg->ctx);
 	}
 
 	if(result && out_color) {
 		*out_color = cp_current_rgb() & 0x00ffffff;
 	}
 
-	mkgui_destroy_child(dlg);
+	mkgui_window_destroy(dlg);
 	return result;
 }

@@ -42,20 +42,20 @@ static uint32_t tests_failed;
 // Event injection helpers (same as test_events.c)
 // ---------------------------------------------------------------------------
 
-static void flush_x_events(struct mkgui_ctx *ctx) {
-	XSync(ctx->plat.dpy, True);
+static void flush_x_events(struct mkgui_window *win) {
+	XSync(win->plat.dpy, True);
 }
 
-static void run_layout(struct mkgui_ctx *ctx) {
-	dirty_all(ctx);
-	layout_widgets(ctx);
-	ctx->dirty = 0;
-	ctx->dirty_full = 0;
-	ctx->dirty_count = 0;
-	flush_x_events(ctx);
+static void run_layout(struct mkgui_window *win) {
+	dirty_all(win);
+	layout_widgets(win);
+	win->dirty = 0;
+	win->dirty_full = 0;
+	win->dirty_count = 0;
+	flush_x_events(win);
 }
 
-static void inject_press(struct mkgui_ctx *ctx, int32_t x, int32_t y, uint32_t button, uint32_t keymod) {
+static void inject_press(struct mkgui_window *win, int32_t x, int32_t y, uint32_t button, uint32_t keymod) {
 	struct mkgui_plat_event pev;
 	memset(&pev, 0, sizeof(pev));
 	pev.type = MKGUI_PLAT_BUTTON_PRESS;
@@ -64,10 +64,10 @@ static void inject_press(struct mkgui_ctx *ctx, int32_t x, int32_t y, uint32_t b
 	pev.button = button;
 	pev.keymod = keymod;
 	pev.popup_idx = -1;
-	platform_deferred_push(ctx, &pev);
+	platform_deferred_push(win, &pev);
 }
 
-static void inject_release(struct mkgui_ctx *ctx, int32_t x, int32_t y, uint32_t button) {
+static void inject_release(struct mkgui_window *win, int32_t x, int32_t y, uint32_t button) {
 	struct mkgui_plat_event pev;
 	memset(&pev, 0, sizeof(pev));
 	pev.type = MKGUI_PLAT_BUTTON_RELEASE;
@@ -75,10 +75,10 @@ static void inject_release(struct mkgui_ctx *ctx, int32_t x, int32_t y, uint32_t
 	pev.y = y;
 	pev.button = button;
 	pev.popup_idx = -1;
-	platform_deferred_push(ctx, &pev);
+	platform_deferred_push(win, &pev);
 }
 
-static void inject_key(struct mkgui_ctx *ctx, uint32_t keysym, uint32_t keymod) {
+static void inject_key(struct mkgui_window *win, uint32_t keysym, uint32_t keymod) {
 	struct mkgui_plat_event pev;
 	memset(&pev, 0, sizeof(pev));
 	pev.type = MKGUI_PLAT_KEY;
@@ -90,62 +90,62 @@ static void inject_key(struct mkgui_ctx *ctx, uint32_t keysym, uint32_t keymod) 
 		pev.text[1] = '\0';
 		pev.text_len = 1;
 	}
-	platform_deferred_push(ctx, &pev);
+	platform_deferred_push(win, &pev);
 }
 
-static void inject_motion(struct mkgui_ctx *ctx, int32_t x, int32_t y) {
+static void inject_motion(struct mkgui_window *win, int32_t x, int32_t y) {
 	struct mkgui_plat_event pev;
 	memset(&pev, 0, sizeof(pev));
 	pev.type = MKGUI_PLAT_MOTION;
 	pev.x = x;
 	pev.y = y;
 	pev.popup_idx = -1;
-	platform_deferred_push(ctx, &pev);
+	platform_deferred_push(win, &pev);
 }
 
-static void widget_center(struct mkgui_ctx *ctx, uint32_t id, int32_t *cx, int32_t *cy) {
-	int32_t idx = find_widget_idx(ctx, id);
+static void widget_center(struct mkgui_window *win, uint32_t id, int32_t *cx, int32_t *cy) {
+	int32_t idx = find_widget_idx(win, id);
 	if(idx < 0) {
 		*cx = 0;
 		*cy = 0;
 		return;
 	}
-	*cx = ctx->rects[idx].x + ctx->rects[idx].w / 2;
-	*cy = ctx->rects[idx].y + ctx->rects[idx].h / 2;
+	*cx = win->rects[idx].x + win->rects[idx].w / 2;
+	*cy = win->rects[idx].y + win->rects[idx].h / 2;
 }
 
-static void inject_click(struct mkgui_ctx *ctx, uint32_t id) {
+static void inject_click(struct mkgui_window *win, uint32_t id) {
 	int32_t cx, cy;
-	widget_center(ctx, id, &cx, &cy);
-	inject_motion(ctx, cx, cy);
-	inject_press(ctx, cx, cy, 1, 0);
-	inject_release(ctx, cx, cy, 1);
+	widget_center(win, id, &cx, &cy);
+	inject_motion(win, cx, cy);
+	inject_press(win, cx, cy, 1, 0);
+	inject_release(win, cx, cy, 1);
 }
 
-static void inject_click_at(struct mkgui_ctx *ctx, int32_t x, int32_t y) {
-	inject_motion(ctx, x, y);
-	inject_press(ctx, x, y, 1, 0);
-	inject_release(ctx, x, y, 1);
+static void inject_click_at(struct mkgui_window *win, int32_t x, int32_t y) {
+	inject_motion(win, x, y);
+	inject_press(win, x, y, 1, 0);
+	inject_release(win, x, y, 1);
 }
 
-static void inject_right_click_at(struct mkgui_ctx *ctx, int32_t x, int32_t y) {
-	inject_motion(ctx, x, y);
-	inject_press(ctx, x, y, 3, 0);
-	inject_release(ctx, x, y, 3);
+static void inject_right_click_at(struct mkgui_window *win, int32_t x, int32_t y) {
+	inject_motion(win, x, y);
+	inject_press(win, x, y, 3, 0);
+	inject_release(win, x, y, 3);
 }
 
-static uint32_t poll_for_event(struct mkgui_ctx *ctx, uint32_t event_type, uint32_t target_id) {
-	flush_x_events(ctx);
+static uint32_t poll_for_event(struct mkgui_window *win, uint32_t event_type, uint32_t target_id) {
+	flush_x_events(win);
 	uint32_t found = 0;
 	struct mkgui_event ev;
 	for(uint32_t i = 0; i < 50; ++i) {
-		uint32_t got = mkgui_poll(ctx, &ev);
+		uint32_t got = mkgui_window_poll(win, &ev);
 		if(got && ev.type == event_type && (target_id == 0 || ev.id == target_id)) {
 			found = 1;
 		}
 
-		if(!got && ctx->plat.deferred_head == ctx->plat.deferred_tail) {
-			mkgui_poll(ctx, &ev);
+		if(!got && win->plat.deferred_head == win->plat.deferred_tail) {
+			mkgui_window_poll(win, &ev);
 			if(ev.type == event_type && (target_id == 0 || ev.id == target_id)) {
 				found = 1;
 			}
@@ -155,11 +155,11 @@ static uint32_t poll_for_event(struct mkgui_ctx *ctx, uint32_t event_type, uint3
 	return found;
 }
 
-static void drain_events(struct mkgui_ctx *ctx) {
-	flush_x_events(ctx);
+static void drain_events(struct mkgui_window *win) {
+	flush_x_events(win);
 	struct mkgui_event ev;
 	for(uint32_t i = 0; i < 50; ++i) {
-		if(!mkgui_poll(ctx, &ev)) {
+		if(!mkgui_window_poll(win, &ev)) {
 			break;
 		}
 	}
@@ -208,18 +208,20 @@ static void test_listview_select(void) {
 		MKGUI_W(MKGUI_VBOX,     VBOX1, "",     "", WIN,   0,   0,   0, 0, 0),
 		MKGUI_W(MKGUI_LISTVIEW, LV,    "",     "", VBOX1, 0,   200, MKGUI_FIXED, 0, 0),
 	};
-	struct mkgui_ctx *ctx = mkgui_create(widgets, 3);
-	CHECK(ctx, "create failed");
-	if(ctx) {
+	struct mkgui_ctx *ctx = mkgui_ctx_create();
+	struct mkgui_window *win = mkgui_window_create(ctx, NULL, widgets, 3, NULL, 0, 0);
+	CHECK(win, "create failed");
+	if(win) {
 		struct mkgui_column cols[] = { { "Name", 200, MKGUI_CELL_TEXT }, { "Size", 100, MKGUI_CELL_TEXT } };
-		mkgui_listview_setup(ctx, LV, 10, 2, cols, dummy_row_cb, NULL);
-		run_layout(ctx);
-		int32_t idx = find_widget_idx(ctx, LV);
-		int32_t rx = ctx->rects[idx].x + 10;
-		int32_t ry = ctx->rects[idx].y + ctx->row_height + 5;
-		inject_click_at(ctx, rx, ry);
-		CHECK(poll_for_event(ctx, MKGUI_EVENT_LISTVIEW_SELECT, LV), "expected LISTVIEW_SELECT");
-		mkgui_destroy(ctx);
+		mkgui_listview_setup(win, LV, 10, 2, cols, dummy_row_cb, NULL);
+		run_layout(win);
+		int32_t idx = find_widget_idx(win, LV);
+		int32_t rx = win->rects[idx].x + 10;
+		int32_t ry = win->rects[idx].y + win->row_height + 5;
+		inject_click_at(win, rx, ry);
+		CHECK(poll_for_event(win, MKGUI_EVENT_LISTVIEW_SELECT, LV), "expected LISTVIEW_SELECT");
+		mkgui_window_destroy(win);
+		mkgui_ctx_destroy(ctx);
 	}
 	TEST_END();
 }
@@ -233,18 +235,20 @@ static void test_listview_sort(void) {
 		MKGUI_W(MKGUI_VBOX,     VBOX1, "",     "", WIN,   0,   0,   0, 0, 0),
 		MKGUI_W(MKGUI_LISTVIEW, LV,    "",     "", VBOX1, 0,   200, MKGUI_FIXED, 0, 0),
 	};
-	struct mkgui_ctx *ctx = mkgui_create(widgets, 3);
-	CHECK(ctx, "create failed");
-	if(ctx) {
+	struct mkgui_ctx *ctx = mkgui_ctx_create();
+	struct mkgui_window *win = mkgui_window_create(ctx, NULL, widgets, 3, NULL, 0, 0);
+	CHECK(win, "create failed");
+	if(win) {
 		struct mkgui_column cols[] = { { "Name", 200, MKGUI_CELL_TEXT }, { "Size", 100, MKGUI_CELL_TEXT } };
-		mkgui_listview_setup(ctx, LV, 10, 2, cols, dummy_row_cb, NULL);
-		run_layout(ctx);
-		int32_t idx = find_widget_idx(ctx, LV);
-		int32_t hx = ctx->rects[idx].x + 50;
-		int32_t hy = ctx->rects[idx].y + ctx->row_height / 2;
-		inject_click_at(ctx, hx, hy);
-		CHECK(poll_for_event(ctx, MKGUI_EVENT_LISTVIEW_SORT, LV), "expected LISTVIEW_SORT");
-		mkgui_destroy(ctx);
+		mkgui_listview_setup(win, LV, 10, 2, cols, dummy_row_cb, NULL);
+		run_layout(win);
+		int32_t idx = find_widget_idx(win, LV);
+		int32_t hx = win->rects[idx].x + 50;
+		int32_t hy = win->rects[idx].y + win->row_height / 2;
+		inject_click_at(win, hx, hy);
+		CHECK(poll_for_event(win, MKGUI_EVENT_LISTVIEW_SORT, LV), "expected LISTVIEW_SORT");
+		mkgui_window_destroy(win);
+		mkgui_ctx_destroy(ctx);
 	}
 	TEST_END();
 }
@@ -258,20 +262,22 @@ static void test_listview_dblclick(void) {
 		MKGUI_W(MKGUI_VBOX,     VBOX1, "",     "", WIN,   0,   0,   0, 0, 0),
 		MKGUI_W(MKGUI_LISTVIEW, LV,    "",     "", VBOX1, 0,   200, MKGUI_FIXED, 0, 0),
 	};
-	struct mkgui_ctx *ctx = mkgui_create(widgets, 3);
-	CHECK(ctx, "create failed");
-	if(ctx) {
+	struct mkgui_ctx *ctx = mkgui_ctx_create();
+	struct mkgui_window *win = mkgui_window_create(ctx, NULL, widgets, 3, NULL, 0, 0);
+	CHECK(win, "create failed");
+	if(win) {
 		struct mkgui_column cols[] = { { "Name", 200, MKGUI_CELL_TEXT } };
-		mkgui_listview_setup(ctx, LV, 10, 1, cols, dummy_row_cb, NULL);
-		run_layout(ctx);
-		int32_t idx = find_widget_idx(ctx, LV);
-		int32_t rx = ctx->rects[idx].x + 10;
-		int32_t ry = ctx->rects[idx].y + ctx->row_height + 5;
-		inject_click_at(ctx, rx, ry);
-		drain_events(ctx);
-		inject_click_at(ctx, rx, ry);
-		CHECK(poll_for_event(ctx, MKGUI_EVENT_LISTVIEW_DBLCLICK, LV), "expected LISTVIEW_DBLCLICK");
-		mkgui_destroy(ctx);
+		mkgui_listview_setup(win, LV, 10, 1, cols, dummy_row_cb, NULL);
+		run_layout(win);
+		int32_t idx = find_widget_idx(win, LV);
+		int32_t rx = win->rects[idx].x + 10;
+		int32_t ry = win->rects[idx].y + win->row_height + 5;
+		inject_click_at(win, rx, ry);
+		drain_events(win);
+		inject_click_at(win, rx, ry);
+		CHECK(poll_for_event(win, MKGUI_EVENT_LISTVIEW_DBLCLICK, LV), "expected LISTVIEW_DBLCLICK");
+		mkgui_window_destroy(win);
+		mkgui_ctx_destroy(ctx);
 	}
 	TEST_END();
 }
@@ -285,18 +291,20 @@ static void test_listview_context_header(void) {
 		MKGUI_W(MKGUI_VBOX,     VBOX1, "",     "", WIN,   0,   0,   0, 0, 0),
 		MKGUI_W(MKGUI_LISTVIEW, LV,    "",     "", VBOX1, 0,   200, MKGUI_FIXED, 0, 0),
 	};
-	struct mkgui_ctx *ctx = mkgui_create(widgets, 3);
-	CHECK(ctx, "create failed");
-	if(ctx) {
+	struct mkgui_ctx *ctx = mkgui_ctx_create();
+	struct mkgui_window *win = mkgui_window_create(ctx, NULL, widgets, 3, NULL, 0, 0);
+	CHECK(win, "create failed");
+	if(win) {
 		struct mkgui_column cols[] = { { "Name", 200, MKGUI_CELL_TEXT } };
-		mkgui_listview_setup(ctx, LV, 10, 1, cols, dummy_row_cb, NULL);
-		run_layout(ctx);
-		int32_t idx = find_widget_idx(ctx, LV);
-		int32_t hx = ctx->rects[idx].x + 50;
-		int32_t hy = ctx->rects[idx].y + ctx->row_height / 2;
-		inject_right_click_at(ctx, hx, hy);
-		CHECK(poll_for_event(ctx, MKGUI_EVENT_CONTEXT_HEADER, LV), "expected CONTEXT_HEADER");
-		mkgui_destroy(ctx);
+		mkgui_listview_setup(win, LV, 10, 1, cols, dummy_row_cb, NULL);
+		run_layout(win);
+		int32_t idx = find_widget_idx(win, LV);
+		int32_t hx = win->rects[idx].x + 50;
+		int32_t hy = win->rects[idx].y + win->row_height / 2;
+		inject_right_click_at(win, hx, hy);
+		CHECK(poll_for_event(win, MKGUI_EVENT_CONTEXT_HEADER, LV), "expected CONTEXT_HEADER");
+		mkgui_window_destroy(win);
+		mkgui_ctx_destroy(ctx);
 	}
 	TEST_END();
 }
@@ -314,19 +322,21 @@ static void test_treeview_select(void) {
 		MKGUI_W(MKGUI_VBOX,     VBOX1, "",     "", WIN,   0,   0,   0, 0, 0),
 		MKGUI_W(MKGUI_TREEVIEW, TV,    "",     "", VBOX1, 0,   200, MKGUI_FIXED, 0, 0),
 	};
-	struct mkgui_ctx *ctx = mkgui_create(widgets, 3);
-	CHECK(ctx, "create failed");
-	if(ctx) {
-		mkgui_treeview_setup(ctx, TV);
-		mkgui_treeview_add(ctx, TV, 100, 0, "Root");
-		mkgui_treeview_add(ctx, TV, 101, 100, "Child");
-		run_layout(ctx);
-		int32_t idx = find_widget_idx(ctx, TV);
-		int32_t rx = ctx->rects[idx].x + 40;
-		int32_t ry = ctx->rects[idx].y + 5;
-		inject_click_at(ctx, rx, ry);
-		CHECK(poll_for_event(ctx, MKGUI_EVENT_TREEVIEW_SELECT, TV), "expected TREEVIEW_SELECT");
-		mkgui_destroy(ctx);
+	struct mkgui_ctx *ctx = mkgui_ctx_create();
+	struct mkgui_window *win = mkgui_window_create(ctx, NULL, widgets, 3, NULL, 0, 0);
+	CHECK(win, "create failed");
+	if(win) {
+		mkgui_treeview_setup(win, TV);
+		mkgui_treeview_add(win, TV, 100, 0, "Root");
+		mkgui_treeview_add(win, TV, 101, 100, "Child");
+		run_layout(win);
+		int32_t idx = find_widget_idx(win, TV);
+		int32_t rx = win->rects[idx].x + 40;
+		int32_t ry = win->rects[idx].y + 5;
+		inject_click_at(win, rx, ry);
+		CHECK(poll_for_event(win, MKGUI_EVENT_TREEVIEW_SELECT, TV), "expected TREEVIEW_SELECT");
+		mkgui_window_destroy(win);
+		mkgui_ctx_destroy(ctx);
 	}
 	TEST_END();
 }
@@ -340,21 +350,23 @@ static void test_treeview_expand(void) {
 		MKGUI_W(MKGUI_VBOX,     VBOX1, "",     "", WIN,   0,   0,   0, 0, 0),
 		MKGUI_W(MKGUI_TREEVIEW, TV,    "",     "", VBOX1, 0,   200, MKGUI_FIXED, 0, 0),
 	};
-	struct mkgui_ctx *ctx = mkgui_create(widgets, 3);
-	CHECK(ctx, "create failed");
-	if(ctx) {
-		mkgui_treeview_setup(ctx, TV);
-		mkgui_treeview_add(ctx, TV, 100, 0, "Root");
-		mkgui_treeview_add(ctx, TV, 101, 100, "Child");
-		run_layout(ctx);
-		ctx->focus_id = TV;
-		struct mkgui_treeview_data *tv = find_treeview_data(ctx, TV);
+	struct mkgui_ctx *ctx = mkgui_ctx_create();
+	struct mkgui_window *win = mkgui_window_create(ctx, NULL, widgets, 3, NULL, 0, 0);
+	CHECK(win, "create failed");
+	if(win) {
+		mkgui_treeview_setup(win, TV);
+		mkgui_treeview_add(win, TV, 100, 0, "Root");
+		mkgui_treeview_add(win, TV, 101, 100, "Child");
+		run_layout(win);
+		win->focus_id = TV;
+		struct mkgui_treeview_data *tv = find_treeview_data(win, TV);
 		if(tv) {
 			tv->selected_node = 100;
 		}
-		inject_key(ctx, MKGUI_KEY_RIGHT, 0);
-		CHECK(poll_for_event(ctx, MKGUI_EVENT_TREEVIEW_EXPAND, TV), "expected TREEVIEW_EXPAND");
-		mkgui_destroy(ctx);
+		inject_key(win, MKGUI_KEY_RIGHT, 0);
+		CHECK(poll_for_event(win, MKGUI_EVENT_TREEVIEW_EXPAND, TV), "expected TREEVIEW_EXPAND");
+		mkgui_window_destroy(win);
+		mkgui_ctx_destroy(ctx);
 	}
 	TEST_END();
 }
@@ -368,23 +380,25 @@ static void test_treeview_collapse(void) {
 		MKGUI_W(MKGUI_VBOX,     VBOX1, "",     "", WIN,   0,   0,   0, 0, 0),
 		MKGUI_W(MKGUI_TREEVIEW, TV,    "",     "", VBOX1, 0,   200, MKGUI_FIXED, 0, 0),
 	};
-	struct mkgui_ctx *ctx = mkgui_create(widgets, 3);
-	CHECK(ctx, "create failed");
-	if(ctx) {
-		mkgui_treeview_setup(ctx, TV);
-		mkgui_treeview_add(ctx, TV, 100, 0, "Root");
-		mkgui_treeview_add(ctx, TV, 101, 100, "Child");
-		run_layout(ctx);
-		ctx->focus_id = TV;
-		struct mkgui_treeview_data *tv = find_treeview_data(ctx, TV);
+	struct mkgui_ctx *ctx = mkgui_ctx_create();
+	struct mkgui_window *win = mkgui_window_create(ctx, NULL, widgets, 3, NULL, 0, 0);
+	CHECK(win, "create failed");
+	if(win) {
+		mkgui_treeview_setup(win, TV);
+		mkgui_treeview_add(win, TV, 100, 0, "Root");
+		mkgui_treeview_add(win, TV, 101, 100, "Child");
+		run_layout(win);
+		win->focus_id = TV;
+		struct mkgui_treeview_data *tv = find_treeview_data(win, TV);
 		if(tv) {
 			tv->selected_node = 100;
 		}
-		inject_key(ctx, MKGUI_KEY_RIGHT, 0);
-		drain_events(ctx);
-		inject_key(ctx, MKGUI_KEY_LEFT, 0);
-		CHECK(poll_for_event(ctx, MKGUI_EVENT_TREEVIEW_COLLAPSE, TV), "expected TREEVIEW_COLLAPSE");
-		mkgui_destroy(ctx);
+		inject_key(win, MKGUI_KEY_RIGHT, 0);
+		drain_events(win);
+		inject_key(win, MKGUI_KEY_LEFT, 0);
+		CHECK(poll_for_event(win, MKGUI_EVENT_TREEVIEW_COLLAPSE, TV), "expected TREEVIEW_COLLAPSE");
+		mkgui_window_destroy(win);
+		mkgui_ctx_destroy(ctx);
 	}
 	TEST_END();
 }
@@ -398,20 +412,22 @@ static void test_treeview_dblclick(void) {
 		MKGUI_W(MKGUI_VBOX,     VBOX1, "",     "", WIN,   0,   0,   0, 0, 0),
 		MKGUI_W(MKGUI_TREEVIEW, TV,    "",     "", VBOX1, 0,   200, MKGUI_FIXED, 0, 0),
 	};
-	struct mkgui_ctx *ctx = mkgui_create(widgets, 3);
-	CHECK(ctx, "create failed");
-	if(ctx) {
-		mkgui_treeview_setup(ctx, TV);
-		mkgui_treeview_add(ctx, TV, 100, 0, "Root");
-		run_layout(ctx);
-		int32_t idx = find_widget_idx(ctx, TV);
-		int32_t rx = ctx->rects[idx].x + 40;
-		int32_t ry = ctx->rects[idx].y + 5;
-		inject_click_at(ctx, rx, ry);
-		drain_events(ctx);
-		inject_click_at(ctx, rx, ry);
-		CHECK(poll_for_event(ctx, MKGUI_EVENT_TREEVIEW_DBLCLICK, TV), "expected TREEVIEW_DBLCLICK");
-		mkgui_destroy(ctx);
+	struct mkgui_ctx *ctx = mkgui_ctx_create();
+	struct mkgui_window *win = mkgui_window_create(ctx, NULL, widgets, 3, NULL, 0, 0);
+	CHECK(win, "create failed");
+	if(win) {
+		mkgui_treeview_setup(win, TV);
+		mkgui_treeview_add(win, TV, 100, 0, "Root");
+		run_layout(win);
+		int32_t idx = find_widget_idx(win, TV);
+		int32_t rx = win->rects[idx].x + 40;
+		int32_t ry = win->rects[idx].y + 5;
+		inject_click_at(win, rx, ry);
+		drain_events(win);
+		inject_click_at(win, rx, ry);
+		CHECK(poll_for_event(win, MKGUI_EVENT_TREEVIEW_DBLCLICK, TV), "expected TREEVIEW_DBLCLICK");
+		mkgui_window_destroy(win);
+		mkgui_ctx_destroy(ctx);
 	}
 	TEST_END();
 }
@@ -429,18 +445,20 @@ static void test_gridview_select(void) {
 		MKGUI_W(MKGUI_VBOX,     VBOX1, "",     "", WIN,   0,   0,   0, 0, 0),
 		MKGUI_W(MKGUI_GRIDVIEW, GV,    "",     "", VBOX1, 0,   200, MKGUI_FIXED, 0, 0),
 	};
-	struct mkgui_ctx *ctx = mkgui_create(widgets, 3);
-	CHECK(ctx, "create failed");
-	if(ctx) {
+	struct mkgui_ctx *ctx = mkgui_ctx_create();
+	struct mkgui_window *win = mkgui_window_create(ctx, NULL, widgets, 3, NULL, 0, 0);
+	CHECK(win, "create failed");
+	if(win) {
 		struct mkgui_grid_column cols[] = { { "Name", 200, MKGUI_GRID_TEXT }, { "Check", 60, MKGUI_GRID_CHECK } };
-		mkgui_gridview_setup(ctx, GV, 10, 2, cols, dummy_grid_cell_cb, NULL);
-		run_layout(ctx);
-		int32_t idx = find_widget_idx(ctx, GV);
-		int32_t rx = ctx->rects[idx].x + 10;
-		int32_t ry = ctx->rects[idx].y + ctx->row_height + 5;
-		inject_click_at(ctx, rx, ry);
-		CHECK(poll_for_event(ctx, MKGUI_EVENT_GRID_CLICK, GV), "expected GRID_CLICK");
-		mkgui_destroy(ctx);
+		mkgui_gridview_setup(win, GV, 10, 2, cols, dummy_grid_cell_cb, NULL);
+		run_layout(win);
+		int32_t idx = find_widget_idx(win, GV);
+		int32_t rx = win->rects[idx].x + 10;
+		int32_t ry = win->rects[idx].y + win->row_height + 5;
+		inject_click_at(win, rx, ry);
+		CHECK(poll_for_event(win, MKGUI_EVENT_GRID_CLICK, GV), "expected GRID_CLICK");
+		mkgui_window_destroy(win);
+		mkgui_ctx_destroy(ctx);
 	}
 	TEST_END();
 }
@@ -458,17 +476,19 @@ static void test_richlist_select(void) {
 		MKGUI_W(MKGUI_VBOX,     VBOX1, "",     "", WIN,   0,   0,   0, 0, 0),
 		MKGUI_W(MKGUI_RICHLIST, RL,    "",     "", VBOX1, 0,   200, MKGUI_FIXED, 0, 0),
 	};
-	struct mkgui_ctx *ctx = mkgui_create(widgets, 3);
-	CHECK(ctx, "create failed");
-	if(ctx) {
-		mkgui_richlist_setup(ctx, RL, 10, 56, dummy_richlist_cb, NULL);
-		run_layout(ctx);
-		int32_t idx = find_widget_idx(ctx, RL);
-		int32_t rx = ctx->rects[idx].x + 20;
-		int32_t ry = ctx->rects[idx].y + 10;
-		inject_click_at(ctx, rx, ry);
-		CHECK(poll_for_event(ctx, MKGUI_EVENT_RICHLIST_SELECT, RL), "expected RICHLIST_SELECT");
-		mkgui_destroy(ctx);
+	struct mkgui_ctx *ctx = mkgui_ctx_create();
+	struct mkgui_window *win = mkgui_window_create(ctx, NULL, widgets, 3, NULL, 0, 0);
+	CHECK(win, "create failed");
+	if(win) {
+		mkgui_richlist_setup(win, RL, 10, 56, dummy_richlist_cb, NULL);
+		run_layout(win);
+		int32_t idx = find_widget_idx(win, RL);
+		int32_t rx = win->rects[idx].x + 20;
+		int32_t ry = win->rects[idx].y + 10;
+		inject_click_at(win, rx, ry);
+		CHECK(poll_for_event(win, MKGUI_EVENT_RICHLIST_SELECT, RL), "expected RICHLIST_SELECT");
+		mkgui_window_destroy(win);
+		mkgui_ctx_destroy(ctx);
 	}
 	TEST_END();
 }
@@ -482,19 +502,21 @@ static void test_richlist_dblclick(void) {
 		MKGUI_W(MKGUI_VBOX,     VBOX1, "",     "", WIN,   0,   0,   0, 0, 0),
 		MKGUI_W(MKGUI_RICHLIST, RL,    "",     "", VBOX1, 0,   200, MKGUI_FIXED, 0, 0),
 	};
-	struct mkgui_ctx *ctx = mkgui_create(widgets, 3);
-	CHECK(ctx, "create failed");
-	if(ctx) {
-		mkgui_richlist_setup(ctx, RL, 10, 56, dummy_richlist_cb, NULL);
-		run_layout(ctx);
-		int32_t idx = find_widget_idx(ctx, RL);
-		int32_t rx = ctx->rects[idx].x + 20;
-		int32_t ry = ctx->rects[idx].y + 10;
-		inject_click_at(ctx, rx, ry);
-		drain_events(ctx);
-		inject_click_at(ctx, rx, ry);
-		CHECK(poll_for_event(ctx, MKGUI_EVENT_RICHLIST_DBLCLICK, RL), "expected RICHLIST_DBLCLICK");
-		mkgui_destroy(ctx);
+	struct mkgui_ctx *ctx = mkgui_ctx_create();
+	struct mkgui_window *win = mkgui_window_create(ctx, NULL, widgets, 3, NULL, 0, 0);
+	CHECK(win, "create failed");
+	if(win) {
+		mkgui_richlist_setup(win, RL, 10, 56, dummy_richlist_cb, NULL);
+		run_layout(win);
+		int32_t idx = find_widget_idx(win, RL);
+		int32_t rx = win->rects[idx].x + 20;
+		int32_t ry = win->rects[idx].y + 10;
+		inject_click_at(win, rx, ry);
+		drain_events(win);
+		inject_click_at(win, rx, ry);
+		CHECK(poll_for_event(win, MKGUI_EVENT_RICHLIST_DBLCLICK, RL), "expected RICHLIST_DBLCLICK");
+		mkgui_window_destroy(win);
+		mkgui_ctx_destroy(ctx);
 	}
 	TEST_END();
 }
@@ -512,17 +534,19 @@ static void test_itemview_select(void) {
 		MKGUI_W(MKGUI_VBOX,     VBOX1, "",     "", WIN,   0,   0,   0, 0, 0),
 		MKGUI_W(MKGUI_ITEMVIEW, IV,    "",     "", VBOX1, 0,   200, MKGUI_FIXED, 0, 0),
 	};
-	struct mkgui_ctx *ctx = mkgui_create(widgets, 3);
-	CHECK(ctx, "create failed");
-	if(ctx) {
-		mkgui_itemview_setup(ctx, IV, 10, MKGUI_VIEW_ICON, dummy_label_cb, dummy_icon_cb, NULL);
-		run_layout(ctx);
-		int32_t idx = find_widget_idx(ctx, IV);
-		int32_t rx = ctx->rects[idx].x + 30;
-		int32_t ry = ctx->rects[idx].y + 30;
-		inject_click_at(ctx, rx, ry);
-		CHECK(poll_for_event(ctx, MKGUI_EVENT_ITEMVIEW_SELECT, IV), "expected ITEMVIEW_SELECT");
-		mkgui_destroy(ctx);
+	struct mkgui_ctx *ctx = mkgui_ctx_create();
+	struct mkgui_window *win = mkgui_window_create(ctx, NULL, widgets, 3, NULL, 0, 0);
+	CHECK(win, "create failed");
+	if(win) {
+		mkgui_itemview_setup(win, IV, 10, MKGUI_VIEW_ICON, dummy_label_cb, dummy_icon_cb, NULL);
+		run_layout(win);
+		int32_t idx = find_widget_idx(win, IV);
+		int32_t rx = win->rects[idx].x + 30;
+		int32_t ry = win->rects[idx].y + 30;
+		inject_click_at(win, rx, ry);
+		CHECK(poll_for_event(win, MKGUI_EVENT_ITEMVIEW_SELECT, IV), "expected ITEMVIEW_SELECT");
+		mkgui_window_destroy(win);
+		mkgui_ctx_destroy(ctx);
 	}
 	TEST_END();
 }
@@ -536,19 +560,21 @@ static void test_itemview_dblclick(void) {
 		MKGUI_W(MKGUI_VBOX,     VBOX1, "",     "", WIN,   0,   0,   0, 0, 0),
 		MKGUI_W(MKGUI_ITEMVIEW, IV,    "",     "", VBOX1, 0,   200, MKGUI_FIXED, 0, 0),
 	};
-	struct mkgui_ctx *ctx = mkgui_create(widgets, 3);
-	CHECK(ctx, "create failed");
-	if(ctx) {
-		mkgui_itemview_setup(ctx, IV, 10, MKGUI_VIEW_ICON, dummy_label_cb, dummy_icon_cb, NULL);
-		run_layout(ctx);
-		int32_t idx = find_widget_idx(ctx, IV);
-		int32_t rx = ctx->rects[idx].x + 30;
-		int32_t ry = ctx->rects[idx].y + 30;
-		inject_click_at(ctx, rx, ry);
-		drain_events(ctx);
-		inject_click_at(ctx, rx, ry);
-		CHECK(poll_for_event(ctx, MKGUI_EVENT_ITEMVIEW_DBLCLICK, IV), "expected ITEMVIEW_DBLCLICK");
-		mkgui_destroy(ctx);
+	struct mkgui_ctx *ctx = mkgui_ctx_create();
+	struct mkgui_window *win = mkgui_window_create(ctx, NULL, widgets, 3, NULL, 0, 0);
+	CHECK(win, "create failed");
+	if(win) {
+		mkgui_itemview_setup(win, IV, 10, MKGUI_VIEW_ICON, dummy_label_cb, dummy_icon_cb, NULL);
+		run_layout(win);
+		int32_t idx = find_widget_idx(win, IV);
+		int32_t rx = win->rects[idx].x + 30;
+		int32_t ry = win->rects[idx].y + 30;
+		inject_click_at(win, rx, ry);
+		drain_events(win);
+		inject_click_at(win, rx, ry);
+		CHECK(poll_for_event(win, MKGUI_EVENT_ITEMVIEW_DBLCLICK, IV), "expected ITEMVIEW_DBLCLICK");
+		mkgui_window_destroy(win);
+		mkgui_ctx_destroy(ctx);
 	}
 	TEST_END();
 }
@@ -566,21 +592,23 @@ static void test_slider_start_end(void) {
 		MKGUI_W(MKGUI_VBOX,   VBOX1, "",     "", WIN,   0,   0,   0, 0, 0),
 		MKGUI_W(MKGUI_SLIDER, SL,    "",     "", VBOX1, 0,   0,   0, 0, 0),
 	};
-	struct mkgui_ctx *ctx = mkgui_create(widgets, 3);
-	CHECK(ctx, "create failed");
-	if(ctx) {
-		run_layout(ctx);
-		mkgui_slider_setup(ctx, SL, 0, 100, 50);
+	struct mkgui_ctx *ctx = mkgui_ctx_create();
+	struct mkgui_window *win = mkgui_window_create(ctx, NULL, widgets, 3, NULL, 0, 0);
+	CHECK(win, "create failed");
+	if(win) {
+		run_layout(win);
+		mkgui_slider_setup(win, SL, 0, 100, 50);
 		int32_t cx, cy;
-		widget_center(ctx, SL, &cx, &cy);
-		inject_motion(ctx, cx, cy);
-		inject_press(ctx, cx, cy, 1, 0);
-		uint32_t got_start = poll_for_event(ctx, MKGUI_EVENT_SLIDER_START, SL);
-		inject_release(ctx, cx, cy, 1);
-		uint32_t got_end = poll_for_event(ctx, MKGUI_EVENT_SLIDER_END, SL);
+		widget_center(win, SL, &cx, &cy);
+		inject_motion(win, cx, cy);
+		inject_press(win, cx, cy, 1, 0);
+		uint32_t got_start = poll_for_event(win, MKGUI_EVENT_SLIDER_START, SL);
+		inject_release(win, cx, cy, 1);
+		uint32_t got_end = poll_for_event(win, MKGUI_EVENT_SLIDER_END, SL);
 		CHECK(got_start, "expected SLIDER_START on press");
 		CHECK(got_end, "expected SLIDER_END on release");
-		mkgui_destroy(ctx);
+		mkgui_window_destroy(win);
+		mkgui_ctx_destroy(ctx);
 	}
 	TEST_END();
 }
@@ -601,16 +629,18 @@ static void test_tab_close(void) {
 		MKGUI_W(MKGUI_LABEL,  LBL_A,  "A",    "", TAB_A, 0,   0,   0, 0, 0),
 		MKGUI_W(MKGUI_LABEL,  LBL_B,  "B",    "", TAB_B, 0,   0,   0, 0, 0),
 	};
-	struct mkgui_ctx *ctx = mkgui_create(widgets, 6);
-	CHECK(ctx, "create failed");
-	if(ctx) {
-		run_layout(ctx);
-		int32_t idx = find_widget_idx(ctx, TABS1);
-		int32_t hx = ctx->rects[idx].x + text_width(ctx, "A") + 20;
-		int32_t hy = ctx->rects[idx].y + ctx->tab_height / 2;
-		inject_click_at(ctx, hx, hy);
-		CHECK(poll_for_event(ctx, MKGUI_EVENT_TAB_CLOSE, TABS1) || poll_for_event(ctx, MKGUI_EVENT_TAB_CHANGED, TABS1), "expected TAB_CLOSE or TAB_CHANGED");
-		mkgui_destroy(ctx);
+	struct mkgui_ctx *ctx = mkgui_ctx_create();
+	struct mkgui_window *win = mkgui_window_create(ctx, NULL, widgets, 6, NULL, 0, 0);
+	CHECK(win, "create failed");
+	if(win) {
+		run_layout(win);
+		int32_t idx = find_widget_idx(win, TABS1);
+		int32_t hx = win->rects[idx].x + text_width(win, "A") + 20;
+		int32_t hy = win->rects[idx].y + win->tab_height / 2;
+		inject_click_at(win, hx, hy);
+		CHECK(poll_for_event(win, MKGUI_EVENT_TAB_CLOSE, TABS1) || poll_for_event(win, MKGUI_EVENT_TAB_CHANGED, TABS1), "expected TAB_CLOSE or TAB_CHANGED");
+		mkgui_window_destroy(win);
+		mkgui_ctx_destroy(ctx);
 	}
 	TEST_END();
 }
@@ -628,17 +658,19 @@ static void test_pathbar_nav(void) {
 		MKGUI_W(MKGUI_VBOX,    VBOX1, "",     "", WIN,   0,   0,   0, 0, 0),
 		MKGUI_W(MKGUI_PATHBAR, PB,    "",     "", VBOX1, 0,   0,   0, 0, 0),
 	};
-	struct mkgui_ctx *ctx = mkgui_create(widgets, 3);
-	CHECK(ctx, "create failed");
-	if(ctx) {
-		mkgui_pathbar_set(ctx, PB, "/home/user/docs");
-		run_layout(ctx);
-		int32_t idx = find_widget_idx(ctx, PB);
-		int32_t px = ctx->rects[idx].x + 10;
-		int32_t py = ctx->rects[idx].y + ctx->rects[idx].h / 2;
-		inject_click_at(ctx, px, py);
-		CHECK(poll_for_event(ctx, MKGUI_EVENT_PATHBAR_NAV, PB), "expected PATHBAR_NAV");
-		mkgui_destroy(ctx);
+	struct mkgui_ctx *ctx = mkgui_ctx_create();
+	struct mkgui_window *win = mkgui_window_create(ctx, NULL, widgets, 3, NULL, 0, 0);
+	CHECK(win, "create failed");
+	if(win) {
+		mkgui_pathbar_set(win, PB, "/home/user/docs");
+		run_layout(win);
+		int32_t idx = find_widget_idx(win, PB);
+		int32_t px = win->rects[idx].x + 10;
+		int32_t py = win->rects[idx].y + win->rects[idx].h / 2;
+		inject_click_at(win, px, py);
+		CHECK(poll_for_event(win, MKGUI_EVENT_PATHBAR_NAV, PB), "expected PATHBAR_NAV");
+		mkgui_window_destroy(win);
+		mkgui_ctx_destroy(ctx);
 	}
 	TEST_END();
 }
@@ -652,21 +684,23 @@ static void test_pathbar_submit(void) {
 		MKGUI_W(MKGUI_VBOX,    VBOX1, "",     "", WIN,   0,   0,   0, 0, 0),
 		MKGUI_W(MKGUI_PATHBAR, PB,    "",     "", VBOX1, 0,   0,   0, 0, 0),
 	};
-	struct mkgui_ctx *ctx = mkgui_create(widgets, 3);
-	CHECK(ctx, "create failed");
-	if(ctx) {
-		mkgui_pathbar_set(ctx, PB, "/home");
-		run_layout(ctx);
-		ctx->focus_id = PB;
-		struct mkgui_pathbar_data *pb = find_pathbar_data(ctx, PB);
+	struct mkgui_ctx *ctx = mkgui_ctx_create();
+	struct mkgui_window *win = mkgui_window_create(ctx, NULL, widgets, 3, NULL, 0, 0);
+	CHECK(win, "create failed");
+	if(win) {
+		mkgui_pathbar_set(win, PB, "/home");
+		run_layout(win);
+		win->focus_id = PB;
+		struct mkgui_pathbar_data *pb = find_pathbar_data(win, PB);
 		if(pb) {
 			pb->editing = 1;
 			snprintf(pb->edit_buf, sizeof(pb->edit_buf), "/tmp");
 			pb->edit_cursor = 4;
 		}
-		inject_key(ctx, MKGUI_KEY_RETURN, 0);
-		CHECK(poll_for_event(ctx, MKGUI_EVENT_PATHBAR_SUBMIT, PB), "expected PATHBAR_SUBMIT");
-		mkgui_destroy(ctx);
+		inject_key(win, MKGUI_KEY_RETURN, 0);
+		CHECK(poll_for_event(win, MKGUI_EVENT_PATHBAR_SUBMIT, PB), "expected PATHBAR_SUBMIT");
+		mkgui_window_destroy(win);
+		mkgui_ctx_destroy(ctx);
 	}
 	TEST_END();
 }
@@ -684,16 +718,18 @@ static void test_ipinput_changed(void) {
 		MKGUI_W(MKGUI_VBOX,    VBOX1, "",     "", WIN,   0,   0,   0, 0, 0),
 		MKGUI_W(MKGUI_IPINPUT, IP,    "",     "", VBOX1, 0,   0,   0, 0, 0),
 	};
-	struct mkgui_ctx *ctx = mkgui_create(widgets, 3);
-	CHECK(ctx, "create failed");
-	if(ctx) {
-		run_layout(ctx);
-		ctx->focus_id = IP;
-		inject_key(ctx, '1', 0);
-		drain_events(ctx);
-		inject_key(ctx, '.', 0);
-		CHECK(poll_for_event(ctx, MKGUI_EVENT_IPINPUT_CHANGED, IP), "expected IPINPUT_CHANGED");
-		mkgui_destroy(ctx);
+	struct mkgui_ctx *ctx = mkgui_ctx_create();
+	struct mkgui_window *win = mkgui_window_create(ctx, NULL, widgets, 3, NULL, 0, 0);
+	CHECK(win, "create failed");
+	if(win) {
+		run_layout(win);
+		win->focus_id = IP;
+		inject_key(win, '1', 0);
+		drain_events(win);
+		inject_key(win, '.', 0);
+		CHECK(poll_for_event(win, MKGUI_EVENT_IPINPUT_CHANGED, IP), "expected IPINPUT_CHANGED");
+		mkgui_window_destroy(win);
+		mkgui_ctx_destroy(ctx);
 	}
 	TEST_END();
 }
@@ -711,17 +747,19 @@ static void test_combobox_changed(void) {
 		MKGUI_W(MKGUI_VBOX,     VBOX1, "",     "", WIN,   0,   0,   0, 0, 0),
 		MKGUI_W(MKGUI_COMBOBOX, CB,    "",     "", VBOX1, 0,   0,   0, 0, 0),
 	};
-	struct mkgui_ctx *ctx = mkgui_create(widgets, 3);
-	CHECK(ctx, "create failed");
-	if(ctx) {
+	struct mkgui_ctx *ctx = mkgui_ctx_create();
+	struct mkgui_window *win = mkgui_window_create(ctx, NULL, widgets, 3, NULL, 0, 0);
+	CHECK(win, "create failed");
+	if(win) {
 		const char *items[] = { "Alpha", "Beta", "Gamma" };
-		mkgui_combobox_setup(ctx, CB, items, 3);
-		run_layout(ctx);
-		inject_click(ctx, CB);
-		drain_events(ctx);
-		inject_key(ctx, 'b', 0);
-		CHECK(poll_for_event(ctx, MKGUI_EVENT_COMBOBOX_CHANGED, CB), "expected COMBOBOX_CHANGED");
-		mkgui_destroy(ctx);
+		mkgui_combobox_setup(win, CB, items, 3);
+		run_layout(win);
+		inject_click(win, CB);
+		drain_events(win);
+		inject_key(win, 'b', 0);
+		CHECK(poll_for_event(win, MKGUI_EVENT_COMBOBOX_CHANGED, CB), "expected COMBOBOX_CHANGED");
+		mkgui_window_destroy(win);
+		mkgui_ctx_destroy(ctx);
 	}
 	TEST_END();
 }
@@ -735,17 +773,19 @@ static void test_combobox_submit(void) {
 		MKGUI_W(MKGUI_VBOX,     VBOX1, "",     "", WIN,   0,   0,   0, 0, 0),
 		MKGUI_W(MKGUI_COMBOBOX, CB,    "",     "", VBOX1, 0,   0,   0, 0, 0),
 	};
-	struct mkgui_ctx *ctx = mkgui_create(widgets, 3);
-	CHECK(ctx, "create failed");
-	if(ctx) {
+	struct mkgui_ctx *ctx = mkgui_ctx_create();
+	struct mkgui_window *win = mkgui_window_create(ctx, NULL, widgets, 3, NULL, 0, 0);
+	CHECK(win, "create failed");
+	if(win) {
 		const char *items[] = { "Alpha", "Beta" };
-		mkgui_combobox_setup(ctx, CB, items, 2);
-		run_layout(ctx);
-		inject_click(ctx, CB);
-		drain_events(ctx);
-		inject_key(ctx, MKGUI_KEY_RETURN, 0);
-		CHECK(poll_for_event(ctx, MKGUI_EVENT_COMBOBOX_SUBMIT, CB), "expected COMBOBOX_SUBMIT");
-		mkgui_destroy(ctx);
+		mkgui_combobox_setup(win, CB, items, 2);
+		run_layout(win);
+		inject_click(win, CB);
+		drain_events(win);
+		inject_key(win, MKGUI_KEY_RETURN, 0);
+		CHECK(poll_for_event(win, MKGUI_EVENT_COMBOBOX_SUBMIT, CB), "expected COMBOBOX_SUBMIT");
+		mkgui_window_destroy(win);
+		mkgui_ctx_destroy(ctx);
 	}
 	TEST_END();
 }
@@ -763,21 +803,23 @@ static void test_datepicker_changed(void) {
 		MKGUI_W(MKGUI_VBOX,       VBOX1, "",     "", WIN,   0,   0,   0, 0, 0),
 		MKGUI_W(MKGUI_DATEPICKER, DP,    "",     "", VBOX1, 0,   0,   0, 0, 0),
 	};
-	struct mkgui_ctx *ctx = mkgui_create(widgets, 3);
-	CHECK(ctx, "create failed");
-	if(ctx) {
-		mkgui_datepicker_set(ctx, DP, 2026, 4, 1);
-		run_layout(ctx);
-		ctx->focus_id = DP;
-		struct mkgui_datepicker_data *dp = find_datepicker_data(ctx, DP);
+	struct mkgui_ctx *ctx = mkgui_ctx_create();
+	struct mkgui_window *win = mkgui_window_create(ctx, NULL, widgets, 3, NULL, 0, 0);
+	CHECK(win, "create failed");
+	if(win) {
+		mkgui_datepicker_set(win, DP, 2026, 4, 1);
+		run_layout(win);
+		win->focus_id = DP;
+		struct mkgui_datepicker_data *dp = find_datepicker_data(win, DP);
 		if(dp) {
 			dp->editing = 1;
 			snprintf(dp->edit_buf, sizeof(dp->edit_buf), "2026-04-15");
 			dp->edit_cursor = 10;
 		}
-		inject_key(ctx, MKGUI_KEY_RETURN, 0);
-		CHECK(poll_for_event(ctx, MKGUI_EVENT_DATEPICKER_CHANGED, DP), "expected DATEPICKER_CHANGED");
-		mkgui_destroy(ctx);
+		inject_key(win, MKGUI_KEY_RETURN, 0);
+		CHECK(poll_for_event(win, MKGUI_EVENT_DATEPICKER_CHANGED, DP), "expected DATEPICKER_CHANGED");
+		mkgui_window_destroy(win);
+		mkgui_ctx_destroy(ctx);
 	}
 	TEST_END();
 }
@@ -787,8 +829,8 @@ static void test_datepicker_changed(void) {
 // ---------------------------------------------------------------------------
 
 static uint32_t timer_fired;
-static void test_timer_cb(struct mkgui_ctx *ctx, uint32_t timer_id, void *userdata) {
-	(void)ctx; (void)timer_id; (void)userdata;
+static void test_timer_cb(struct mkgui_window *win, uint32_t timer_id, void *userdata) {
+	(void)win; (void)timer_id; (void)userdata;
 	timer_fired = 1;
 }
 
@@ -800,28 +842,30 @@ static void test_timer_event(void) {
 		MKGUI_W(MKGUI_WINDOW, WIN, "Test", "", 0,   400, 300, 0, 0, 0),
 		MKGUI_W(MKGUI_LABEL,  LBL, "Hi",  "", WIN, 0,   0,   0, 0, 0),
 	};
-	struct mkgui_ctx *ctx = mkgui_create(widgets, 2);
-	CHECK(ctx, "create failed");
-	if(ctx) {
-		run_layout(ctx);
+	struct mkgui_ctx *ctx = mkgui_ctx_create();
+	struct mkgui_window *win = mkgui_window_create(ctx, NULL, widgets, 2, NULL, 0, 0);
+	CHECK(win, "create failed");
+	if(win) {
+		run_layout(win);
 		timer_fired = 0;
-		uint32_t tid = mkgui_add_timer(ctx, 1000000, test_timer_cb, NULL);
+		uint32_t tid = mkgui_window_add_timer(win, 1000000, test_timer_cb, NULL);
 		CHECK(tid != 0, "timer creation failed");
 		struct timespec ts = {0, 5000000};
 		nanosleep(&ts, NULL);
-		drain_events(ctx);
+		drain_events(win);
 		if(!timer_fired) {
 			nanosleep(&ts, NULL);
-			drain_events(ctx);
+			drain_events(win);
 		}
 		CHECK(timer_fired, "expected timer callback to fire");
-		mkgui_remove_timer(ctx, tid);
-		mkgui_destroy(ctx);
+		mkgui_window_remove_timer(win, tid);
+		mkgui_window_destroy(win);
+		mkgui_ctx_destroy(ctx);
 	}
 	TEST_END();
 }
 
-// Note: MKGUI_EVENT_TIMER never fires because mkgui_add_timer rejects
+// Note: MKGUI_EVENT_TIMER never fires because mkgui_window_add_timer rejects
 // NULL callbacks (line 7286), but the event path (line 4404) requires
 // cb==NULL. This is an API inconsistency -- the NULL check should be
 // removed to allow event-based timers.
@@ -839,19 +883,21 @@ static void test_context_menu_event(void) {
 		MKGUI_W(MKGUI_VBOX,   VBOX1, "",     "", WIN,   0,   0,   0, 0, 0),
 		MKGUI_W(MKGUI_BUTTON, BTN,   "OK",   "", VBOX1, 100, 0, MKGUI_FIXED, 0, 0),
 	};
-	struct mkgui_ctx *ctx = mkgui_create(widgets, 3);
-	CHECK(ctx, "create failed");
-	if(ctx) {
-		run_layout(ctx);
-		mkgui_context_menu_clear(ctx);
-		mkgui_context_menu_add(ctx, 500, "Cut", NULL, 0);
-		mkgui_context_menu_add(ctx, 501, "Copy", NULL, 0);
-		mkgui_context_menu_show_at(ctx, 100, 100);
-		inject_key(ctx, MKGUI_KEY_DOWN, 0);
-		drain_events(ctx);
-		inject_key(ctx, MKGUI_KEY_RETURN, 0);
-		CHECK(poll_for_event(ctx, MKGUI_EVENT_CONTEXT_MENU, 0), "expected CONTEXT_MENU event");
-		mkgui_destroy(ctx);
+	struct mkgui_ctx *ctx = mkgui_ctx_create();
+	struct mkgui_window *win = mkgui_window_create(ctx, NULL, widgets, 3, NULL, 0, 0);
+	CHECK(win, "create failed");
+	if(win) {
+		run_layout(win);
+		mkgui_context_menu_clear(win);
+		mkgui_context_menu_add(win, 500, "Cut", NULL, 0);
+		mkgui_context_menu_add(win, 501, "Copy", NULL, 0);
+		mkgui_context_menu_show_at(win, 100, 100);
+		inject_key(win, MKGUI_KEY_DOWN, 0);
+		drain_events(win);
+		inject_key(win, MKGUI_KEY_RETURN, 0);
+		CHECK(poll_for_event(win, MKGUI_EVENT_CONTEXT_MENU, 0), "expected CONTEXT_MENU event");
+		mkgui_window_destroy(win);
+		mkgui_ctx_destroy(ctx);
 	}
 	TEST_END();
 }

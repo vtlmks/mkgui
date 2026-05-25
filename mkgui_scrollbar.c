@@ -2,25 +2,25 @@
 // SPDX-License-Identifier: MIT
 
 // [=]===^=[ find_scrollbar_data ]================================[=]
-static struct mkgui_scrollbar_data *find_scrollbar_data(struct mkgui_ctx *ctx, uint32_t id) {
-	for(uint32_t i = 0; i < ctx->scrollbar_count; ++i) {
-		if(ctx->scrollbars[i].id == id) {
-			return &ctx->scrollbars[i];
+static struct mkgui_scrollbar_data *find_scrollbar_data(struct mkgui_window *win, uint32_t id) {
+	for(uint32_t i = 0; i < win->scrollbar_count; ++i) {
+		if(win->scrollbars[i].id == id) {
+			return &win->scrollbars[i];
 		}
 	}
 	return NULL;
 }
 
 // [=]===^=[ mkgui_scrollbar_setup ]==============================[=]
-MKGUI_API void mkgui_scrollbar_setup(struct mkgui_ctx *ctx, uint32_t id, int32_t max_value, int32_t page_size) {
-	MKGUI_CHECK(ctx);
-	struct mkgui_scrollbar_data *sb = find_scrollbar_data(ctx, id);
+MKGUI_API void mkgui_scrollbar_setup(struct mkgui_window *win, uint32_t id, int32_t max_value, int32_t page_size) {
+	MKGUI_CHECK(win);
+	struct mkgui_scrollbar_data *sb = find_scrollbar_data(win, id);
 	if(!sb) {
-		MKGUI_AUX_GROW(&ctx->arenas.scrollbars, ctx->scrollbar_count, ctx->scrollbar_cap, struct mkgui_scrollbar_data);
-		if(ctx->scrollbar_count >= ctx->scrollbar_cap) {
+		MKGUI_AUX_GROW(&win->arenas.scrollbars, win->scrollbar_count, win->scrollbar_cap, struct mkgui_scrollbar_data);
+		if(win->scrollbar_count >= win->scrollbar_cap) {
 			return;
 		}
-		sb = &ctx->scrollbars[ctx->scrollbar_count++];
+		sb = &win->scrollbars[win->scrollbar_count++];
 		sb->id = id;
 	}
 	sb->value = 0;
@@ -29,9 +29,9 @@ MKGUI_API void mkgui_scrollbar_setup(struct mkgui_ctx *ctx, uint32_t id, int32_t
 }
 
 // [=]===^=[ mkgui_scrollbar_set ]================================[=]
-MKGUI_API void mkgui_scrollbar_set(struct mkgui_ctx *ctx, uint32_t id, int32_t value) {
-	MKGUI_CHECK(ctx);
-	struct mkgui_scrollbar_data *sb = find_scrollbar_data(ctx, id);
+MKGUI_API void mkgui_scrollbar_set(struct mkgui_window *win, uint32_t id, int32_t value) {
+	MKGUI_CHECK(win);
+	struct mkgui_scrollbar_data *sb = find_scrollbar_data(win, id);
 	if(!sb) {
 		return;
 	}
@@ -48,13 +48,13 @@ MKGUI_API void mkgui_scrollbar_set(struct mkgui_ctx *ctx, uint32_t id, int32_t v
 		value = max_scroll;
 	}
 	sb->value = value;
-	dirty_all(ctx);
+	dirty_all(win);
 }
 
 // [=]===^=[ mkgui_scrollbar_get ]================================[=]
-MKGUI_API int32_t mkgui_scrollbar_get(struct mkgui_ctx *ctx, uint32_t id) {
-	MKGUI_CHECK_VAL(ctx, 0);
-	struct mkgui_scrollbar_data *sb = find_scrollbar_data(ctx, id);
+MKGUI_API int32_t mkgui_scrollbar_get(struct mkgui_window *win, uint32_t id) {
+	MKGUI_CHECK_VAL(win, 0);
+	struct mkgui_scrollbar_data *sb = find_scrollbar_data(win, id);
 	if(!sb) {
 		return 0;
 	}
@@ -62,12 +62,12 @@ MKGUI_API int32_t mkgui_scrollbar_get(struct mkgui_ctx *ctx, uint32_t id) {
 }
 
 // [=]===^=[ scrollbar_thumb_rect ]===============================[=]
-static void scrollbar_thumb_rect(struct mkgui_ctx *ctx, uint32_t idx, struct mkgui_scrollbar_data *sb, int32_t *out_ty, int32_t *out_th) {
-	struct mkgui_widget *w = &ctx->widgets[idx];
-	int32_t rx = ctx->rects[idx].x;
-	int32_t ry = ctx->rects[idx].y;
-	int32_t rw = ctx->rects[idx].w;
-	int32_t rh = ctx->rects[idx].h;
+static void scrollbar_thumb_rect(struct mkgui_window *win, uint32_t idx, struct mkgui_scrollbar_data *sb, int32_t *out_ty, int32_t *out_th) {
+	struct mkgui_widget *w = &win->widgets[idx];
+	int32_t rx = win->rects[idx].x;
+	int32_t ry = win->rects[idx].y;
+	int32_t rw = win->rects[idx].w;
+	int32_t rh = win->rects[idx].h;
 	uint32_t horizontal = (w->flags & MKGUI_VERTICAL) ? 0 : 1;
 
 	int32_t track = horizontal ? rw : rh;
@@ -79,7 +79,7 @@ static void scrollbar_thumb_rect(struct mkgui_ctx *ctx, uint32_t idx, struct mkg
 	if(total < 1) {
 		total = 1;
 	}
-	int32_t min_thumb = sc(ctx, 20);
+	int32_t min_thumb = sc(win, 20);
 	int32_t thumb = track * sb->page_size / total;
 	if(thumb < min_thumb) {
 		thumb = min_thumb;
@@ -107,52 +107,52 @@ static void scrollbar_thumb_rect(struct mkgui_ctx *ctx, uint32_t idx, struct mkg
 }
 
 // [=]===^=[ render_scrollbar ]===================================[=]
-static void render_scrollbar(struct mkgui_ctx *ctx, uint32_t idx) {
-	struct mkgui_widget *w = &ctx->widgets[idx];
-	struct mkgui_scrollbar_data *sb = find_scrollbar_data(ctx, w->id);
+static void render_scrollbar(struct mkgui_window *win, uint32_t idx) {
+	struct mkgui_widget *w = &win->widgets[idx];
+	struct mkgui_scrollbar_data *sb = find_scrollbar_data(win, w->id);
 	if(!sb) {
 		return;
 	}
 
-	int32_t rx = ctx->rects[idx].x;
-	int32_t ry = ctx->rects[idx].y;
-	int32_t rw = ctx->rects[idx].w;
-	int32_t rh = ctx->rects[idx].h;
+	int32_t rx = win->rects[idx].x;
+	int32_t ry = win->rects[idx].y;
+	int32_t rw = win->rects[idx].w;
+	int32_t rh = win->rects[idx].h;
 	uint32_t horizontal = (w->flags & MKGUI_VERTICAL) ? 0 : 1;
 
-	draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, rx, ry, rw, rh, ctx->theme.scrollbar_bg);
+	draw_rect_fill(win->pixels, win->win_w, win->win_h, rx, ry, rw, rh, win->theme.scrollbar_bg);
 
 	if(sb->max_value <= sb->page_size) {
 		return;
 	}
 
 	int32_t thumb_pos, thumb_len;
-	scrollbar_thumb_rect(ctx, idx, sb, &thumb_pos, &thumb_len);
+	scrollbar_thumb_rect(win, idx, sb, &thumb_pos, &thumb_len);
 
-	uint32_t thumb_color = (ctx->drag_scrollbar_id == w->id) ? ctx->theme.widget_hover : ctx->theme.scrollbar_thumb;
-	if(ctx->hover_id == w->id && ctx->drag_scrollbar_id != w->id) {
-		thumb_color = ctx->theme.scrollbar_thumb_hover;
+	uint32_t thumb_color = (win->drag_scrollbar_id == w->id) ? win->theme.widget_hover : win->theme.scrollbar_thumb;
+	if(win->hover_id == w->id && win->drag_scrollbar_id != w->id) {
+		thumb_color = win->theme.scrollbar_thumb_hover;
 	}
 
-	int32_t r = ctx->theme.corner_radius;
-	int32_t inset = sc(ctx, 2);
+	int32_t r = win->theme.corner_radius;
+	int32_t inset = sc(win, 2);
 	if(horizontal) {
-		draw_rounded_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, thumb_pos, ry + inset, thumb_len, rh - inset * 2, thumb_color, r);
+		draw_rounded_rect_fill(win->pixels, win->win_w, win->win_h, thumb_pos, ry + inset, thumb_len, rh - inset * 2, thumb_color, r);
 	} else {
-		draw_rounded_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, rx + inset, thumb_pos, rw - inset * 2, thumb_len, thumb_color, r);
+		draw_rounded_rect_fill(win->pixels, win->win_w, win->win_h, rx + inset, thumb_pos, rw - inset * 2, thumb_len, thumb_color, r);
 	}
 }
 
 // [=]===^=[ scrollbar_hit_thumb ]================================[=]
-static uint32_t scrollbar_hit_thumb(struct mkgui_ctx *ctx, uint32_t idx, int32_t mx, int32_t my) {
-	struct mkgui_widget *w = &ctx->widgets[idx];
-	struct mkgui_scrollbar_data *sb = find_scrollbar_data(ctx, w->id);
+static uint32_t scrollbar_hit_thumb(struct mkgui_window *win, uint32_t idx, int32_t mx, int32_t my) {
+	struct mkgui_widget *w = &win->widgets[idx];
+	struct mkgui_scrollbar_data *sb = find_scrollbar_data(win, w->id);
 	if(!sb || sb->max_value <= sb->page_size) {
 		return 0;
 	}
 
 	int32_t thumb_pos, thumb_len;
-	scrollbar_thumb_rect(ctx, idx, sb, &thumb_pos, &thumb_len);
+	scrollbar_thumb_rect(win, idx, sb, &thumb_pos, &thumb_len);
 
 	uint32_t horizontal = (w->flags & MKGUI_VERTICAL) ? 0 : 1;
 	int32_t coord = horizontal ? mx : my;
@@ -160,15 +160,15 @@ static uint32_t scrollbar_hit_thumb(struct mkgui_ctx *ctx, uint32_t idx, int32_t
 }
 
 // [=]===^=[ scrollbar_thumb_drag_offset ]========================[=]
-static int32_t scrollbar_thumb_drag_offset(struct mkgui_ctx *ctx, uint32_t idx, int32_t mx, int32_t my) {
-	struct mkgui_widget *w = &ctx->widgets[idx];
-	struct mkgui_scrollbar_data *sb = find_scrollbar_data(ctx, w->id);
+static int32_t scrollbar_thumb_drag_offset(struct mkgui_window *win, uint32_t idx, int32_t mx, int32_t my) {
+	struct mkgui_widget *w = &win->widgets[idx];
+	struct mkgui_scrollbar_data *sb = find_scrollbar_data(win, w->id);
 	if(!sb) {
 		return 0;
 	}
 
 	int32_t thumb_pos, thumb_len;
-	scrollbar_thumb_rect(ctx, idx, sb, &thumb_pos, &thumb_len);
+	scrollbar_thumb_rect(win, idx, sb, &thumb_pos, &thumb_len);
 
 	uint32_t horizontal = (w->flags & MKGUI_VERTICAL) ? 0 : 1;
 	int32_t coord = horizontal ? mx : my;
@@ -176,27 +176,27 @@ static int32_t scrollbar_thumb_drag_offset(struct mkgui_ctx *ctx, uint32_t idx, 
 }
 
 // [=]===^=[ scrollbar_drag_to ]==================================[=]
-static void scrollbar_drag_to(struct mkgui_ctx *ctx, uint32_t id, int32_t mx, int32_t my) {
-	int32_t idx = find_widget_idx(ctx, id);
+static void scrollbar_drag_to(struct mkgui_window *win, uint32_t id, int32_t mx, int32_t my) {
+	int32_t idx = find_widget_idx(win, id);
 	if(idx < 0) {
 		return;
 	}
-	struct mkgui_widget *w = &ctx->widgets[idx];
-	struct mkgui_scrollbar_data *sb = find_scrollbar_data(ctx, w->id);
+	struct mkgui_widget *w = &win->widgets[idx];
+	struct mkgui_scrollbar_data *sb = find_scrollbar_data(win, w->id);
 	if(!sb) {
 		return;
 	}
 
 	uint32_t horizontal = (w->flags & MKGUI_VERTICAL) ? 0 : 1;
-	int32_t track = horizontal ? ctx->rects[idx].w : ctx->rects[idx].h;
-	int32_t origin = horizontal ? ctx->rects[idx].x : ctx->rects[idx].y;
+	int32_t track = horizontal ? win->rects[idx].w : win->rects[idx].h;
+	int32_t origin = horizontal ? win->rects[idx].x : win->rects[idx].y;
 	int32_t coord = horizontal ? mx : my;
 
 	int32_t total = sb->max_value;
 	if(total < 1) {
 		total = 1;
 	}
-	int32_t min_thumb = sc(ctx, 20);
+	int32_t min_thumb = sc(win, 20);
 	int32_t thumb = track * sb->page_size / total;
 	if(thumb < min_thumb) {
 		thumb = min_thumb;
@@ -216,7 +216,7 @@ static void scrollbar_drag_to(struct mkgui_ctx *ctx, uint32_t id, int32_t mx, in
 		max_scroll = 0;
 	}
 
-	float frac = (float)(coord - origin - ctx->drag_scrollbar_offset) / (float)usable;
+	float frac = (float)(coord - origin - win->drag_scrollbar_offset) / (float)usable;
 	if(frac < 0.0f) {
 		frac = 0.0f;
 	}
@@ -226,12 +226,12 @@ static void scrollbar_drag_to(struct mkgui_ctx *ctx, uint32_t id, int32_t mx, in
 	}
 
 	sb->value = (int32_t)(frac * (float)max_scroll);
-	dirty_all(ctx);
+	dirty_all(win);
 }
 
 // [=]===^=[ scrollbar_scroll ]=================================[=]
-static void scrollbar_scroll(struct mkgui_ctx *ctx, uint32_t id, int32_t direction) {
-	struct mkgui_scrollbar_data *sb = find_scrollbar_data(ctx, id);
+static void scrollbar_scroll(struct mkgui_window *win, uint32_t id, int32_t direction) {
+	struct mkgui_scrollbar_data *sb = find_scrollbar_data(win, id);
 	if(!sb) {
 		return;
 	}
@@ -251,5 +251,5 @@ static void scrollbar_scroll(struct mkgui_ctx *ctx, uint32_t id, int32_t directi
 	if(sb->value > max_scroll) {
 		sb->value = max_scroll;
 	}
-	dirty_all(ctx);
+	dirty_all(win);
 }

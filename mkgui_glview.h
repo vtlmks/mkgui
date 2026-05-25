@@ -12,10 +12,10 @@
 #include "mkgui.h"
 
 #ifdef _WIN32
-MKGUI_API HWND mkgui_glview_get_hwnd(struct mkgui_ctx *ctx, uint32_t id);
+MKGUI_API HWND mkgui_glview_get_hwnd(struct mkgui_window *win, uint32_t id);
 #else
-MKGUI_API Window mkgui_glview_get_x11_window(struct mkgui_ctx *ctx, uint32_t id);
-MKGUI_API Display *mkgui_glview_get_x11_display(struct mkgui_ctx *ctx);
+MKGUI_API Window mkgui_glview_get_x11_window(struct mkgui_window *win, uint32_t id);
+MKGUI_API Display *mkgui_glview_get_x11_display(struct mkgui_window *win);
 #endif
 
 #endif

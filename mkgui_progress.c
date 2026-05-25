@@ -2,16 +2,16 @@
 // SPDX-License-Identifier: MIT
 
 // [=]===^=[ render_progress ]===================================[=]
-static void render_progress(struct mkgui_ctx *ctx, uint32_t idx) {
-	struct mkgui_widget *w = &ctx->widgets[idx];
-	int32_t rx = ctx->rects[idx].x;
-	int32_t ry = ctx->rects[idx].y;
-	int32_t rw = ctx->rects[idx].w;
-	int32_t rh = ctx->rects[idx].h;
+static void render_progress(struct mkgui_window *win, uint32_t idx) {
+	struct mkgui_widget *w = &win->widgets[idx];
+	int32_t rx = win->rects[idx].x;
+	int32_t ry = win->rects[idx].y;
+	int32_t rw = win->rects[idx].w;
+	int32_t rh = win->rects[idx].h;
 
-	draw_patch(ctx, MKGUI_STYLE_SUNKEN, rx, ry, rw, rh, ctx->theme.input_bg, ctx->theme.widget_border);
+	draw_patch(win, MKGUI_STYLE_SUNKEN, rx, ry, rw, rh, win->theme.input_bg, win->theme.widget_border);
 
-	struct mkgui_progress_data *pd = find_progress_data(ctx, w->id);
+	struct mkgui_progress_data *pd = find_progress_data(win, w->id);
 	if(pd && pd->max_val > 0) {
 		int32_t fill_w = (int32_t)((int64_t)(rw - 2) * pd->value / pd->max_val);
 		if(fill_w < 0) {
@@ -21,16 +21,16 @@ static void render_progress(struct mkgui_ctx *ctx, uint32_t idx) {
 		if(fill_w > rw - 2) {
 			fill_w = rw - 2;
 		}
-		int32_t fill_r = ctx->theme.corner_radius > 1 ? ctx->theme.corner_radius - 1 : 0;
-		uint32_t bar_color = pd->color ? pd->color : ctx->theme.accent;
-		draw_rounded_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, rx + 1, ry + 1, fill_w, rh - 2, bar_color, fill_r);
+		int32_t fill_r = win->theme.corner_radius > 1 ? win->theme.corner_radius - 1 : 0;
+		uint32_t bar_color = pd->color ? pd->color : win->theme.accent;
+		draw_rounded_rect_fill(win->pixels, win->win_w, win->win_h, rx + 1, ry + 1, fill_w, rh - 2, bar_color, fill_r);
 
 		if((w->style & MKGUI_PROGRESS_SHIMMER) && pd->value > 0 && pd->value < pd->max_val) {
 			int32_t shimmer_w = fill_w / 4;
-			if(shimmer_w < sc(ctx, 16)) {
-				shimmer_w = sc(ctx, 16);
+			if(shimmer_w < sc(win, 16)) {
+				shimmer_w = sc(win, 16);
 			}
-			double phase = ctx->anim_time * 0.4;
+			double phase = win->anim_time * 0.4;
 			phase -= (double)(int32_t)phase;
 			int32_t sweep_range = fill_w + shimmer_w;
 			int32_t shimmer_x = (int32_t)(phase * sweep_range) - shimmer_w;
@@ -61,8 +61,8 @@ static void render_progress(struct mkgui_ctx *ctx, uint32_t idx) {
 				clip_y0 = render_clip_y1;
 			}
 
-			if(clip_y1_s > ctx->win_h) {
-				clip_y1_s = ctx->win_h;
+			if(clip_y1_s > win->win_h) {
+				clip_y1_s = win->win_h;
 			}
 
 			if(clip_y1_s > render_clip_y2) {
@@ -107,7 +107,7 @@ static void render_progress(struct mkgui_ctx *ctx, uint32_t idx) {
 					}
 					int32_t alpha = 30 * (half - from_center) / (half + 1);
 					if(alpha > 0) {
-						ctx->pixels[py * ctx->win_w + px] = blend_pixel(ctx->pixels[py * ctx->win_w + px], highlight, (uint8_t)alpha);
+						win->pixels[py * win->win_w + px] = blend_pixel(win->pixels[py * win->win_w + px], highlight, (uint8_t)alpha);
 					}
 				}
 			}
@@ -116,28 +116,28 @@ static void render_progress(struct mkgui_ctx *ctx, uint32_t idx) {
 		char buf[64];
 		int32_t pct = (int32_t)((int64_t)pd->value * 100 / pd->max_val);
 		snprintf(buf, sizeof(buf), "%d%%", pct);
-		int32_t tw = text_width(ctx, buf);
+		int32_t tw = text_width(win, buf);
 		int32_t tx = rx + (rw - tw) / 2;
-		int32_t ty = ry + (rh - ctx->font_height) / 2;
-		push_text_clip(tx, ty, buf, ctx->theme.sel_text, rx + 1, ry + 1, rx + rw - 1, ry + rh - 1);
+		int32_t ty = ry + (rh - win->font_height) / 2;
+		push_text_clip(tx, ty, buf, win->theme.sel_text, rx + 1, ry + 1, rx + rw - 1, ry + rh - 1);
 	}
 }
 
 // [=]===^=[ mkgui_progress_setup ]===============================[=]
-MKGUI_API void mkgui_progress_setup(struct mkgui_ctx *ctx, uint32_t id, int32_t max_val) {
-	MKGUI_CHECK(ctx);
-	struct mkgui_progress_data *pd = find_progress_data(ctx, id);
+MKGUI_API void mkgui_progress_setup(struct mkgui_window *win, uint32_t id, int32_t max_val) {
+	MKGUI_CHECK(win);
+	struct mkgui_progress_data *pd = find_progress_data(win, id);
 	if(pd) {
 		pd->max_val = max_val;
 		pd->value = 0;
-		dirty_widget_id(ctx, id);
+		dirty_widget_id(win, id);
 	}
 }
 
 // [=]===^=[ mkgui_progress_set ]=================================[=]
-MKGUI_API void mkgui_progress_set(struct mkgui_ctx *ctx, uint32_t id, int32_t value) {
-	MKGUI_CHECK(ctx);
-	struct mkgui_progress_data *pd = find_progress_data(ctx, id);
+MKGUI_API void mkgui_progress_set(struct mkgui_window *win, uint32_t id, int32_t value) {
+	MKGUI_CHECK(win);
+	struct mkgui_progress_data *pd = find_progress_data(win, id);
 	if(pd) {
 		pd->value = value;
 		if(pd->value < 0) {
@@ -147,21 +147,21 @@ MKGUI_API void mkgui_progress_set(struct mkgui_ctx *ctx, uint32_t id, int32_t va
 		if(pd->value > pd->max_val) {
 			pd->value = pd->max_val;
 		}
-		dirty_widget_id(ctx, id);
+		dirty_widget_id(win, id);
 	}
 }
 
 // [=]===^=[ mkgui_progress_get ]=================================[=]
-MKGUI_API int32_t mkgui_progress_get(struct mkgui_ctx *ctx, uint32_t id) {
-	MKGUI_CHECK_VAL(ctx, 0);
-	struct mkgui_progress_data *pd = find_progress_data(ctx, id);
+MKGUI_API int32_t mkgui_progress_get(struct mkgui_window *win, uint32_t id) {
+	MKGUI_CHECK_VAL(win, 0);
+	struct mkgui_progress_data *pd = find_progress_data(win, id);
 	return pd ? pd->value : 0;
 }
 
 // [=]===^=[ mkgui_progress_set_range ]=============================[=]
-MKGUI_API void mkgui_progress_set_range(struct mkgui_ctx *ctx, uint32_t id, int32_t max_val) {
-	MKGUI_CHECK(ctx);
-	struct mkgui_progress_data *pd = find_progress_data(ctx, id);
+MKGUI_API void mkgui_progress_set_range(struct mkgui_window *win, uint32_t id, int32_t max_val) {
+	MKGUI_CHECK(win);
+	struct mkgui_progress_data *pd = find_progress_data(win, id);
 	if(!pd) {
 		return;
 	}
@@ -169,24 +169,24 @@ MKGUI_API void mkgui_progress_set_range(struct mkgui_ctx *ctx, uint32_t id, int3
 	if(pd->value > pd->max_val) {
 		pd->value = pd->max_val;
 	}
-	dirty_widget_id(ctx, id);
+	dirty_widget_id(win, id);
 }
 
 // [=]===^=[ mkgui_progress_get_range ]=============================[=]
-MKGUI_API void mkgui_progress_get_range(struct mkgui_ctx *ctx, uint32_t id, int32_t *max_val) {
-	MKGUI_CHECK(ctx);
-	struct mkgui_progress_data *pd = find_progress_data(ctx, id);
+MKGUI_API void mkgui_progress_get_range(struct mkgui_window *win, uint32_t id, int32_t *max_val) {
+	MKGUI_CHECK(win);
+	struct mkgui_progress_data *pd = find_progress_data(win, id);
 	if(max_val) {
 		*max_val = pd ? pd->max_val : 0;
 	}
 }
 
 // [=]===^=[ mkgui_progress_set_color ]=============================[=]
-MKGUI_API void mkgui_progress_set_color(struct mkgui_ctx *ctx, uint32_t id, uint32_t color) {
-	MKGUI_CHECK(ctx);
-	struct mkgui_progress_data *pd = find_progress_data(ctx, id);
+MKGUI_API void mkgui_progress_set_color(struct mkgui_window *win, uint32_t id, uint32_t color) {
+	MKGUI_CHECK(win);
+	struct mkgui_progress_data *pd = find_progress_data(win, id);
 	if(pd) {
 		pd->color = color;
-		dirty_widget_id(ctx, id);
+		dirty_widget_id(win, id);
 	}
 }

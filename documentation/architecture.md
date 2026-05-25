@@ -151,7 +151,7 @@ The base pointer never changes. Pages are committed on demand as the arrays grow
 | `layout_sibling_arena` | Next-sibling index | 65,536 | ~256 KB |
 | `layout_hash_arena` | Widget ID hash table | 131,072 | ~1 MB |
 
-These are static globals (shared across all contexts). Initialized on first `mkgui_create()`, destroyed on last `mkgui_destroy()`.
+These are static globals (shared across all windows). Initialized on first `mkgui_window_create()`, destroyed when the last window on the ctx is destroyed.
 
 The limits are `#define`s at the top of the arena section in mkgui.c:
 
@@ -163,7 +163,7 @@ The limits are `#define`s at the top of the arena section in mkgui.c:
 
 ### What still uses malloc/realloc
 
-- **Widget arrays** (`ctx->widgets`, `ctx->rects`, `ctx->tooltip_texts`): grow via `mkgui_grow_widgets()` (+256 entries). Cold path, only during `mkgui_add_widget`.
+- **Widget arrays** (`ctx->widgets`, `ctx->rects`, `ctx->tooltip_texts`): grow via `mkgui_grow_widgets()` (+256 entries). Cold path, only during `mkgui_widget_add`.
 - **Aux data arrays**: grow via `MKGUI_AUX_GROW` (+16 entries). Cold path.
 - **Textarea text buffers**: per-instance, exponential doubling. Appropriate for small per-widget buffers.
 - **Treeview node arrays**: per-instance, exponential doubling.
@@ -264,11 +264,11 @@ Each platform translates native events into a uniform `struct mkgui_plat_event`:
 | X11 LeaveNotify / WM_MOUSELEAVE | `MKGUI_PLAT_LEAVE` |
 | X11 FocusOut / WM_KILLFOCUS | `MKGUI_PLAT_FOCUS_OUT` |
 
-### Dispatch (internal mkgui_poll)
+### Dispatch (internal mkgui_window_poll)
 
-Internally the dispatch loop is still named `mkgui_poll()` / `mkgui_wait()` / `mkgui_flush()`, but these are `static` helpers used only by `mkgui_run()` and by nested dialog event loops (`mkgui_dialogs.c`, `mkgui_filedialog.c`, `mkgui_iconbrowser.c`, `mkgui_colorpicker.c`). They are not part of the public API -- applications talk to mkgui exclusively through `mkgui_run()` plus per-context callbacks registered with `mkgui_set_callback()`.
+Internally the dispatch loop is still named `mkgui_window_poll()` / `mkgui_ctx_wait()` / `mkgui_flush()`, but these are `static` helpers used only by `mkgui_ctx_run()` and by nested dialog event loops (`mkgui_dialogs.c`, `mkgui_filedialog.c`, `mkgui_iconbrowser.c`, `mkgui_colorpicker.c`). They are not part of the public API -- applications talk to mkgui exclusively through `mkgui_ctx_run()` plus per-context callbacks registered with `mkgui_window_set_callback()`.
 
-`mkgui_poll()` does the following on each call:
+`mkgui_window_poll()` does the following on each call:
 
 1. Update animation time.
 2. Fire expired timer callbacks.
@@ -279,30 +279,30 @@ Internally the dispatch loop is still named `mkgui_poll()` / `mkgui_wait()` / `m
    - **Button release**: generate click events, delegate to widget-specific release handler.
    - **Key press**: route to focused widget's key handler (text input, arrow navigation, etc.). Accelerators are matched after context menu keys but before Tab and clipboard shortcuts.
    - **Resize**: reallocate framebuffer, re-layout.
-   - **Close**: set `close_requested`.
+   - **Close**: set `should_close` on the window.
 5. Return the resulting `struct mkgui_event` to the application via the registered callback.
 
 ### Application event loop
 
 ```c
 // Public API: one function, no manual poll/wait:
-mkgui_run(ctx, on_event, userdata);
+mkgui_ctx_run(ctx, on_event, userdata);
 ```
 
-`mkgui_run()` is the only public event loop. Internally it is roughly:
+`mkgui_ctx_run()` is the canonical event loop. Internally it is roughly:
 
 ```c
-while(!ctx->close_requested) {
+while(!ctx->should_quit && !ctx->primary->should_close) {
     struct mkgui_event ev;
-    while(mkgui_poll(ctx, &ev)) {
-        cb(ctx, &ev, userdata);
+    while(mkgui_window_poll(ctx->primary, &ev)) {
+        cb(ctx->primary, &ev, userdata);
     }
-    // pump any other contexts registered via mkgui_set_callback()
-    mkgui_wait(ctx);  // flush + block until next event or timer
+    mkgui_ctx_pump_others(ctx);    // pump every non-primary window
+    mkgui_ctx_wait(ctx);            // flush + block until next event or timer
 }
 ```
 
-`mkgui_wait()` calls `mkgui_flush()` then blocks on `platform_wait_event()` (poll/select on Linux, MsgWaitForMultipleObjects on Windows). It also drains events for secondary contexts that were registered via `mkgui_set_callback()`, so multi-window applications work without a manual pump.
+`mkgui_ctx_wait()` calls `mkgui_flush()` then blocks on `platform_wait_event()` (poll/select on Linux, MsgWaitForMultipleObjects on Windows). It also drains events for secondary contexts that were registered via `mkgui_window_set_callback()`, so multi-window applications work without a manual pump.
 
 ## Platform abstraction
 
@@ -344,7 +344,7 @@ Loading paths:
 3. `mkgui_icon_load_app_icons(ctx, app_name)` -- resolve the directory via XDG/FHS paths, then batch load.
 4. Lazy system theme fallback (Linux): if an icon is referenced but not found in the loaded set, `icon_resolve()` walks the detected system theme chain (Papirus -> breeze -> hicolor, etc.) and loads the first match. Results are cached; a negative cache prevents repeated filesystem lookups for names that don't exist in any theme.
 
-Icons are automatically re-rasterized on scale change (`mkgui_set_scale`) and theme change (`mkgui_set_theme`) because `currentColor` in the SVG follows `theme.text`. The SVG source cache makes this cheap. Drawing is done by `draw_icon()` / `draw_icon_popup()` with per-pixel alpha blending and clip rect support.
+Icons are automatically re-rasterized on scale change (`mkgui_ctx_set_scale`) and theme change (`mkgui_ctx_set_theme`) because `currentColor` in the SVG follows `theme.text`. The SVG source cache makes this cheap. Drawing is done by `draw_icon()` / `draw_icon_popup()` with per-pixel alpha blending and clip rect support.
 
 The base table is sized by `MKGUI_MAX_ICONS` (default 2048; can be overridden at compile time, the editor defines it as 32768 to support browsing entire system themes).
 
@@ -363,18 +363,18 @@ Each popup has its own pixel buffer and is rendered/blitted independently. Max 8
 
 ## Multi-window support
 
-`mkgui_create_child()` creates a second context with its own window, framebuffer, and widget tree. The child shares the parent's font data, icon cache, and display connection. It is marked as a transient window of the parent (window manager handles stacking/modality). Destroy children with `mkgui_destroy_child()`, not `mkgui_destroy()`.
+A single `mkgui_ctx` owns any number of `mkgui_window`s. Each window has its own X11/Win32 window, framebuffer, and widget tree; all windows on the ctx share the display connection, font data, icon cache, and theme. Create additional windows with `mkgui_window_create(ctx, parent_win, ...)`; passing a non-NULL `parent` marks the new window as transient of that parent (window manager handles stacking/modality). Every window is destroyed with `mkgui_window_destroy()` regardless of whether it was top-level or transient.
 
-Each context can register an event callback via `mkgui_set_callback()`. A global window registry maps platform window handles to their owning `mkgui_ctx`, so `mkgui_run()` routes events to the correct context without manual pumping. For events that arrive while another context is the running loop, the event is pushed onto the target context's deferred event queue and delivered on its next iteration.
+Each window can register an event callback via `mkgui_window_set_callback()`. A global window registry maps platform window handles to their owning `mkgui_window`, so `mkgui_ctx_run()` routes events to the correct window without manual pumping. For events that arrive while another window's modal loop is running, the event is pushed onto the target window's deferred event queue and delivered on its next iteration.
 
 ## Widget lifecycle
 
 1. **Define**: create a `struct mkgui_widget` with type, id, parent_id, size, flags.
-2. **Add**: `mkgui_add_widget(ctx, widget, after_id)` inserts into the flat array. If the widget type has aux data, `init_widget_aux()` allocates and initializes it.
+2. **Add**: `mkgui_widget_add(ctx, widget, after_id)` inserts into the flat array. If the widget type has aux data, `init_widget_aux()` allocates and initializes it.
 3. **Layout**: next `mkgui_flush()` recomputes `ctx->rects[]` for all widgets.
 4. **Render**: type-specific renderer draws the widget into the framebuffer.
 5. **Interact**: platform events are dispatched; widget-specific handlers update state and emit `mkgui_event`s.
-6. **Remove**: `mkgui_remove_widget(ctx, id)` removes the widget and all descendants, frees aux data, compacts the arrays.
+6. **Remove**: `mkgui_widget_remove(ctx, id)` removes the widget and all descendants, frees aux data, compacts the arrays.
 
 ## Performance notes
 

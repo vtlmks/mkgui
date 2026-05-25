@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: MIT
 
 // [=]===^=[ pathbar_rebuild_segments ]=============================[=]
-static void pathbar_rebuild_segments(struct mkgui_ctx *ctx, struct mkgui_pathbar_data *pb) {
-	int32_t sep_w = sc(ctx, 8);
-	int32_t seg_pad = sc(ctx, 6);
+static void pathbar_rebuild_segments(struct mkgui_window *win, struct mkgui_pathbar_data *pb) {
+	int32_t sep_w = sc(win, 8);
+	int32_t seg_pad = sc(win, 6);
 	pb->segment_count = 0;
 	if(pb->path[0] == '\0') {
 		return;
@@ -21,7 +21,7 @@ static void pathbar_rebuild_segments(struct mkgui_ctx *ctx, struct mkgui_pathbar
 		char tmp[4];
 		memcpy(tmp, pb->path, pb->segments[0].len);
 		tmp[pb->segments[0].len] = '\0';
-		pb->segments[0].w = text_width(ctx, tmp) + seg_pad * 2;
+		pb->segments[0].w = text_width(win, tmp) + seg_pad * 2;
 		pb->segment_count = 1;
 		i = pb->segments[0].len;
 	}
@@ -30,7 +30,7 @@ static void pathbar_rebuild_segments(struct mkgui_ctx *ctx, struct mkgui_pathbar
 		pb->segments[0].offset = 0;
 		pb->segments[0].len = 1;
 		pb->segments[0].x = 0;
-		pb->segments[0].w = sc(ctx, 18) + seg_pad * 2;
+		pb->segments[0].w = sc(win, 18) + seg_pad * 2;
 		pb->segment_count = 1;
 		i = 1;
 	}
@@ -57,7 +57,7 @@ static void pathbar_rebuild_segments(struct mkgui_ctx *ctx, struct mkgui_pathbar
 		uint32_t cplen = slen < sizeof(tmp) - 1 ? slen : (uint32_t)(sizeof(tmp) - 1);
 		memcpy(tmp, &pb->path[start], cplen);
 		tmp[cplen] = '\0';
-		pb->segments[si].w = text_width(ctx, tmp) + seg_pad * 2;
+		pb->segments[si].w = text_width(win, tmp) + seg_pad * 2;
 	}
 
 	int32_t cx = 0;
@@ -68,8 +68,8 @@ static void pathbar_rebuild_segments(struct mkgui_ctx *ctx, struct mkgui_pathbar
 }
 
 // [=]===^=[ pathbar_segment_hit ]=================================[=]
-static int32_t pathbar_segment_hit(struct mkgui_ctx *ctx, struct mkgui_pathbar_data *pb, int32_t widget_x, int32_t mouse_x) {
-	int32_t lx = mouse_x - widget_x - sc(ctx, 2);
+static int32_t pathbar_segment_hit(struct mkgui_window *win, struct mkgui_pathbar_data *pb, int32_t widget_x, int32_t mouse_x) {
+	int32_t lx = mouse_x - widget_x - sc(win, 2);
 	for(uint32_t i = 0; i < pb->segment_count; ++i) {
 		if(lx >= pb->segments[i].x && lx < pb->segments[i].x + pb->segments[i].w) {
 			return (int32_t)i;
@@ -119,36 +119,36 @@ static void pathbar_exit_edit(struct mkgui_pathbar_data *pb) {
 }
 
 // [=]===^=[ render_pathbar ]========================================[=]
-static void render_pathbar(struct mkgui_ctx *ctx, uint32_t idx) {
-	struct mkgui_widget *w = &ctx->widgets[idx];
-	int32_t rx = ctx->rects[idx].x;
-	int32_t ry = ctx->rects[idx].y;
-	int32_t rw = ctx->rects[idx].w;
-	int32_t rh = ctx->rects[idx].h;
+static void render_pathbar(struct mkgui_window *win, uint32_t idx) {
+	struct mkgui_widget *w = &win->widgets[idx];
+	int32_t rx = win->rects[idx].x;
+	int32_t ry = win->rects[idx].y;
+	int32_t rw = win->rects[idx].w;
+	int32_t rh = win->rects[idx].h;
 
-	int32_t text_pad = sc(ctx, 4);
-	int32_t inset2 = sc(ctx, 2);
-	int32_t seg_pad = sc(ctx, 6);
-	int32_t sep_w = sc(ctx, 8);
+	int32_t text_pad = sc(win, 4);
+	int32_t inset2 = sc(win, 2);
+	int32_t seg_pad = sc(win, 6);
+	int32_t sep_w = sc(win, 8);
 
-	struct mkgui_pathbar_data *pb = find_pathbar_data(ctx, w->id);
+	struct mkgui_pathbar_data *pb = find_pathbar_data(win, w->id);
 	if(!pb) {
 		return;
 	}
 
-	uint32_t focused = (ctx->focus_id == w->id);
-	draw_patch(ctx, MKGUI_STYLE_SUNKEN, rx, ry, rw, rh, ctx->theme.input_bg, focused ? ctx->theme.highlight : ctx->theme.widget_border);
+	uint32_t focused = (win->focus_id == w->id);
+	draw_patch(win, MKGUI_STYLE_SUNKEN, rx, ry, rw, rh, win->theme.input_bg, focused ? win->theme.highlight : win->theme.widget_border);
 
 	if(pb->editing) {
-		int32_t ty = ry + (rh - ctx->font_height) / 2;
+		int32_t ty = ry + (rh - win->font_height) / 2;
 		int32_t tx = rx + text_pad - pb->edit_scroll_x;
 
 		struct mkgui_text_edit te = {pb->edit_buf, (uint32_t)sizeof(pb->edit_buf), pb->edit_cursor, pb->edit_sel_start, pb->edit_sel_end, pb->edit_scroll_x};
-		textedit_render(ctx, &te, pb->edit_buf, tx, ty, ry + inset2, rh - inset2 * 2, rx + 1, ry + 1, rx + rw - 1, ry + rh - 1, ctx->theme.text, focused);
+		textedit_render(win, &te, pb->edit_buf, tx, ty, ry + inset2, rh - inset2 * 2, rx + 1, ry + 1, rx + rw - 1, ry + rh - 1, win->theme.text, focused);
 		return;
 	}
 
-	int32_t ty = ry + (rh - ctx->font_height) / 2;
+	int32_t ty = ry + (rh - win->font_height) / 2;
 
 	for(uint32_t i = 0; i < pb->segment_count; ++i) {
 		int32_t sx = rx + inset2 + pb->segments[i].x;
@@ -159,8 +159,8 @@ static void render_pathbar(struct mkgui_ctx *ctx, uint32_t idx) {
 		}
 
 		if((int32_t)i == pb->hover_seg) {
-			int32_t r = ctx->theme.corner_radius;
-			draw_rounded_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, sx, ry + inset2, sw, rh - inset2 * 2, ctx->theme.widget_hover, r);
+			int32_t r = win->theme.corner_radius;
+			draw_rounded_rect_fill(win->pixels, win->win_w, win->win_h, sx, ry + inset2, sw, rh - inset2 * 2, win->theme.widget_hover, r);
 		}
 
 		uint32_t is_root = 0;
@@ -171,77 +171,77 @@ static void render_pathbar(struct mkgui_ctx *ctx, uint32_t idx) {
 #endif
 
 		if(is_root) {
-			int32_t ii = icon_resolve(ctx, "folder");
+			int32_t ii = icon_resolve(win, "folder");
 			if(ii >= 0) {
-				draw_icon(ctx->pixels, ctx->win_w, ctx->win_h, &icons[ii], sx + seg_pad, ry + (rh - icons[ii].h) / 2, rx + 1, ry + 1, rx + rw - 1, ry + rh - 1);
+				draw_icon(win->pixels, win->win_w, win->win_h, &icons[ii], sx + seg_pad, ry + (rh - icons[ii].h) / 2, rx + 1, ry + 1, rx + rw - 1, ry + rh - 1);
 			}
 		} else {
 			char tmp[256];
 			uint32_t cplen = pb->segments[i].len < sizeof(tmp) - 1 ? pb->segments[i].len : (uint32_t)(sizeof(tmp) - 1);
 			memcpy(tmp, &pb->path[pb->segments[i].offset], cplen);
 			tmp[cplen] = '\0';
-			push_text_clip(sx + seg_pad, ty, tmp, ctx->theme.text, rx + 1, ry + 1, rx + rw - 1, ry + rh - 1);
+			push_text_clip(sx + seg_pad, ty, tmp, win->theme.text, rx + 1, ry + 1, rx + rw - 1, ry + rh - 1);
 		}
 
 		if(i + 1 < pb->segment_count) {
 			int32_t sep_x = sx + sw + sep_w / 2 - inset2;
-			push_text_clip(sep_x, ty, ">", ctx->theme.text_disabled, rx + 1, ry + 1, rx + rw - 1, ry + rh - 1);
+			push_text_clip(sep_x, ty, ">", win->theme.text_disabled, rx + 1, ry + 1, rx + rw - 1, ry + rh - 1);
 		}
 	}
 }
 
 // [=]===^=[ handle_pathbar_click ]=================================[=]
-static uint32_t handle_pathbar_click(struct mkgui_ctx *ctx, struct mkgui_event *ev, uint32_t idx, int32_t mx, int32_t my) {
+static uint32_t handle_pathbar_click(struct mkgui_window *win, struct mkgui_event *ev, uint32_t idx, int32_t mx, int32_t my) {
 	(void)my;
-	struct mkgui_widget *w = &ctx->widgets[idx];
-	struct mkgui_pathbar_data *pb = find_pathbar_data(ctx, w->id);
+	struct mkgui_widget *w = &win->widgets[idx];
+	struct mkgui_pathbar_data *pb = find_pathbar_data(win, w->id);
 	if(!pb) {
 		return 0;
 	}
 
 	if(pb->editing) {
-		int32_t rx = ctx->rects[idx].x;
-		int32_t base_x = rx + sc(ctx, 4) - pb->edit_scroll_x;
-		uint32_t hit_pos = textedit_hit_cursor(ctx, pb->edit_buf, base_x, mx);
+		int32_t rx = win->rects[idx].x;
+		int32_t base_x = rx + sc(win, 4) - pb->edit_scroll_x;
+		uint32_t hit_pos = textedit_hit_cursor(win, pb->edit_buf, base_x, mx);
 		pb->edit_cursor = hit_pos;
 		pb->edit_sel_start = hit_pos;
 		pb->edit_sel_end = hit_pos;
-		ctx->drag_select_id = w->id;
-		dirty_all(ctx);
+		win->drag_select_id = w->id;
+		dirty_all(win);
 		return 0;
 	}
 
-	int32_t seg = pathbar_segment_hit(ctx, pb, ctx->rects[idx].x, mx);
+	int32_t seg = pathbar_segment_hit(win, pb, win->rects[idx].x, mx);
 	if(seg >= 0) {
 		ev->type = MKGUI_EVENT_PATHBAR_NAV;
 		ev->id = w->id;
 		ev->value = seg;
-		dirty_all(ctx);
+		dirty_all(win);
 		return 1;
 	}
 
 	pathbar_enter_edit(pb);
-	dirty_all(ctx);
+	dirty_all(win);
 	return 0;
 }
 
 // [=]===^=[ pathbar_scroll_to_cursor ]==============================[=]
-static void pathbar_scroll_to_cursor(struct mkgui_ctx *ctx, struct mkgui_pathbar_data *pb) {
-	int32_t widx = find_widget_idx(ctx, pb->widget_id);
+static void pathbar_scroll_to_cursor(struct mkgui_window *win, struct mkgui_pathbar_data *pb) {
+	int32_t widx = find_widget_idx(win, pb->widget_id);
 	if(widx < 0) {
 		return;
 	}
-	int32_t pad = sc(ctx, 4);
-	int32_t visible = ctx->rects[widx].w - pad * 2;
+	int32_t pad = sc(win, 4);
+	int32_t visible = win->rects[widx].w - pad * 2;
 
 	struct mkgui_text_edit te = {pb->edit_buf, (uint32_t)sizeof(pb->edit_buf), pb->edit_cursor, pb->edit_sel_start, pb->edit_sel_end, pb->edit_scroll_x};
-	textedit_scroll_to_cursor(ctx, &te, pb->edit_buf, visible);
+	textedit_scroll_to_cursor(win, &te, pb->edit_buf, visible);
 	pb->edit_scroll_x = te.scroll_x;
 }
 
 // [=]===^=[ handle_pathbar_key ]===================================[=]
-static uint32_t handle_pathbar_key(struct mkgui_ctx *ctx, struct mkgui_event *ev, uint32_t ks, uint32_t keymod, char *buf, int32_t len) {
-	struct mkgui_pathbar_data *pb = find_pathbar_data(ctx, ctx->focus_id);
+static uint32_t handle_pathbar_key(struct mkgui_window *win, struct mkgui_event *ev, uint32_t ks, uint32_t keymod, char *buf, int32_t len) {
+	struct mkgui_pathbar_data *pb = find_pathbar_data(win, win->focus_id);
 	if(!pb) {
 		return 0;
 	}
@@ -249,7 +249,7 @@ static uint32_t handle_pathbar_key(struct mkgui_ctx *ctx, struct mkgui_event *ev
 	if(!pb->editing) {
 		if(ks == MKGUI_KEY_RETURN || ks == ' ') {
 			pathbar_enter_edit(pb);
-			dirty_all(ctx);
+			dirty_all(win);
 			return 0;
 		}
 		return 0;
@@ -260,18 +260,18 @@ static uint32_t handle_pathbar_key(struct mkgui_ctx *ctx, struct mkgui_event *ev
 	switch(ks) {
 	case MKGUI_KEY_ESCAPE: {
 		pathbar_exit_edit(pb);
-		dirty_all(ctx);
+		dirty_all(win);
 		return 0;
 	}
 
 	case MKGUI_KEY_RETURN: {
 		uint32_t elen = (uint32_t)strlen(pb->edit_buf);
 		memcpy(pb->path, pb->edit_buf, elen + 1);
-		pathbar_rebuild_segments(ctx, pb);
+		pathbar_rebuild_segments(win, pb);
 		pathbar_exit_edit(pb);
 		ev->type = MKGUI_EVENT_PATHBAR_SUBMIT;
-		ev->id = ctx->focus_id;
-		dirty_all(ctx);
+		ev->id = win->focus_id;
+		dirty_all(win);
 		return 1;
 	}
 
@@ -281,8 +281,8 @@ static uint32_t handle_pathbar_key(struct mkgui_ctx *ctx, struct mkgui_event *ev
 		pb->edit_cursor = te.cursor;
 		pb->edit_sel_start = te.sel_start;
 		pb->edit_sel_end = te.sel_end;
-		dirty_all(ctx);
-		pathbar_scroll_to_cursor(ctx, pb);
+		dirty_all(win);
+		pathbar_scroll_to_cursor(win, pb);
 		return 0;
 	}
 
@@ -292,8 +292,8 @@ static uint32_t handle_pathbar_key(struct mkgui_ctx *ctx, struct mkgui_event *ev
 		pb->edit_cursor = te.cursor;
 		pb->edit_sel_start = te.sel_start;
 		pb->edit_sel_end = te.sel_end;
-		dirty_all(ctx);
-		pathbar_scroll_to_cursor(ctx, pb);
+		dirty_all(win);
+		pathbar_scroll_to_cursor(win, pb);
 		return 0;
 	}
 
@@ -303,8 +303,8 @@ static uint32_t handle_pathbar_key(struct mkgui_ctx *ctx, struct mkgui_event *ev
 		pb->edit_cursor = te.cursor;
 		pb->edit_sel_start = te.sel_start;
 		pb->edit_sel_end = te.sel_end;
-		dirty_all(ctx);
-		pathbar_scroll_to_cursor(ctx, pb);
+		dirty_all(win);
+		pathbar_scroll_to_cursor(win, pb);
 		return 0;
 	}
 
@@ -314,8 +314,8 @@ static uint32_t handle_pathbar_key(struct mkgui_ctx *ctx, struct mkgui_event *ev
 		pb->edit_cursor = te.cursor;
 		pb->edit_sel_start = te.sel_start;
 		pb->edit_sel_end = te.sel_end;
-		dirty_all(ctx);
-		pathbar_scroll_to_cursor(ctx, pb);
+		dirty_all(win);
+		pathbar_scroll_to_cursor(win, pb);
 		return 0;
 	}
 
@@ -325,8 +325,8 @@ static uint32_t handle_pathbar_key(struct mkgui_ctx *ctx, struct mkgui_event *ev
 		pb->edit_cursor = te.cursor;
 		pb->edit_sel_start = te.sel_start;
 		pb->edit_sel_end = te.sel_end;
-		dirty_all(ctx);
-		pathbar_scroll_to_cursor(ctx, pb);
+		dirty_all(win);
+		pathbar_scroll_to_cursor(win, pb);
 		return 0;
 	}
 
@@ -336,8 +336,8 @@ static uint32_t handle_pathbar_key(struct mkgui_ctx *ctx, struct mkgui_event *ev
 		pb->edit_cursor = te.cursor;
 		pb->edit_sel_start = te.sel_start;
 		pb->edit_sel_end = te.sel_end;
-		dirty_all(ctx);
-		pathbar_scroll_to_cursor(ctx, pb);
+		dirty_all(win);
+		pathbar_scroll_to_cursor(win, pb);
 		return 0;
 	}
 
@@ -348,8 +348,8 @@ static uint32_t handle_pathbar_key(struct mkgui_ctx *ctx, struct mkgui_event *ev
 			pb->edit_cursor = te.cursor;
 			pb->edit_sel_start = te.sel_start;
 			pb->edit_sel_end = te.sel_end;
-			dirty_all(ctx);
-			pathbar_scroll_to_cursor(ctx, pb);
+			dirty_all(win);
+			pathbar_scroll_to_cursor(win, pb);
 		}
 		return 0;
 	}
@@ -357,39 +357,39 @@ static uint32_t handle_pathbar_key(struct mkgui_ctx *ctx, struct mkgui_event *ev
 }
 
 // [=]===^=[ pathbar_focus_lost ]====================================[=]
-static void pathbar_focus_lost(struct mkgui_ctx *ctx) {
-	if(!ctx->focus_id) {
+static void pathbar_focus_lost(struct mkgui_window *win) {
+	if(!win->focus_id) {
 		return;
 	}
-	struct mkgui_pathbar_data *pb = find_pathbar_data(ctx, ctx->focus_id);
+	struct mkgui_pathbar_data *pb = find_pathbar_data(win, win->focus_id);
 	if(pb && pb->editing) {
 		pathbar_exit_edit(pb);
-		dirty_all(ctx);
+		dirty_all(win);
 	}
 }
 
 // [=]===^=[ mkgui_pathbar_set ]=====================================[=]
-MKGUI_API void mkgui_pathbar_set(struct mkgui_ctx *ctx, uint32_t id, const char *path) {
-	MKGUI_CHECK(ctx);
+MKGUI_API void mkgui_pathbar_set(struct mkgui_window *win, uint32_t id, const char *path) {
+	MKGUI_CHECK(win);
 	if(!path) {
 		path = "";
 	}
-	struct mkgui_pathbar_data *pb = find_pathbar_data(ctx, id);
+	struct mkgui_pathbar_data *pb = find_pathbar_data(win, id);
 	if(!pb) {
 		return;
 	}
 	snprintf(pb->path, sizeof(pb->path), "%s", path);
-	pathbar_rebuild_segments(ctx, pb);
+	pathbar_rebuild_segments(win, pb);
 	if(pb->editing) {
 		pathbar_exit_edit(pb);
 	}
-	dirty_all(ctx);
+	dirty_all(win);
 }
 
 // [=]===^=[ mkgui_pathbar_get ]=====================================[=]
-MKGUI_API const char *mkgui_pathbar_get(struct mkgui_ctx *ctx, uint32_t id) {
-	MKGUI_CHECK_VAL(ctx, "");
-	struct mkgui_pathbar_data *pb = find_pathbar_data(ctx, id);
+MKGUI_API const char *mkgui_pathbar_get(struct mkgui_window *win, uint32_t id) {
+	MKGUI_CHECK_VAL(win, "");
+	struct mkgui_pathbar_data *pb = find_pathbar_data(win, id);
 	if(!pb) {
 		return "";
 	}
@@ -397,12 +397,12 @@ MKGUI_API const char *mkgui_pathbar_get(struct mkgui_ctx *ctx, uint32_t id) {
 }
 
 // [=]===^=[ mkgui_pathbar_get_segment_path ]========================[=]
-MKGUI_API void mkgui_pathbar_get_segment_path(struct mkgui_ctx *ctx, uint32_t id, uint32_t seg_idx, char *out, uint32_t out_size) {
-	MKGUI_CHECK(ctx);
+MKGUI_API void mkgui_pathbar_get_segment_path(struct mkgui_window *win, uint32_t id, uint32_t seg_idx, char *out, uint32_t out_size) {
+	MKGUI_CHECK(win);
 	if(!out || out_size == 0) {
 		return;
 	}
-	struct mkgui_pathbar_data *pb = find_pathbar_data(ctx, id);
+	struct mkgui_pathbar_data *pb = find_pathbar_data(win, id);
 	if(!pb) {
 		if(out_size > 0) {
 			out[0] = '\0';

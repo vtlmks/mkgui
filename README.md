@@ -78,16 +78,16 @@ OpenGL is only required if the application uses the `MKGUI_GLVIEW` widget (add `
 
 enum { ID_WIN = 0, ID_BTN = 1, ID_LBL = 2 };
 
-static void on_event(struct mkgui_ctx *ctx, struct mkgui_event *ev, void *userdata) {
+static void on_event(struct mkgui_window *win, struct mkgui_event *ev, void *userdata) {
     (void)userdata;
     switch(ev->type) {
         case MKGUI_EVENT_CLOSE: {
-            mkgui_quit(ctx);
+            mkgui_ctx_quit(mkgui_window_get_ctx(win));
         } break;
 
         case MKGUI_EVENT_CLICK: {
             if(ev->id == ID_BTN) {
-                mkgui_label_set(ctx, ID_LBL, "Clicked!");
+                mkgui_label_set(win, ID_LBL, "Clicked!");
             }
         } break;
     }
@@ -100,11 +100,17 @@ int main(void) {
         MKGUI_W(MKGUI_LABEL,  ID_LBL, "Ready", "", ID_WIN, 0, 0, 0, 0, 0),
     };
 
-    struct mkgui_ctx *ctx = mkgui_create(widgets, 3);
+    struct mkgui_ctx *ctx = mkgui_ctx_create();
     if(!ctx) return 1;
+    struct mkgui_window *win = mkgui_window_create(ctx, NULL, widgets, 3, NULL, 0, 0);
+    if(!win) {
+        mkgui_ctx_destroy(ctx);
+        return 1;
+    }
 
-    mkgui_run(ctx, on_event, NULL);
-    mkgui_destroy(ctx);
+    mkgui_ctx_run(ctx, on_event, NULL);
+    mkgui_window_destroy(win);
+    mkgui_ctx_destroy(ctx);
     return 0;
 }
 ```

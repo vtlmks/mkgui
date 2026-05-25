@@ -857,9 +857,9 @@ enum {
 };
 
 // [=]===^=[ draw_patch ]==========================================[=]
-static void draw_patch(struct mkgui_ctx *ctx, uint32_t style, int32_t x, int32_t y, int32_t w, int32_t h, uint32_t fill, uint32_t border) {
-	int32_t r = ctx->theme.corner_radius;
-	draw_rounded_rect(ctx->pixels, ctx->win_w, ctx->win_h, x, y, w, h, fill, border, r);
+static void draw_patch(struct mkgui_window *win, uint32_t style, int32_t x, int32_t y, int32_t w, int32_t h, uint32_t fill, uint32_t border) {
+	int32_t r = win->theme.corner_radius;
+	draw_rounded_rect(win->pixels, win->win_w, win->win_h, x, y, w, h, fill, border, r);
 
 	if(w > 2 && h > 2) {
 		int32_t inner_r = r > 1 ? r - 1 : 0;
@@ -870,14 +870,14 @@ static void draw_patch(struct mkgui_ctx *ctx, uint32_t style, int32_t x, int32_t
 			hl_inset = insets[0];
 		}
 		int32_t hl_y = y + 1;
-		if(hl_y >= 0 && hl_y < ctx->win_h && hl_y >= render_clip_y1 && hl_y < render_clip_y2) {
+		if(hl_y >= 0 && hl_y < win->win_h && hl_y >= render_clip_y1 && hl_y < render_clip_y2) {
 			uint32_t hl;
 			if(style == MKGUI_STYLE_SUNKEN) {
 				hl = shade_color(fill, -6);
 			} else {
 				hl = shade_color(fill, 8);
 			}
-			fill_span_clipped(ctx->pixels, ctx->win_w, hl_y, x + 1 + hl_inset, x + w - 1 - hl_inset, hl);
+			fill_span_clipped(win->pixels, win->win_w, hl_y, x + 1 + hl_inset, x + w - 1 - hl_inset, hl);
 		}
 	}
 }
@@ -913,17 +913,17 @@ static uint32_t utf8_decode(char *p, uint32_t *out_cp) {
 }
 
 // [=]===^=[ draw_text_sw ]=======================================[=]
-static void draw_text_sw(struct mkgui_ctx *ctx, uint32_t *buf, int32_t bw, int32_t x, int32_t y, char *text, uint32_t color, int32_t cx1, int32_t cy1, int32_t cx2, int32_t cy2) {
+static void draw_text_sw(struct mkgui_window *win, uint32_t *buf, int32_t bw, int32_t x, int32_t y, char *text, uint32_t color, int32_t cx1, int32_t cy1, int32_t cx2, int32_t cy2) {
 	int32_t cx = x;
 	for(char *p = text; *p; ) {
 		uint32_t ch;
 		uint32_t bytes = utf8_decode(p, &ch);
 		p += bytes;
 		if(ch < MKGUI_GLYPH_FIRST || ch > MKGUI_GLYPH_LAST) {
-			cx += ctx->char_width;
+			cx += win->char_width;
 			continue;
 		}
-		struct mkgui_glyph *g = &ctx->glyphs[ch - MKGUI_GLYPH_FIRST];
+		struct mkgui_glyph *g = &win->glyphs[ch - MKGUI_GLYPH_FIRST];
 
 		int32_t gx = cx + g->bearing_x;
 		if(gx >= cx2) {
@@ -935,7 +935,7 @@ static void draw_text_sw(struct mkgui_ctx *ctx, uint32_t *buf, int32_t bw, int32
 			continue;
 		}
 
-		int32_t gy = y + ctx->font_ascent - g->bearing_y;
+		int32_t gy = y + win->font_ascent - g->bearing_y;
 		int32_t col0 = cx1 - gx;
 		int32_t col1 = cx2 - gx;
 		if(col0 < 0) {
@@ -1066,7 +1066,7 @@ static void clip_intersect(int32_t *x1, int32_t *y1, int32_t *x2, int32_t *y2, i
 // text commands are queued in screen coordinates; ox/oy translate them into
 // the target buffer's local space so the same queue can flush to either the
 // main framebuffer (ox=0,oy=0) or a popup window at its own origin
-static void flush_text_to(struct mkgui_ctx *ctx, uint32_t *buf, int32_t bw, int32_t bh, int32_t ox, int32_t oy) {
+static void flush_text_to(struct mkgui_window *win, uint32_t *buf, int32_t bw, int32_t bh, int32_t ox, int32_t oy) {
 	for(uint32_t i = 0; i < text_cmd_count; ++i) {
 		struct mkgui_text_cmd *cmd = &text_cmds[i];
 		int32_t cx1 = cmd->clip_x1 - ox, cy1 = cmd->clip_y1 - oy;
@@ -1075,56 +1075,56 @@ static void flush_text_to(struct mkgui_ctx *ctx, uint32_t *buf, int32_t bw, int3
 		if(cx1 >= cx2 || cy1 >= cy2) {
 			continue;
 		}
-		draw_text_sw(ctx, buf, bw, cmd->x - ox, cmd->y - oy, cmd->text, cmd->color, cx1, cy1, cx2, cy2);
+		draw_text_sw(win, buf, bw, cmd->x - ox, cmd->y - oy, cmd->text, cmd->color, cx1, cy1, cx2, cy2);
 	}
 	text_cmd_count = 0;
 }
 
 // [=]===^=[ flush_text ]========================================[=]
-static void flush_text(struct mkgui_ctx *ctx) {
-	flush_text_to(ctx, ctx->pixels, ctx->win_w, ctx->win_h, 0, 0);
+static void flush_text(struct mkgui_window *win) {
+	flush_text_to(win, win->pixels, win->win_w, win->win_h, 0, 0);
 }
 
 // [=]===^=[ flush_text_popup ]==================================[=]
-static void flush_text_popup(struct mkgui_ctx *ctx, struct mkgui_popup *p) {
-	flush_text_to(ctx, p->pixels, p->w, p->h, p->x, p->y);
+static void flush_text_popup(struct mkgui_window *win, struct mkgui_popup *p) {
+	flush_text_to(win, p->pixels, p->w, p->h, p->x, p->y);
 }
 
 // [=]===^=[ text_width ]========================================[=]
-static int32_t text_width(struct mkgui_ctx *ctx, char *text) {
+static int32_t text_width(struct mkgui_window *win, char *text) {
 	int32_t w = 0;
 	for(char *p = text; *p; ) {
 		uint32_t ch;
 		uint32_t bytes = utf8_decode(p, &ch);
 		p += bytes;
 		if(ch >= MKGUI_GLYPH_FIRST && ch <= MKGUI_GLYPH_LAST) {
-			w += ctx->glyphs[ch - MKGUI_GLYPH_FIRST].advance;
+			w += win->glyphs[ch - MKGUI_GLYPH_FIRST].advance;
 		} else {
-			w += ctx->char_width;
+			w += win->char_width;
 		}
 	}
 	return w;
 }
 
 // [=]===^=[ label_text_width ]=====================================[=]
-static int32_t label_text_width(struct mkgui_ctx *ctx, struct mkgui_widget *w) {
+static int32_t label_text_width(struct mkgui_window *win, struct mkgui_widget *w) {
 	if(w->label_tw >= 0) {
 		return w->label_tw;
 	}
-	w->label_tw = text_width(ctx, w->label);
+	w->label_tw = text_width(win, w->label);
 	return w->label_tw;
 }
 
 // [=]===^=[ text_truncate ]=====================================[=]
-static char *text_truncate(struct mkgui_ctx *ctx, char *text, int32_t max_w) {
+static char *text_truncate(struct mkgui_window *win, char *text, int32_t max_w) {
 	static char buf[MKGUI_MAX_TEXT];
-	int32_t tw = text_width(ctx, text);
+	int32_t tw = text_width(win, text);
 	if(tw <= max_w) {
 		return text;
 	}
 	int32_t dots_w = 0;
 	for(uint32_t i = 0; i < 3; ++i) {
-		dots_w += ctx->glyphs['.' - MKGUI_GLYPH_FIRST].advance;
+		dots_w += win->glyphs['.' - MKGUI_GLYPH_FIRST].advance;
 	}
 	int32_t budget = max_w - dots_w;
 	if(budget <= 0) {
@@ -1138,9 +1138,9 @@ static char *text_truncate(struct mkgui_ctx *ctx, char *text, int32_t max_w) {
 		uint32_t bytes = utf8_decode(p, &ch);
 		int32_t adv;
 		if(ch >= MKGUI_GLYPH_FIRST && ch <= MKGUI_GLYPH_LAST) {
-			adv = ctx->glyphs[ch - MKGUI_GLYPH_FIRST].advance;
+			adv = win->glyphs[ch - MKGUI_GLYPH_FIRST].advance;
 		} else {
-			adv = ctx->char_width;
+			adv = win->char_width;
 		}
 
 		if(w + adv > budget) {

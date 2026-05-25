@@ -53,7 +53,7 @@ palette, code generation, rendering, or event handling.
 5. **Aux data initialization**
    If the widget has aux data, add a case to `init_widget_aux()` in mkgui.c
    that allocates and initializes the aux struct. Add a matching cleanup case
-   to the per-type aux removal path so `mkgui_remove_widget` frees any
+   to the per-type aux removal path so `mkgui_widget_remove` frees any
    allocations.
 
 6. **Event dispatch**

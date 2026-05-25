@@ -118,29 +118,29 @@ static uint32_t treeview_is_last_visible_child(struct mkgui_treeview_data *tv, u
 }
 
 // [=]===^=[ render_treeview ]====================================[=]
-static void render_treeview(struct mkgui_ctx *ctx, uint32_t idx) {
-	struct mkgui_widget *w = &ctx->widgets[idx];
-	int32_t rx = ctx->rects[idx].x;
-	int32_t ry = ctx->rects[idx].y;
-	int32_t rw = ctx->rects[idx].w;
-	int32_t rh = ctx->rects[idx].h;
+static void render_treeview(struct mkgui_window *win, uint32_t idx) {
+	struct mkgui_widget *w = &win->widgets[idx];
+	int32_t rx = win->rects[idx].x;
+	int32_t ry = win->rects[idx].y;
+	int32_t rw = win->rects[idx].w;
+	int32_t rh = win->rects[idx].h;
 
 	uint32_t disabled = (w->flags & MKGUI_DISABLED);
-	uint32_t focused = (ctx->focus_id == w->id);
-	uint32_t frame_bg = disabled_blend(ctx->theme.input_bg, ctx->theme.bg, disabled);
-	uint32_t frame_border = disabled_blend(focused ? ctx->theme.highlight : ctx->theme.widget_border, ctx->theme.bg, disabled);
-	draw_patch(ctx, MKGUI_STYLE_SUNKEN, rx, ry, rw, rh, frame_bg, frame_border);
+	uint32_t focused = (win->focus_id == w->id);
+	uint32_t frame_bg = disabled_blend(win->theme.input_bg, win->theme.bg, disabled);
+	uint32_t frame_border = disabled_blend(focused ? win->theme.highlight : win->theme.widget_border, win->theme.bg, disabled);
+	draw_patch(win, MKGUI_STYLE_SUNKEN, rx, ry, rw, rh, frame_bg, frame_border);
 
-	struct mkgui_treeview_data *tv = find_treeview_data(ctx, w->id);
+	struct mkgui_treeview_data *tv = find_treeview_data(win, w->id);
 	if(!tv) {
 		return;
 	}
 	tv_idx_build(tv);
 
-	int32_t tree_indent = sc(ctx, MKGUI_TREE_INDENT_PX);
-	int32_t arrow_size = sc(ctx, MKGUI_TREE_ARROW_SIZE_PX);
-	int32_t tree_pad = sc(ctx, MKGUI_TREE_PAD_PX);
-	int32_t icon_gap = sc(ctx, MKGUI_TREE_ICON_GAP_PX);
+	int32_t tree_indent = sc(win, MKGUI_TREE_INDENT_PX);
+	int32_t arrow_size = sc(win, MKGUI_TREE_ARROW_SIZE_PX);
+	int32_t tree_pad = sc(win, MKGUI_TREE_PAD_PX);
+	int32_t icon_gap = sc(win, MKGUI_TREE_ICON_GAP_PX);
 
 	int32_t clip_top = ry + 1;
 	int32_t clip_bottom = ry + rh - 1;
@@ -152,7 +152,7 @@ static void render_treeview(struct mkgui_ctx *ctx, uint32_t idx) {
 			++vis_count;
 		}
 	}
-	int32_t max_scroll = (int32_t)vis_count * ctx->row_height - view_h;
+	int32_t max_scroll = (int32_t)vis_count * win->row_height - view_h;
 	if(max_scroll < 0) {
 		max_scroll = 0;
 	}
@@ -168,7 +168,7 @@ static void render_treeview(struct mkgui_ctx *ctx, uint32_t idx) {
 	int32_t draw_y = ry + 1 - tv->scroll_y;
 
 	uint32_t line_active[32] = {0};
-	uint32_t line_color = shade_color(ctx->theme.widget_border, 20);
+	uint32_t line_color = shade_color(win->theme.widget_border, 20);
 
 	for(uint32_t i = 0; i < tv->node_count; ++i) {
 		if(!treeview_node_visible(tv, i)) {
@@ -176,8 +176,8 @@ static void render_treeview(struct mkgui_ctx *ctx, uint32_t idx) {
 		}
 
 		int32_t row_y = draw_y;
-		int32_t row_end = draw_y + ctx->row_height;
-		draw_y += ctx->row_height;
+		int32_t row_end = draw_y + win->row_height;
+		draw_y += win->row_height;
 
 		uint32_t depth = treeview_node_depth(tv, i);
 		uint32_t is_last = treeview_is_last_visible_child(tv, i);
@@ -204,37 +204,37 @@ static void render_treeview(struct mkgui_ctx *ctx, uint32_t idx) {
 			for(uint32_t d = 0; d + 1 < depth; ++d) {
 				if(line_active[d]) {
 					int32_t lx = rx + tree_pad + (int32_t)d * tree_indent + tree_indent / 2;
-					draw_vline(ctx->pixels, ctx->win_w, ctx->win_h, lx, row_y, ctx->row_height, line_color);
+					draw_vline(win->pixels, win->win_w, win->win_h, lx, row_y, win->row_height, line_color);
 				}
 			}
 
 			int32_t lx = rx + tree_pad + (int32_t)(depth - 1) * tree_indent + tree_indent / 2;
-			int32_t cy = row_y + ctx->row_height / 2;
+			int32_t cy = row_y + win->row_height / 2;
 			if(is_last) {
-				draw_vline(ctx->pixels, ctx->win_w, ctx->win_h, lx, row_y, ctx->row_height / 2 + 1, line_color);
+				draw_vline(win->pixels, win->win_w, win->win_h, lx, row_y, win->row_height / 2 + 1, line_color);
 			} else {
-				draw_vline(ctx->pixels, ctx->win_w, ctx->win_h, lx, row_y, ctx->row_height, line_color);
+				draw_vline(win->pixels, win->win_w, win->win_h, lx, row_y, win->row_height, line_color);
 			}
-			int32_t hlen = tv->nodes[i].has_children ? tree_indent / 2 - 1 : tree_indent + tree_indent / 2 - sc(ctx, 4) - 1;
-			draw_hline(ctx->pixels, ctx->win_w, ctx->win_h, lx + 1, cy, hlen, line_color);
+			int32_t hlen = tv->nodes[i].has_children ? tree_indent / 2 - 1 : tree_indent + tree_indent / 2 - sc(win, 4) - 1;
+			draw_hline(win->pixels, win->win_w, win->win_h, lx + 1, cy, hlen, line_color);
 		}
 
 		if((int32_t)tv->nodes[i].id == tv->selected_node) {
 			int32_t dy = row_y < clip_top ? clip_top : row_y;
 			int32_t de = row_end > clip_bottom ? clip_bottom : row_end;
-			draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, rx + 1, dy, rw - 2, de - dy, ctx->theme.selection);
+			draw_rect_fill(win->pixels, win->win_w, win->win_h, rx + 1, dy, rw - 2, de - dy, win->theme.selection);
 		}
 
 		if(tv->nodes[i].has_children) {
 			int32_t ax = rx + tree_pad + indent;
-			int32_t ay = row_y + ctx->row_height / 2;
+			int32_t ay = row_y + win->row_height / 2;
 
 			if(ay >= clip_top && ay < clip_bottom) {
 				int32_t as = arrow_size;
 				if(tv->nodes[i].expanded) {
-					draw_triangle_aa(ctx->pixels, ctx->win_w, ctx->win_h, ax, ay - as / 2, ax + as, ay - as / 2, ax + as / 2, ay + as / 2, ctx->theme.text);
+					draw_triangle_aa(win->pixels, win->win_w, win->win_h, ax, ay - as / 2, ax + as, ay - as / 2, ax + as / 2, ay + as / 2, win->theme.text);
 				} else {
-					draw_triangle_aa(ctx->pixels, ctx->win_w, ctx->win_h, ax, ay - as / 2, ax + as, ay, ax, ay + as / 2, ctx->theme.text);
+					draw_triangle_aa(win->pixels, win->win_w, win->win_h, ax, ay - as / 2, ax + as, ay, ax, ay + as / 2, win->theme.text);
 				}
 			}
 		}
@@ -242,14 +242,14 @@ static void render_treeview(struct mkgui_ctx *ctx, uint32_t idx) {
 		int32_t text_x = rx + tree_pad + indent + tree_indent;
 		if(tv->nodes[i].icon_idx >= 0 && tv->nodes[i].icon_idx < (int32_t)icon_count) {
 			int32_t ti = tv->nodes[i].icon_idx;
-			int32_t iy = row_y + (ctx->row_height - icons[ti].h) / 2;
-			draw_icon(ctx->pixels, ctx->win_w, ctx->win_h, &icons[ti], text_x, iy, rx + 1, clip_top, rx + rw - 1, clip_bottom);
+			int32_t iy = row_y + (win->row_height - icons[ti].h) / 2;
+			draw_icon(win->pixels, win->win_w, win->win_h, &icons[ti], text_x, iy, rx + 1, clip_top, rx + rw - 1, clip_bottom);
 			text_x += icons[ti].w + icon_gap;
 		}
-		int32_t ty = row_y + (ctx->row_height - ctx->font_height) / 2;
-		if(ty >= clip_top && ty + ctx->font_height <= clip_bottom) {
-			if(!(ctx->cell_edit.active && ctx->cell_edit.widget_id == w->id && ctx->cell_edit.row == (int32_t)tv->nodes[i].id)) {
-				uint32_t tc = ((int32_t)tv->nodes[i].id == tv->selected_node) ? ctx->theme.sel_text : ((w->flags & MKGUI_DISABLED) ? ctx->theme.text_disabled : ctx->theme.text);
+		int32_t ty = row_y + (win->row_height - win->font_height) / 2;
+		if(ty >= clip_top && ty + win->font_height <= clip_bottom) {
+			if(!(win->cell_edit.active && win->cell_edit.widget_id == w->id && win->cell_edit.row == (int32_t)tv->nodes[i].id)) {
+				uint32_t tc = ((int32_t)tv->nodes[i].id == tv->selected_node) ? win->theme.sel_text : ((w->flags & MKGUI_DISABLED) ? win->theme.text_disabled : win->theme.text);
 				push_text_clip(text_x, ty, tv->nodes[i].label, tc, rx + 1, clip_top, rx + rw - 1, clip_bottom);
 			}
 		}
@@ -266,21 +266,21 @@ static void render_treeview(struct mkgui_ctx *ctx, uint32_t idx) {
 		}
 
 		if(treeview_node_visible(tv, (uint32_t)tv->drag_target)) {
-			int32_t dot_sz = sc(ctx, 5);
+			int32_t dot_sz = sc(win, 5);
 			int32_t line_y;
 			if(tv->drag_pos == 0) {
-				line_y = ry + 1 - tv->scroll_y + vis * ctx->row_height;
+				line_y = ry + 1 - tv->scroll_y + vis * win->row_height;
 			} else if(tv->drag_pos == 2) {
 				indent = (int32_t)(depth + 1) * tree_indent + tree_indent + tree_pad;
-				line_y = ry + 1 - tv->scroll_y + vis * ctx->row_height + ctx->row_height / 2;
+				line_y = ry + 1 - tv->scroll_y + vis * win->row_height + win->row_height / 2;
 			} else {
-				line_y = ry + 1 - tv->scroll_y + (vis + 1) * ctx->row_height;
+				line_y = ry + 1 - tv->scroll_y + (vis + 1) * win->row_height;
 			}
 
 			if(line_y >= clip_top && line_y < clip_bottom) {
-				draw_hline(ctx->pixels, ctx->win_w, ctx->win_h, rx + indent, line_y, rw - indent - 2, ctx->theme.accent);
-				draw_hline(ctx->pixels, ctx->win_w, ctx->win_h, rx + indent, line_y - 1, rw - indent - 2, ctx->theme.accent);
-				draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, rx + indent - 2, line_y - 2, dot_sz, dot_sz, ctx->theme.accent);
+				draw_hline(win->pixels, win->win_w, win->win_h, rx + indent, line_y, rw - indent - 2, win->theme.accent);
+				draw_hline(win->pixels, win->win_w, win->win_h, rx + indent, line_y - 1, rw - indent - 2, win->theme.accent);
+				draw_rect_fill(win->pixels, win->win_w, win->win_h, rx + indent - 2, line_y - 2, dot_sz, dot_sz, win->theme.accent);
 			}
 		}
 	}
@@ -299,17 +299,17 @@ static uint32_t treeview_visible_count(struct mkgui_treeview_data *tv) {
 }
 
 // [=]===^=[ treeview_clamp_scroll ]==============================[=]
-static void treeview_clamp_scroll(struct mkgui_ctx *ctx, uint32_t widget_id) {
-	struct mkgui_treeview_data *tv = find_treeview_data(ctx, widget_id);
+static void treeview_clamp_scroll(struct mkgui_window *win, uint32_t widget_id) {
+	struct mkgui_treeview_data *tv = find_treeview_data(win, widget_id);
 	if(!tv) {
 		return;
 	}
-	int32_t idx = find_widget_idx(ctx, widget_id);
+	int32_t idx = find_widget_idx(win, widget_id);
 	if(idx < 0) {
 		return;
 	}
-	int32_t content_h = (int32_t)treeview_visible_count(tv) * ctx->row_height;
-	int32_t view_h = ctx->rects[idx].h - 2;
+	int32_t content_h = (int32_t)treeview_visible_count(tv) * win->row_height;
+	int32_t view_h = win->rects[idx].h - 2;
 	int32_t max_scroll = content_h - view_h;
 	if(max_scroll < 0) {
 		max_scroll = 0;
@@ -325,17 +325,17 @@ static void treeview_clamp_scroll(struct mkgui_ctx *ctx, uint32_t widget_id) {
 }
 
 // [=]===^=[ treeview_row_hit ]===================================[=]
-static int32_t treeview_row_hit(struct mkgui_ctx *ctx, uint32_t widget_idx, int32_t my) {
-	struct mkgui_widget *w = &ctx->widgets[widget_idx];
-	struct mkgui_treeview_data *tv = find_treeview_data(ctx, w->id);
+static int32_t treeview_row_hit(struct mkgui_window *win, uint32_t widget_idx, int32_t my) {
+	struct mkgui_widget *w = &win->widgets[widget_idx];
+	struct mkgui_treeview_data *tv = find_treeview_data(win, w->id);
 	if(!tv) {
 		return -1;
 	}
 
 	tv_idx_build(tv);
-	int32_t ry = ctx->rects[widget_idx].y;
+	int32_t ry = win->rects[widget_idx].y;
 	int32_t local_y = my - ry - 1 + tv->scroll_y;
-	int32_t vis_row = local_y / ctx->row_height;
+	int32_t vis_row = local_y / win->row_height;
 
 	int32_t count = 0;
 	for(uint32_t i = 0; i < tv->node_count; ++i) {
@@ -352,9 +352,9 @@ static int32_t treeview_row_hit(struct mkgui_ctx *ctx, uint32_t widget_idx, int3
 }
 
 // [=]===^=[ treeview_arrow_hit ]=================================[=]
-static uint32_t treeview_arrow_hit(struct mkgui_ctx *ctx, uint32_t widget_idx, int32_t mx, int32_t node_idx) {
-	struct mkgui_widget *w = &ctx->widgets[widget_idx];
-	struct mkgui_treeview_data *tv = find_treeview_data(ctx, w->id);
+static uint32_t treeview_arrow_hit(struct mkgui_window *win, uint32_t widget_idx, int32_t mx, int32_t node_idx) {
+	struct mkgui_widget *w = &win->widgets[widget_idx];
+	struct mkgui_treeview_data *tv = find_treeview_data(win, w->id);
 	if(!tv || node_idx < 0 || (uint32_t)node_idx >= tv->node_count) {
 		return 0;
 	}
@@ -363,17 +363,17 @@ static uint32_t treeview_arrow_hit(struct mkgui_ctx *ctx, uint32_t widget_idx, i
 		return 0;
 	}
 	tv_idx_build(tv);
-	int32_t tree_indent = sc(ctx, MKGUI_TREE_INDENT_PX);
-	int32_t tree_pad = sc(ctx, MKGUI_TREE_PAD_PX);
+	int32_t tree_indent = sc(win, MKGUI_TREE_INDENT_PX);
+	int32_t tree_pad = sc(win, MKGUI_TREE_PAD_PX);
 	uint32_t depth = treeview_node_depth(tv, (uint32_t)node_idx);
-	int32_t rx = ctx->rects[widget_idx].x;
+	int32_t rx = win->rects[widget_idx].x;
 	int32_t arrow_x = rx + tree_pad + (int32_t)depth * tree_indent;
 	return (mx >= arrow_x && mx < arrow_x + tree_indent);
 }
 
 // [=]===^=[ handle_treeview_key ]================================[=]
-static uint32_t handle_treeview_key(struct mkgui_ctx *ctx, struct mkgui_event *ev, uint32_t ks) {
-	struct mkgui_treeview_data *tv = find_treeview_data(ctx, ctx->focus_id);
+static uint32_t handle_treeview_key(struct mkgui_window *win, struct mkgui_event *ev, uint32_t ks) {
+	struct mkgui_treeview_data *tv = find_treeview_data(win, win->focus_id);
 	if(!tv || tv->node_count == 0) {
 		return 0;
 	}
@@ -395,10 +395,10 @@ static uint32_t handle_treeview_key(struct mkgui_ctx *ctx, struct mkgui_event *e
 
 		if(prev >= 0) {
 			tv->selected_node = (int32_t)tv->nodes[prev].id;
-			dirty_all(ctx);
-			treeview_clamp_scroll(ctx, ctx->focus_id);
+			dirty_all(win);
+			treeview_clamp_scroll(win, win->focus_id);
 			ev->type = MKGUI_EVENT_TREEVIEW_SELECT;
-			ev->id = ctx->focus_id;
+			ev->id = win->focus_id;
 			ev->value = tv->selected_node;
 			return 1;
 		}
@@ -413,10 +413,10 @@ static uint32_t handle_treeview_key(struct mkgui_ctx *ctx, struct mkgui_event *e
 
 			if(found) {
 				tv->selected_node = (int32_t)tv->nodes[i].id;
-				dirty_all(ctx);
-				treeview_clamp_scroll(ctx, ctx->focus_id);
+				dirty_all(win);
+				treeview_clamp_scroll(win, win->focus_id);
 				ev->type = MKGUI_EVENT_TREEVIEW_SELECT;
-				ev->id = ctx->focus_id;
+				ev->id = win->focus_id;
 				ev->value = tv->selected_node;
 				return 1;
 			}
@@ -431,9 +431,9 @@ static uint32_t handle_treeview_key(struct mkgui_ctx *ctx, struct mkgui_event *e
 		for(uint32_t i = 0; i < tv->node_count; ++i) {
 			if((int32_t)tv->nodes[i].id == tv->selected_node && tv->nodes[i].has_children && !tv->nodes[i].expanded) {
 				tv->nodes[i].expanded = 1;
-				dirty_all(ctx);
+				dirty_all(win);
 				ev->type = MKGUI_EVENT_TREEVIEW_EXPAND;
-				ev->id = ctx->focus_id;
+				ev->id = win->focus_id;
 				ev->value = tv->selected_node;
 				return 1;
 			}
@@ -460,8 +460,8 @@ static uint32_t handle_treeview_key(struct mkgui_ctx *ctx, struct mkgui_event *e
 		if(vis_total == 0) {
 			return 0;
 		}
-		int32_t idx = find_widget_idx(ctx, ctx->focus_id);
-		int32_t page = idx >= 0 ? (ctx->rects[idx].h - 2) / ctx->row_height : 10;
+		int32_t idx = find_widget_idx(win, win->focus_id);
+		int32_t page = idx >= 0 ? (win->rects[idx].h - 2) / win->row_height : 10;
 		if(page < 1) {
 			page = 1;
 		}
@@ -491,10 +491,10 @@ static uint32_t handle_treeview_key(struct mkgui_ctx *ctx, struct mkgui_event *e
 
 			if((int32_t)vis_cur == target) {
 				tv->selected_node = (int32_t)tv->nodes[i].id;
-				dirty_all(ctx);
-				treeview_clamp_scroll(ctx, ctx->focus_id);
+				dirty_all(win);
+				treeview_clamp_scroll(win, win->focus_id);
 				ev->type = MKGUI_EVENT_TREEVIEW_SELECT;
-				ev->id = ctx->focus_id;
+				ev->id = win->focus_id;
 				ev->value = tv->selected_node;
 				return 1;
 			}
@@ -507,18 +507,18 @@ static uint32_t handle_treeview_key(struct mkgui_ctx *ctx, struct mkgui_event *e
 			if((int32_t)tv->nodes[i].id == tv->selected_node) {
 				if(tv->nodes[i].has_children && tv->nodes[i].expanded) {
 					tv->nodes[i].expanded = 0;
-					dirty_all(ctx);
+					dirty_all(win);
 					ev->type = MKGUI_EVENT_TREEVIEW_COLLAPSE;
-					ev->id = ctx->focus_id;
+					ev->id = win->focus_id;
 					ev->value = tv->selected_node;
 					return 1;
 
 				} else if(tv->nodes[i].parent_node != 0) {
 					tv->selected_node = (int32_t)tv->nodes[i].parent_node;
-					dirty_all(ctx);
-					treeview_clamp_scroll(ctx, ctx->focus_id);
+					dirty_all(win);
+					treeview_clamp_scroll(win, win->focus_id);
 					ev->type = MKGUI_EVENT_TREEVIEW_SELECT;
-					ev->id = ctx->focus_id;
+					ev->id = win->focus_id;
 					ev->value = tv->selected_node;
 					return 1;
 				}
@@ -535,9 +535,9 @@ static uint32_t handle_treeview_key(struct mkgui_ctx *ctx, struct mkgui_event *e
 }
 
 // [=]===^=[ mkgui_treeview_setup ]===============================[=]
-MKGUI_API void mkgui_treeview_setup(struct mkgui_ctx *ctx, uint32_t id) {
-	MKGUI_CHECK(ctx);
-	struct mkgui_treeview_data *tv = find_treeview_data(ctx, id);
+MKGUI_API void mkgui_treeview_setup(struct mkgui_window *win, uint32_t id) {
+	MKGUI_CHECK(win);
+	struct mkgui_treeview_data *tv = find_treeview_data(win, id);
 	if(tv) {
 		tv->node_count = 0;
 		tv->selected_node = -1;
@@ -547,17 +547,17 @@ MKGUI_API void mkgui_treeview_setup(struct mkgui_ctx *ctx, uint32_t id) {
 		}
 		tv->nodes = (struct mkgui_treeview_node *)calloc(256, sizeof(struct mkgui_treeview_node));
 		tv->node_cap = 256;
-		dirty_all(ctx);
+		dirty_all(win);
 	}
 }
 
 // [=]===^=[ mkgui_treeview_add ]=================================[=]
-MKGUI_API uint32_t mkgui_treeview_add(struct mkgui_ctx *ctx, uint32_t widget_id, uint32_t node_id, uint32_t parent_node, const char *label) {
-	MKGUI_CHECK_VAL(ctx, 0);
+MKGUI_API uint32_t mkgui_treeview_add(struct mkgui_window *win, uint32_t widget_id, uint32_t node_id, uint32_t parent_node, const char *label) {
+	MKGUI_CHECK_VAL(win, 0);
 	if(!label) {
 		label = "";
 	}
-	struct mkgui_treeview_data *tv = find_treeview_data(ctx, widget_id);
+	struct mkgui_treeview_data *tv = find_treeview_data(win, widget_id);
 	if(!tv || !tv->nodes) {
 		return 0;
 	}
@@ -595,32 +595,32 @@ MKGUI_API uint32_t mkgui_treeview_add(struct mkgui_ctx *ctx, uint32_t widget_id,
 	}
 	tv->order_dirty = 1;
 
-	dirty_all(ctx);
+	dirty_all(win);
 	return node_id;
 }
 
 // [=]===^=[ mkgui_treeview_get_selected ]========================[=]
-MKGUI_API int32_t mkgui_treeview_get_selected(struct mkgui_ctx *ctx, uint32_t id) {
-	MKGUI_CHECK_VAL(ctx, -1);
-	struct mkgui_treeview_data *tv = find_treeview_data(ctx, id);
+MKGUI_API int32_t mkgui_treeview_get_selected(struct mkgui_window *win, uint32_t id) {
+	MKGUI_CHECK_VAL(win, -1);
+	struct mkgui_treeview_data *tv = find_treeview_data(win, id);
 	return tv ? tv->selected_node : -1;
 }
 
 // [=]===^=[ mkgui_treeview_select ]==============================[=]
-MKGUI_API void mkgui_treeview_select(struct mkgui_ctx *ctx, uint32_t widget_id, int32_t node_id) {
-	MKGUI_CHECK(ctx);
-	struct mkgui_treeview_data *tv = find_treeview_data(ctx, widget_id);
+MKGUI_API void mkgui_treeview_select(struct mkgui_window *win, uint32_t widget_id, int32_t node_id) {
+	MKGUI_CHECK(win);
+	struct mkgui_treeview_data *tv = find_treeview_data(win, widget_id);
 	if(!tv) {
 		return;
 	}
 	tv->selected_node = node_id;
-	dirty_all(ctx);
+	dirty_all(win);
 }
 
 // [=]===^=[ mkgui_treeview_remove ]================================[=]
-MKGUI_API void mkgui_treeview_remove(struct mkgui_ctx *ctx, uint32_t widget_id, uint32_t node_id) {
-	MKGUI_CHECK(ctx);
-	struct mkgui_treeview_data *tv = find_treeview_data(ctx, widget_id);
+MKGUI_API void mkgui_treeview_remove(struct mkgui_window *win, uint32_t widget_id, uint32_t node_id) {
+	MKGUI_CHECK(win);
+	struct mkgui_treeview_data *tv = find_treeview_data(win, widget_id);
 	if(!tv) {
 		return;
 	}
@@ -662,29 +662,29 @@ MKGUI_API void mkgui_treeview_remove(struct mkgui_ctx *ctx, uint32_t widget_id, 
 		tv->selected_node = -1;
 	}
 	tv_idx_build(tv);
-	dirty_all(ctx);
+	dirty_all(win);
 }
 
 // [=]===^=[ mkgui_treeview_clear ]=================================[=]
-MKGUI_API void mkgui_treeview_clear(struct mkgui_ctx *ctx, uint32_t widget_id) {
-	MKGUI_CHECK(ctx);
-	struct mkgui_treeview_data *tv = find_treeview_data(ctx, widget_id);
+MKGUI_API void mkgui_treeview_clear(struct mkgui_window *win, uint32_t widget_id) {
+	MKGUI_CHECK(win);
+	struct mkgui_treeview_data *tv = find_treeview_data(win, widget_id);
 	if(!tv) {
 		return;
 	}
 	tv->node_count = 0;
 	tv->selected_node = -1;
 	tv->scroll_y = 0;
-	dirty_all(ctx);
+	dirty_all(win);
 }
 
 // [=]===^=[ mkgui_treeview_set_label ]=============================[=]
-MKGUI_API void mkgui_treeview_set_label(struct mkgui_ctx *ctx, uint32_t widget_id, uint32_t node_id, const char *label) {
-	MKGUI_CHECK(ctx);
+MKGUI_API void mkgui_treeview_set_label(struct mkgui_window *win, uint32_t widget_id, uint32_t node_id, const char *label) {
+	MKGUI_CHECK(win);
 	if(!label) {
 		label = "";
 	}
-	struct mkgui_treeview_data *tv = find_treeview_data(ctx, widget_id);
+	struct mkgui_treeview_data *tv = find_treeview_data(win, widget_id);
 	if(!tv) {
 		return;
 	}
@@ -692,16 +692,16 @@ MKGUI_API void mkgui_treeview_set_label(struct mkgui_ctx *ctx, uint32_t widget_i
 		if(tv->nodes[i].id == node_id) {
 			strncpy(tv->nodes[i].label, label, MKGUI_MAX_TEXT - 1);
 			tv->nodes[i].label[MKGUI_MAX_TEXT - 1] = '\0';
-			dirty_all(ctx);
+			dirty_all(win);
 			return;
 		}
 	}
 }
 
 // [=]===^=[ mkgui_treeview_get_label ]=============================[=]
-MKGUI_API const char *mkgui_treeview_get_label(struct mkgui_ctx *ctx, uint32_t widget_id, uint32_t node_id) {
-	MKGUI_CHECK_VAL(ctx, "");
-	struct mkgui_treeview_data *tv = find_treeview_data(ctx, widget_id);
+MKGUI_API const char *mkgui_treeview_get_label(struct mkgui_window *win, uint32_t widget_id, uint32_t node_id) {
+	MKGUI_CHECK_VAL(win, "");
+	struct mkgui_treeview_data *tv = find_treeview_data(win, widget_id);
 	if(!tv) {
 		return "";
 	}
@@ -714,41 +714,41 @@ MKGUI_API const char *mkgui_treeview_get_label(struct mkgui_ctx *ctx, uint32_t w
 }
 
 // [=]===^=[ mkgui_treeview_expand ]================================[=]
-MKGUI_API void mkgui_treeview_expand(struct mkgui_ctx *ctx, uint32_t widget_id, uint32_t node_id) {
-	MKGUI_CHECK(ctx);
-	struct mkgui_treeview_data *tv = find_treeview_data(ctx, widget_id);
+MKGUI_API void mkgui_treeview_expand(struct mkgui_window *win, uint32_t widget_id, uint32_t node_id) {
+	MKGUI_CHECK(win);
+	struct mkgui_treeview_data *tv = find_treeview_data(win, widget_id);
 	if(!tv) {
 		return;
 	}
 	for(uint32_t i = 0; i < tv->node_count; ++i) {
 		if(tv->nodes[i].id == node_id) {
 			tv->nodes[i].expanded = 1;
-			dirty_all(ctx);
+			dirty_all(win);
 			return;
 		}
 	}
 }
 
 // [=]===^=[ mkgui_treeview_collapse ]==============================[=]
-MKGUI_API void mkgui_treeview_collapse(struct mkgui_ctx *ctx, uint32_t widget_id, uint32_t node_id) {
-	MKGUI_CHECK(ctx);
-	struct mkgui_treeview_data *tv = find_treeview_data(ctx, widget_id);
+MKGUI_API void mkgui_treeview_collapse(struct mkgui_window *win, uint32_t widget_id, uint32_t node_id) {
+	MKGUI_CHECK(win);
+	struct mkgui_treeview_data *tv = find_treeview_data(win, widget_id);
 	if(!tv) {
 		return;
 	}
 	for(uint32_t i = 0; i < tv->node_count; ++i) {
 		if(tv->nodes[i].id == node_id) {
 			tv->nodes[i].expanded = 0;
-			dirty_all(ctx);
+			dirty_all(win);
 			return;
 		}
 	}
 }
 
 // [=]===^=[ mkgui_treeview_is_expanded ]============================[=]
-MKGUI_API uint32_t mkgui_treeview_is_expanded(struct mkgui_ctx *ctx, uint32_t widget_id, uint32_t node_id) {
-	MKGUI_CHECK_VAL(ctx, 0);
-	struct mkgui_treeview_data *tv = find_treeview_data(ctx, widget_id);
+MKGUI_API uint32_t mkgui_treeview_is_expanded(struct mkgui_window *win, uint32_t widget_id, uint32_t node_id) {
+	MKGUI_CHECK_VAL(win, 0);
+	struct mkgui_treeview_data *tv = find_treeview_data(win, widget_id);
 	if(!tv) {
 		return 0;
 	}
@@ -761,9 +761,9 @@ MKGUI_API uint32_t mkgui_treeview_is_expanded(struct mkgui_ctx *ctx, uint32_t wi
 }
 
 // [=]===^=[ mkgui_treeview_expand_all ]=============================[=]
-MKGUI_API void mkgui_treeview_expand_all(struct mkgui_ctx *ctx, uint32_t widget_id) {
-	MKGUI_CHECK(ctx);
-	struct mkgui_treeview_data *tv = find_treeview_data(ctx, widget_id);
+MKGUI_API void mkgui_treeview_expand_all(struct mkgui_window *win, uint32_t widget_id) {
+	MKGUI_CHECK(win);
+	struct mkgui_treeview_data *tv = find_treeview_data(win, widget_id);
 	if(!tv) {
 		return;
 	}
@@ -772,26 +772,26 @@ MKGUI_API void mkgui_treeview_expand_all(struct mkgui_ctx *ctx, uint32_t widget_
 			tv->nodes[i].expanded = 1;
 		}
 	}
-	dirty_all(ctx);
+	dirty_all(win);
 }
 
 // [=]===^=[ mkgui_treeview_collapse_all ]============================[=]
-MKGUI_API void mkgui_treeview_collapse_all(struct mkgui_ctx *ctx, uint32_t widget_id) {
-	MKGUI_CHECK(ctx);
-	struct mkgui_treeview_data *tv = find_treeview_data(ctx, widget_id);
+MKGUI_API void mkgui_treeview_collapse_all(struct mkgui_window *win, uint32_t widget_id) {
+	MKGUI_CHECK(win);
+	struct mkgui_treeview_data *tv = find_treeview_data(win, widget_id);
 	if(!tv) {
 		return;
 	}
 	for(uint32_t i = 0; i < tv->node_count; ++i) {
 		tv->nodes[i].expanded = 0;
 	}
-	dirty_all(ctx);
+	dirty_all(win);
 }
 
 // [=]===^=[ mkgui_treeview_get_parent ]=============================[=]
-MKGUI_API uint32_t mkgui_treeview_get_parent(struct mkgui_ctx *ctx, uint32_t widget_id, uint32_t node_id) {
-	MKGUI_CHECK_VAL(ctx, 0);
-	struct mkgui_treeview_data *tv = find_treeview_data(ctx, widget_id);
+MKGUI_API uint32_t mkgui_treeview_get_parent(struct mkgui_window *win, uint32_t widget_id, uint32_t node_id) {
+	MKGUI_CHECK_VAL(win, 0);
+	struct mkgui_treeview_data *tv = find_treeview_data(win, widget_id);
 	if(!tv) {
 		return 0;
 	}
@@ -804,20 +804,20 @@ MKGUI_API uint32_t mkgui_treeview_get_parent(struct mkgui_ctx *ctx, uint32_t wid
 }
 
 // [=]===^=[ mkgui_treeview_node_count ]=============================[=]
-MKGUI_API uint32_t mkgui_treeview_node_count(struct mkgui_ctx *ctx, uint32_t widget_id) {
-	MKGUI_CHECK_VAL(ctx, 0);
-	struct mkgui_treeview_data *tv = find_treeview_data(ctx, widget_id);
+MKGUI_API uint32_t mkgui_treeview_node_count(struct mkgui_window *win, uint32_t widget_id) {
+	MKGUI_CHECK_VAL(win, 0);
+	struct mkgui_treeview_data *tv = find_treeview_data(win, widget_id);
 	return tv ? tv->node_count : 0;
 }
 
 // [=]===^=[ mkgui_treeview_scroll_to ]==============================[=]
-MKGUI_API void mkgui_treeview_scroll_to(struct mkgui_ctx *ctx, uint32_t widget_id, uint32_t node_id) {
-	MKGUI_CHECK(ctx);
-	struct mkgui_treeview_data *tv = find_treeview_data(ctx, widget_id);
+MKGUI_API void mkgui_treeview_scroll_to(struct mkgui_window *win, uint32_t widget_id, uint32_t node_id) {
+	MKGUI_CHECK(win);
+	struct mkgui_treeview_data *tv = find_treeview_data(win, widget_id);
 	if(!tv) {
 		return;
 	}
-	int32_t widx = find_widget_idx(ctx, widget_id);
+	int32_t widx = find_widget_idx(win, widget_id);
 	if(widx < 0) {
 		return;
 	}
@@ -828,16 +828,16 @@ MKGUI_API void mkgui_treeview_scroll_to(struct mkgui_ctx *ctx, uint32_t widget_i
 		}
 
 		if(tv->nodes[i].id == node_id) {
-			int32_t rh = ctx->rects[widx].h;
-			int32_t node_y = (int32_t)vis_row * ctx->row_height;
+			int32_t rh = win->rects[widx].h;
+			int32_t node_y = (int32_t)vis_row * win->row_height;
 			if(node_y < tv->scroll_y) {
 				tv->scroll_y = node_y;
 			}
 
-			if(node_y + ctx->row_height > tv->scroll_y + rh) {
-				tv->scroll_y = node_y + ctx->row_height - rh;
+			if(node_y + win->row_height > tv->scroll_y + rh) {
+				tv->scroll_y = node_y + win->row_height - rh;
 			}
-			dirty_all(ctx);
+			dirty_all(win);
 			return;
 		}
 		++vis_row;

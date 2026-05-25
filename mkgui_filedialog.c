@@ -616,7 +616,7 @@ static uint32_t fd_strcasestr(char *haystack, char *needle, uint32_t needle_len)
 }
 
 // [=]===^=[ fd_apply_filter ]=====================================[=]
-static void fd_apply_filter(struct mkgui_ctx *dlg) {
+static void fd_apply_filter(struct mkgui_window *dlg) {
 	fd->filtered_count = 0;
 	for(uint32_t i = 0; i < fd->entry_count; ++i) {
 		if(fd->entries[i].is_dir) {
@@ -655,7 +655,7 @@ static void fd_apply_filter(struct mkgui_ctx *dlg) {
 }
 
 // [=]===^=[ fd_clear_filter ]=====================================[=]
-static void fd_clear_filter(struct mkgui_ctx *dlg) {
+static void fd_clear_filter(struct mkgui_window *dlg) {
 	if(fd->filter_len == 0) {
 		return;
 	}
@@ -669,7 +669,7 @@ static void fd_clear_filter(struct mkgui_ctx *dlg) {
 // ---------------------------------------------------------------------------
 
 // [=]===^=[ fd_navigate ]========================================[=]
-static void fd_navigate(struct mkgui_ctx *dlg, const char *newpath) {
+static void fd_navigate(struct mkgui_window *dlg, const char *newpath) {
 	if(!mkgui_path_is_dir(newpath)) {
 		return;
 	}
@@ -697,7 +697,7 @@ static void fd_navigate(struct mkgui_ctx *dlg, const char *newpath) {
 }
 
 // [=]===^=[ fd_navigate_entry ]==================================[=]
-static void fd_navigate_entry(struct mkgui_ctx *dlg, int32_t idx) {
+static void fd_navigate_entry(struct mkgui_window *dlg, int32_t idx) {
 	if(idx < 0 || idx >= (int32_t)fd->entry_count) {
 		return;
 	}
@@ -735,7 +735,7 @@ static void fd_navigate_entry(struct mkgui_ctx *dlg, int32_t idx) {
 }
 
 // [=]===^=[ fd_navigate_up ]=====================================[=]
-static void fd_navigate_up(struct mkgui_ctx *dlg) {
+static void fd_navigate_up(struct mkgui_window *dlg) {
 	char *last = strrchr(fd->path, '/');
 #ifdef _WIN32
 	char *last_bs = strrchr(fd->path, '\\');
@@ -770,7 +770,7 @@ static void fd_navigate_up(struct mkgui_ctx *dlg) {
 }
 
 // [=]===^=[ fd_navigate_back ]====================================[=]
-static void fd_navigate_back(struct mkgui_ctx *dlg) {
+static void fd_navigate_back(struct mkgui_window *dlg) {
 	if(!fd_history_can_back()) {
 		return;
 	}
@@ -785,7 +785,7 @@ static void fd_navigate_back(struct mkgui_ctx *dlg) {
 }
 
 // [=]===^=[ fd_navigate_fwd ]=====================================[=]
-static void fd_navigate_fwd(struct mkgui_ctx *dlg) {
+static void fd_navigate_fwd(struct mkgui_window *dlg) {
 	if(!fd_history_can_fwd()) {
 		return;
 	}
@@ -849,7 +849,7 @@ static struct fd_entry *fd_filtered_entry(uint32_t row) {
 // ---------------------------------------------------------------------------
 
 // [=]===^=[ fd_build_results ]===================================[=]
-static void fd_build_results(struct mkgui_ctx *dlg) {
+static void fd_build_results(struct mkgui_window *dlg) {
 	fd_result_count = 0;
 
 	if(fd->mode == 1) {
@@ -901,7 +901,7 @@ static void fd_build_results(struct mkgui_ctx *dlg) {
 }
 
 // [=]===^=[ fd_confirm ]=========================================[=]
-static uint32_t fd_confirm(struct mkgui_ctx *dlg) {
+static uint32_t fd_confirm(struct mkgui_window *dlg) {
 	fd_build_results(dlg);
 	if(fd_result_count == 0) {
 		return 0;
@@ -916,7 +916,7 @@ static uint32_t fd_confirm(struct mkgui_ctx *dlg) {
 		}
 		char msg[FD_PATH_SIZE + 320];
 		snprintf(msg, sizeof(msg), "Overwrite existing file %s?", fname);
-		if(!mkgui_confirm_dialog(dlg, "Confirm Save", msg)) {
+		if(!mkgui_dialog_confirm(dlg, "Confirm Save", msg)) {
 			return 0;
 		}
 	}
@@ -996,7 +996,7 @@ static void fd_file_row_cb(uint32_t row, uint32_t col, char *buf, uint32_t buf_s
 }
 
 // [=]===^=[ fd_update_name_from_selection ]=======================[=]
-static void fd_update_name_from_selection(struct mkgui_ctx *dlg) {
+static void fd_update_name_from_selection(struct mkgui_window *dlg) {
 	struct mkgui_listview_data *lv = find_listv_data(dlg, FD_ID_FILES);
 	if(!lv) {
 		return;
@@ -1039,9 +1039,9 @@ static void fd_update_name_from_selection(struct mkgui_ctx *dlg) {
 }
 
 // [=]===^=[ fd_new_folder ]=======================================[=]
-static void fd_new_folder(struct mkgui_ctx *dlg) {
+static void fd_new_folder(struct mkgui_window *dlg) {
 	char name[256] = {0};
-	if(!mkgui_input_dialog(dlg, "New Folder", "Name:", "", name, sizeof(name))) {
+	if(!mkgui_dialog_input(dlg, "New Folder", "Name:", "", name, sizeof(name))) {
 		return;
 	}
 
@@ -1067,7 +1067,7 @@ static void fd_new_folder(struct mkgui_ctx *dlg) {
 // ---------------------------------------------------------------------------
 
 // [=]===^=[ fd_run_dialog ]=======================================[=]
-static uint32_t fd_run_dialog(struct mkgui_ctx *ctx, uint32_t mode, const struct mkgui_file_dialog_opts *opts) {
+static uint32_t fd_run_dialog(struct mkgui_window *win, uint32_t mode, const struct mkgui_file_dialog_opts *opts) {
 	fd = (struct fd_state *)calloc(1, sizeof(struct fd_state));
 	if(!fd) {
 		return 0;
@@ -1101,7 +1101,7 @@ static uint32_t fd_run_dialog(struct mkgui_ctx *ctx, uint32_t mode, const struct
 	fd_history_push(fd->path);
 	fd_scan_dir();
 
-	popup_destroy_all(ctx);
+	popup_destroy_all(win);
 
 	uint32_t multi = (mode == 0 && opts && opts->multi_select) ? MKGUI_LISTVIEW_MULTI_SELECT : 0;
 	char *confirm_label = (mode == 0) ? "Open" : "Save";
@@ -1151,11 +1151,11 @@ static uint32_t fd_run_dialog(struct mkgui_ctx *ctx, uint32_t mode, const struct
 	strncpy(widgets[confirm_idx].label, confirm_label, MKGUI_MAX_TEXT - 1);
 
 	uint32_t wcount = sizeof(widgets) / sizeof(widgets[0]);
-	struct mkgui_ctx *dlg = mkgui_create_child(ctx, widgets, wcount, title, FD_INIT_W, FD_INIT_H);
+	struct mkgui_window *dlg = mkgui_window_create(win->ctx, win, widgets, wcount, title, FD_INIT_W, FD_INIT_H);
 	if(!dlg) {
 		return 0;
 	}
-	mkgui_set_window_instance(dlg, "filedialog");
+	mkgui_window_set_instance(dlg, "filedialog");
 
 	mkgui_pathbar_set(dlg, FD_ID_PATHBAR, fd->path);
 
@@ -1198,7 +1198,7 @@ static uint32_t fd_run_dialog(struct mkgui_ctx *ctx, uint32_t mode, const struct
 	uint32_t running = 1;
 	struct mkgui_event ev;
 	while(running) {
-		while(mkgui_poll(dlg, &ev)) {
+		while(mkgui_window_poll(dlg, &ev)) {
 			switch(ev.type) {
 				case MKGUI_EVENT_CLOSE: {
 					running = 0;
@@ -1408,11 +1408,11 @@ static uint32_t fd_run_dialog(struct mkgui_ctx *ctx, uint32_t mode, const struct
 				default: break;
 			}
 		}
-		mkgui_wait(dlg);
+		mkgui_ctx_wait(dlg->ctx);
 	}
 
-	mkgui_destroy_child(dlg);
-	dirty_all(ctx);
+	mkgui_window_destroy(dlg);
+	dirty_all(win);
 
 	uint32_t result = fd->confirmed ? fd_result_count : 0;
 	free(fd);
@@ -1424,22 +1424,22 @@ static uint32_t fd_run_dialog(struct mkgui_ctx *ctx, uint32_t mode, const struct
 // Public API
 // ---------------------------------------------------------------------------
 
-// [=]===^=[ mkgui_open_dialog ]==================================[=]
-MKGUI_API uint32_t mkgui_open_dialog(struct mkgui_ctx *ctx, const struct mkgui_file_dialog_opts *opts) {
-	MKGUI_CHECK_VAL(ctx, 0);
-	return fd_run_dialog(ctx, 0, opts);
+// [=]===^=[ mkgui_dialog_open ]==================================[=]
+MKGUI_API uint32_t mkgui_dialog_open(struct mkgui_window *win, const struct mkgui_file_dialog_opts *opts) {
+	MKGUI_CHECK_VAL(win, 0);
+	return fd_run_dialog(win, 0, opts);
 }
 
-// [=]===^=[ mkgui_save_dialog ]==================================[=]
-MKGUI_API uint32_t mkgui_save_dialog(struct mkgui_ctx *ctx, const struct mkgui_file_dialog_opts *opts) {
-	MKGUI_CHECK_VAL(ctx, 0);
-	return fd_run_dialog(ctx, 1, opts);
+// [=]===^=[ mkgui_dialog_save ]==================================[=]
+MKGUI_API uint32_t mkgui_dialog_save(struct mkgui_window *win, const struct mkgui_file_dialog_opts *opts) {
+	MKGUI_CHECK_VAL(win, 0);
+	return fd_run_dialog(win, 1, opts);
 }
 
-// [=]===^=[ mkgui_dialog_path ]==================================[=]
-MKGUI_API const char *mkgui_dialog_path(struct mkgui_ctx *ctx, uint32_t index) {
-	MKGUI_CHECK_VAL(ctx, "");
-	(void)ctx;
+// [=]===^=[ mkgui_dialog_get_path ]==================================[=]
+MKGUI_API const char *mkgui_dialog_get_path(struct mkgui_window *win, uint32_t index) {
+	MKGUI_CHECK_VAL(win, "");
+	(void)win;
 	if(index >= fd_result_count) {
 		return "";
 	}

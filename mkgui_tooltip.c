@@ -4,70 +4,70 @@
 #define MKGUI_TOOLTIP_DELAY_MS 500
 
 // [=]===^=[ render_tooltip ]=====================================[=]
-static void render_tooltip(struct mkgui_ctx *ctx) {
-	if(!ctx->tooltip_id) {
+static void render_tooltip(struct mkgui_window *win) {
+	if(!win->tooltip_id) {
 		return;
 	}
-	uint32_t elapsed = mkgui_time_ms() - ctx->tooltip_start_ms;
+	uint32_t elapsed = (uint32_t)(mkgui_now_ns() / 1000000ull) - win->tooltip_start_ms;
 	if(elapsed < MKGUI_TOOLTIP_DELAY_MS) {
 		return;
 	}
 
-	int32_t idx = find_widget_idx(ctx, ctx->tooltip_id);
+	int32_t idx = find_widget_idx(win, win->tooltip_id);
 	if(idx < 0) {
 		return;
 	}
 
-	char *text = ctx->tooltip_texts[idx];
+	char *text = win->tooltip_texts[idx];
 	if(text[0] == '\0') {
-		ctx->tooltip_shown = 1;
+		win->tooltip_shown = 1;
 		return;
 	}
 
-	int32_t pad = sc(ctx, 4);
-	int32_t tw = text_width(ctx, text) + pad * 2;
-	int32_t th = ctx->font_height + pad * 2;
-	int32_t tx = ctx->tooltip_x + sc(ctx, 12);
-	int32_t ty = ctx->tooltip_y + sc(ctx, 16);
+	int32_t pad = sc(win, 4);
+	int32_t tw = text_width(win, text) + pad * 2;
+	int32_t th = win->font_height + pad * 2;
+	int32_t tx = win->tooltip_x + sc(win, 12);
+	int32_t ty = win->tooltip_y + sc(win, 16);
 
-	if(tx + tw > ctx->win_w) {
-		tx = ctx->win_w - tw;
+	if(tx + tw > win->win_w) {
+		tx = win->win_w - tw;
 	}
 
-	if(ty + th > ctx->win_h) {
-		ty = ctx->tooltip_y - th - sc(ctx, 4);
+	if(ty + th > win->win_h) {
+		ty = win->tooltip_y - th - sc(win, 4);
 	}
 
-	ctx->tooltip_shown = 1;
-	draw_rounded_rect(ctx->pixels, ctx->win_w, ctx->win_h, tx, ty, tw, th, ctx->theme.widget_bg, ctx->theme.widget_border, ctx->theme.corner_radius);
-	push_text_clip(tx + pad, ty + pad, text, ctx->theme.text, tx, ty, tx + tw, ty + th);
+	win->tooltip_shown = 1;
+	draw_rounded_rect(win->pixels, win->win_w, win->win_h, tx, ty, tw, th, win->theme.widget_bg, win->theme.widget_border, win->theme.corner_radius);
+	push_text_clip(tx + pad, ty + pad, text, win->theme.text, tx, ty, tx + tw, ty + th);
 }
 
 // [=]===^=[ tooltip_update ]=====================================[=]
-static void tooltip_update(struct mkgui_ctx *ctx, uint32_t hover_id, int32_t mx, int32_t my) {
-	if(hover_id != ctx->tooltip_id) {
-		if(ctx->tooltip_shown) {
-			dirty_all(ctx);
+static void tooltip_update(struct mkgui_window *win, uint32_t hover_id, int32_t mx, int32_t my) {
+	if(hover_id != win->tooltip_id) {
+		if(win->tooltip_shown) {
+			dirty_all(win);
 		}
-		ctx->tooltip_id = hover_id;
-		ctx->tooltip_start_ms = hover_id ? mkgui_time_ms() : 0;
-		ctx->tooltip_shown = 0;
-		ctx->tooltip_x = mx;
-		ctx->tooltip_y = my;
+		win->tooltip_id = hover_id;
+		win->tooltip_start_ms = hover_id ? (uint32_t)(mkgui_now_ns() / 1000000ull) : 0;
+		win->tooltip_shown = 0;
+		win->tooltip_x = mx;
+		win->tooltip_y = my;
 	}
 }
 
 // [=]===^=[ mkgui_set_tooltip ]==================================[=]
-MKGUI_API void mkgui_set_tooltip(struct mkgui_ctx *ctx, uint32_t id, const char *text) {
-	MKGUI_CHECK(ctx);
-	int32_t idx = find_widget_idx(ctx, id);
+MKGUI_API void mkgui_set_tooltip(struct mkgui_window *win, uint32_t id, const char *text) {
+	MKGUI_CHECK(win);
+	int32_t idx = find_widget_idx(win, id);
 	if(idx < 0) {
 		return;
 	}
 
 	if(text) {
-		snprintf(ctx->tooltip_texts[idx], sizeof(ctx->tooltip_texts[idx]), "%s", text);
+		snprintf(win->tooltip_texts[idx], sizeof(win->tooltip_texts[idx]), "%s", text);
 	} else {
-		ctx->tooltip_texts[idx][0] = '\0';
+		win->tooltip_texts[idx][0] = '\0';
 	}
 }

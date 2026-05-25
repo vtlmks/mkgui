@@ -188,7 +188,7 @@ static uint32_t textedit_insert(struct mkgui_text_edit *te, char *buf, uint32_t 
 }
 
 // [=]===^=[ textedit_hit_cursor ]====================================[=]
-static uint32_t textedit_hit_cursor(struct mkgui_ctx *ctx, char *display, int32_t base_x, int32_t mx) {
+static uint32_t textedit_hit_cursor(struct mkgui_window *win, char *display, int32_t base_x, int32_t mx) {
 	uint32_t len = (uint32_t)strlen(display);
 	char tmp[MKGUI_MAX_TEXT];
 	if(len >= MKGUI_MAX_TEXT) {
@@ -197,11 +197,11 @@ static uint32_t textedit_hit_cursor(struct mkgui_ctx *ctx, char *display, int32_
 	for(uint32_t i = 0; i <= len; ++i) {
 		memcpy(tmp, display, i);
 		tmp[i] = '\0';
-		int32_t w = text_width(ctx, tmp);
+		int32_t w = text_width(win, tmp);
 		if(base_x + w >= mx) {
 			if(i > 0) {
 				tmp[i - 1] = '\0';
-				int32_t prev_w = text_width(ctx, tmp);
+				int32_t prev_w = text_width(win, tmp);
 				if(mx - (base_x + prev_w) < (base_x + w) - mx) {
 					return i - 1;
 				}
@@ -213,7 +213,7 @@ static uint32_t textedit_hit_cursor(struct mkgui_ctx *ctx, char *display, int32_
 }
 
 // [=]===^=[ textedit_scroll_to_cursor ]==============================[=]
-static void textedit_scroll_to_cursor(struct mkgui_ctx *ctx, struct mkgui_text_edit *te, char *display, int32_t visible_w) {
+static void textedit_scroll_to_cursor(struct mkgui_window *win, struct mkgui_text_edit *te, char *display, int32_t visible_w) {
 	if(visible_w < 1) {
 		return;
 	}
@@ -228,7 +228,7 @@ static void textedit_scroll_to_cursor(struct mkgui_ctx *ctx, struct mkgui_text_e
 	}
 	memcpy(tmp, display, cpos);
 	tmp[cpos] = '\0';
-	int32_t cx = text_width(ctx, tmp);
+	int32_t cx = text_width(win, tmp);
 
 	if(cx - te->scroll_x > visible_w) {
 		te->scroll_x = cx - visible_w;
@@ -238,7 +238,7 @@ static void textedit_scroll_to_cursor(struct mkgui_ctx *ctx, struct mkgui_text_e
 		te->scroll_x = cx;
 	}
 
-	int32_t total_w = text_width(ctx, display);
+	int32_t total_w = text_width(win, display);
 	if(total_w - te->scroll_x < visible_w && te->scroll_x > 0) {
 		te->scroll_x = total_w - visible_w;
 		if(te->scroll_x < 0) {
@@ -250,7 +250,7 @@ static void textedit_scroll_to_cursor(struct mkgui_ctx *ctx, struct mkgui_text_e
 // [=]===^=[ textedit_render ]========================================[=]
 // renders selection highlight, clipped text, and cursor for inline editing.
 // display may differ from te->text (e.g. password masking)
-static void textedit_render(struct mkgui_ctx *ctx, struct mkgui_text_edit *te, char *display, int32_t tx, int32_t ty, int32_t sel_y, int32_t sel_h, int32_t clip_x1, int32_t clip_y1, int32_t clip_x2, int32_t clip_y2, uint32_t text_color, uint32_t focused) {
+static void textedit_render(struct mkgui_window *win, struct mkgui_text_edit *te, char *display, int32_t tx, int32_t ty, int32_t sel_y, int32_t sel_h, int32_t clip_x1, int32_t clip_y1, int32_t clip_x2, int32_t clip_y2, uint32_t text_color, uint32_t focused) {
 	if(focused && textedit_has_selection(te)) {
 		uint32_t lo, hi;
 		textedit_sel_range(te, &lo, &hi);
@@ -266,16 +266,16 @@ static void textedit_render(struct mkgui_ctx *ctx, struct mkgui_text_edit *te, c
 
 		memcpy(tmp, display, lo);
 		tmp[lo] = '\0';
-		int32_t sel_x1 = tx + text_width(ctx, tmp);
+		int32_t sel_x1 = tx + text_width(win, tmp);
 
 		memcpy(tmp, display, hi);
 		tmp[hi] = '\0';
-		int32_t sel_x2 = tx + text_width(ctx, tmp);
+		int32_t sel_x2 = tx + text_width(win, tmp);
 
 		int32_t cx1 = sel_x1 < clip_x1 ? clip_x1 : sel_x1;
 		int32_t cx2 = sel_x2 > clip_x2 ? clip_x2 : sel_x2;
 		if(cx2 > cx1) {
-			draw_rect_fill(ctx->pixels, ctx->win_w, ctx->win_h, cx1, sel_y, cx2 - cx1, sel_h, ctx->theme.selection);
+			draw_rect_fill(win->pixels, win->win_w, win->win_h, cx1, sel_y, cx2 - cx1, sel_h, win->theme.selection);
 		}
 
 		push_text_clip(tx, ty, display, text_color, clip_x1, clip_y1, clip_x2, clip_y2);
@@ -283,7 +283,7 @@ static void textedit_render(struct mkgui_ctx *ctx, struct mkgui_text_edit *te, c
 		uint32_t sel_len = hi - lo;
 		memcpy(tmp, display + lo, sel_len);
 		tmp[sel_len] = '\0';
-		push_text_clip(sel_x1, ty, tmp, ctx->theme.sel_text, cx1, clip_y1, cx2, clip_y2);
+		push_text_clip(sel_x1, ty, tmp, win->theme.sel_text, cx1, clip_y1, cx2, clip_y2);
 
 	} else {
 		push_text_clip(tx, ty, display, text_color, clip_x1, clip_y1, clip_x2, clip_y2);
@@ -298,9 +298,9 @@ static void textedit_render(struct mkgui_ctx *ctx, struct mkgui_text_edit *te, c
 		char tmp[MKGUI_MAX_TEXT];
 		memcpy(tmp, display, cpos);
 		tmp[cpos] = '\0';
-		int32_t cx = tx + text_width(ctx, tmp);
+		int32_t cx = tx + text_width(win, tmp);
 		if(cx >= clip_x1 && cx <= clip_x2) {
-			draw_vline(ctx->pixels, ctx->win_w, ctx->win_h, cx, sel_y, sel_h, ctx->theme.text);
+			draw_vline(win->pixels, win->win_w, win->win_h, cx, sel_y, sel_h, win->theme.text);
 		}
 	}
 }

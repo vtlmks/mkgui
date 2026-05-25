@@ -5,7 +5,7 @@
 
 // [=]===^=[ input_undo_push ]====================================[=]
 static void input_undo_push(struct mkgui_input_data *inp) {
-	uint32_t now = mkgui_time_ms();
+	uint32_t now = (uint32_t)(mkgui_now_ns() / 1000000ull);
 	if(inp->undo_count > 0 && (now - inp->undo_last_ms) < MKGUI_UNDO_COALESCE_MS) {
 		return;
 	}
@@ -69,7 +69,7 @@ static uint32_t input_redo(struct mkgui_input_data *inp) {
 
 // [=]===^=[ textarea_undo_push ]=================================[=]
 static void textarea_undo_push(struct mkgui_textarea_data *ta) {
-	uint32_t now = mkgui_time_ms();
+	uint32_t now = (uint32_t)(mkgui_now_ns() / 1000000ull);
 	if(ta->undo_count > 0 && (now - ta->undo_last_ms) < MKGUI_UNDO_COALESCE_MS) {
 		return;
 	}
