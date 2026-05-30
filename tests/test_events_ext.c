@@ -159,6 +159,27 @@ static uint32_t poll_for_event(struct mkgui_window *win, uint32_t event_type, ui
 	return found;
 }
 
+// Like poll_for_event but returns the first matching event so callers can
+// assert on its payload (value/col/keysym). Returns an event of type
+// MKGUI_EVENT_NONE if no match was seen.
+static struct mkgui_event poll_capture(struct mkgui_window *win, uint32_t event_type, uint32_t target_id) {
+	flush_x_events(win);
+	struct mkgui_event ev;
+	struct mkgui_event hit;
+	memset(&hit, 0, sizeof(hit));
+	for(uint32_t i = 0; i < 50; ++i) {
+		uint32_t got = mkgui_window_poll(win, &ev);
+		if(got && ev.type == event_type && (target_id == 0 || ev.id == target_id)) {
+			return ev;
+		}
+
+		if(!got && win->plat.deferred_head == win->plat.deferred_tail) {
+			break;
+		}
+	}
+	return hit;
+}
+
 static void drain_events(struct mkgui_window *win) {
 	flush_x_events(win);
 	struct mkgui_event ev;
@@ -1348,6 +1369,202 @@ static void test_logview_line_clicked(void) {
 	TEST_END();
 }
 
+// ---------------------------------------------------------------------------
+// Payload assertions: events must carry the correct row/col/state
+// ---------------------------------------------------------------------------
+
+// [=]===^=[ test_listview_reorder_payload ]=======================[=]
+static void test_listview_reorder_payload(void) {
+	TEST_BEGIN("listview: REORDER carries source row in value, target in col");
+	enum { WIN = 1, VBOX1 = 2, LV = 3 };
+	struct mkgui_widget widgets[] = {
+		MKGUI_W(MKGUI_WINDOW,   WIN,   "Test", "", 0,     400, 300, 0, 0, 0),
+		MKGUI_W(MKGUI_VBOX,     VBOX1, "",     "", WIN,   0,   0,   0, 0, 0),
+		MKGUI_W(MKGUI_LISTVIEW, LV,    "",     "", VBOX1, 0,   200, MKGUI_FIXED, 0, 0),
+	};
+	struct mkgui_ctx *ctx = mkgui_ctx_create();
+	struct mkgui_window *win = mkgui_window_create(ctx, NULL, widgets, 3, NULL, 0, 0);
+	CHECK(win, "create failed");
+	if(win) {
+		struct mkgui_column cols[] = { { "Name", 200, MKGUI_CELL_TEXT } };
+		mkgui_listview_setup(win, LV, 10, 1, cols, dummy_row_cb, NULL);
+		run_layout(win);
+		int32_t idx = find_widget_idx(win, LV);
+		int32_t rx = win->rects[idx].x + 10;
+		int32_t row1 = win->rects[idx].y + win->row_height * 2 + 3;
+		int32_t row4 = win->rects[idx].y + win->row_height * 5 + 3;
+		inject_press(win, rx, row1, 1, 0);
+		inject_motion(win, rx, row1 + 10);
+		inject_motion(win, rx, row4);
+		inject_release(win, rx, row4, 1);
+		struct mkgui_event ev = poll_capture(win, MKGUI_EVENT_LISTVIEW_REORDER, LV);
+		CHECK(ev.type == MKGUI_EVENT_LISTVIEW_REORDER, "expected REORDER");
+		CHECK(ev.value == 1, "source row %d != 1", ev.value);
+		CHECK(ev.col == 4, "target row %d != 4", ev.col);
+		mkgui_window_destroy(win);
+		mkgui_ctx_destroy(ctx);
+	}
+	TEST_END();
+}
+
+// [=]===^=[ test_gridview_check_payload ]=========================[=]
+static void test_gridview_check_payload(void) {
+	TEST_BEGIN("gridview: GRID_CHECK carries row/col and toggles state");
+	enum { WIN = 1, VBOX1 = 2, GV = 3 };
+	struct mkgui_widget widgets[] = {
+		MKGUI_W(MKGUI_WINDOW,   WIN,   "Test", "", 0,     400, 300, 0, 0, 0),
+		MKGUI_W(MKGUI_VBOX,     VBOX1, "",     "", WIN,   0,   0,   0, 0, 0),
+		MKGUI_W(MKGUI_GRIDVIEW, GV,    "",     "", VBOX1, 0,   200, MKGUI_FIXED, 0, 0),
+	};
+	struct mkgui_ctx *ctx = mkgui_ctx_create();
+	struct mkgui_window *win = mkgui_window_create(ctx, NULL, widgets, 3, NULL, 0, 0);
+	CHECK(win, "create failed");
+	if(win) {
+		struct mkgui_grid_column cols[] = { { "On", 40, MKGUI_GRID_CHECK }, { "Name", 120, MKGUI_GRID_TEXT } };
+		mkgui_gridview_setup(win, GV, 10, 2, cols, dummy_grid_cell_cb, NULL);
+		run_layout(win);
+		CHECK(mkgui_gridview_get_check(win, GV, 2, 0) == 0, "cell should start unchecked");
+		int32_t idx = find_widget_idx(win, GV);
+		int32_t rx = win->rects[idx].x + 20;
+		int32_t ry = win->rects[idx].y + win->row_height * 3 + win->row_height / 2;
+		inject_click_at(win, rx, ry);
+		struct mkgui_event ev = poll_capture(win, MKGUI_EVENT_GRID_CHECK, GV);
+		CHECK(ev.type == MKGUI_EVENT_GRID_CHECK, "expected GRID_CHECK");
+		CHECK(ev.value == 2, "row %d != 2", ev.value);
+		CHECK(ev.col == 0, "col %d != 0", ev.col);
+		CHECK(mkgui_gridview_get_check(win, GV, 2, 0) == 1, "cell should be checked after click");
+		mkgui_window_destroy(win);
+		mkgui_ctx_destroy(ctx);
+	}
+	TEST_END();
+}
+
+// [=]===^=[ test_treeview_move_payload ]==========================[=]
+static void test_treeview_move_payload(void) {
+	TEST_BEGIN("treeview: MOVE carries source and target node ids");
+	enum { WIN = 1, VBOX1 = 2, TV = 3 };
+	struct mkgui_widget widgets[] = {
+		MKGUI_W(MKGUI_WINDOW,   WIN,   "Test", "", 0,     400, 300, 0, 0, 0),
+		MKGUI_W(MKGUI_VBOX,     VBOX1, "",     "", WIN,   0,   0,   0, 0, 0),
+		MKGUI_W(MKGUI_TREEVIEW, TV,    "",     "", VBOX1, 0,   200, MKGUI_FIXED, 0, 0),
+	};
+	struct mkgui_ctx *ctx = mkgui_ctx_create();
+	struct mkgui_window *win = mkgui_window_create(ctx, NULL, widgets, 3, NULL, 0, 0);
+	CHECK(win, "create failed");
+	if(win) {
+		mkgui_treeview_setup(win, TV);
+		mkgui_treeview_add(win, TV, 100, 0, "One");
+		mkgui_treeview_add(win, TV, 101, 0, "Two");
+		mkgui_treeview_add(win, TV, 102, 0, "Three");
+		run_layout(win);
+		int32_t idx = find_widget_idx(win, TV);
+		int32_t rx = win->rects[idx].x + 40;
+		int32_t row0 = win->rects[idx].y + win->row_height / 2 + 1;
+		int32_t row2 = win->rects[idx].y + win->row_height * 2 + win->row_height / 2 + 1;
+		inject_press(win, rx, row0, 1, 0);
+		inject_motion(win, rx, row0 + 10);
+		inject_motion(win, rx, row2);
+		inject_release(win, rx, row2, 1);
+		struct mkgui_event ev = poll_capture(win, MKGUI_EVENT_TREEVIEW_MOVE, TV);
+		CHECK(ev.type == MKGUI_EVENT_TREEVIEW_MOVE, "expected TREEVIEW_MOVE");
+		CHECK(ev.value == 100, "source node %d != 100", ev.value);
+		CHECK(ev.col == 102, "target node %d != 102", ev.col);
+		mkgui_window_destroy(win);
+		mkgui_ctx_destroy(ctx);
+	}
+	TEST_END();
+}
+
+// ---------------------------------------------------------------------------
+// Negative cases: events must NOT fire when they shouldn't
+// ---------------------------------------------------------------------------
+
+// [=]===^=[ test_disabled_listview_no_select ]====================[=]
+static void test_disabled_listview_no_select(void) {
+	TEST_BEGIN("listview: click on a DISABLED listview fires no SELECT");
+	enum { WIN = 1, VBOX1 = 2, LV = 3 };
+	struct mkgui_widget widgets[] = {
+		MKGUI_W(MKGUI_WINDOW,   WIN,   "Test", "", 0,     400, 300, 0, 0, 0),
+		MKGUI_W(MKGUI_VBOX,     VBOX1, "",     "", WIN,   0,   0,   0, 0, 0),
+		MKGUI_W(MKGUI_LISTVIEW, LV,    "",     "", VBOX1, 0,   200, MKGUI_FIXED | MKGUI_DISABLED, 0, 0),
+	};
+	struct mkgui_ctx *ctx = mkgui_ctx_create();
+	struct mkgui_window *win = mkgui_window_create(ctx, NULL, widgets, 3, NULL, 0, 0);
+	CHECK(win, "create failed");
+	if(win) {
+		struct mkgui_column cols[] = { { "Name", 200, MKGUI_CELL_TEXT } };
+		mkgui_listview_setup(win, LV, 10, 1, cols, dummy_row_cb, NULL);
+		run_layout(win);
+		int32_t idx = find_widget_idx(win, LV);
+		int32_t rx = win->rects[idx].x + 10;
+		int32_t ry = win->rects[idx].y + win->row_height + 5;
+		inject_click_at(win, rx, ry);
+		CHECK(!poll_for_event(win, MKGUI_EVENT_LISTVIEW_SELECT, LV), "disabled listview must not fire SELECT");
+		mkgui_window_destroy(win);
+		mkgui_ctx_destroy(ctx);
+	}
+	TEST_END();
+}
+
+// [=]===^=[ test_listview_below_threshold_no_reorder ]============[=]
+static void test_listview_below_threshold_no_reorder(void) {
+	TEST_BEGIN("listview: a sub-threshold drag fires neither DRAG_START nor REORDER");
+	enum { WIN = 1, VBOX1 = 2, LV = 3 };
+	struct mkgui_widget widgets[] = {
+		MKGUI_W(MKGUI_WINDOW,   WIN,   "Test", "", 0,     400, 300, 0, 0, 0),
+		MKGUI_W(MKGUI_VBOX,     VBOX1, "",     "", WIN,   0,   0,   0, 0, 0),
+		MKGUI_W(MKGUI_LISTVIEW, LV,    "",     "", VBOX1, 0,   200, MKGUI_FIXED, 0, 0),
+	};
+	struct mkgui_ctx *ctx = mkgui_ctx_create();
+	struct mkgui_window *win = mkgui_window_create(ctx, NULL, widgets, 3, NULL, 0, 0);
+	CHECK(win, "create failed");
+	if(win) {
+		struct mkgui_column cols[] = { { "Name", 200, MKGUI_CELL_TEXT } };
+		mkgui_listview_setup(win, LV, 10, 1, cols, dummy_row_cb, NULL);
+		run_layout(win);
+		int32_t idx = find_widget_idx(win, LV);
+		int32_t rx = win->rects[idx].x + 10;
+		int32_t row0 = win->rects[idx].y + win->row_height + 3;
+		// move only 2px: below the 4px drag activation threshold
+		inject_press(win, rx, row0, 1, 0);
+		inject_motion(win, rx, row0 + 2);
+		inject_release(win, rx, row0 + 2, 1);
+		CHECK(!poll_for_event(win, MKGUI_EVENT_DRAG_START, LV), "must not fire DRAG_START below threshold");
+		CHECK(!poll_for_event(win, MKGUI_EVENT_LISTVIEW_REORDER, LV), "must not fire REORDER below threshold");
+		mkgui_window_destroy(win);
+		mkgui_ctx_destroy(ctx);
+	}
+	TEST_END();
+}
+
+// [=]===^=[ test_listview_click_empty_no_select ]=================[=]
+static void test_listview_click_empty_no_select(void) {
+	TEST_BEGIN("listview: click below the last row fires no SELECT");
+	enum { WIN = 1, VBOX1 = 2, LV = 3 };
+	struct mkgui_widget widgets[] = {
+		MKGUI_W(MKGUI_WINDOW,   WIN,   "Test", "", 0,     400, 300, 0, 0, 0),
+		MKGUI_W(MKGUI_VBOX,     VBOX1, "",     "", WIN,   0,   0,   0, 0, 0),
+		MKGUI_W(MKGUI_LISTVIEW, LV,    "",     "", VBOX1, 0,   200, MKGUI_FIXED, 0, 0),
+	};
+	struct mkgui_ctx *ctx = mkgui_ctx_create();
+	struct mkgui_window *win = mkgui_window_create(ctx, NULL, widgets, 3, NULL, 0, 0);
+	CHECK(win, "create failed");
+	if(win) {
+		// only 2 rows; click well below them but still inside the widget
+		struct mkgui_column cols[] = { { "Name", 200, MKGUI_CELL_TEXT } };
+		mkgui_listview_setup(win, LV, 2, 1, cols, dummy_row_cb, NULL);
+		run_layout(win);
+		int32_t idx = find_widget_idx(win, LV);
+		int32_t rx = win->rects[idx].x + 10;
+		int32_t ry = win->rects[idx].y + win->rects[idx].h - 4;
+		inject_click_at(win, rx, ry);
+		CHECK(!poll_for_event(win, MKGUI_EVENT_LISTVIEW_SELECT, LV), "empty-area click must not fire SELECT");
+		mkgui_window_destroy(win);
+		mkgui_ctx_destroy(ctx);
+	}
+	TEST_END();
+}
+
 int main(void) {
 	printf("mkgui extended event test harness\n");
 	printf("==================================\n\n");
@@ -1388,6 +1605,12 @@ int main(void) {
 	test_window_close();
 	test_file_drop();
 	test_logview_line_clicked();
+	test_listview_reorder_payload();
+	test_gridview_check_payload();
+	test_treeview_move_payload();
+	test_disabled_listview_no_select();
+	test_listview_below_threshold_no_reorder();
+	test_listview_click_empty_no_select();
 
 	printf("\n==================================\n");
 	printf("%u tests: %u passed, %u failed\n", tests_run, tests_passed, tests_failed);

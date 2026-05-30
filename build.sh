@@ -182,6 +182,15 @@ if [ "$TARGET" != "editor" ]; then
 	(
 		$CC -std=gnu99 -O2 -Wall -Wextra -Wno-stringop-truncation -Wno-format-truncation tools/extract_icons.c -o out/linux/extract_icons
 	) &
+
+	# Win32 platform-layer test (unity build, pokes the WndProc). The GUI core
+	# is covered by the Linux suites; this only exercises the divergent Win32
+	# windowing/message-translation surface. Run with: wine out/windows/test_platform_win32.exe
+	if [ "$WIN_ENABLED" -eq 1 ]; then
+		(
+			$WINCC $CFLAGS $LIB_DEFINES tests/test_platform_win32.c -o out/windows/test_platform_win32.exe $WINDOWS_LIBS -mconsole
+		) &
+	fi
 fi
 
 if [ "$TARGET" = "editor" ] || [ "$TARGET" = "all" ]; then
