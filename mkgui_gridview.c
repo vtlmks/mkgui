@@ -617,7 +617,9 @@ static uint32_t handle_gridview_key(struct mkgui_window *win, struct mkgui_event
 	}
 	gridview_clamp_scroll(win, gv, content_h);
 	dirty_all(win);
-	ev->type = MKGUI_EVENT_GRID_CLICK;
+	// Keyboard row navigation (up/down/page/home/end) is a selection change;
+	// column focus moves (left/right) and mouse cell clicks emit GRID_CLICK.
+	ev->type = MKGUI_EVENT_GRIDVIEW_SELECT;
 	ev->id = win->focus_id;
 	ev->value = gv->selected_row;
 	ev->col = gv->selected_col;

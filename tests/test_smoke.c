@@ -153,6 +153,7 @@ enum {
 	S_VSPLIT_T,
 	S_VSPLIT_B,
 	S_STATUSBAR,
+	S_LOGVIEW,
 };
 
 // [=]===^=[ test_smoke_all_widget_types ]===========================[=]
@@ -211,6 +212,7 @@ static void test_smoke_all_widget_types(void) {
 		MKGUI_W(MKGUI_IMAGE,      S_IMAGE,       "",      "", S_VBOX_ROOT,    0,   40,  MKGUI_FIXED, 0, 0),
 		MKGUI_W(MKGUI_GLVIEW,     S_GLVIEW,      "",      "", S_VBOX_ROOT,    0,   60,  MKGUI_FIXED, 0, 0),
 		MKGUI_W(MKGUI_SCROLLBAR,  S_SCROLLBAR,   "",      "", S_VBOX_ROOT,    0,   14,  MKGUI_FIXED, 0, 0),
+		MKGUI_W(MKGUI_LOGVIEW,    S_LOGVIEW,     "",      "", S_VBOX_ROOT,    0,   60,  MKGUI_FIXED, 0, 0),
 
 		MKGUI_W(MKGUI_TABS,       S_TABS,        "",      "", S_VBOX_ROOT,    0,   120, MKGUI_FIXED, 0, 0),
 		MKGUI_W(MKGUI_TAB,        S_TAB_A,       "A",     "", S_TABS,         0,   0,   0, 0, 0),

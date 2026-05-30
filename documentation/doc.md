@@ -156,7 +156,7 @@ There are no `x, y` fields. All positioning is handled by the container-based la
 | `MKGUI_METER` | Level meter with colored zones. `MKGUI_VERTICAL` for vertical, `MKGUI_METER_TEXT` for percentage text. No events. |
 | `MKGUI_SPINNER` | Animated spinning arc indicator. No events, no setup needed. |
 | `MKGUI_LISTVIEW` | Scrollable multi-column list with virtual rows and per-column cell types. Emits `MKGUI_EVENT_LISTVIEW_SELECT`, `_DBLCLICK`, `_SORT`, `_COL_REORDER`, `_REORDER`. |
-| `MKGUI_GRIDVIEW` | Multi-column grid with per-cell checkboxes and resizable columns. Virtual data via callback. Emits `MKGUI_EVENT_GRID_CLICK`, `MKGUI_EVENT_GRID_CHECK`, `_GRIDVIEW_REORDER`. |
+| `MKGUI_GRIDVIEW` | Multi-column grid with per-cell checkboxes and resizable columns. Virtual data via callback. Emits `MKGUI_EVENT_GRID_CLICK`, `MKGUI_EVENT_GRID_CHECK`, `_GRIDVIEW_SELECT`, `_GRIDVIEW_REORDER`. |
 | `MKGUI_RICHLIST` | Rich list with thumbnail, title, subtitle, and right-aligned text per row. Virtual data via callback. Emits `MKGUI_EVENT_RICHLIST_SELECT`, `_RICHLIST_DBLCLICK`. |
 | `MKGUI_ITEMVIEW` | Multi-mode item view (icon, thumbnail, compact, detail). Emits `MKGUI_EVENT_ITEMVIEW_SELECT`, `_DBLCLICK`. |
 | `MKGUI_TREEVIEW` | Hierarchical tree. Emits `MKGUI_EVENT_TREEVIEW_SELECT`, `_DBLCLICK`, `_EXPAND`, `_COLLAPSE`, `_MOVE`. |
@@ -409,8 +409,7 @@ struct mkgui_event {
 | `MKGUI_EVENT_CONTEXT` | Right-click on widget | row/node/item (-1 if empty) for views, mouse x otherwise | column for views, mouse y otherwise |
 | `MKGUI_EVENT_CONTEXT_HEADER` | Right-click on column header | mouse x | column index |
 | `MKGUI_EVENT_CONTEXT_MENU` | Context menu item selected | item id | checked state (0/1) |
-| `MKGUI_EVENT_GRIDVIEW_SELECT` | Grid cell selected | row | column |
-| `MKGUI_EVENT_GRIDVIEW_SELECT` | Grid row selected (keyboard navigation / single click) | row | column |
+| `MKGUI_EVENT_GRIDVIEW_SELECT` | Grid row selection changed via keyboard navigation (up/down/page/home/end); mouse cell clicks and left/right column moves emit `GRID_CLICK` | row | column |
 | `MKGUI_EVENT_GRIDVIEW_REORDER` | Row drag-and-drop reorder | source row | target row |
 | `MKGUI_EVENT_RICHLIST_SELECT` | Rich list row selected | row | -- |
 | `MKGUI_EVENT_RICHLIST_DBLCLICK` | Rich list row double-clicked | row | -- |
@@ -423,7 +422,7 @@ struct mkgui_event {
 | `MKGUI_EVENT_SLIDER_END` | Slider drag ended | final value | -- |
 | `MKGUI_EVENT_TREEVIEW_DBLCLICK` | Tree node double-clicked | node id | -- |
 | `MKGUI_EVENT_TEXTAREA_CURSOR` | Textarea cursor moved | cursor position | -- |
-| `MKGUI_EVENT_LOGVIEW_LINE_CLICKED` | Line in a logview clicked | source line index (sequence number, 0-based) | -- |
+| `MKGUI_EVENT_LOGVIEW_LINE_CLICKED` | Line in a logview clicked | 0-based index into the retained line buffer (matches `mkgui_logview_get_line_count`) | -- |
 | `MKGUI_EVENT_DRAG_START` | DnD drag started | source id/row | -- |
 | `MKGUI_EVENT_DRAG_END` | DnD drag cancelled | -- | -- |
 | `MKGUI_EVENT_TREEVIEW_MOVE` | Tree node moved via DnD | source node id | target node id |
@@ -1134,7 +1133,8 @@ The cell callback is called for `MKGUI_GRID_TEXT` and `MKGUI_GRID_CHECK_TEXT` co
 
 Events:
 
-- `MKGUI_EVENT_GRID_CLICK` -- cell selected. `ev->value` = row, `ev->col` = column.
+- `MKGUI_EVENT_GRID_CLICK` -- cell selected by mouse click, or column focus moved with left/right keys. `ev->value` = row, `ev->col` = column.
+- `MKGUI_EVENT_GRIDVIEW_SELECT` -- row selection changed via keyboard navigation (up/down/page up/page down/home/end). `ev->value` = row, `ev->col` = column.
 - `MKGUI_EVENT_GRID_CHECK` -- checkbox toggled. `ev->value` = row, `ev->col` = column. Read new state with `mkgui_gridview_get_check()`.
 - `MKGUI_EVENT_GRIDVIEW_REORDER` -- row drag-and-drop reorder. `ev->value` = source row, `ev->col` = target row. Drag activates after 4px vertical mouse movement. A drop indicator line is drawn at the target position during drag.
 - `MKGUI_EVENT_DRAG_START` -- drag started. `ev->value` = source row.

@@ -6695,6 +6695,15 @@ MKGUI_API uint32_t mkgui_window_poll(struct mkgui_window *win, struct mkgui_even
 							lv->has_selection = 0;
 							win->drag_select_id = hw->id;
 							dirty_widget(win, (uint32_t)hi);
+							// Deliver the clicked line as a 0-based index into the
+							// retained buffer; a drag-select may still follow via
+							// drag_select_id, mirroring listview select-on-press.
+							if(seq >= lv->line_seq_tail && seq < lv->line_seq_head) {
+								ev->type = MKGUI_EVENT_LOGVIEW_LINE_CLICKED;
+								ev->id = hw->id;
+								ev->value = (int32_t)(seq - lv->line_seq_tail);
+								return 1;
+							}
 						}
 					}
 

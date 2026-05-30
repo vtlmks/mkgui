@@ -4,7 +4,11 @@
 // Extended event tests for mkgui.
 // Covers events not tested in test_events.c: listview, treeview, gridview,
 // richlist, itemview, pathbar, combobox, datepicker, ipinput, tab close,
-// slider start/end, context menu, context header, timer, and file drop.
+// slider start/end, context menu, context header, and timer; drag/reorder
+// (DRAG_START/END, LISTVIEW_REORDER, LISTVIEW_COL_REORDER, TREEVIEW_MOVE,
+// GRIDVIEW_REORDER), gridview keyboard select and checkbox, cell-edit commit,
+// canvas press/motion/release, and the window-level RESIZE, CLOSE, FILE_DROP,
+// plus logview line clicks.
 
 #include "../mkgui.c"
 
@@ -163,6 +167,32 @@ static void drain_events(struct mkgui_window *win) {
 			break;
 		}
 	}
+}
+
+static void inject_resize(struct mkgui_window *win, int32_t w, int32_t h) {
+	struct mkgui_plat_event pev;
+	memset(&pev, 0, sizeof(pev));
+	pev.type = MKGUI_PLAT_RESIZE;
+	pev.width = w;
+	pev.height = h;
+	pev.popup_idx = -1;
+	platform_deferred_push(win, &pev);
+}
+
+static void inject_close(struct mkgui_window *win) {
+	struct mkgui_plat_event pev;
+	memset(&pev, 0, sizeof(pev));
+	pev.type = MKGUI_PLAT_CLOSE;
+	pev.popup_idx = -1;
+	platform_deferred_push(win, &pev);
+}
+
+static void inject_drop(struct mkgui_window *win) {
+	struct mkgui_plat_event pev;
+	memset(&pev, 0, sizeof(pev));
+	pev.type = MKGUI_PLAT_DROP;
+	pev.popup_idx = -1;
+	platform_deferred_push(win, &pev);
 }
 
 // ---------------------------------------------------------------------------
@@ -932,6 +962,392 @@ static void test_context_menu_event(void) {
 // Main
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Gridview: keyboard SELECT and checkbox CHECK
+// ---------------------------------------------------------------------------
+
+// [=]===^=[ test_gridview_keyboard_select ]=======================[=]
+static void test_gridview_keyboard_select(void) {
+	TEST_BEGIN("gridview: keyboard row nav fires GRIDVIEW_SELECT");
+	enum { WIN = 1, VBOX1 = 2, GV = 3 };
+	struct mkgui_widget widgets[] = {
+		MKGUI_W(MKGUI_WINDOW,   WIN,   "Test", "", 0,     400, 300, 0, 0, 0),
+		MKGUI_W(MKGUI_VBOX,     VBOX1, "",     "", WIN,   0,   0,   0, 0, 0),
+		MKGUI_W(MKGUI_GRIDVIEW, GV,    "",     "", VBOX1, 0,   200, MKGUI_FIXED, 0, 0),
+	};
+	struct mkgui_ctx *ctx = mkgui_ctx_create();
+	struct mkgui_window *win = mkgui_window_create(ctx, NULL, widgets, 3, NULL, 0, 0);
+	CHECK(win, "create failed");
+	if(win) {
+		struct mkgui_grid_column cols[] = { { "A", 80, MKGUI_GRID_TEXT }, { "B", 80, MKGUI_GRID_TEXT } };
+		mkgui_gridview_setup(win, GV, 10, 2, cols, dummy_grid_cell_cb, NULL);
+		run_layout(win);
+		win->focus_id = GV;
+		struct mkgui_gridview_data *gv = find_gridv_data(win, GV);
+		if(gv) {
+			gv->selected_row = 0;
+			gv->selected_col = 0;
+		}
+		inject_key(win, MKGUI_KEY_DOWN, 0);
+		CHECK(poll_for_event(win, MKGUI_EVENT_GRIDVIEW_SELECT, GV), "expected GRIDVIEW_SELECT");
+		mkgui_window_destroy(win);
+		mkgui_ctx_destroy(ctx);
+	}
+	TEST_END();
+}
+
+// [=]===^=[ test_gridview_check ]=================================[=]
+static void test_gridview_check(void) {
+	TEST_BEGIN("gridview: click checkbox cell fires GRID_CHECK");
+	enum { WIN = 1, VBOX1 = 2, GV = 3 };
+	struct mkgui_widget widgets[] = {
+		MKGUI_W(MKGUI_WINDOW,   WIN,   "Test", "", 0,     400, 300, 0, 0, 0),
+		MKGUI_W(MKGUI_VBOX,     VBOX1, "",     "", WIN,   0,   0,   0, 0, 0),
+		MKGUI_W(MKGUI_GRIDVIEW, GV,    "",     "", VBOX1, 0,   200, MKGUI_FIXED, 0, 0),
+	};
+	struct mkgui_ctx *ctx = mkgui_ctx_create();
+	struct mkgui_window *win = mkgui_window_create(ctx, NULL, widgets, 3, NULL, 0, 0);
+	CHECK(win, "create failed");
+	if(win) {
+		struct mkgui_grid_column cols[] = { { "On", 40, MKGUI_GRID_CHECK }, { "Name", 120, MKGUI_GRID_TEXT } };
+		mkgui_gridview_setup(win, GV, 10, 2, cols, dummy_grid_cell_cb, NULL);
+		run_layout(win);
+		int32_t idx = find_widget_idx(win, GV);
+		int32_t rx = win->rects[idx].x + 20;
+		int32_t ry = win->rects[idx].y + win->row_height + win->row_height / 2;
+		inject_click_at(win, rx, ry);
+		CHECK(poll_for_event(win, MKGUI_EVENT_GRID_CHECK, GV), "expected GRID_CHECK");
+		mkgui_window_destroy(win);
+		mkgui_ctx_destroy(ctx);
+	}
+	TEST_END();
+}
+
+// ---------------------------------------------------------------------------
+// Drag/reorder: DRAG_START, DRAG_END, LISTVIEW_REORDER, LISTVIEW_COL_REORDER,
+// TREEVIEW_MOVE, GRIDVIEW_REORDER
+// ---------------------------------------------------------------------------
+
+// [=]===^=[ test_listview_drag_start_end ]========================[=]
+static void test_listview_drag_start_end(void) {
+	TEST_BEGIN("listview: drag past threshold fires DRAG_START then DRAG_END");
+	enum { WIN = 1, VBOX1 = 2, LV = 3 };
+	struct mkgui_widget widgets[] = {
+		MKGUI_W(MKGUI_WINDOW,   WIN,   "Test", "", 0,     400, 300, 0, 0, 0),
+		MKGUI_W(MKGUI_VBOX,     VBOX1, "",     "", WIN,   0,   0,   0, 0, 0),
+		MKGUI_W(MKGUI_LISTVIEW, LV,    "",     "", VBOX1, 0,   200, MKGUI_FIXED, 0, 0),
+	};
+	struct mkgui_ctx *ctx = mkgui_ctx_create();
+	struct mkgui_window *win = mkgui_window_create(ctx, NULL, widgets, 3, NULL, 0, 0);
+	CHECK(win, "create failed");
+	if(win) {
+		struct mkgui_column cols[] = { { "Name", 200, MKGUI_CELL_TEXT } };
+		mkgui_listview_setup(win, LV, 10, 1, cols, dummy_row_cb, NULL);
+		run_layout(win);
+		int32_t idx = find_widget_idx(win, LV);
+		int32_t rx = win->rects[idx].x + 10;
+		int32_t row0 = win->rects[idx].y + win->row_height + 3;
+		// press row 0, drag down past threshold, release back over the source
+		// row so there is no valid reorder target -> DRAG_END (not REORDER).
+		inject_press(win, rx, row0, 1, 0);
+		inject_motion(win, rx, row0 + win->row_height * 2);
+		CHECK(poll_for_event(win, MKGUI_EVENT_DRAG_START, LV), "expected DRAG_START");
+		inject_motion(win, rx, row0);
+		inject_release(win, rx, row0, 1);
+		CHECK(poll_for_event(win, MKGUI_EVENT_DRAG_END, LV), "expected DRAG_END");
+		mkgui_window_destroy(win);
+		mkgui_ctx_destroy(ctx);
+	}
+	TEST_END();
+}
+
+// [=]===^=[ test_listview_reorder ]===============================[=]
+static void test_listview_reorder(void) {
+	TEST_BEGIN("listview: drag row onto another fires LISTVIEW_REORDER");
+	enum { WIN = 1, VBOX1 = 2, LV = 3 };
+	struct mkgui_widget widgets[] = {
+		MKGUI_W(MKGUI_WINDOW,   WIN,   "Test", "", 0,     400, 300, 0, 0, 0),
+		MKGUI_W(MKGUI_VBOX,     VBOX1, "",     "", WIN,   0,   0,   0, 0, 0),
+		MKGUI_W(MKGUI_LISTVIEW, LV,    "",     "", VBOX1, 0,   200, MKGUI_FIXED, 0, 0),
+	};
+	struct mkgui_ctx *ctx = mkgui_ctx_create();
+	struct mkgui_window *win = mkgui_window_create(ctx, NULL, widgets, 3, NULL, 0, 0);
+	CHECK(win, "create failed");
+	if(win) {
+		struct mkgui_column cols[] = { { "Name", 200, MKGUI_CELL_TEXT } };
+		mkgui_listview_setup(win, LV, 10, 1, cols, dummy_row_cb, NULL);
+		run_layout(win);
+		int32_t idx = find_widget_idx(win, LV);
+		int32_t rx = win->rects[idx].x + 10;
+		int32_t row0 = win->rects[idx].y + win->row_height + 3;
+		int32_t row3 = win->rects[idx].y + win->row_height * 4 + 3;
+		inject_press(win, rx, row0, 1, 0);
+		inject_motion(win, rx, row0 + 10);
+		inject_motion(win, rx, row3);
+		inject_release(win, rx, row3, 1);
+		CHECK(poll_for_event(win, MKGUI_EVENT_LISTVIEW_REORDER, LV), "expected LISTVIEW_REORDER");
+		mkgui_window_destroy(win);
+		mkgui_ctx_destroy(ctx);
+	}
+	TEST_END();
+}
+
+// [=]===^=[ test_listview_col_reorder ]===========================[=]
+static void test_listview_col_reorder(void) {
+	TEST_BEGIN("listview: drag column header fires LISTVIEW_COL_REORDER");
+	enum { WIN = 1, VBOX1 = 2, LV = 3 };
+	struct mkgui_widget widgets[] = {
+		MKGUI_W(MKGUI_WINDOW,   WIN,   "Test", "", 0,     400, 300, 0, 0, 0),
+		MKGUI_W(MKGUI_VBOX,     VBOX1, "",     "", WIN,   0,   0,   0, 0, 0),
+		MKGUI_W(MKGUI_LISTVIEW, LV,    "",     "", VBOX1, 0,   200, MKGUI_FIXED, 0, 0),
+	};
+	struct mkgui_ctx *ctx = mkgui_ctx_create();
+	struct mkgui_window *win = mkgui_window_create(ctx, NULL, widgets, 3, NULL, 0, 0);
+	CHECK(win, "create failed");
+	if(win) {
+		struct mkgui_column cols[] = { { "Name", 200, MKGUI_CELL_TEXT }, { "Size", 100, MKGUI_CELL_TEXT } };
+		mkgui_listview_setup(win, LV, 10, 2, cols, dummy_row_cb, NULL);
+		run_layout(win);
+		int32_t idx = find_widget_idx(win, LV);
+		int32_t hy = win->rects[idx].y + win->row_height / 2;
+		int32_t col0 = win->rects[idx].x + 100;
+		// drop past the midpoint of column 1 so the insert position lands
+		// after it (dst == 2); dropping inside col1 (dst == src+1) is a no-op.
+		int32_t drop_x = win->rects[idx].x + 290;
+		inject_press(win, col0, hy, 1, 0);
+		inject_motion(win, drop_x, hy);
+		inject_release(win, drop_x, hy, 1);
+		CHECK(poll_for_event(win, MKGUI_EVENT_LISTVIEW_COL_REORDER, LV), "expected LISTVIEW_COL_REORDER");
+		mkgui_window_destroy(win);
+		mkgui_ctx_destroy(ctx);
+	}
+	TEST_END();
+}
+
+// [=]===^=[ test_treeview_move ]==================================[=]
+static void test_treeview_move(void) {
+	TEST_BEGIN("treeview: drag node onto another fires TREEVIEW_MOVE");
+	enum { WIN = 1, VBOX1 = 2, TV = 3 };
+	struct mkgui_widget widgets[] = {
+		MKGUI_W(MKGUI_WINDOW,   WIN,   "Test", "", 0,     400, 300, 0, 0, 0),
+		MKGUI_W(MKGUI_VBOX,     VBOX1, "",     "", WIN,   0,   0,   0, 0, 0),
+		MKGUI_W(MKGUI_TREEVIEW, TV,    "",     "", VBOX1, 0,   200, MKGUI_FIXED, 0, 0),
+	};
+	struct mkgui_ctx *ctx = mkgui_ctx_create();
+	struct mkgui_window *win = mkgui_window_create(ctx, NULL, widgets, 3, NULL, 0, 0);
+	CHECK(win, "create failed");
+	if(win) {
+		mkgui_treeview_setup(win, TV);
+		mkgui_treeview_add(win, TV, 100, 0, "One");
+		mkgui_treeview_add(win, TV, 101, 0, "Two");
+		mkgui_treeview_add(win, TV, 102, 0, "Three");
+		run_layout(win);
+		int32_t idx = find_widget_idx(win, TV);
+		int32_t rx = win->rects[idx].x + 40;
+		int32_t row0 = win->rects[idx].y + win->row_height / 2 + 1;
+		int32_t row2 = win->rects[idx].y + win->row_height * 2 + win->row_height / 2 + 1;
+		inject_press(win, rx, row0, 1, 0);
+		inject_motion(win, rx, row0 + 10);
+		inject_motion(win, rx, row2);
+		inject_release(win, rx, row2, 1);
+		CHECK(poll_for_event(win, MKGUI_EVENT_TREEVIEW_MOVE, TV), "expected TREEVIEW_MOVE");
+		mkgui_window_destroy(win);
+		mkgui_ctx_destroy(ctx);
+	}
+	TEST_END();
+}
+
+// [=]===^=[ test_gridview_reorder ]===============================[=]
+static void test_gridview_reorder(void) {
+	TEST_BEGIN("gridview: drag row onto another fires GRIDVIEW_REORDER");
+	enum { WIN = 1, VBOX1 = 2, GV = 3 };
+	struct mkgui_widget widgets[] = {
+		MKGUI_W(MKGUI_WINDOW,   WIN,   "Test", "", 0,     400, 300, 0, 0, 0),
+		MKGUI_W(MKGUI_VBOX,     VBOX1, "",     "", WIN,   0,   0,   0, 0, 0),
+		MKGUI_W(MKGUI_GRIDVIEW, GV,    "",     "", VBOX1, 0,   200, MKGUI_FIXED, 0, 0),
+	};
+	struct mkgui_ctx *ctx = mkgui_ctx_create();
+	struct mkgui_window *win = mkgui_window_create(ctx, NULL, widgets, 3, NULL, 0, 0);
+	CHECK(win, "create failed");
+	if(win) {
+		struct mkgui_grid_column cols[] = { { "A", 80, MKGUI_GRID_TEXT }, { "B", 80, MKGUI_GRID_TEXT } };
+		mkgui_gridview_setup(win, GV, 10, 2, cols, dummy_grid_cell_cb, NULL);
+		run_layout(win);
+		int32_t idx = find_widget_idx(win, GV);
+		int32_t rx = win->rects[idx].x + 10;
+		int32_t row0 = win->rects[idx].y + win->row_height + win->row_height / 2;
+		int32_t row3 = win->rects[idx].y + win->row_height * 4 + win->row_height / 2;
+		inject_press(win, rx, row0, 1, 0);
+		inject_motion(win, rx, row0 + 10);
+		inject_motion(win, rx, row3);
+		inject_release(win, rx, row3, 1);
+		CHECK(poll_for_event(win, MKGUI_EVENT_GRIDVIEW_REORDER, GV), "expected GRIDVIEW_REORDER");
+		mkgui_window_destroy(win);
+		mkgui_ctx_destroy(ctx);
+	}
+	TEST_END();
+}
+
+// ---------------------------------------------------------------------------
+// Cell edit commit
+// ---------------------------------------------------------------------------
+
+// [=]===^=[ test_cell_edit_commit ]===============================[=]
+static void test_cell_edit_commit(void) {
+	TEST_BEGIN("listview: editing a cell and pressing Enter fires CELL_EDIT_COMMIT");
+	enum { WIN = 1, VBOX1 = 2, LV = 3 };
+	struct mkgui_widget widgets[] = {
+		MKGUI_W(MKGUI_WINDOW,   WIN,   "Test", "", 0,     400, 300, 0, 0, 0),
+		MKGUI_W(MKGUI_VBOX,     VBOX1, "",     "", WIN,   0,   0,   0, 0, 0),
+		MKGUI_W(MKGUI_LISTVIEW, LV,    "",     "", VBOX1, 0,   200, MKGUI_FIXED, MKGUI_LISTVIEW_EDITABLE, 0),
+	};
+	struct mkgui_ctx *ctx = mkgui_ctx_create();
+	struct mkgui_window *win = mkgui_window_create(ctx, NULL, widgets, 3, NULL, 0, 0);
+	CHECK(win, "create failed");
+	if(win) {
+		struct mkgui_column cols[] = { { "Name", 200, MKGUI_CELL_TEXT } };
+		mkgui_listview_setup(win, LV, 10, 1, cols, dummy_row_cb, NULL);
+		run_layout(win);
+		win->focus_id = LV;
+		celledit_begin(win, LV, 0, 0, "edit me");
+		CHECK(win->cell_edit.active, "cell edit did not start");
+		inject_key(win, MKGUI_KEY_RETURN, 0);
+		CHECK(poll_for_event(win, MKGUI_EVENT_CELL_EDIT_COMMIT, LV), "expected CELL_EDIT_COMMIT");
+		mkgui_window_destroy(win);
+		mkgui_ctx_destroy(ctx);
+	}
+	TEST_END();
+}
+
+// ---------------------------------------------------------------------------
+// Canvas: PRESS, MOTION, RELEASE
+// ---------------------------------------------------------------------------
+
+// [=]===^=[ test_canvas_events ]==================================[=]
+static void test_canvas_events(void) {
+	TEST_BEGIN("canvas: press/motion/release fire CANVAS_PRESS/MOTION/RELEASE");
+	enum { WIN = 1, CV = 2 };
+	struct mkgui_widget widgets[] = {
+		MKGUI_W(MKGUI_WINDOW, WIN, "Test", "", 0,   400, 300, 0, MKGUI_WINDOW_CANVAS, 0),
+		MKGUI_W(MKGUI_CANVAS, CV,  "",     "", WIN, 0,   0,   0, 0, 0),
+	};
+	struct mkgui_ctx *ctx = mkgui_ctx_create();
+	struct mkgui_window *win = mkgui_window_create(ctx, NULL, widgets, 2, NULL, 0, 0);
+	CHECK(win, "create failed");
+	if(win) {
+		run_layout(win);
+		inject_press(win, 50, 50, 1, 0);
+		CHECK(poll_for_event(win, MKGUI_EVENT_CANVAS_PRESS, CV), "expected CANVAS_PRESS");
+		inject_motion(win, 60, 60);
+		CHECK(poll_for_event(win, MKGUI_EVENT_CANVAS_MOTION, CV), "expected CANVAS_MOTION");
+		inject_release(win, 60, 60, 1);
+		CHECK(poll_for_event(win, MKGUI_EVENT_CANVAS_RELEASE, CV), "expected CANVAS_RELEASE");
+		mkgui_window_destroy(win);
+		mkgui_ctx_destroy(ctx);
+	}
+	TEST_END();
+}
+
+// ---------------------------------------------------------------------------
+// Window-level events: RESIZE, CLOSE, FILE_DROP
+// ---------------------------------------------------------------------------
+
+// [=]===^=[ test_window_resize ]==================================[=]
+static void test_window_resize(void) {
+	TEST_BEGIN("window: resize fires RESIZE");
+	enum { WIN = 1 };
+	struct mkgui_widget widgets[] = {
+		MKGUI_W(MKGUI_WINDOW, WIN, "Test", "", 0, 400, 300, 0, 0, 0),
+	};
+	struct mkgui_ctx *ctx = mkgui_ctx_create();
+	struct mkgui_window *win = mkgui_window_create(ctx, NULL, widgets, 1, NULL, 0, 0);
+	CHECK(win, "create failed");
+	if(win) {
+		run_layout(win);
+		inject_resize(win, win->win_w + 64, win->win_h + 48);
+		CHECK(poll_for_event(win, MKGUI_EVENT_RESIZE, 0), "expected RESIZE");
+		mkgui_window_destroy(win);
+		mkgui_ctx_destroy(ctx);
+	}
+	TEST_END();
+}
+
+// [=]===^=[ test_window_close ]===================================[=]
+static void test_window_close(void) {
+	TEST_BEGIN("window: close request fires CLOSE");
+	enum { WIN = 1 };
+	struct mkgui_widget widgets[] = {
+		MKGUI_W(MKGUI_WINDOW, WIN, "Test", "", 0, 400, 300, 0, 0, 0),
+	};
+	struct mkgui_ctx *ctx = mkgui_ctx_create();
+	struct mkgui_window *win = mkgui_window_create(ctx, NULL, widgets, 1, NULL, 0, 0);
+	CHECK(win, "create failed");
+	if(win) {
+		run_layout(win);
+		inject_close(win);
+		CHECK(poll_for_event(win, MKGUI_EVENT_CLOSE, 0), "expected CLOSE");
+		mkgui_window_destroy(win);
+		mkgui_ctx_destroy(ctx);
+	}
+	TEST_END();
+}
+
+// [=]===^=[ test_file_drop ]======================================[=]
+static void test_file_drop(void) {
+	TEST_BEGIN("window: dropping files fires FILE_DROP");
+	enum { WIN = 1 };
+	struct mkgui_widget widgets[] = {
+		MKGUI_W(MKGUI_WINDOW, WIN, "Test", "", 0, 400, 300, 0, 0, 0),
+	};
+	struct mkgui_ctx *ctx = mkgui_ctx_create();
+	struct mkgui_window *win = mkgui_window_create(ctx, NULL, widgets, 1, NULL, 0, 0);
+	CHECK(win, "create failed");
+	if(win) {
+		run_layout(win);
+		drop_add_path(win, "/tmp/dropped_a.txt");
+		drop_add_path(win, "/tmp/dropped_b.txt");
+		inject_drop(win);
+		CHECK(poll_for_event(win, MKGUI_EVENT_FILE_DROP, 0), "expected FILE_DROP");
+		CHECK(mkgui_drop_count(win) == 2, "expected drop_count == 2");
+		mkgui_window_destroy(win);
+		mkgui_ctx_destroy(ctx);
+	}
+	TEST_END();
+}
+
+// ---------------------------------------------------------------------------
+// Logview: LINE_CLICKED
+// ---------------------------------------------------------------------------
+
+// [=]===^=[ test_logview_line_clicked ]===========================[=]
+static void test_logview_line_clicked(void) {
+	TEST_BEGIN("logview: clicking a line fires LOGVIEW_LINE_CLICKED");
+	enum { WIN = 1, VBOX1 = 2, LV = 3 };
+	struct mkgui_widget widgets[] = {
+		MKGUI_W(MKGUI_WINDOW,  WIN,   "Test", "", 0,     400, 300, 0, 0, 0),
+		MKGUI_W(MKGUI_VBOX,    VBOX1, "",     "", WIN,   0,   0,   0, 0, 0),
+		MKGUI_W(MKGUI_LOGVIEW, LV,    "",     "", VBOX1, 0,   200, MKGUI_FIXED, 0, 0),
+	};
+	struct mkgui_ctx *ctx = mkgui_ctx_create();
+	struct mkgui_window *win = mkgui_window_create(ctx, NULL, widgets, 3, NULL, 0, 0);
+	CHECK(win, "create failed");
+	if(win) {
+		mkgui_logview_setup(win, LV, 256, 64 * 1024);
+		mkgui_logview_append(win, LV, "first line\n");
+		mkgui_logview_append(win, LV, "second line\n");
+		mkgui_logview_append(win, LV, "third line\n");
+		run_layout(win);
+		int32_t idx = find_widget_idx(win, LV);
+		int32_t rx = win->rects[idx].x + 10;
+		int32_t ry = win->rects[idx].y + win->row_height / 2 + 1;
+		inject_click_at(win, rx, ry);
+		CHECK(poll_for_event(win, MKGUI_EVENT_LOGVIEW_LINE_CLICKED, LV), "expected LOGVIEW_LINE_CLICKED");
+		mkgui_window_destroy(win);
+		mkgui_ctx_destroy(ctx);
+	}
+	TEST_END();
+}
+
 int main(void) {
 	printf("mkgui extended event test harness\n");
 	printf("==================================\n\n");
@@ -959,6 +1375,19 @@ int main(void) {
 	test_datepicker_changed();
 	test_timer_event();
 	test_context_menu_event();
+	test_gridview_keyboard_select();
+	test_gridview_check();
+	test_listview_drag_start_end();
+	test_listview_reorder();
+	test_listview_col_reorder();
+	test_treeview_move();
+	test_gridview_reorder();
+	test_cell_edit_commit();
+	test_canvas_events();
+	test_window_resize();
+	test_window_close();
+	test_file_drop();
+	test_logview_line_clicked();
 
 	printf("\n==================================\n");
 	printf("%u tests: %u passed, %u failed\n", tests_run, tests_passed, tests_failed);
