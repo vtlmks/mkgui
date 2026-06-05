@@ -392,9 +392,9 @@ static uint32_t celledit_key(struct mkgui_window *win, struct mkgui_event *ev, u
 		}
 
 		if(ks == 'v' || ks == 'V') {
-			char clip_buf[MKGUI_CLIP_MAX];
-			uint32_t clip_len = platform_clipboard_get(win, clip_buf, sizeof(clip_buf));
-			if(clip_len > 0) {
+			uint32_t clip_len = 0;
+			char *clip_buf = platform_clipboard_get_alloc(win, &clip_len);
+			if(clip_buf && clip_len > 0) {
 				for(uint32_t ci = 0; ci < clip_len; ++ci) {
 					if(clip_buf[ci] == '\n' || clip_buf[ci] == '\r') {
 						clip_buf[ci] = ' ';
@@ -405,6 +405,7 @@ static uint32_t celledit_key(struct mkgui_window *win, struct mkgui_event *ev, u
 				textedit_scroll_to_cursor(win, &ce->te, ce->text, visible_w);
 				dirty_widget_id(win, ce->widget_id);
 			}
+			free(clip_buf);
 			return 1;
 		}
 		return 1;

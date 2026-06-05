@@ -2,7 +2,7 @@
 
 All notable changes to mkgui. Pre-1.0 betas may break the API between releases.
 
-## v0.3.0-beta (unreleased)
+## v0.3.0-beta
 
 ### Breaking
 
@@ -63,6 +63,7 @@ All notable changes to mkgui. Pre-1.0 betas may break the API between releases.
 - **`mkgui_ctx_set_theme` and `mkgui_ctx_set_scale` apply to all windows on the ctx.** Previously each window held its own theme/scale; new ctx-level setters iterate and update every window in the registry.
 - **`mkgui_window_create` returns `NULL` when the window registry is full** (`MKGUI_MAX_WINDOWS` = 16). Previously it would silently create an untracked window.
 - **Single nanosecond-only time API.** `mkgui_time_ms()`, `mkgui_time_us()`, and `mkgui_sleep_ms()` are gone. Use `mkgui_now_ns()` (monotonic ns, `uint64_t`) and `mkgui_sleep_ns(ns)`. Convert to other units at the call site: `(uint32_t)(mkgui_now_ns() / 1000000ull)` for ms, `(double)mkgui_now_ns() * 1e-3` for us. One time unit, one sleep function, no choice paralysis.
+- **Clipboard size limit removed.** Internal selection storage no longer has the fixed 4 KB cap; it grows on demand, so copy and paste handle arbitrarily large text. The Linux backend now implements the X11 INCR protocol on both sides (owner and requestor), streaming selections that exceed a single X request in chunks; Win32 already handled arbitrary sizes via the OS clipboard.
 
 ### Migration
 

@@ -178,6 +178,10 @@ if [ "$TARGET" != "editor" ]; then
 		$CC $CFLAGS tests/test_lifecycle.c -o out/linux/test_lifecycle $LINUX_LIBS
 	) &
 
+	(
+		$CC $CFLAGS tests/test_clipboard.c -o out/linux/test_clipboard $LINUX_LIBS
+	) &
+
 	# extract_icons is independent (doesn't use mkgui)
 	(
 		$CC -std=gnu99 -O2 -Wall -Wextra -Wno-stringop-truncation -Wno-format-truncation tools/extract_icons.c -o out/linux/extract_icons

@@ -19,11 +19,29 @@
 
 #define MKGUI_DEFERRED_SIZE 64
 
+// Concurrent outgoing INCR clipboard transfers we can serve at once. One per
+// requestor that pulls a selection too large for a single X request.
+#define MKGUI_CLIP_INCR_MAX 8
+
+// One in-flight INCR send: a snapshot of the selection data being streamed to
+// a single requestor, chunk by chunk, as it deletes the property between
+// chunks. data is owned (malloc'd) so a later clipboard change can't pull the
+// rug out from under an active transfer.
+struct mkgui_clip_incr {
+	Window requestor;
+	Atom property;
+	Atom type;
+	char *data;
+	uint32_t len;
+	uint32_t offset;
+};
+
 struct mkgui_platform_atoms {
 	Atom wm_delete;
 	Atom clipboard;
 	Atom utf8_string;
 	Atom targets;
+	Atom incr;
 	Atom mkgui_clip_prop;
 	Atom net_wm_pid;
 	Atom xdnd_aware;
@@ -62,6 +80,8 @@ struct mkgui_platform {
 	struct mkgui_plat_event deferred[MKGUI_DEFERRED_SIZE];
 	uint32_t deferred_head;
 	uint32_t deferred_tail;
+	struct mkgui_clip_incr incr_send[MKGUI_CLIP_INCR_MAX];
+	uint32_t incr_send_count;
 };
 
 struct mkgui_popup_platform {

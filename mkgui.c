@@ -294,7 +294,6 @@ struct mkgui_split_data {
 
 #define MKGUI_MAX_TEXTAREA_LINES 4096
 #define MKGUI_MAX_TEXTAREA_LINE  1024
-#define MKGUI_CLIP_MAX           4096
 
 struct mkgui_treeview_node {
 	uint32_t id;
@@ -935,8 +934,9 @@ struct mkgui_window {
 
 	struct mkgui_window *parent;
 
-	char clip_text[MKGUI_CLIP_MAX];
+	char *clip_text;
 	uint32_t clip_len;
+	uint32_t clip_cap;
 
 	struct mkgui_ctxmenu_item ctxmenu_items[MKGUI_MAX_CTXMENU];
 	uint32_t ctxmenu_count;
@@ -4855,6 +4855,7 @@ MKGUI_API void mkgui_window_destroy(struct mkgui_window *win) {
 	for(uint32_t i = 0; i < win->image_count; ++i) {
 		free(win->images[i].pixels);
 	}
+	free(win->clip_text);
 	for(uint32_t i = 0; i < win->glview_count; ++i) {
 		if(win->glviews[i].created) {
 			platform_glview_destroy(win, &win->glviews[i]);
@@ -7821,9 +7822,9 @@ MKGUI_API uint32_t mkgui_window_poll(struct mkgui_window *win, struct mkgui_even
 
 					if(fw && (ks == 'v' || ks == 'V')) {
 						if(fw->type == MKGUI_INPUT && !(fw->style & MKGUI_INPUT_READONLY)) {
-							char clip_buf[MKGUI_CLIP_MAX];
-							uint32_t clip_len = platform_clipboard_get(win, clip_buf, sizeof(clip_buf));
-							if(clip_len > 0) {
+							uint32_t clip_len = 0;
+							char *clip_buf = platform_clipboard_get_alloc(win, &clip_len);
+							if(clip_buf && clip_len > 0) {
 								struct mkgui_input_data *inp = find_input_data(win, win->focus_id);
 								if(inp) {
 									input_undo_push_force(inp);
@@ -7845,10 +7846,12 @@ MKGUI_API uint32_t mkgui_window_poll(struct mkgui_window *win, struct mkgui_even
 										input_scroll_to_cursor(win, win->focus_id);
 										ev->type = MKGUI_EVENT_INPUT_CHANGED;
 										ev->id = win->focus_id;
+										free(clip_buf);
 										return 1;
 									}
 								}
 							}
+							free(clip_buf);
 
 						} else if(fw->type == MKGUI_TEXTAREA && !(fw->style & MKGUI_TEXTAREA_READONLY)) {
 							uint32_t clip_len = 0;
@@ -7887,9 +7890,9 @@ MKGUI_API uint32_t mkgui_window_poll(struct mkgui_window *win, struct mkgui_even
 						} else if(fw->type == MKGUI_PATHBAR) {
 							struct mkgui_pathbar_data *pb = find_pathbar_data(win, win->focus_id);
 							if(pb && pb->editing) {
-								char clip_buf[MKGUI_CLIP_MAX];
-								uint32_t clip_len = platform_clipboard_get(win, clip_buf, sizeof(clip_buf));
-								if(clip_len > 0) {
+								uint32_t clip_len = 0;
+								char *clip_buf = platform_clipboard_get_alloc(win, &clip_len);
+								if(clip_buf && clip_len > 0) {
 									for(uint32_t ci = 0; ci < clip_len; ++ci) {
 										if(clip_buf[ci] == '\n' || clip_buf[ci] == '\r') {
 											clip_buf[ci] = ' ';
@@ -7904,12 +7907,13 @@ MKGUI_API uint32_t mkgui_window_poll(struct mkgui_window *win, struct mkgui_even
 										pathbar_scroll_to_cursor(win, pb);
 									}
 								}
+								free(clip_buf);
 							}
 
 						} else if(fw->type == MKGUI_COMBOBOX) {
-							char clip_buf[MKGUI_CLIP_MAX];
-							uint32_t clip_len = platform_clipboard_get(win, clip_buf, sizeof(clip_buf));
-							if(clip_len > 0) {
+							uint32_t clip_len = 0;
+							char *clip_buf = platform_clipboard_get_alloc(win, &clip_len);
+							if(clip_buf && clip_len > 0) {
 								struct mkgui_combobox_data *cb = find_combobox_data(win, win->focus_id);
 								if(cb) {
 									for(uint32_t ci = 0; ci < clip_len; ++ci) {
@@ -7929,10 +7933,12 @@ MKGUI_API uint32_t mkgui_window_poll(struct mkgui_window *win, struct mkgui_even
 										ev->id = win->focus_id;
 										dirty_widget_id(win, win->focus_id);
 										combobox_scroll_to_cursor(win, win->focus_id);
+										free(clip_buf);
 										return 1;
 									}
 								}
 							}
+							free(clip_buf);
 						}
 						break;
 					}

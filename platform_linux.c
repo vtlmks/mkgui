@@ -91,7 +91,6 @@ static uint32_t platform_init(struct mkgui_window *win, const char *title, int32
 
 	plat->dpy = XOpenDisplay(NULL);
 	if(!plat->dpy) {
-		fprintf(stderr, "mkgui: cannot open display\n");
 		return 0;
 	}
 
@@ -121,6 +120,7 @@ static uint32_t platform_init(struct mkgui_window *win, const char *title, int32
 	plat->atoms.clipboard = XInternAtom(plat->dpy, "CLIPBOARD", False);
 	plat->atoms.utf8_string = XInternAtom(plat->dpy, "UTF8_STRING", False);
 	plat->atoms.targets = XInternAtom(plat->dpy, "TARGETS", False);
+	plat->atoms.incr = XInternAtom(plat->dpy, "INCR", False);
 	plat->atoms.mkgui_clip_prop = XInternAtom(plat->dpy, "MKGUI_CLIP", False);
 	plat->atoms.net_wm_pid = XInternAtom(plat->dpy, "_NET_WM_PID", False);
 	plat->atoms.xdnd_aware = XInternAtom(plat->dpy, "XdndAware", False);
@@ -145,7 +145,7 @@ static uint32_t platform_init(struct mkgui_window *win, const char *title, int32
 	XChangeProperty(plat->dpy, plat->win, plat->atoms.net_wm_pid, XA_CARDINAL, 32, PropModeReplace, (unsigned char *)&pid, 1);
 	XSetWMClientMachine(plat->dpy, plat->win, &(XTextProperty){ .value = (unsigned char *)"localhost", .encoding = XA_STRING, .format = 8, .nitems = 9 });
 
-	XSelectInput(plat->dpy, plat->win, ExposureMask | StructureNotifyMask | ButtonPressMask | ButtonReleaseMask | PointerMotionMask | KeyPressMask | KeyReleaseMask | FocusChangeMask);
+	XSelectInput(plat->dpy, plat->win, ExposureMask | StructureNotifyMask | ButtonPressMask | ButtonReleaseMask | PointerMotionMask | KeyPressMask | KeyReleaseMask | FocusChangeMask | PropertyChangeMask);
 
 	plat->gc = XCreateGC(plat->dpy, plat->win, 0, NULL);
 
@@ -238,7 +238,7 @@ static uint32_t platform_init_child(struct mkgui_window *win, struct mkgui_windo
 	XChangeProperty(plat->dpy, plat->win, plat->atoms.net_wm_pid, XA_CARDINAL, 32, PropModeReplace, (unsigned char *)&pid, 1);
 	XSetWMClientMachine(plat->dpy, plat->win, &(XTextProperty){ .value = (unsigned char *)"localhost", .encoding = XA_STRING, .format = 8, .nitems = 9 });
 
-	XSelectInput(plat->dpy, plat->win, ExposureMask | StructureNotifyMask | ButtonPressMask | ButtonReleaseMask | PointerMotionMask | KeyPressMask | KeyReleaseMask | FocusChangeMask);
+	XSelectInput(plat->dpy, plat->win, ExposureMask | StructureNotifyMask | ButtonPressMask | ButtonReleaseMask | PointerMotionMask | KeyPressMask | KeyReleaseMask | FocusChangeMask | PropertyChangeMask);
 
 	plat->gc = XCreateGC(plat->dpy, plat->win, 0, NULL);
 
@@ -283,6 +283,10 @@ static uint32_t platform_init_child(struct mkgui_window *win, struct mkgui_windo
 // the last window on the ctx goes.
 static void platform_window_destroy(struct mkgui_window *win) {
 	struct mkgui_platform *plat = &win->plat;
+	for(uint32_t i = 0; i < plat->incr_send_count; ++i) {
+		free(plat->incr_send[i].data);
+	}
+	plat->incr_send_count = 0;
 	platform_fb_destroy(plat, &plat->shm, plat->img);
 	plat->img = NULL;
 	XFreeCursor(plat->dpy, plat->cursor_default);
@@ -837,6 +841,89 @@ static uint32_t platform_xdnd_selection(struct mkgui_window *win, XSelectionEven
 	return 0;
 }
 
+// [=]===^=[ platform_clip_chunk_bytes ]===========================[=]
+// Largest payload we put in a single XChangeProperty, derived from the
+// server's max request size (with BIG-REQUESTS when available) minus header
+// slack, and capped so a huge clipboard streams in bounded steps.
+static uint32_t platform_clip_chunk_bytes(Display *dpy) {
+	long units = XExtendedMaxRequestSize(dpy);
+	if(units == 0) {
+		units = XMaxRequestSize(dpy);
+	}
+	uint32_t bytes = (uint32_t)(units * 4);
+	bytes = bytes > 4096 ? bytes - 4096 : bytes / 2;
+	if(bytes > (1u << 20)) {
+		bytes = 1u << 20;
+	}
+	return bytes;
+}
+
+// [=]===^=[ platform_clip_incr_begin ]============================[=]
+// Start an incremental selection transfer to `requestor`: snapshot the data,
+// advertise the size via an INCR-typed property, and watch the requestor for
+// the property deletions that pace the stream. Returns 0 if it cannot start
+// (no free slot, alloc failure, or a same-process requestor whose event mask
+// we must not clobber), leaving the caller to report transfer failure.
+static uint32_t platform_clip_incr_begin(struct mkgui_window *win, Window requestor, Atom property, Atom target) {
+	struct mkgui_platform *plat = &win->plat;
+	if(plat->incr_send_count >= MKGUI_CLIP_INCR_MAX) {
+		return 0;
+	}
+	for(uint32_t i = 0; i < g_ctx->window_count; ++i) {
+		if(g_ctx->windows[i]->plat.win == requestor) {
+			return 0;
+		}
+	}
+	char *copy = (char *)malloc(win->clip_len ? win->clip_len : 1);
+	if(!copy) {
+		return 0;
+	}
+	memcpy(copy, win->clip_text, win->clip_len);
+
+	struct mkgui_clip_incr *e = &plat->incr_send[plat->incr_send_count++];
+	e->requestor = requestor;
+	e->property = property;
+	e->type = target;
+	e->data = copy;
+	e->len = win->clip_len;
+	e->offset = 0;
+
+	XSelectInput(plat->dpy, requestor, PropertyChangeMask);
+	long lower = (long)e->len;
+	XChangeProperty(plat->dpy, requestor, property, plat->atoms.incr, 32, PropModeReplace, (unsigned char *)&lower, 1);
+	XFlush(plat->dpy);
+	return 1;
+}
+
+// [=]===^=[ platform_clip_incr_continue ]=========================[=]
+// A requestor deleted a property; if it matches an in-flight INCR send, push
+// the next chunk (a final zero-length chunk ends the stream). Returns 1 if the
+// event belonged to a transfer we are driving.
+static uint32_t platform_clip_incr_continue(XPropertyEvent *pe) {
+	for(uint32_t w = 0; w < g_ctx->window_count; ++w) {
+		struct mkgui_platform *plat = &g_ctx->windows[w]->plat;
+		for(uint32_t i = 0; i < plat->incr_send_count; ++i) {
+			struct mkgui_clip_incr *e = &plat->incr_send[i];
+			if(e->requestor != pe->window || e->property != pe->atom) {
+				continue;
+			}
+			uint32_t remaining = e->len - e->offset;
+			uint32_t chunk = platform_clip_chunk_bytes(plat->dpy);
+			uint32_t n = remaining < chunk ? remaining : chunk;
+			XChangeProperty(plat->dpy, e->requestor, e->property, e->type, 8, PropModeReplace, (unsigned char *)(e->data + e->offset), (int)n);
+			XFlush(plat->dpy);
+			e->offset += n;
+			if(n == 0) {
+				XSelectInput(plat->dpy, e->requestor, NoEventMask);
+				free(e->data);
+				*e = plat->incr_send[--plat->incr_send_count];
+			}
+			return 1;
+		}
+	}
+	return 0;
+}
+
 // [=]===^=[ platform_translate_xevent ]===========================[=]
 static void platform_translate_xevent(struct mkgui_window *owner, XEvent *xev, struct mkgui_plat_event *pev) {
 	switch(xev->type) {
@@ -940,8 +1027,14 @@ static void platform_translate_xevent(struct mkgui_window *owner, XEvent *xev, s
 				XChangeProperty(owner->plat.dpy, req->requestor, req->property, XA_ATOM, 32, PropModeReplace, (unsigned char *)supported, 2);
 				resp.property = req->property;
 			} else if(req->target == owner->plat.atoms.utf8_string || req->target == XA_STRING) {
-				XChangeProperty(owner->plat.dpy, req->requestor, req->property, req->target, 8, PropModeReplace, (unsigned char *)owner->clip_text, (int)owner->clip_len);
-				resp.property = req->property;
+				if(owner->clip_len > platform_clip_chunk_bytes(owner->plat.dpy)) {
+					if(platform_clip_incr_begin(owner, req->requestor, req->property, req->target)) {
+						resp.property = req->property;
+					}
+				} else {
+					XChangeProperty(owner->plat.dpy, req->requestor, req->property, req->target, 8, PropModeReplace, (unsigned char *)owner->clip_text, (int)owner->clip_len);
+					resp.property = req->property;
+				}
 			}
 
 			XSendEvent(owner->plat.dpy, req->requestor, False, 0, (XEvent *)&resp);
@@ -989,6 +1082,16 @@ static void platform_next_event(struct mkgui_window *win, struct mkgui_plat_even
 
 	XEvent xev;
 	XNextEvent(win->plat.dpy, &xev);
+
+	// An in-flight INCR send is paced by the requestor deleting our property;
+	// those PropertyNotify events carry the requestor's (foreign) window, so
+	// handle them before the per-window routing below would drop them.
+	if(xev.type == PropertyNotify && xev.xproperty.state == PropertyDelete) {
+		if(platform_clip_incr_continue(&xev.xproperty)) {
+			pev->type = MKGUI_PLAT_NONE;
+			return;
+		}
+	}
 
 	if(xev.xany.window == win->plat.win) {
 		platform_translate_xevent(win, &xev, pev);
@@ -1126,7 +1229,6 @@ static void platform_font_rasterize(struct mkgui_window *win, int32_t pixel_size
 // [=]===^=[ platform_font_init ]==================================[=]
 static void platform_font_init(struct mkgui_window *win) {
 	if(FT_Init_FreeType(&plat_ft_lib)) {
-		fprintf(stderr, "mkgui: cannot init freetype\n");
 		win->font_ascent = sc(win, 11);
 		win->font_height = sc(win, 13);
 		win->char_width = sc(win, 7);
@@ -1135,7 +1237,6 @@ static void platform_font_init(struct mkgui_window *win) {
 
 	const char *path = platform_find_font();
 	if(!path || FT_New_Face(plat_ft_lib, path, 0, &plat_ft_face)) {
-		fprintf(stderr, "mkgui: cannot load font%s%s\n", path ? ": " : "", path ? path : "");
 		plat_ft_face = NULL;
 		win->font_ascent = sc(win, 11);
 		win->font_height = sc(win, 13);
@@ -1172,8 +1273,17 @@ static void platform_font_fini(struct mkgui_window *win) {
 
 // [=]===^=[ platform_clipboard_set ]==============================[=]
 static void platform_clipboard_set(struct mkgui_window *win, const char *text, uint32_t len) {
-	if(len >= MKGUI_CLIP_MAX) {
-		len = MKGUI_CLIP_MAX - 1;
+	if(len + 1 > win->clip_cap) {
+		uint32_t cap = win->clip_cap ? win->clip_cap : 256;
+		while(cap < len + 1) {
+			cap *= 2;
+		}
+		char *nt = (char *)realloc(win->clip_text, cap);
+		if(!nt) {
+			return;
+		}
+		win->clip_text = nt;
+		win->clip_cap = cap;
 	}
 	memcpy(win->clip_text, text, len);
 	win->clip_text[len] = '\0';
@@ -1182,54 +1292,99 @@ static void platform_clipboard_set(struct mkgui_window *win, const char *text, u
 	XFlush(win->plat.dpy);
 }
 
-// [=]===^=[ platform_clipboard_get ]==============================[=]
-static uint32_t platform_clipboard_get(struct mkgui_window *win, char *buf, uint32_t buf_size) {
+// [=]===^=[ platform_clip_drain_prop ]============================[=]
+// Read MKGUI_CLIP off our window in full, deleting as we go, and append it to
+// *buf (grown as needed). A single property can exceed one request, so page
+// through it; the delete that signals an INCR owner happens on the final read.
+// Returns bytes appended (0 = empty property), or 0 with *failed set on OOM.
+static uint32_t platform_clip_drain_prop(struct mkgui_window *win, char **buf, uint32_t *cap, uint32_t *len, uint32_t *failed) {
 	struct mkgui_platform *plat = &win->plat;
-
-	if(XGetSelectionOwner(plat->dpy, plat->atoms.clipboard) == plat->win) {
-		uint32_t len = win->clip_len;
-		if(len >= buf_size) {
-			len = buf_size - 1;
+	uint32_t appended = 0;
+	uint32_t offset = 0;
+	for(;;) {
+		Atom type;
+		int format;
+		unsigned long nitems, bytes_after;
+		unsigned char *data = NULL;
+		XGetWindowProperty(plat->dpy, plat->win, plat->atoms.mkgui_clip_prop, offset, 1024 * 1024, True, AnyPropertyType, &type, &format, &nitems, &bytes_after, &data);
+		if(!data) {
+			break;
 		}
-		memcpy(buf, win->clip_text, len);
-		buf[len] = '\0';
-		return len;
-	}
-
-	XConvertSelection(plat->dpy, plat->atoms.clipboard, plat->atoms.utf8_string, plat->atoms.mkgui_clip_prop, plat->win, CurrentTime);
-	XFlush(plat->dpy);
-
-	XEvent xev;
-	for(uint32_t i = 0; i < 50; ++i) {
-		if(XCheckTypedWindowEvent(plat->dpy, plat->win, SelectionNotify, &xev)) {
-			if(xev.xselection.property == None) {
-				return 0;
-			}
-			Atom type;
-			int format;
-			unsigned long nitems, bytes_after;
-			unsigned char *data = NULL;
-			XGetWindowProperty(plat->dpy, plat->win, plat->atoms.mkgui_clip_prop, 0, 1024 * 1024, True, AnyPropertyType, &type, &format, &nitems, &bytes_after, &data);
-			if(data && nitems > 0) {
-				uint32_t len = (uint32_t)nitems;
-				if(len >= buf_size) {
-					len = buf_size - 1;
+		uint32_t n = (uint32_t)nitems * ((uint32_t)format / 8);
+		if(n > 0) {
+			if(*len + n + 1 > *cap) {
+				uint32_t nc = *cap ? *cap : 4096;
+				while(nc < *len + n + 1) {
+					nc *= 2;
 				}
-				memcpy(buf, data, len);
-				buf[len] = '\0';
-				XFree(data);
-				return len;
+				char *nb = (char *)realloc(*buf, nc);
+				if(!nb) {
+					XFree(data);
+					*failed = 1;
+					break;
+				}
+				*buf = nb;
+				*cap = nc;
 			}
-
-			if(data) {
-				XFree(data);
-			}
-			return 0;
+			memcpy(*buf + *len, data, n);
+			*len += n;
+			appended += n;
 		}
-		struct timespec ts = {0, 10000000};
-		nanosleep(&ts, NULL);
+		XFree(data);
+		if(bytes_after == 0) {
+			break;
+		}
+		offset += n / 4;
 	}
-	return 0;
+	return appended;
+}
+
+// [=]===^=[ platform_clip_recv_incr ]=============================[=]
+// Receive an incremental selection: the owner appends one chunk per property
+// delete we issue, terminating with a zero-length chunk. Returns the malloc'd,
+// NUL-terminated payload (NULL on timeout/OOM/empty).
+static char *platform_clip_recv_incr(struct mkgui_window *win, uint32_t *out_len) {
+	struct mkgui_platform *plat = &win->plat;
+	char *buf = NULL;
+	uint32_t cap = 0;
+	uint32_t len = 0;
+
+	for(;;) {
+		XEvent xev;
+		uint32_t got = 0;
+		for(uint32_t i = 0; i < 1000; ++i) {
+			if(XCheckTypedWindowEvent(plat->dpy, plat->win, PropertyNotify, &xev)) {
+				if(xev.xproperty.atom == plat->atoms.mkgui_clip_prop && xev.xproperty.state == PropertyNewValue) {
+					got = 1;
+					break;
+				}
+				continue;
+			}
+			struct timespec ts = {0, 10000000};
+			nanosleep(&ts, NULL);
+		}
+		if(!got) {
+			free(buf);
+			return NULL;
+		}
+
+		uint32_t failed = 0;
+		uint32_t n = platform_clip_drain_prop(win, &buf, &cap, &len, &failed);
+		if(failed) {
+			free(buf);
+			return NULL;
+		}
+		if(n == 0) {
+			break;
+		}
+	}
+
+	if(!buf) {
+		return NULL;
+	}
+	buf[len] = '\0';
+	*out_len = len;
+	return buf;
 }
 
 // [=]===^=[ platform_clipboard_get_alloc ]========================[=]
@@ -1258,29 +1413,42 @@ static char *platform_clipboard_get_alloc(struct mkgui_window *win, uint32_t *ou
 			if(xev.xselection.property == None) {
 				return NULL;
 			}
+			// Peek the type: an INCR property means the data arrives in chunks
+			// paced by us deleting the property; anything else is inline.
 			Atom type;
 			int format;
 			unsigned long nitems, bytes_after;
-			unsigned char *data = NULL;
-			XGetWindowProperty(plat->dpy, plat->win, plat->atoms.mkgui_clip_prop, 0, 1024 * 1024, True, AnyPropertyType, &type, &format, &nitems, &bytes_after, &data);
-			if(data && nitems > 0) {
-				uint32_t len = (uint32_t)nitems;
-				char *buf = (char *)malloc(len + 1);
-				if(!buf) {
-					XFree(data);
-					return NULL;
+			unsigned char *probe = NULL;
+			XGetWindowProperty(plat->dpy, plat->win, plat->atoms.mkgui_clip_prop, 0, 0, False, AnyPropertyType, &type, &format, &nitems, &bytes_after, &probe);
+			if(probe) {
+				XFree(probe);
+			}
+			if(type == plat->atoms.incr) {
+				// The XChangeProperty that delivered the INCR atom already
+				// queued a PropertyNotify(NewValue); discard any such pending
+				// events so recv_incr does not mistake the (now-empty) INCR
+				// property for the terminating zero-length chunk. Data chunks
+				// only start arriving after we delete the property below.
+				XEvent stale;
+				while(XCheckTypedWindowEvent(plat->dpy, plat->win, PropertyNotify, &stale)) {
 				}
-				memcpy(buf, data, len);
-				buf[len] = '\0';
-				XFree(data);
-				*out_len = len;
-				return buf;
+				XDeleteProperty(plat->dpy, plat->win, plat->atoms.mkgui_clip_prop);
+				XFlush(plat->dpy);
+				return platform_clip_recv_incr(win, out_len);
 			}
 
-			if(data) {
-				XFree(data);
+			char *buf = NULL;
+			uint32_t cap = 0;
+			uint32_t len = 0;
+			uint32_t failed = 0;
+			platform_clip_drain_prop(win, &buf, &cap, &len, &failed);
+			if(failed || !buf) {
+				free(buf);
+				return NULL;
 			}
-			return NULL;
+			buf[len] = '\0';
+			*out_len = len;
+			return buf;
 		}
 		struct timespec ts = {0, 10000000};
 		nanosleep(&ts, NULL);

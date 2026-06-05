@@ -1051,13 +1051,6 @@ static void platform_font_fini(struct mkgui_window *win) {
 
 // [=]===^=[ platform_clipboard_set ]==============================[=]
 static void platform_clipboard_set(struct mkgui_window *win, const char *text, uint32_t len) {
-	if(len >= MKGUI_CLIP_MAX) {
-		len = MKGUI_CLIP_MAX - 1;
-	}
-	memcpy(win->clip_text, text, len);
-	win->clip_text[len] = '\0';
-	win->clip_len = len;
-
 	if(!OpenClipboard(win->plat.hwnd)) {
 		return;
 	}
@@ -1071,32 +1064,6 @@ static void platform_clipboard_set(struct mkgui_window *win, const char *text, u
 		SetClipboardData(CF_TEXT, hg);
 	}
 	CloseClipboard();
-}
-
-// [=]===^=[ platform_clipboard_get ]==============================[=]
-static uint32_t platform_clipboard_get(struct mkgui_window *win, char *buf, uint32_t buf_size) {
-	if(!OpenClipboard(win->plat.hwnd)) {
-		return 0;
-	}
-	HANDLE h = GetClipboardData(CF_TEXT);
-	if(!h) {
-		CloseClipboard();
-		return 0;
-	}
-	const char *p = (const char *)GlobalLock(h);
-	if(!p) {
-		CloseClipboard();
-		return 0;
-	}
-	uint32_t len = (uint32_t)strlen(p);
-	if(len >= buf_size) {
-		len = buf_size - 1;
-	}
-	memcpy(buf, p, len);
-	buf[len] = '\0';
-	GlobalUnlock(h);
-	CloseClipboard();
-	return len;
 }
 
 // [=]===^=[ platform_clipboard_get_alloc ]========================[=]
