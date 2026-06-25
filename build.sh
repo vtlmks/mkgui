@@ -26,6 +26,10 @@ LINUX_LIBS="$(pkg-config --cflags freetype2 fontconfig) -lX11 -lXext $(pkg-confi
 LINUX_DEMO_LIBS="-lGL "
 WINDOWS_LIBS="-lgdi32 -mwindows "
 WINDOWS_DEMO_LIBS="-lopengl32 "
+# Pull winpthread from its static archive on final links: mingw-w64's posix-
+# threads libgcc references it, which otherwise leaves the .exe depending on
+# libwinpthread-1.dll. Only the link steps need it, not the -c compile of mkgui.o.
+WINDOWS_PTHREAD="-Wl,-Bstatic -lwinpthread -Wl,-Bdynamic "
 
 # Each argument is either a build mode or a build target. Defaults: normal mode,
 # all target (library + demo + tests + extract_icons + editor). The editor
@@ -140,7 +144,7 @@ if [ "$TARGET" != "editor" ]; then
 
 	if [ "$WIN_ENABLED" -eq 1 ]; then
 		(
-			$WINCC $CFLAGS demo.c out/windows/libmkgui.a -o out/windows/demo.exe $WINDOWS_LIBS $WINDOWS_DEMO_LIBS
+			$WINCC $CFLAGS demo.c out/windows/libmkgui.a -o out/windows/demo.exe $WINDOWS_LIBS $WINDOWS_DEMO_LIBS $WINDOWS_PTHREAD
 		) &
 	fi
 
@@ -192,7 +196,7 @@ if [ "$TARGET" != "editor" ]; then
 	# windowing/message-translation surface. Run with: wine out/windows/test_platform_win32.exe
 	if [ "$WIN_ENABLED" -eq 1 ]; then
 		(
-			$WINCC $CFLAGS $LIB_DEFINES tests/test_platform_win32.c -o out/windows/test_platform_win32.exe $WINDOWS_LIBS -mconsole
+			$WINCC $CFLAGS $LIB_DEFINES tests/test_platform_win32.c -o out/windows/test_platform_win32.exe $WINDOWS_LIBS $WINDOWS_PTHREAD -mconsole
 		) &
 	fi
 fi
@@ -205,7 +209,7 @@ if [ "$TARGET" = "editor" ] || [ "$TARGET" = "all" ]; then
 
 	if [ "$WIN_ENABLED" -eq 1 ]; then
 		(
-			$WINCC $CFLAGS editor.c -o out/windows/editor.exe $WINDOWS_LIBS
+			$WINCC $CFLAGS editor.c -o out/windows/editor.exe $WINDOWS_LIBS $WINDOWS_PTHREAD
 		) &
 	fi
 fi

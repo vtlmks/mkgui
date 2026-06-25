@@ -4677,7 +4677,7 @@ int main(void) {
 		MKGUI_W(MKGUI_TREEVIEW, ED_TREE,        "",                 "", ED_SPLIT_MAIN, 0, 0, MKGUI_REGION_LEFT, 0, 0 ),
 		MKGUI_W(MKGUI_VSPLIT, ED_SPLIT_RIGHT, "",              "", ED_SPLIT_MAIN, 0, 0, MKGUI_REGION_RIGHT, 0, 0 ),
 		MKGUI_W(MKGUI_CANVAS,   ED_CANVAS_LBL,  "",                 "", ED_SPLIT_RIGHT, 0, 0, MKGUI_REGION_LEFT, 0, 0 ),
-		MKGUI_W(MKGUI_VBOX,     ED_RIGHT_PANEL, "",                 "", ED_SPLIT_RIGHT, 0, 0, MKGUI_REGION_RIGHT, 0, 0 ),
+		MKGUI_W(MKGUI_VBOX,     ED_RIGHT_PANEL, "",                 "", ED_SPLIT_RIGHT, 0, 0, MKGUI_REGION_RIGHT | MKGUI_SCROLL, 0, 0 ),
 
 		MKGUI_W(MKGUI_GROUP,    ED_PAL_GROUP,   "Widgets",          "", ED_RIGHT_PANEL, 0, ED_PALETTE_H, MKGUI_FIXED, 0, 0 ),
 		MKGUI_W(MKGUI_HBOX,     ED_PAL_HBOX,   "",                 "", ED_PAL_GROUP,   0, 0, 0, 0, 0 ),
