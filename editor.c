@@ -1359,13 +1359,22 @@ static void ed_set_active_tab(uint32_t tabs_id, uint32_t tab_id) {
 
 // [=]===^=[ ed_is_tab_child_visible ]=============================[=]
 static uint32_t ed_is_tab_child_visible(uint32_t idx) {
-	struct ed_widget *w = &ed.widgets[idx];
-	for(uint32_t j = 0; j < ed.widget_count; ++j) {
-		if(ed.widgets[j].id == w->parent_id && ed.widgets[j].type == MKGUI_TAB) {
-			uint32_t tabs_id = ed.widgets[j].parent_id;
-			if(ed_get_active_tab(tabs_id) != ed.widgets[j].id) {
+	uint32_t pid = ed.widgets[idx].parent_id;
+	for(uint32_t depth = 0; depth < ED_MAX_WIDGETS && pid != 0; ++depth) {
+		uint32_t found = 0;
+		for(uint32_t j = 0; j < ed.widget_count; ++j) {
+			if(ed.widgets[j].id != pid) {
+				continue;
+			}
+			if(ed.widgets[j].type == MKGUI_TAB && ed_get_active_tab(ed.widgets[j].parent_id) != ed.widgets[j].id) {
 				return 0;
 			}
+			pid = ed.widgets[j].parent_id;
+			found = 1;
+			break;
+		}
+		if(!found) {
+			break;
 		}
 	}
 	return 1;
@@ -2625,6 +2634,10 @@ static void ed_render_canvas(struct mkgui_window *win, uint32_t id, uint32_t *pi
 
 	// Draw dashed outlines for invisible containers
 	for(uint32_t i = 0; i < ed.widget_count; ++i) {
+		if(!ed_is_tab_child_visible(i)) {
+			continue;
+		}
+
 		uint32_t t = ed.widgets[i].type;
 		uint32_t st = ed.widgets[i].style;
 		uint32_t needs_outline = 0;
