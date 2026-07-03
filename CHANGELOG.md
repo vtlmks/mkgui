@@ -43,6 +43,7 @@ All notable changes to mkgui. Pre-1.0 betas may break the API between releases.
 
 ### Added
 
+- **`MKGUI_TREELIST` widget (columned tree / tree-table).** A listview whose rows nest into an expandable hierarchy, with the disclosure twisty and indentation in column 0 and full listview column machinery (per-column cell types, sortable/resizable/reorderable headers, multi-select, horizontal + vertical scroll). Retained node model with stable handle-based selection that survives expand/collapse; sorting is per-parent (siblings reorder within their parent, never across parents). Set up with `mkgui_treelist_setup()` and populate with `mkgui_treelist_add()`; see `documentation/doc.md` for the full API.
 - **Host-owned main loop.** For game-style loops or custom pacing:
   - `mkgui_now_ns()` — monotonic clock in nanoseconds (`uint64_t`).
   - `mkgui_ctx_wait_until(ctx, deadline_ns)` — blocks until an event, an animation step, a tooltip/toast deadline, or the caller's absolute ns deadline, whichever fires first.

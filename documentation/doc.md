@@ -106,6 +106,7 @@ A small number of functions take explicit output parameters that the caller allo
 | `mkgui_dialog_color` | `uint32_t *out_color` | Chosen color |
 | `mkgui_icon_browser_theme` | `char *out, uint32_t out_size` | Selected icon name |
 | `mkgui_listview_get_multi_sel` | `int32_t **out` | Selection index array (library-owned) |
+| `mkgui_treelist_get_multi_sel` | `int32_t **out` | Selected node-handle array (library-owned) |
 | `mkgui_pathbar_get_segment_path` | `char *out, uint32_t out_size` | Composed path string |
 
 These are the only parameters mkgui writes to.
@@ -160,6 +161,7 @@ There are no `x, y` fields. All positioning is handled by the container-based la
 | `MKGUI_RICHLIST` | Rich list with thumbnail, title, subtitle, and right-aligned text per row. Virtual data via callback. Emits `MKGUI_EVENT_RICHLIST_SELECT`, `_RICHLIST_DBLCLICK`. |
 | `MKGUI_ITEMVIEW` | Multi-mode item view (icon, thumbnail, compact, detail). Emits `MKGUI_EVENT_ITEMVIEW_SELECT`, `_DBLCLICK`. |
 | `MKGUI_TREEVIEW` | Hierarchical tree. Emits `MKGUI_EVENT_TREEVIEW_SELECT`, `_DBLCLICK`, `_EXPAND`, `_COLLAPSE`, `_MOVE`. |
+| `MKGUI_TREELIST` | Columned tree (tree-table): listview columns whose rows nest into an expandable hierarchy, twisty and indent in column 0. Retained, handle-based, per-parent sort. Emits `MKGUI_EVENT_TREELIST_SELECT`, `_DBLCLICK`, `_EXPAND`, `_COLLAPSE`, `_SORT`, `_COL_REORDER`. |
 | `MKGUI_TABS` | Tab container. Children must be `MKGUI_TAB`. Emits `MKGUI_EVENT_TAB_CHANGED`. |
 | `MKGUI_TAB` | Individual tab page (parent must be `MKGUI_TABS`). |
 | `MKGUI_MENU` | Menu bar. Children are top-level `MKGUI_MENUITEM`. |
@@ -348,7 +350,7 @@ The toolbar mode is selected by masking `MKGUI_TOOLBAR_MODE_MASK`. Change at run
 |------|-------------|
 | `MKGUI_TAB_CLOSABLE` | Show close button (emits `MKGUI_EVENT_TAB_CLOSE`) |
 
-**Listview / Treeview / Gridview / Itemview:**
+**Listview / Treeview / TreeList / Gridview / Itemview:**
 
 | Flag | Description |
 |------|-------------|
@@ -356,6 +358,7 @@ The toolbar mode is selected by masking `MKGUI_TOOLBAR_MODE_MASK`. Change at run
 | `MKGUI_LISTVIEW_EDITABLE` | Enable F2 / slow-double-click cell editing |
 | `MKGUI_TREEVIEW_MULTI_SELECT` | Enable multi-selection |
 | `MKGUI_TREEVIEW_EDITABLE` | Enable F2 / slow-double-click cell editing |
+| `MKGUI_TREELIST_MULTI_SELECT` | Enable multi-selection |
 | `MKGUI_GRIDVIEW_MULTI_SELECT` | Enable multi-selection |
 | `MKGUI_ITEMVIEW_EDITABLE` | Enable F2 / slow-double-click cell editing |
 
@@ -426,6 +429,12 @@ struct mkgui_event {
 | `MKGUI_EVENT_DRAG_START` | DnD drag started | source id/row | -- |
 | `MKGUI_EVENT_DRAG_END` | DnD drag cancelled | -- | -- |
 | `MKGUI_EVENT_TREEVIEW_MOVE` | Tree node moved via DnD | source node id | target node id |
+| `MKGUI_EVENT_TREELIST_SELECT` | TreeList row selected | node handle | column index |
+| `MKGUI_EVENT_TREELIST_DBLCLICK` | TreeList row double-clicked or Enter | node handle | column index |
+| `MKGUI_EVENT_TREELIST_EXPAND` | TreeList node expanded | node handle | -- |
+| `MKGUI_EVENT_TREELIST_COLLAPSE` | TreeList node collapsed | node handle | -- |
+| `MKGUI_EVENT_TREELIST_SORT` | TreeList column header clicked | sort direction | column index |
+| `MKGUI_EVENT_TREELIST_COL_REORDER` | TreeList column dragged to new position | -- | -- |
 | `MKGUI_EVENT_TAB_CLOSE` | Tab close button clicked | tab id | -- |
 | `MKGUI_EVENT_TIMER` | Timer fired (when cb is NULL) | timer id | -- |
 | `MKGUI_EVENT_ACCEL` | Keyboard accelerator matched (non-menu target) | -- | -- |
@@ -1263,6 +1272,46 @@ void mkgui_set_treenode_icon(struct mkgui_window *win, uint32_t widget_id, uint3
 ```
 
 `parent_node = 0` for root-level nodes. `treeview_remove` removes a node and all its descendants. `treeview_clear` removes all nodes. `expand` / `collapse` / `expand_all` / `collapse_all` control node visibility. `get_parent` returns the parent node ID (0 for root nodes). `scroll_to` ensures a node is visible in the scrollable area.
+
+### TreeList
+
+A columned tree (tree-table): a listview whose rows also nest into an expandable hierarchy. The disclosure twisty and indentation live in column 0; every other column renders as a listview cell (same `MKGUI_CELL_*` types). Use it for anything that is "table columns + parent/child" -- file managers, property trees, parent/clone game lists.
+
+```c
+void mkgui_treelist_setup(struct mkgui_window *win, uint32_t id, uint32_t col_count,
+                          const struct mkgui_column *columns);
+uint32_t mkgui_treelist_add(struct mkgui_window *win, uint32_t id, uint32_t parent_node,
+                            const char *const *cells, void *row_userdata);
+void mkgui_treelist_clear(struct mkgui_window *win, uint32_t id);
+void mkgui_treelist_expand(struct mkgui_window *win, uint32_t id, uint32_t node);
+void mkgui_treelist_collapse(struct mkgui_window *win, uint32_t id, uint32_t node);
+void mkgui_treelist_expand_all(struct mkgui_window *win, uint32_t id);
+void mkgui_treelist_collapse_all(struct mkgui_window *win, uint32_t id);
+uint32_t mkgui_treelist_is_expanded(struct mkgui_window *win, uint32_t id, uint32_t node);
+int32_t mkgui_treelist_get_selected(struct mkgui_window *win, uint32_t id);
+void mkgui_treelist_set_selected(struct mkgui_window *win, uint32_t id, int32_t node);
+uint32_t mkgui_treelist_is_selected(struct mkgui_window *win, uint32_t id, uint32_t node);
+void mkgui_treelist_clear_selection(struct mkgui_window *win, uint32_t id);
+uint32_t mkgui_treelist_get_multi_sel(struct mkgui_window *win, uint32_t id, int32_t **out);
+void *mkgui_treelist_get_userdata(struct mkgui_window *win, uint32_t id, uint32_t node);
+uint32_t mkgui_treelist_get_parent(struct mkgui_window *win, uint32_t id, uint32_t node);
+uint32_t mkgui_treelist_node_count(struct mkgui_window *win, uint32_t id);
+void mkgui_treelist_set_col_width(struct mkgui_window *win, uint32_t id, uint32_t col, int32_t width);
+void mkgui_treelist_set_cell_type(struct mkgui_window *win, uint32_t id, uint32_t col, uint32_t cell_type);
+void mkgui_treelist_get_sort(struct mkgui_window *win, uint32_t id, int32_t *col, int32_t *dir);
+void mkgui_treelist_set_sort(struct mkgui_window *win, uint32_t id, int32_t col, int32_t dir);
+void mkgui_treelist_scroll_to(struct mkgui_window *win, uint32_t id, uint32_t node);
+```
+
+Unlike the listview (which is fully virtual via a row callback), the treelist is **retained**: it stores the node tree and each row's cell strings, because a callback cannot express hierarchy cheaply. `mkgui_treelist_add` returns a **stable node handle** (a small 1-based integer); pass `MKGUI_TREELIST_ROOT` (0) as `parent_node` for a top-level row, or a parent's handle to nest under it. Arbitrary depth is supported. `cells` is an array of `col_count` strings (NULL entries render empty). `row_userdata` maps a row back to your record without a hidden column; retrieve it with `mkgui_treelist_get_userdata`.
+
+Selection is **handle-based**, not offset-based, so it survives expand/collapse of unrelated subtrees. `get_selected` / `set_selected` use node handles (`-1` = none); with the `MKGUI_TREELIST_MULTI_SELECT` style, Ctrl/Shift extend the selection and `get_multi_sel` returns the selected handles.
+
+Sorting is **per-parent**: clicking a header (or `set_sort`) sorts top-level rows among themselves and each parent's children among their siblings -- a child is never promoted or moved across parents. Unlike the listview, the treelist owns its data and sorts internally (numerically for `MKGUI_CELL_SIZE`/`DATE`/`PROGRESS`/`CHECKBOX` columns, case-insensitively otherwise); flat data (no children anywhere) sorts identically to a listview. Column resize, reorder, and auto-fit-on-divider-double-click work as in the listview.
+
+Interaction: click the twisty, double-click a row, or press Left/Right or `+`/`-` to expand/collapse (Right expands or descends into the first child; Left collapses or ascends to the parent). Enter or double-click activates a row.
+
+Events: `MKGUI_EVENT_TREELIST_SELECT`, `MKGUI_EVENT_TREELIST_DBLCLICK`, `MKGUI_EVENT_TREELIST_EXPAND`, `MKGUI_EVENT_TREELIST_COLLAPSE`, `MKGUI_EVENT_TREELIST_SORT`, `MKGUI_EVENT_TREELIST_COL_REORDER`, plus `MKGUI_EVENT_CONTEXT` (right-click row) and `MKGUI_EVENT_CONTEXT_HEADER` (right-click header). SELECT/DBLCLICK carry the node handle in `ev->value` and the clicked column in `ev->col`; SORT carries the logical column in `ev->col` and the direction in `ev->value`.
 
 ### Textarea
 
