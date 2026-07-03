@@ -70,6 +70,7 @@ struct mkgui_platform {
 	uint32_t xdnd_uri_ok;
 	XShmSegmentInfo shm;
 	XImage *img;
+	size_t shm_cap;
 	Cursor cursor_default;
 	Cursor cursor_h_resize;
 	Cursor cursor_v_resize;

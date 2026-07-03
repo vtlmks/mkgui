@@ -6,24 +6,28 @@
 // ---------------------------------------------------------------------------
 
 // [=]===^=[ platform_fb_create ]=================================[=]
-static uint32_t platform_fb_create(struct mkgui_platform *plat, XShmSegmentInfo *shm, XImage **img, uint32_t **pixels, int32_t w, int32_t h) {
+static uint32_t platform_fb_create(struct mkgui_platform *plat, XShmSegmentInfo *shm, XImage **img, uint32_t **pixels, int32_t w, int32_t h, size_t *out_cap) {
 	*img = XShmCreateImage(plat->dpy, plat->visual, plat->depth, ZPixmap, NULL, shm, (uint32_t)w, (uint32_t)h);
 	if(!*img) {
 		return 0;
 	}
-	shm->shmid = shmget(IPC_PRIVATE, (size_t)((*img)->bytes_per_line * h), IPC_CREAT | 0600);
+	size_t bytes = (size_t)((*img)->bytes_per_line * h);
+	shm->shmid = shmget(IPC_PRIVATE, bytes, IPC_CREAT | 0600);
 	if(shm->shmid < 0) {
 		XDestroyImage(*img);
 		*img = NULL;
 		return 0;
 	}
 	shm->shmaddr = (char *)shmat(shm->shmid, NULL, 0);
-	memset(shm->shmaddr, 0, (size_t)((*img)->bytes_per_line * h));
+	memset(shm->shmaddr, 0, bytes);
 	(*img)->data = shm->shmaddr;
 	shm->readOnly = False;
 	XShmAttach(plat->dpy, shm);
 	XSync(plat->dpy, False);
 	*pixels = (uint32_t *)shm->shmaddr;
+	if(out_cap) {
+		*out_cap = bytes;
+	}
 	return 1;
 }
 
@@ -152,7 +156,7 @@ static uint32_t platform_init(struct mkgui_window *win, const char *title, int32
 	win->win_w = w;
 	win->win_h = h;
 
-	platform_fb_create(plat, &plat->shm, &plat->img, &win->pixels, w, h);
+	platform_fb_create(plat, &plat->shm, &plat->img, &win->pixels, w, h, &plat->shm_cap);
 
 	{
 		XSizeHints hints = {0};
@@ -245,7 +249,7 @@ static uint32_t platform_init_child(struct mkgui_window *win, struct mkgui_windo
 	win->win_w = w;
 	win->win_h = h;
 
-	platform_fb_create(plat, &plat->shm, &plat->img, &win->pixels, w, h);
+	platform_fb_create(plat, &plat->shm, &plat->img, &win->pixels, w, h, &plat->shm_cap);
 
 	{
 		XSizeHints hints = {0};
@@ -289,6 +293,7 @@ static void platform_window_destroy(struct mkgui_window *win) {
 	plat->incr_send_count = 0;
 	platform_fb_destroy(plat, &plat->shm, plat->img);
 	plat->img = NULL;
+	plat->shm_cap = 0;
 	XFreeCursor(plat->dpy, plat->cursor_default);
 	XFreeCursor(plat->dpy, plat->cursor_h_resize);
 	XFreeCursor(plat->dpy, plat->cursor_v_resize);
@@ -346,16 +351,52 @@ static void platform_set_cursor(struct mkgui_window *win, uint32_t cursor_type) 
 // ---------------------------------------------------------------------------
 
 // [=]===^=[ platform_fb_resize ]==================================[=]
+// The software renderer tight-packs the framebuffer at stride = width, so the
+// shared segment only has to hold bytes_per_line * height. Recreating it costs a
+// shmget/shmat plus two XShmAttach/Detach round-trips (~3.5ms), which is fatal
+// when a high-rate mouse floods ConfigureNotify during an interactive resize. So
+// keep the segment across resizes and reallocate only when the new frame no
+// longer fits, over-allocating 1.5x so a continuous drag grows a handful of
+// times instead of once per event. The XImage header is client-side and cheap
+// to swap, so it is rebuilt every time to carry the new dimensions.
 static void platform_fb_resize(struct mkgui_window *win) {
 	if(win->win_w <= 0 || win->win_h <= 0) {
 		return;
 	}
 	struct mkgui_platform *plat = &win->plat;
+	XImage *img = XShmCreateImage(plat->dpy, plat->visual, plat->depth, ZPixmap, NULL, &plat->shm, (uint32_t)win->win_w, (uint32_t)win->win_h);
+	if(!img) {
+		return;
+	}
+	size_t need = (size_t)(img->bytes_per_line * win->win_h);
 	if(plat->img) {
-		platform_fb_destroy(plat, &plat->shm, plat->img);
+		plat->img->data = NULL;
+		XDestroyImage(plat->img);
 		plat->img = NULL;
 	}
-	platform_fb_create(plat, &plat->shm, &plat->img, &win->pixels, win->win_w, win->win_h);
+	if(need > plat->shm_cap) {
+		if(plat->shm_cap) {
+			XShmDetach(plat->dpy, &plat->shm);
+			XSync(plat->dpy, False);
+			shmdt(plat->shm.shmaddr);
+			shmctl(plat->shm.shmid, IPC_RMID, NULL);
+			plat->shm_cap = 0;
+		}
+		size_t cap = need + need / 2;
+		plat->shm.shmid = shmget(IPC_PRIVATE, cap, IPC_CREAT | 0600);
+		if(plat->shm.shmid < 0) {
+			XDestroyImage(img);
+			return;
+		}
+		plat->shm.shmaddr = (char *)shmat(plat->shm.shmid, NULL, 0);
+		plat->shm.readOnly = False;
+		XShmAttach(plat->dpy, &plat->shm);
+		XSync(plat->dpy, False);
+		plat->shm_cap = cap;
+	}
+	img->data = plat->shm.shmaddr;
+	plat->img = img;
+	win->pixels = (uint32_t *)plat->shm.shmaddr;
 }
 
 // [=]===^=[ platform_detect_scale ]================================[=]
@@ -555,7 +596,7 @@ static uint32_t platform_popup_init(struct mkgui_window *win, struct mkgui_popup
 		return 0;
 	}
 
-	platform_fb_create(plat, &p->plat.shm, &p->plat.img, &p->pixels, w, h);
+	platform_fb_create(plat, &p->plat.shm, &p->plat.img, &p->pixels, w, h, NULL);
 
 	XMapRaised(plat->dpy, p->plat.xwin);
 	XFlush(plat->dpy);
