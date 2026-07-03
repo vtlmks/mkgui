@@ -141,9 +141,12 @@ static void format_date(char *timestamp_str, char *buf, uint32_t buf_size) {
 }
 
 // [=]===^=[ render_cell ]========================================[=]
-static void render_cell(struct mkgui_window *win, struct mkgui_listview_data *lv, uint32_t col, char *cell_buf, int32_t cx, int32_t ty, int32_t col_w, int32_t clip_left, int32_t clip_right, int32_t clip_top, int32_t clip_bottom, uint32_t tc, int32_t row_y) {
+// Shared by listview and treelist: renders a single cell of the given
+// cell_type. The caller owns column geometry (cx/col_w) so the tree-table can
+// inset column 0 for its indent and twisty without this code knowing about it.
+static void render_cell(struct mkgui_window *win, uint32_t cell_type, char *cell_buf, int32_t cx, int32_t ty, int32_t col_w, int32_t clip_left, int32_t clip_right, int32_t clip_top, int32_t clip_bottom, uint32_t tc, int32_t row_y) {
 	int32_t cell_pad = sc(win, 4);
-	switch(lv->columns[col].cell_type) {
+	switch(cell_type) {
 		case MKGUI_CELL_PROGRESS: {
 			int32_t val = 0;
 			int32_t max = 100;
@@ -515,7 +518,7 @@ static void render_listview(struct mkgui_window *win, uint32_t idx) {
 			}
 
 			if(!(win->cell_edit.active && win->cell_edit.widget_id == w->id && win->cell_edit.row == row_idx && win->cell_edit.col == (int32_t)c)) {
-				render_cell(win, lv, c, cell_buf, cx, ty, col_w, cell_cl, cell_cr, clip_top, clip_bottom, tc, row_y);
+				render_cell(win, lv->columns[c].cell_type, cell_buf, cx, ty, col_w, cell_cl, cell_cr, clip_top, clip_bottom, tc, row_y);
 			}
 			cx += col_w;
 		}

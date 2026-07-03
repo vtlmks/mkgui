@@ -162,6 +162,7 @@ enum {
 	MKGUI_METER,
 	MKGUI_DIVIDER,
 	MKGUI_LOGVIEW,
+	MKGUI_TREELIST,
 };
 
 // ---------------------------------------------------------------------------
@@ -256,6 +257,7 @@ enum {
 #define MKGUI_GRIDVIEW_MULTI_SELECT    (1u << 0)
 #define MKGUI_TREEVIEW_MULTI_SELECT    (1u << 0)
 #define MKGUI_TREEVIEW_EDITABLE        (1u << 1)
+#define MKGUI_TREELIST_MULTI_SELECT    (1u << 0)
 #define MKGUI_ITEMVIEW_EDITABLE        (1u << 0)
 
 // -- Label --
@@ -350,6 +352,12 @@ enum {
 	MKGUI_EVENT_CANVAS_RELEASE,
 	MKGUI_EVENT_CANVAS_MOTION,
 	MKGUI_EVENT_LOGVIEW_LINE_CLICKED,
+	MKGUI_EVENT_TREELIST_SELECT,
+	MKGUI_EVENT_TREELIST_DBLCLICK,
+	MKGUI_EVENT_TREELIST_EXPAND,
+	MKGUI_EVENT_TREELIST_COLLAPSE,
+	MKGUI_EVENT_TREELIST_SORT,
+	MKGUI_EVENT_TREELIST_COL_REORDER,
 };
 
 // ---------------------------------------------------------------------------
@@ -947,6 +955,34 @@ MKGUI_API void mkgui_treeview_collapse_all(struct mkgui_window *win, uint32_t wi
 MKGUI_API uint32_t mkgui_treeview_get_parent(struct mkgui_window *win, uint32_t widget_id, uint32_t node_id);
 MKGUI_API uint32_t mkgui_treeview_node_count(struct mkgui_window *win, uint32_t widget_id);
 MKGUI_API void mkgui_treeview_scroll_to(struct mkgui_window *win, uint32_t widget_id, uint32_t node_id);
+
+// ---------------------------------------------------------------------------
+// TreeList (columned tree / tree-table)
+// ---------------------------------------------------------------------------
+
+#define MKGUI_TREELIST_ROOT 0
+
+MKGUI_API void mkgui_treelist_setup(struct mkgui_window *win, uint32_t id, uint32_t col_count, const struct mkgui_column *columns);
+MKGUI_API uint32_t mkgui_treelist_add(struct mkgui_window *win, uint32_t id, uint32_t parent_node, const char *const *cells, void *row_userdata);
+MKGUI_API void mkgui_treelist_clear(struct mkgui_window *win, uint32_t id);
+MKGUI_API void mkgui_treelist_expand(struct mkgui_window *win, uint32_t id, uint32_t node);
+MKGUI_API void mkgui_treelist_collapse(struct mkgui_window *win, uint32_t id, uint32_t node);
+MKGUI_API void mkgui_treelist_expand_all(struct mkgui_window *win, uint32_t id);
+MKGUI_API void mkgui_treelist_collapse_all(struct mkgui_window *win, uint32_t id);
+MKGUI_API uint32_t mkgui_treelist_is_expanded(struct mkgui_window *win, uint32_t id, uint32_t node);
+MKGUI_API int32_t mkgui_treelist_get_selected(struct mkgui_window *win, uint32_t id);
+MKGUI_API void mkgui_treelist_set_selected(struct mkgui_window *win, uint32_t id, int32_t node);
+MKGUI_API uint32_t mkgui_treelist_is_selected(struct mkgui_window *win, uint32_t id, uint32_t node);
+MKGUI_API void mkgui_treelist_clear_selection(struct mkgui_window *win, uint32_t id);
+MKGUI_API uint32_t mkgui_treelist_get_multi_sel(struct mkgui_window *win, uint32_t id, int32_t **out);
+MKGUI_API void *mkgui_treelist_get_userdata(struct mkgui_window *win, uint32_t id, uint32_t node);
+MKGUI_API uint32_t mkgui_treelist_get_parent(struct mkgui_window *win, uint32_t id, uint32_t node);
+MKGUI_API uint32_t mkgui_treelist_node_count(struct mkgui_window *win, uint32_t id);
+MKGUI_API void mkgui_treelist_set_col_width(struct mkgui_window *win, uint32_t id, uint32_t col, int32_t width);
+MKGUI_API void mkgui_treelist_set_cell_type(struct mkgui_window *win, uint32_t id, uint32_t col, uint32_t cell_type);
+MKGUI_API void mkgui_treelist_get_sort(struct mkgui_window *win, uint32_t id, int32_t *col, int32_t *dir);
+MKGUI_API void mkgui_treelist_set_sort(struct mkgui_window *win, uint32_t id, int32_t col, int32_t dir);
+MKGUI_API void mkgui_treelist_scroll_to(struct mkgui_window *win, uint32_t id, uint32_t node);
 
 // ---------------------------------------------------------------------------
 // ItemView

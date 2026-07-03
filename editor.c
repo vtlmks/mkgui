@@ -164,6 +164,7 @@ static struct ed_palette_entry ed_widgets[] = {
 	{ "Spinner",    MKGUI_SPINNER },
 	{ "Textarea",   MKGUI_TEXTAREA },
 	{ "Toggle",     MKGUI_TOGGLE },
+	{ "TreeList",   MKGUI_TREELIST },
 	{ "Treeview",   MKGUI_TREEVIEW },
 };
 
@@ -205,6 +206,7 @@ static struct ed_type_event_map ed_type_events[] = {
 	{ MKGUI_SLIDER,    { MKGUI_EVENT_SLIDER_CHANGED, MKGUI_EVENT_SLIDER_START, MKGUI_EVENT_SLIDER_END, MKGUI_EVENT_CONTEXT, MKGUI_EVENT_FOCUS, MKGUI_EVENT_UNFOCUS, MKGUI_EVENT_HOVER_ENTER, MKGUI_EVENT_HOVER_LEAVE, MKGUI_EVENT_KEY }, 9 },
 	{ MKGUI_LISTVIEW,  { MKGUI_EVENT_LISTVIEW_SELECT, MKGUI_EVENT_LISTVIEW_DBLCLICK, MKGUI_EVENT_LISTVIEW_SORT, MKGUI_EVENT_LISTVIEW_COL_REORDER, MKGUI_EVENT_LISTVIEW_REORDER, MKGUI_EVENT_DRAG_START, MKGUI_EVENT_DRAG_END, MKGUI_EVENT_CONTEXT, MKGUI_EVENT_CONTEXT_HEADER, MKGUI_EVENT_FOCUS, MKGUI_EVENT_UNFOCUS, MKGUI_EVENT_HOVER_ENTER, MKGUI_EVENT_HOVER_LEAVE, MKGUI_EVENT_KEY }, 14 },
 	{ MKGUI_TREEVIEW,  { MKGUI_EVENT_TREEVIEW_SELECT, MKGUI_EVENT_TREEVIEW_DBLCLICK, MKGUI_EVENT_TREEVIEW_EXPAND, MKGUI_EVENT_TREEVIEW_COLLAPSE, MKGUI_EVENT_TREEVIEW_MOVE, MKGUI_EVENT_DRAG_START, MKGUI_EVENT_DRAG_END, MKGUI_EVENT_CONTEXT, MKGUI_EVENT_FOCUS, MKGUI_EVENT_UNFOCUS, MKGUI_EVENT_HOVER_ENTER, MKGUI_EVENT_HOVER_LEAVE, MKGUI_EVENT_KEY }, 13 },
+	{ MKGUI_TREELIST,  { MKGUI_EVENT_TREELIST_SELECT, MKGUI_EVENT_TREELIST_DBLCLICK, MKGUI_EVENT_TREELIST_EXPAND, MKGUI_EVENT_TREELIST_COLLAPSE, MKGUI_EVENT_TREELIST_SORT, MKGUI_EVENT_TREELIST_COL_REORDER, MKGUI_EVENT_CONTEXT, MKGUI_EVENT_CONTEXT_HEADER, MKGUI_EVENT_FOCUS, MKGUI_EVENT_UNFOCUS, MKGUI_EVENT_HOVER_ENTER, MKGUI_EVENT_HOVER_LEAVE, MKGUI_EVENT_KEY }, 13 },
 	{ MKGUI_TABS,      { MKGUI_EVENT_TAB_CHANGED, MKGUI_EVENT_TAB_CLOSE, MKGUI_EVENT_CONTEXT, MKGUI_EVENT_FOCUS, MKGUI_EVENT_UNFOCUS, MKGUI_EVENT_HOVER_ENTER, MKGUI_EVENT_HOVER_LEAVE, MKGUI_EVENT_KEY }, 8 },
 	{ MKGUI_RADIO,     { MKGUI_EVENT_RADIO_CHANGED, MKGUI_EVENT_CONTEXT, MKGUI_EVENT_FOCUS, MKGUI_EVENT_UNFOCUS, MKGUI_EVENT_HOVER_ENTER, MKGUI_EVENT_HOVER_LEAVE, MKGUI_EVENT_KEY }, 7 },
 	{ MKGUI_TEXTAREA,  { MKGUI_EVENT_TEXTAREA_CHANGED, MKGUI_EVENT_TEXTAREA_CURSOR, MKGUI_EVENT_CONTEXT, MKGUI_EVENT_FOCUS, MKGUI_EVENT_UNFOCUS, MKGUI_EVENT_HOVER_ENTER, MKGUI_EVENT_HOVER_LEAVE, MKGUI_EVENT_KEY }, 8 },
@@ -730,6 +732,7 @@ static struct ed_help_entry ed_help[] = {
 	{ MKGUI_TEXTAREA,  "Multi-line text editor. Supports clipboard, selection, and scrolling. READONLY flag disables editing." },
 	{ MKGUI_LOGVIEW,   "Append-only scrolling log view with ANSI color parsing, word wrap, and selection. Configure capacity with mkgui_logview_setup() before appending. NOWRAP flag disables wrapping." },
 	{ MKGUI_TREEVIEW,  "Hierarchical tree with expand/collapse. Supports drag-and-drop reordering of nodes." },
+	{ MKGUI_TREELIST,  "Columned tree (tree-table). Multi-column rows that nest into an expandable hierarchy; twisty and indent live in column 0. Sorting a header reorders siblings within each parent. Populate with mkgui_treelist_setup()/mkgui_treelist_add()." },
 	{ MKGUI_FORM,      "Two-column form layout. Children are paired: label on the left, control on the right. Label column auto-sizes." },
 	{ MKGUI_GROUP,     "Bordered container with a title label. Children are inset inside the frame. Useful for grouping related controls." },
 	{ MKGUI_HBOX,      "Horizontal box layout. Stacks children left-to-right with 6px gap. Children with w=0 flex to fill remaining space. SCROLL flag enables horizontal scrolling." },
@@ -1070,7 +1073,7 @@ static uint32_t ed_compute_vis_mask(struct ed_widget *w) {
 		mask |= ED_VIS_INPUT_ONLY;
 	}
 
-	if(w->type == MKGUI_LISTVIEW || w->type == MKGUI_GRIDVIEW || w->type == MKGUI_TREEVIEW) {
+	if(w->type == MKGUI_LISTVIEW || w->type == MKGUI_GRIDVIEW || w->type == MKGUI_TREEVIEW || w->type == MKGUI_TREELIST) {
 		mask |= ED_VIS_HAS_MULTI;
 	}
 
@@ -1493,6 +1496,7 @@ static void ed_gen_id_name(struct ed_widget *w) {
 		case MKGUI_HSPLIT: { prefix = "ID_SPLITH"; } break;
 		case MKGUI_VSPLIT: { prefix = "ID_SPLITV"; } break;
 		case MKGUI_TREEVIEW:   { prefix = "ID_TREEVIEW"; } break;
+		case MKGUI_TREELIST:   { prefix = "ID_TREELIST"; } break;
 		case MKGUI_MENU:       { prefix = "ID_MENU"; } break;
 		case MKGUI_MENUITEM:   { prefix = "ID_MENUITEM"; } break;
 		case MKGUI_STATUSBAR:  { prefix = "ID_STATUSBAR"; } break;
@@ -1634,6 +1638,11 @@ static int32_t ed_add_widget(uint32_t type, int32_t x, int32_t y) {
 
 		case MKGUI_TREEVIEW: {
 			w->w = 200;
+			w->h = 200;
+		} break;
+
+		case MKGUI_TREELIST: {
+			w->w = 300;
 			w->h = 200;
 		} break;
 
@@ -2327,6 +2336,16 @@ static void ed_draw_widget_fallback(struct mkgui_window *win, uint32_t idx) {
 			draw_patch(win, MKGUI_STYLE_SUNKEN, rx, ry, rw, rh, win->theme.input_bg, win->theme.widget_border);
 			int32_t ty = ry + (rh - win->font_height) / 2;
 			push_text_clip(rx + 4, ty, ew->label[0] ? ew->label : "TreeView", win->theme.text_disabled, rx + 1, ry + 1, rx + rw - 1, ry + rh - 1);
+		} break;
+
+		case MKGUI_TREELIST: {
+			draw_patch(win, MKGUI_STYLE_SUNKEN, rx, ry, rw, rh, win->theme.input_bg, win->theme.widget_border);
+			draw_rect_fill(buf, bw, bh, rx + 1, ry + 1, rw - 2, win->row_height, win->theme.header_bg);
+			draw_hline(buf, bw, bh, rx + 1, ry + win->row_height, rw - 2, win->theme.widget_border);
+			int32_t ty = ry + (win->row_height - win->font_height) / 2 + 1;
+			push_text_clip(rx + 4, ty, ew->label[0] ? ew->label : "TreeList", win->theme.text, rx + 1, ry + 1, rx + rw - 1, ry + win->row_height);
+			int32_t gx = rx + 1 + rw / 3;
+			draw_vline(buf, bw, bh, gx, ry + 1, rh - 2, blend_pixel(win->theme.input_bg, win->theme.widget_border, 80));
 		} break;
 
 		case MKGUI_TEXTAREA: {
@@ -3604,6 +3623,7 @@ static char *ed_type_name_upper(uint32_t type) {
 		case MKGUI_HSPLIT:     { return "MKGUI_HSPLIT"; }
 		case MKGUI_VSPLIT:     { return "MKGUI_VSPLIT"; }
 		case MKGUI_TREEVIEW:   { return "MKGUI_TREEVIEW"; }
+		case MKGUI_TREELIST:   { return "MKGUI_TREELIST"; }
 		case MKGUI_STATUSBAR:  { return "MKGUI_STATUSBAR"; }
 		case MKGUI_TOOLBAR:    { return "MKGUI_TOOLBAR"; }
 		case MKGUI_SPINBOX:    { return "MKGUI_SPINBOX"; }
@@ -3776,6 +3796,9 @@ static char *ed_style_to_str(uint32_t style, uint32_t widget_type, char *buf, ui
 		{ MKGUI_TREEVIEW_MULTI_SELECT, "MKGUI_TREEVIEW_MULTI_SELECT" },
 		{ MKGUI_TREEVIEW_EDITABLE,   "MKGUI_TREEVIEW_EDITABLE" },
 	};
+	static struct ed_bit_name bits_treelist[] = {
+		{ MKGUI_TREELIST_MULTI_SELECT, "MKGUI_TREELIST_MULTI_SELECT" },
+	};
 	static struct ed_bit_name bits_itemview[] = {
 		{ MKGUI_ITEMVIEW_EDITABLE,   "MKGUI_ITEMVIEW_EDITABLE" },
 	};
@@ -3905,6 +3928,11 @@ static char *ed_style_to_str(uint32_t style, uint32_t widget_type, char *buf, ui
 		case MKGUI_TREEVIEW: {
 			bits = bits_treeview;
 			bits_count = sizeof(bits_treeview) / sizeof(bits_treeview[0]);
+		} break;
+
+		case MKGUI_TREELIST: {
+			bits = bits_treelist;
+			bits_count = sizeof(bits_treelist) / sizeof(bits_treelist[0]);
 		} break;
 
 		case MKGUI_ITEMVIEW: {

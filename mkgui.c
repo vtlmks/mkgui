@@ -319,6 +319,47 @@ struct mkgui_treeview_data {
 	uint32_t order_dirty;
 };
 
+// Columned tree (tree-table). Retained forest whose nodes never move in the
+// array, so a node's array index + 1 is a stable handle that selection and the
+// visible-row index reference across expand/collapse. Sorting only relinks
+// first_child/next_sibling; the array and every handle stay put.
+struct mkgui_treelist_node {
+	uint32_t parent;         // node index, or 0xffffffff for a root
+	uint32_t first_child;
+	uint32_t last_child;
+	uint32_t next_sibling;
+	uint32_t depth;
+	uint32_t expanded;
+	uint32_t has_children;
+	void *userdata;
+	char *cells;                        // blob: col_count NUL-terminated strings
+	uint16_t cell_off[MKGUI_MAX_COLS];  // offset of each column string in cells
+};
+
+struct mkgui_treelist_data {
+	uint32_t widget_id;
+	uint32_t col_count;
+	struct mkgui_column columns[MKGUI_MAX_COLS];
+	uint32_t col_order[MKGUI_MAX_COLS];
+	struct mkgui_treelist_node *nodes;
+	uint32_t node_count;
+	uint32_t node_cap;
+	uint32_t root_first;
+	uint32_t root_last;
+	uint32_t *visible;       // node indices in display order
+	uint32_t visible_count;
+	uint32_t visible_cap;
+	uint32_t dirty_visible;
+	int32_t selected;        // node handle (1-based), -1 for none
+	int32_t multi_sel[MKGUI_MAX_MULTI_SEL];  // node handles, sorted ascending
+	uint32_t multi_sel_count;
+	int32_t scroll_x;
+	int32_t scroll_y;
+	int32_t sort_col;
+	int32_t sort_dir;
+	int32_t header_height;
+};
+
 struct mkgui_statusbar_section {
 	char text[MKGUI_MAX_TEXT];
 	int32_t width;
@@ -728,6 +769,7 @@ struct mkgui_window_arenas {
 	struct vm_arena datepickers;
 	struct vm_arena gridviews;
 	struct vm_arena richlists;
+	struct vm_arena treelists;
 };
 
 // Forward decl: mkgui_window and mkgui_ctx hold pointers to each other.
@@ -802,6 +844,8 @@ struct mkgui_window {
 	uint32_t gridview_count, gridview_cap;
 	struct mkgui_richlist_data *richlists;
 	uint32_t richlist_count, richlist_cap;
+	struct mkgui_treelist_data *treelists;
+	uint32_t treelist_count, treelist_cap;
 
 	struct mkgui_popup popups[MKGUI_MAX_POPUPS];
 	uint32_t popup_count;
@@ -1345,6 +1389,7 @@ MKGUI_FIND_AUX(find_dropdown_data,   mkgui_dropdown_data,   dropdowns,   dropdow
 MKGUI_FIND_AUX(find_slider_data,     mkgui_slider_data,     sliders,     slider_count)
 MKGUI_FIND_AUX(find_split_data,      mkgui_split_data,      splits,      split_count)
 MKGUI_FIND_AUX(find_treeview_data,   mkgui_treeview_data,   treeviews,   treeview_count)
+MKGUI_FIND_AUX(find_treelist_data,   mkgui_treelist_data,   treelists,   treelist_count)
 MKGUI_FIND_AUX(find_statusbar_data,  mkgui_statusbar_data,  statusbars,  statusbar_count)
 MKGUI_FIND_AUX(find_spinbox_data,    mkgui_spinbox_data,    spinboxes,   spinbox_count)
 MKGUI_FIND_AUX(find_progress_data,   mkgui_progress_data,   progress,    progress_count)
@@ -1459,6 +1504,7 @@ static uint32_t is_focusable(struct mkgui_widget *w) {
 		case MKGUI_SLIDER:
 		case MKGUI_LISTVIEW:
 		case MKGUI_TREEVIEW:
+		case MKGUI_TREELIST:
 		case MKGUI_SPINBOX:
 		case MKGUI_RADIO:
 		case MKGUI_TEXTAREA:
@@ -1858,6 +1904,7 @@ static int32_t natural_height(struct mkgui_window *win, uint32_t widget_type) {
 		case MKGUI_GRIDVIEW:
 		case MKGUI_RICHLIST:
 		case MKGUI_TREEVIEW:
+		case MKGUI_TREELIST:
 		case MKGUI_ITEMVIEW:
 		case MKGUI_TEXTAREA:
 		case MKGUI_LOGVIEW: {
@@ -3041,6 +3088,7 @@ plutovg_surface_t *plutovg_surface_load_from_image_data(const void *d, int l) { 
 #include "mkgui_ctxmenu.c"
 #include "mkgui_split.c"
 #include "mkgui_treeview.c"
+#include "mkgui_treelist.c"
 #include "mkgui_statusbar.c"
 #include "mkgui_toolbar.c"
 #include "mkgui_pathbar.c"
@@ -3125,6 +3173,10 @@ static void render_widget(struct mkgui_window *win, uint32_t idx) {
 		case MKGUI_TREEVIEW: {
 			render_treeview(win, idx);
 			celledit_render(win, idx);
+		} break;
+
+		case MKGUI_TREELIST: {
+			render_treelist(win, idx);
 		} break;
 
 		case MKGUI_STATUSBAR: {
@@ -3539,6 +3591,21 @@ static void init_widget_aux(struct mkgui_window *win, struct mkgui_widget *w) {
 			}
 		} break;
 
+		case MKGUI_TREELIST: {
+			MKGUI_AUX_GROW(&win->arenas.treelists, win->treelist_count, win->treelist_cap, struct mkgui_treelist_data);
+			if(win->treelist_count < win->treelist_cap) {
+				struct mkgui_treelist_data *tl = &win->treelists[win->treelist_count++];
+				memset(tl, 0, sizeof(*tl));
+				tl->widget_id = w->id;
+				tl->selected = -1;
+				tl->sort_col = -1;
+				tl->sort_dir = 1;
+				tl->root_first = 0xffffffffu;
+				tl->root_last = 0xffffffffu;
+				tl->dirty_visible = 1;
+			}
+		} break;
+
 		case MKGUI_STATUSBAR: {
 			MKGUI_AUX_GROW(&win->arenas.statusbars, win->statusbar_count, win->statusbar_cap, struct mkgui_statusbar_data);
 			if(win->statusbar_count < win->statusbar_cap) {
@@ -3860,6 +3927,19 @@ static void mkgui_remove_aux_(struct mkgui_window *win, uint32_t id, uint32_t ty
 						win->treeviews[i] = win->treeviews[win->treeview_count - 1];
 					}
 					--win->treeview_count;
+					break;
+				}
+			}
+		} break;
+
+		case MKGUI_TREELIST: {
+			for(uint32_t i = 0; i < win->treelist_count; ++i) {
+				if(win->treelists[i].widget_id == id) {
+					treelist_free(&win->treelists[i]);
+					if(i < win->treelist_count - 1) {
+						win->treelists[i] = win->treelists[win->treelist_count - 1];
+					}
+					--win->treelist_count;
 					break;
 				}
 			}
@@ -4242,6 +4322,7 @@ static uint32_t mkgui_alloc_arrays(struct mkgui_window *win, uint32_t widget_cap
 	win->datepicker_cap = 16;
 	win->gridview_cap   = 16;
 	win->richlist_cap   = 16;
+	win->treelist_cap   = 16;
 
 	if(!mkgui_aux_arena_create(&win->arenas.listvs,      sizeof(struct mkgui_listview_data),   win->listv_cap))      return 0;
 	if(!mkgui_aux_arena_create(&win->arenas.inputs,      sizeof(struct mkgui_input_data),      win->input_cap))      return 0;
@@ -4269,6 +4350,7 @@ static uint32_t mkgui_alloc_arrays(struct mkgui_window *win, uint32_t widget_cap
 	if(!mkgui_aux_arena_create(&win->arenas.datepickers, sizeof(struct mkgui_datepicker_data), win->datepicker_cap)) return 0;
 	if(!mkgui_aux_arena_create(&win->arenas.gridviews,   sizeof(struct mkgui_gridview_data),   win->gridview_cap))   return 0;
 	if(!mkgui_aux_arena_create(&win->arenas.richlists,   sizeof(struct mkgui_richlist_data),   win->richlist_cap))   return 0;
+	if(!mkgui_aux_arena_create(&win->arenas.treelists,   sizeof(struct mkgui_treelist_data),   win->treelist_cap))   return 0;
 
 	win->listvs      = (struct mkgui_listview_data *)win->arenas.listvs.base;
 	win->inputs      = (struct mkgui_input_data *)win->arenas.inputs.base;
@@ -4296,6 +4378,7 @@ static uint32_t mkgui_alloc_arrays(struct mkgui_window *win, uint32_t widget_cap
 	win->datepickers = (struct mkgui_datepicker_data *)win->arenas.datepickers.base;
 	win->gridviews   = (struct mkgui_gridview_data *)win->arenas.gridviews.base;
 	win->richlists   = (struct mkgui_richlist_data *)win->arenas.richlists.base;
+	win->treelists   = (struct mkgui_treelist_data *)win->arenas.treelists.base;
 
 	return 1;
 }
@@ -4334,6 +4417,7 @@ static void mkgui_free_arrays(struct mkgui_window *win) {
 	vm_arena_destroy(&win->arenas.datepickers);
 	vm_arena_destroy(&win->arenas.gridviews);
 	vm_arena_destroy(&win->arenas.richlists);
+	vm_arena_destroy(&win->arenas.treelists);
 	win->widgets = NULL;
 	win->rects = NULL;
 	win->tooltip_texts = NULL;
@@ -4836,6 +4920,9 @@ MKGUI_API void mkgui_window_destroy(struct mkgui_window *win) {
 	popup_destroy_all(win);
 	for(uint32_t i = 0; i < win->treeview_count; ++i) {
 		free(win->treeviews[i].nodes);
+	}
+	for(uint32_t i = 0; i < win->treelist_count; ++i) {
+		treelist_free(&win->treelists[i]);
 	}
 	for(uint32_t i = 0; i < win->textarea_count; ++i) {
 		textarea_undo_free(&win->textareas[i]);
@@ -5416,6 +5503,13 @@ MKGUI_API uint32_t mkgui_window_poll(struct mkgui_window *win, struct mkgui_even
 						if(gv) {
 							gv->columns[win->drag_col_resize_col].width = nw;
 							dirty_widget_id(win, win->drag_col_resize_id);
+
+						} else {
+							struct mkgui_treelist_data *tl = find_treelist_data(win, win->drag_col_resize_id);
+							if(tl) {
+								tl->columns[win->drag_col_resize_col].width = nw;
+								dirty_widget_id(win, win->drag_col_resize_id);
+							}
 						}
 					}
 					break;
@@ -5443,6 +5537,24 @@ MKGUI_API uint32_t mkgui_window_poll(struct mkgui_window *win, struct mkgui_even
 								dirty_widget(win, (uint32_t)lv_idx);
 							}
 							listview_clamp_scroll_x(lv, content_w);
+
+						} else {
+							struct mkgui_treelist_data *tl = find_treelist_data(win, win->drag_col_id);
+							if(tl) {
+								int32_t lx = win->rects[lv_idx].x;
+								int32_t lw = win->rects[lv_idx].w;
+								int32_t edge = sc(win, 30);
+								int32_t scroll_step = win->row_height * 2;
+								int32_t content_w = lw - 2 - win->scrollbar_w;
+								if(win->mouse_x < lx + edge) {
+									tl->scroll_x -= scroll_step;
+									dirty_widget(win, (uint32_t)lv_idx);
+								} else if(win->mouse_x > lx + lw - edge) {
+									tl->scroll_x += scroll_step;
+									dirty_widget(win, (uint32_t)lv_idx);
+								}
+								treelist_clamp_scroll_x(tl, content_w);
+							}
 						}
 					}
 					break;
@@ -5717,6 +5829,10 @@ MKGUI_API uint32_t mkgui_window_poll(struct mkgui_window *win, struct mkgui_even
 						cursor_type = MKGUI_CURSOR_H_RESIZE;
 					} else if(htype == MKGUI_LISTVIEW) {
 						if(listview_divider_hit(win, (uint32_t)hi, win->mouse_x, win->mouse_y) >= 0) {
+							cursor_type = MKGUI_CURSOR_H_RESIZE;
+						}
+					} else if(htype == MKGUI_TREELIST) {
+						if(treelist_divider_hit(win, (uint32_t)hi, win->mouse_x, win->mouse_y) >= 0) {
 							cursor_type = MKGUI_CURSOR_H_RESIZE;
 						}
 					} else if(htype == MKGUI_GRIDVIEW) {
@@ -6137,6 +6253,35 @@ MKGUI_API uint32_t mkgui_window_poll(struct mkgui_window *win, struct mkgui_even
 								return 1;
 							}
 
+						} else if(hw->type == MKGUI_TREELIST) {
+							struct mkgui_treelist_data *tl = find_treelist_data(win, hw->id);
+							if(tl) {
+								int32_t hdr = treelist_header_hit(win, (uint32_t)hi, win->mouse_x, win->mouse_y);
+								if(hdr >= 0) {
+									ev->type = MKGUI_EVENT_CONTEXT_HEADER;
+									ev->id = hw->id;
+									ev->col = (int32_t)tl->col_order[hdr];
+									ev->value = win->mouse_x;
+									return 1;
+								}
+								int32_t vis_row = treelist_row_hit(win, (uint32_t)hi, win->mouse_x, win->mouse_y);
+								int32_t node_handle = -1;
+								if(vis_row >= 0 && (uint32_t)vis_row < tl->visible_count) {
+									node_handle = (int32_t)tl->visible[vis_row] + 1;
+									if(tl->selected != node_handle) {
+										tl->selected = node_handle;
+										tl->multi_sel[0] = node_handle;
+										tl->multi_sel_count = 1;
+										dirty_widget(win, (uint32_t)hi);
+									}
+								}
+								ev->type = MKGUI_EVENT_CONTEXT;
+								ev->id = hw->id;
+								ev->value = node_handle;
+								ev->col = treelist_col_hit(win, (uint32_t)hi, win->mouse_x);
+								return 1;
+							}
+
 						} else if(hw->type == MKGUI_ITEMVIEW) {
 							struct mkgui_itemview_data *iv = find_itemview_data(win, hw->id);
 							if(iv) {
@@ -6221,6 +6366,38 @@ MKGUI_API uint32_t mkgui_window_poll(struct mkgui_window *win, struct mkgui_even
 						if(tv) {
 							tv->scroll_y += delta;
 							treeview_clamp_scroll(win, win->widgets[hi].id);
+							dirty_widget(win, (uint32_t)hi);
+						}
+
+					} else if(hi >= 0 && win->widgets[hi].type == MKGUI_TREELIST) {
+						struct mkgui_treelist_data *tl = find_treelist_data(win, win->widgets[hi].id);
+						if(tl) {
+							if((pev.keymod & MKGUI_MOD_SHIFT) || treelist_hscrollbar_hit(win, (uint32_t)hi, win->mouse_x, win->mouse_y)) {
+								tl->scroll_x += delta;
+								int32_t content_w = win->rects[hi].w - 2 - win->scrollbar_w;
+								treelist_clamp_scroll_x(tl, content_w);
+							} else {
+								treelist_rebuild_visible(tl);
+								tl->scroll_y += delta;
+								int32_t hh = tl->header_height > 0 ? tl->header_height : win->row_height;
+								int32_t content_h = win->rects[hi].h - hh - 2;
+								int32_t content_w = win->rects[hi].w - 2 - win->scrollbar_w;
+								if(treelist_total_col_w(tl) > content_w) {
+									content_h -= win->scrollbar_w;
+								}
+								int32_t max_scroll = (int32_t)tl->visible_count * win->row_height - content_h;
+								if(max_scroll < 0) {
+									max_scroll = 0;
+								}
+
+								if(tl->scroll_y < 0) {
+									tl->scroll_y = 0;
+								}
+
+								if(tl->scroll_y > max_scroll) {
+									tl->scroll_y = max_scroll;
+								}
+							}
 							dirty_widget(win, (uint32_t)hi);
 						}
 
@@ -7156,6 +7333,131 @@ MKGUI_API uint32_t mkgui_window_poll(struct mkgui_window *win, struct mkgui_even
 						}
 					}
 
+					if(hw->type == MKGUI_TREELIST) {
+						uint32_t hsb_hit = treelist_hscrollbar_hit(win, (uint32_t)hi, win->mouse_x, win->mouse_y);
+						if(hsb_hit == 1) {
+							win->drag_scrollbar_id = hw->id;
+							win->drag_scrollbar_offset = treelist_hthumb_offset(win, (uint32_t)hi, win->mouse_x);
+							win->drag_scrollbar_horiz = 1;
+
+						} else if(hsb_hit == 2 || hsb_hit == 3) {
+							struct mkgui_treelist_data *htl = find_treelist_data(win, hw->id);
+							if(htl) {
+								int32_t cw = win->rects[hi].w - 2 - win->scrollbar_w;
+								htl->scroll_x += (hsb_hit == 2 ? -1 : 1) * (cw / 2);
+								treelist_clamp_scroll_x(htl, cw);
+								dirty_widget(win, (uint32_t)hi);
+							}
+
+						} else {
+						uint32_t sb_hit = treelist_scrollbar_hit(win, (uint32_t)hi, win->mouse_x, win->mouse_y);
+						if(sb_hit == 1) {
+							win->drag_scrollbar_id = hw->id;
+							win->drag_scrollbar_offset = treelist_thumb_offset(win, (uint32_t)hi, win->mouse_y);
+							win->drag_scrollbar_horiz = 0;
+
+						} else if(sb_hit == 2 || sb_hit == 3) {
+							treelist_page_scroll(win, (uint32_t)hi, sb_hit == 2 ? -1 : 1);
+
+						} else {
+							int32_t div = treelist_divider_hit(win, (uint32_t)hi, win->mouse_x, win->mouse_y);
+							if(div >= 0) {
+								struct mkgui_treelist_data *tl = find_treelist_data(win, hw->id);
+								if(tl) {
+									uint32_t logical = tl->col_order[div];
+									uint32_t now_ms = (uint32_t)(mkgui_now_ns() / 1000000ull);
+									if(win->divider_dblclick_id == hw->id && win->divider_dblclick_col == (int32_t)logical && (now_ms - win->divider_dblclick_time) < 400) {
+										treelist_autosize_col(win, tl, logical);
+										win->divider_dblclick_id = 0;
+
+									} else {
+										win->divider_dblclick_id = hw->id;
+										win->divider_dblclick_col = (int32_t)logical;
+										win->divider_dblclick_time = now_ms;
+										win->drag_col_resize_id = hw->id;
+										win->drag_col_resize_col = (int32_t)logical;
+										win->drag_col_resize_start_x = win->mouse_x;
+										win->drag_col_resize_start_w = tl->columns[logical].width;
+									}
+								}
+
+							} else {
+								int32_t dcol = treelist_header_hit(win, (uint32_t)hi, win->mouse_x, win->mouse_y);
+								if(dcol >= 0) {
+									win->drag_col_id = hw->id;
+									win->drag_col_src = dcol;
+									win->drag_col_start_x = win->mouse_x;
+
+								} else {
+									int32_t vis_row = treelist_row_hit(win, (uint32_t)hi, win->mouse_x, win->mouse_y);
+									struct mkgui_treelist_data *tl = find_treelist_data(win, hw->id);
+									if(tl && vis_row >= 0 && (uint32_t)vis_row < tl->visible_count) {
+										uint32_t node = tl->visible[vis_row];
+										if(treelist_twisty_hit(win, (uint32_t)hi, win->mouse_x, node) && tl->nodes[node].has_children) {
+											tl->nodes[node].expanded = !tl->nodes[node].expanded;
+											tl->dirty_visible = 1;
+											dirty_all(win);
+											ev->type = tl->nodes[node].expanded ? MKGUI_EVENT_TREELIST_EXPAND : MKGUI_EVENT_TREELIST_COLLAPSE;
+											ev->id = hw->id;
+											ev->value = (int32_t)node + 1;
+											return 1;
+										}
+
+										int32_t handle = (int32_t)node + 1;
+										uint32_t now = (uint32_t)(mkgui_now_ns() / 1000000ull);
+										uint32_t elapsed = now - win->dblclick_time;
+										uint32_t is_dblclick = (win->dblclick_id == hw->id && win->dblclick_row == handle && elapsed < 400);
+										win->dblclick_id = hw->id;
+										win->dblclick_row = handle;
+										win->dblclick_time = now;
+										if(hw->style & MKGUI_TREELIST_MULTI_SELECT) {
+											uint32_t mod_ctrl = (pev.keymod & MKGUI_MOD_CONTROL) != 0;
+											uint32_t mod_shift = (pev.keymod & MKGUI_MOD_SHIFT) != 0;
+											if(mod_ctrl) {
+												tl_multi_sel_toggle(tl, handle);
+												tl->selected = handle;
+											} else if(mod_shift) {
+												int32_t anchor_row = treelist_visible_row_of(tl, tl->selected);
+												if(anchor_row < 0) {
+													anchor_row = vis_row;
+												}
+												int32_t lo = anchor_row < vis_row ? anchor_row : vis_row;
+												int32_t rhi = anchor_row < vis_row ? vis_row : anchor_row;
+												tl->multi_sel_count = 0;
+												for(int32_t r = lo; r <= rhi && tl->multi_sel_count < MKGUI_MAX_MULTI_SEL; ++r) {
+													tl_multi_sel_toggle(tl, (int32_t)tl->visible[r] + 1);
+												}
+												tl->selected = handle;
+											} else {
+												tl->multi_sel[0] = handle;
+												tl->multi_sel_count = 1;
+												tl->selected = handle;
+											}
+										} else {
+											tl->selected = handle;
+										}
+										int32_t col = treelist_col_hit(win, (uint32_t)hi, win->mouse_x);
+										dirty_widget(win, (uint32_t)hi);
+										if(is_dblclick) {
+											ev->type = MKGUI_EVENT_TREELIST_DBLCLICK;
+											ev->id = hw->id;
+											ev->value = handle;
+											ev->col = col;
+											win->dblclick_id = 0;
+											return 1;
+										}
+										ev->type = MKGUI_EVENT_TREELIST_SELECT;
+										ev->id = hw->id;
+										ev->value = handle;
+										ev->col = col;
+										return 1;
+									}
+								}
+							}
+						}
+						}
+					}
+
 					if(hw->type == MKGUI_SPINBOX) {
 						int32_t dir = spinbox_btn_hit(win, (uint32_t)hi, win->mouse_x, win->mouse_y);
 						struct mkgui_spinbox_data *sd = find_spinbox_data(win, hw->id);
@@ -7379,6 +7681,45 @@ MKGUI_API uint32_t mkgui_window_poll(struct mkgui_window *win, struct mkgui_even
 										lv->col_order[dst] = grabbed;
 									}
 									ev->type = MKGUI_EVENT_LISTVIEW_COL_REORDER;
+									ev->id = dcid;
+									return 1;
+								}
+							}
+						}
+					}
+
+					struct mkgui_treelist_data *tld = lv ? NULL : find_treelist_data(win, dcid);
+					if(tld) {
+						if(dx > -4 && dx < 4) {
+							uint32_t logical = tld->col_order[src];
+							if(tld->sort_col == (int32_t)logical) {
+								tld->sort_dir = -tld->sort_dir;
+
+							} else {
+								tld->sort_col = (int32_t)logical;
+								tld->sort_dir = 1;
+							}
+							treelist_do_sort(tld);
+							ev->type = MKGUI_EVENT_TREELIST_SORT;
+							ev->id = dcid;
+							ev->col = (int32_t)logical;
+							ev->value = tld->sort_dir;
+							return 1;
+
+						} else {
+							int32_t widx = find_widget_idx(win, dcid);
+							if(widx >= 0) {
+								int32_t dst = treelist_col_insert_pos(win, tld, (uint32_t)widx);
+								if(dst != src && dst != src + 1) {
+									uint32_t grabbed = tld->col_order[src];
+									if(dst > src) {
+										memmove(&tld->col_order[src], &tld->col_order[src + 1], (uint32_t)(dst - src - 1) * sizeof(uint32_t));
+										tld->col_order[dst - 1] = grabbed;
+									} else {
+										memmove(&tld->col_order[dst + 1], &tld->col_order[dst], (uint32_t)(src - dst) * sizeof(uint32_t));
+										tld->col_order[dst] = grabbed;
+									}
+									ev->type = MKGUI_EVENT_TREELIST_COL_REORDER;
 									ev->id = dcid;
 									return 1;
 								}
@@ -8042,6 +8383,12 @@ MKGUI_API uint32_t mkgui_window_poll(struct mkgui_window *win, struct mkgui_even
 
 							case MKGUI_TREEVIEW: {
 								if(handle_treeview_key(win, ev, ks)) {
+									return 1;
+								}
+							} break;
+
+							case MKGUI_TREELIST: {
+								if(handle_treelist_key(win, ev, ks)) {
 									return 1;
 								}
 							} break;

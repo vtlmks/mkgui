@@ -484,6 +484,337 @@ static void test_treeview_dblclick(void) {
 }
 
 // ---------------------------------------------------------------------------
+// TreeList: SELECT, DBLCLICK, EXPAND, COLLAPSE, SORT, COL_REORDER, CONTEXT
+// plus behaviour invariants (hierarchy-preserving sort, handle-stable
+// selection across expand/collapse).
+// ---------------------------------------------------------------------------
+
+// [=]===^=[ test_treelist_select ]===============================[=]
+static void test_treelist_select(void) {
+	TEST_BEGIN("treelist: click row fires TREELIST_SELECT");
+	enum { WIN = 1, VBOX1 = 2, TL = 3 };
+	struct mkgui_widget widgets[] = {
+		MKGUI_W(MKGUI_WINDOW,   WIN,   "Test", "", 0,     400, 300, 0, 0, 0),
+		MKGUI_W(MKGUI_VBOX,     VBOX1, "",     "", WIN,   0,   0,   0, 0, 0),
+		MKGUI_W(MKGUI_TREELIST, TL,    "",     "", VBOX1, 0,   200, MKGUI_FIXED, 0, 0),
+	};
+	struct mkgui_ctx *ctx = mkgui_ctx_create();
+	struct mkgui_window *win = mkgui_window_create(ctx, NULL, widgets, 3, NULL, 0, 0);
+	CHECK(win, "create failed");
+	if(win) {
+		struct mkgui_column cols[] = { { "Name", 200, MKGUI_CELL_TEXT }, { "Size", 100, MKGUI_CELL_TEXT } };
+		mkgui_treelist_setup(win, TL, 2, cols);
+		const char *r0[] = { "Alpha", "1" };
+		mkgui_treelist_add(win, TL, MKGUI_TREELIST_ROOT, r0, NULL);
+		run_layout(win);
+		int32_t idx = find_widget_idx(win, TL);
+		int32_t rx = win->rects[idx].x + 80;
+		int32_t ry = win->rects[idx].y + win->row_height + 5;
+		inject_click_at(win, rx, ry);
+		CHECK(poll_for_event(win, MKGUI_EVENT_TREELIST_SELECT, TL), "expected TREELIST_SELECT");
+		CHECK(mkgui_treelist_get_selected(win, TL) == 1, "selection should be handle 1");
+		mkgui_window_destroy(win);
+		mkgui_ctx_destroy(ctx);
+	}
+	TEST_END();
+}
+
+// [=]===^=[ test_treelist_dblclick ]=============================[=]
+static void test_treelist_dblclick(void) {
+	TEST_BEGIN("treelist: double-click row fires TREELIST_DBLCLICK");
+	enum { WIN = 1, VBOX1 = 2, TL = 3 };
+	struct mkgui_widget widgets[] = {
+		MKGUI_W(MKGUI_WINDOW,   WIN,   "Test", "", 0,     400, 300, 0, 0, 0),
+		MKGUI_W(MKGUI_VBOX,     VBOX1, "",     "", WIN,   0,   0,   0, 0, 0),
+		MKGUI_W(MKGUI_TREELIST, TL,    "",     "", VBOX1, 0,   200, MKGUI_FIXED, 0, 0),
+	};
+	struct mkgui_ctx *ctx = mkgui_ctx_create();
+	struct mkgui_window *win = mkgui_window_create(ctx, NULL, widgets, 3, NULL, 0, 0);
+	CHECK(win, "create failed");
+	if(win) {
+		struct mkgui_column cols[] = { { "Name", 200, MKGUI_CELL_TEXT } };
+		mkgui_treelist_setup(win, TL, 1, cols);
+		const char *r0[] = { "Alpha" };
+		mkgui_treelist_add(win, TL, MKGUI_TREELIST_ROOT, r0, NULL);
+		run_layout(win);
+		int32_t idx = find_widget_idx(win, TL);
+		int32_t rx = win->rects[idx].x + 80;
+		int32_t ry = win->rects[idx].y + win->row_height + 5;
+		inject_click_at(win, rx, ry);
+		drain_events(win);
+		inject_click_at(win, rx, ry);
+		CHECK(poll_for_event(win, MKGUI_EVENT_TREELIST_DBLCLICK, TL), "expected TREELIST_DBLCLICK");
+		mkgui_window_destroy(win);
+		mkgui_ctx_destroy(ctx);
+	}
+	TEST_END();
+}
+
+// [=]===^=[ test_treelist_twisty_expand ]========================[=]
+static void test_treelist_twisty_expand(void) {
+	TEST_BEGIN("treelist: click twisty fires TREELIST_EXPAND");
+	enum { WIN = 1, VBOX1 = 2, TL = 3 };
+	struct mkgui_widget widgets[] = {
+		MKGUI_W(MKGUI_WINDOW,   WIN,   "Test", "", 0,     400, 300, 0, 0, 0),
+		MKGUI_W(MKGUI_VBOX,     VBOX1, "",     "", WIN,   0,   0,   0, 0, 0),
+		MKGUI_W(MKGUI_TREELIST, TL,    "",     "", VBOX1, 0,   200, MKGUI_FIXED, 0, 0),
+	};
+	struct mkgui_ctx *ctx = mkgui_ctx_create();
+	struct mkgui_window *win = mkgui_window_create(ctx, NULL, widgets, 3, NULL, 0, 0);
+	CHECK(win, "create failed");
+	if(win) {
+		struct mkgui_column cols[] = { { "Name", 200, MKGUI_CELL_TEXT } };
+		mkgui_treelist_setup(win, TL, 1, cols);
+		const char *rp[] = { "Parent" };
+		const char *rc[] = { "Child" };
+		uint32_t p = mkgui_treelist_add(win, TL, MKGUI_TREELIST_ROOT, rp, NULL);
+		mkgui_treelist_add(win, TL, p, rc, NULL);
+		run_layout(win);
+		int32_t idx = find_widget_idx(win, TL);
+		int32_t tx = win->rects[idx].x + 1 + sc(win, 4) + sc(win, MKGUI_TL_INDENT_PX) / 2;
+		int32_t ty = win->rects[idx].y + win->row_height + win->row_height / 2;
+		inject_click_at(win, tx, ty);
+		CHECK(poll_for_event(win, MKGUI_EVENT_TREELIST_EXPAND, TL), "expected TREELIST_EXPAND");
+		CHECK(mkgui_treelist_is_expanded(win, TL, p), "parent should be expanded");
+		mkgui_window_destroy(win);
+		mkgui_ctx_destroy(ctx);
+	}
+	TEST_END();
+}
+
+// [=]===^=[ test_treelist_expand_key ]===========================[=]
+static void test_treelist_expand_key(void) {
+	TEST_BEGIN("treelist: Right on parent fires TREELIST_EXPAND");
+	enum { WIN = 1, VBOX1 = 2, TL = 3 };
+	struct mkgui_widget widgets[] = {
+		MKGUI_W(MKGUI_WINDOW,   WIN,   "Test", "", 0,     400, 300, 0, 0, 0),
+		MKGUI_W(MKGUI_VBOX,     VBOX1, "",     "", WIN,   0,   0,   0, 0, 0),
+		MKGUI_W(MKGUI_TREELIST, TL,    "",     "", VBOX1, 0,   200, MKGUI_FIXED, 0, 0),
+	};
+	struct mkgui_ctx *ctx = mkgui_ctx_create();
+	struct mkgui_window *win = mkgui_window_create(ctx, NULL, widgets, 3, NULL, 0, 0);
+	CHECK(win, "create failed");
+	if(win) {
+		struct mkgui_column cols[] = { { "Name", 200, MKGUI_CELL_TEXT } };
+		mkgui_treelist_setup(win, TL, 1, cols);
+		const char *rp[] = { "Parent" };
+		const char *rc[] = { "Child" };
+		uint32_t p = mkgui_treelist_add(win, TL, MKGUI_TREELIST_ROOT, rp, NULL);
+		mkgui_treelist_add(win, TL, p, rc, NULL);
+		run_layout(win);
+		win->focus_id = TL;
+		mkgui_treelist_set_selected(win, TL, (int32_t)p);
+		inject_key(win, MKGUI_KEY_RIGHT, 0);
+		CHECK(poll_for_event(win, MKGUI_EVENT_TREELIST_EXPAND, TL), "expected TREELIST_EXPAND");
+		mkgui_window_destroy(win);
+		mkgui_ctx_destroy(ctx);
+	}
+	TEST_END();
+}
+
+// [=]===^=[ test_treelist_collapse_key ]=========================[=]
+static void test_treelist_collapse_key(void) {
+	TEST_BEGIN("treelist: Left on expanded parent fires TREELIST_COLLAPSE");
+	enum { WIN = 1, VBOX1 = 2, TL = 3 };
+	struct mkgui_widget widgets[] = {
+		MKGUI_W(MKGUI_WINDOW,   WIN,   "Test", "", 0,     400, 300, 0, 0, 0),
+		MKGUI_W(MKGUI_VBOX,     VBOX1, "",     "", WIN,   0,   0,   0, 0, 0),
+		MKGUI_W(MKGUI_TREELIST, TL,    "",     "", VBOX1, 0,   200, MKGUI_FIXED, 0, 0),
+	};
+	struct mkgui_ctx *ctx = mkgui_ctx_create();
+	struct mkgui_window *win = mkgui_window_create(ctx, NULL, widgets, 3, NULL, 0, 0);
+	CHECK(win, "create failed");
+	if(win) {
+		struct mkgui_column cols[] = { { "Name", 200, MKGUI_CELL_TEXT } };
+		mkgui_treelist_setup(win, TL, 1, cols);
+		const char *rp[] = { "Parent" };
+		const char *rc[] = { "Child" };
+		uint32_t p = mkgui_treelist_add(win, TL, MKGUI_TREELIST_ROOT, rp, NULL);
+		mkgui_treelist_add(win, TL, p, rc, NULL);
+		mkgui_treelist_expand(win, TL, p);
+		run_layout(win);
+		win->focus_id = TL;
+		mkgui_treelist_set_selected(win, TL, (int32_t)p);
+		inject_key(win, MKGUI_KEY_LEFT, 0);
+		CHECK(poll_for_event(win, MKGUI_EVENT_TREELIST_COLLAPSE, TL), "expected TREELIST_COLLAPSE");
+		mkgui_window_destroy(win);
+		mkgui_ctx_destroy(ctx);
+	}
+	TEST_END();
+}
+
+// [=]===^=[ test_treelist_sort ]=================================[=]
+static void test_treelist_sort(void) {
+	TEST_BEGIN("treelist: click header fires TREELIST_SORT");
+	enum { WIN = 1, VBOX1 = 2, TL = 3 };
+	struct mkgui_widget widgets[] = {
+		MKGUI_W(MKGUI_WINDOW,   WIN,   "Test", "", 0,     400, 300, 0, 0, 0),
+		MKGUI_W(MKGUI_VBOX,     VBOX1, "",     "", WIN,   0,   0,   0, 0, 0),
+		MKGUI_W(MKGUI_TREELIST, TL,    "",     "", VBOX1, 0,   200, MKGUI_FIXED, 0, 0),
+	};
+	struct mkgui_ctx *ctx = mkgui_ctx_create();
+	struct mkgui_window *win = mkgui_window_create(ctx, NULL, widgets, 3, NULL, 0, 0);
+	CHECK(win, "create failed");
+	if(win) {
+		struct mkgui_column cols[] = { { "Name", 200, MKGUI_CELL_TEXT }, { "Size", 100, MKGUI_CELL_TEXT } };
+		mkgui_treelist_setup(win, TL, 2, cols);
+		const char *r0[] = { "Alpha", "1" };
+		mkgui_treelist_add(win, TL, MKGUI_TREELIST_ROOT, r0, NULL);
+		run_layout(win);
+		int32_t idx = find_widget_idx(win, TL);
+		int32_t hx = win->rects[idx].x + 50;
+		int32_t hy = win->rects[idx].y + win->row_height / 2;
+		inject_click_at(win, hx, hy);
+		CHECK(poll_for_event(win, MKGUI_EVENT_TREELIST_SORT, TL), "expected TREELIST_SORT");
+		mkgui_window_destroy(win);
+		mkgui_ctx_destroy(ctx);
+	}
+	TEST_END();
+}
+
+// [=]===^=[ test_treelist_col_reorder ]==========================[=]
+static void test_treelist_col_reorder(void) {
+	TEST_BEGIN("treelist: drag column header fires TREELIST_COL_REORDER");
+	enum { WIN = 1, VBOX1 = 2, TL = 3 };
+	struct mkgui_widget widgets[] = {
+		MKGUI_W(MKGUI_WINDOW,   WIN,   "Test", "", 0,     400, 300, 0, 0, 0),
+		MKGUI_W(MKGUI_VBOX,     VBOX1, "",     "", WIN,   0,   0,   0, 0, 0),
+		MKGUI_W(MKGUI_TREELIST, TL,    "",     "", VBOX1, 0,   200, MKGUI_FIXED, 0, 0),
+	};
+	struct mkgui_ctx *ctx = mkgui_ctx_create();
+	struct mkgui_window *win = mkgui_window_create(ctx, NULL, widgets, 3, NULL, 0, 0);
+	CHECK(win, "create failed");
+	if(win) {
+		struct mkgui_column cols[] = { { "Name", 200, MKGUI_CELL_TEXT }, { "Size", 100, MKGUI_CELL_TEXT } };
+		mkgui_treelist_setup(win, TL, 2, cols);
+		run_layout(win);
+		int32_t idx = find_widget_idx(win, TL);
+		int32_t hy = win->rects[idx].y + win->row_height / 2;
+		int32_t col0 = win->rects[idx].x + 100;
+		int32_t drop_x = win->rects[idx].x + 290;
+		inject_press(win, col0, hy, 1, 0);
+		inject_motion(win, drop_x, hy);
+		inject_release(win, drop_x, hy, 1);
+		CHECK(poll_for_event(win, MKGUI_EVENT_TREELIST_COL_REORDER, TL), "expected TREELIST_COL_REORDER");
+		mkgui_window_destroy(win);
+		mkgui_ctx_destroy(ctx);
+	}
+	TEST_END();
+}
+
+// [=]===^=[ test_treelist_context_header ]=======================[=]
+static void test_treelist_context_header(void) {
+	TEST_BEGIN("treelist: right-click header fires CONTEXT_HEADER");
+	enum { WIN = 1, VBOX1 = 2, TL = 3 };
+	struct mkgui_widget widgets[] = {
+		MKGUI_W(MKGUI_WINDOW,   WIN,   "Test", "", 0,     400, 300, 0, 0, 0),
+		MKGUI_W(MKGUI_VBOX,     VBOX1, "",     "", WIN,   0,   0,   0, 0, 0),
+		MKGUI_W(MKGUI_TREELIST, TL,    "",     "", VBOX1, 0,   200, MKGUI_FIXED, 0, 0),
+	};
+	struct mkgui_ctx *ctx = mkgui_ctx_create();
+	struct mkgui_window *win = mkgui_window_create(ctx, NULL, widgets, 3, NULL, 0, 0);
+	CHECK(win, "create failed");
+	if(win) {
+		struct mkgui_column cols[] = { { "Name", 200, MKGUI_CELL_TEXT } };
+		mkgui_treelist_setup(win, TL, 1, cols);
+		run_layout(win);
+		int32_t idx = find_widget_idx(win, TL);
+		int32_t hx = win->rects[idx].x + 50;
+		int32_t hy = win->rects[idx].y + win->row_height / 2;
+		inject_right_click_at(win, hx, hy);
+		CHECK(poll_for_event(win, MKGUI_EVENT_CONTEXT_HEADER, TL), "expected CONTEXT_HEADER");
+		mkgui_window_destroy(win);
+		mkgui_ctx_destroy(ctx);
+	}
+	TEST_END();
+}
+
+// [=]===^=[ test_treelist_sort_keeps_hierarchy ]=================[=]
+// Sorting reorders parents at the top level and children within each parent,
+// but never reparents or promotes a child. Handles: p1=1, p2=2, c1=3, c2=4.
+static void test_treelist_sort_keeps_hierarchy(void) {
+	TEST_BEGIN("treelist: sort reorders per-parent without promoting children");
+	enum { WIN = 1, VBOX1 = 2, TL = 3 };
+	struct mkgui_widget widgets[] = {
+		MKGUI_W(MKGUI_WINDOW,   WIN,   "Test", "", 0,     400, 300, 0, 0, 0),
+		MKGUI_W(MKGUI_VBOX,     VBOX1, "",     "", WIN,   0,   0,   0, 0, 0),
+		MKGUI_W(MKGUI_TREELIST, TL,    "",     "", VBOX1, 0,   200, MKGUI_FIXED, 0, 0),
+	};
+	struct mkgui_ctx *ctx = mkgui_ctx_create();
+	struct mkgui_window *win = mkgui_window_create(ctx, NULL, widgets, 3, NULL, 0, 0);
+	CHECK(win, "create failed");
+	if(win) {
+		struct mkgui_column cols[] = { { "Name", 200, MKGUI_CELL_TEXT } };
+		mkgui_treelist_setup(win, TL, 1, cols);
+		const char *rb[] = { "Beta" };
+		const char *ra[] = { "Alpha" };
+		const char *rz[] = { "Zeta" };
+		const char *rd[] = { "Aardvark" };
+		uint32_t p1 = mkgui_treelist_add(win, TL, MKGUI_TREELIST_ROOT, rb, NULL);
+		uint32_t p2 = mkgui_treelist_add(win, TL, MKGUI_TREELIST_ROOT, ra, NULL);
+		uint32_t c1 = mkgui_treelist_add(win, TL, p1, rz, NULL);
+		uint32_t c2 = mkgui_treelist_add(win, TL, p1, rd, NULL);
+		CHECK(p1 == 1 && p2 == 2 && c1 == 3 && c2 == 4, "handles are 1-based insertion order");
+		mkgui_treelist_expand_all(win, TL);
+		mkgui_treelist_set_sort(win, TL, 0, 1);
+
+		CHECK(mkgui_treelist_node_count(win, TL) == 4, "node count unchanged by sort");
+		CHECK(mkgui_treelist_get_parent(win, TL, c1) == p1, "c1 stays under p1");
+		CHECK(mkgui_treelist_get_parent(win, TL, c2) == p1, "c2 stays under p1");
+		CHECK(mkgui_treelist_get_parent(win, TL, p1) == 0, "p1 stays a root");
+		CHECK(mkgui_treelist_get_parent(win, TL, p2) == 0, "p2 stays a root");
+
+		struct mkgui_treelist_data *tl = find_treelist_data(win, TL);
+		if(tl) {
+			treelist_rebuild_visible(tl);
+			// Expected display order: Alpha(p2), then p1's children Aardvark(c2),
+			// Zeta(c1) under Beta(p1). Node indices are handle - 1.
+			CHECK(tl->visible_count == 4, "all four nodes visible");
+			CHECK(tl->visible[0] == p2 - 1, "Alpha sorts first at root");
+			CHECK(tl->visible[1] == p1 - 1, "Beta second at root");
+			CHECK(tl->visible[2] == c2 - 1, "Aardvark first among Beta's children");
+			CHECK(tl->visible[3] == c1 - 1, "Zeta second among Beta's children");
+		}
+		mkgui_window_destroy(win);
+		mkgui_ctx_destroy(ctx);
+	}
+	TEST_END();
+}
+
+// [=]===^=[ test_treelist_selection_survives_expand ]============[=]
+static void test_treelist_selection_survives_expand(void) {
+	TEST_BEGIN("treelist: selection survives expand/collapse of another subtree");
+	enum { WIN = 1, VBOX1 = 2, TL = 3 };
+	struct mkgui_widget widgets[] = {
+		MKGUI_W(MKGUI_WINDOW,   WIN,   "Test", "", 0,     400, 300, 0, 0, 0),
+		MKGUI_W(MKGUI_VBOX,     VBOX1, "",     "", WIN,   0,   0,   0, 0, 0),
+		MKGUI_W(MKGUI_TREELIST, TL,    "",     "", VBOX1, 0,   200, MKGUI_FIXED, 0, 0),
+	};
+	struct mkgui_ctx *ctx = mkgui_ctx_create();
+	struct mkgui_window *win = mkgui_window_create(ctx, NULL, widgets, 3, NULL, 0, 0);
+	CHECK(win, "create failed");
+	if(win) {
+		struct mkgui_column cols[] = { { "Name", 200, MKGUI_CELL_TEXT } };
+		mkgui_treelist_setup(win, TL, 1, cols);
+		const char *r[] = { "n" };
+		uint32_t p1 = mkgui_treelist_add(win, TL, MKGUI_TREELIST_ROOT, r, NULL);
+		uint32_t p2 = mkgui_treelist_add(win, TL, MKGUI_TREELIST_ROOT, r, NULL);
+		uint32_t c1 = mkgui_treelist_add(win, TL, p1, r, NULL);
+		mkgui_treelist_add(win, TL, p2, r, NULL);
+		mkgui_treelist_expand_all(win, TL);
+		run_layout(win);
+		mkgui_treelist_set_selected(win, TL, (int32_t)c1);
+		mkgui_treelist_collapse(win, TL, p2);
+		mkgui_treelist_expand(win, TL, p2);
+		CHECK(mkgui_treelist_get_selected(win, TL) == (int32_t)c1, "selection handle unchanged");
+		CHECK(mkgui_treelist_is_selected(win, TL, c1), "c1 still selected");
+		mkgui_window_destroy(win);
+		mkgui_ctx_destroy(ctx);
+	}
+	TEST_END();
+}
+
+// ---------------------------------------------------------------------------
 // Gridview: GRID_CLICK, GRIDVIEW_SELECT
 // ---------------------------------------------------------------------------
 
@@ -1577,6 +1908,16 @@ int main(void) {
 	test_treeview_expand();
 	test_treeview_collapse();
 	test_treeview_dblclick();
+	test_treelist_select();
+	test_treelist_dblclick();
+	test_treelist_twisty_expand();
+	test_treelist_expand_key();
+	test_treelist_collapse_key();
+	test_treelist_sort();
+	test_treelist_col_reorder();
+	test_treelist_context_header();
+	test_treelist_sort_keeps_hierarchy();
+	test_treelist_selection_survives_expand();
 	test_gridview_select();
 	test_richlist_select();
 	test_richlist_dblclick();

@@ -75,7 +75,7 @@ enum {
 
 	/* Data Views tab */
 	ID_DATA_SPLIT,
-	ID_DATA_LVBOX, ID_LV_LBL, ID_LISTVIEW1,
+	ID_DATA_LVBOX, ID_LV_LBL, ID_LISTVIEW1, ID_TLIST_LBL, ID_TREELIST1,
 	ID_DATA_RVBOX, ID_GV_LBL, ID_GRIDVIEW1,
 	ID_RL_LBL, ID_RICHLIST1,
 	ID_IV_HBOX, ID_IV_ICON, ID_IV_THUMB, ID_IV_COMPACT, ID_IV_DETAIL, ID_ITEMVIEW1,
@@ -575,6 +575,20 @@ static void demo_event(struct mkgui_window *win, struct mkgui_event *ev, void *u
 			}
 		} break;
 
+		case MKGUI_EVENT_TREELIST_SELECT: {
+			if(ev->id == ID_TREELIST1) {
+				snprintf(buf, sizeof(buf), "TreeList select: node %d, col %d", ev->value, ev->col);
+				mkgui_statusbar_set(win, ID_STATUSBAR, 0, buf);
+			}
+		} break;
+
+		case MKGUI_EVENT_TREELIST_SORT: {
+			if(ev->id == ID_TREELIST1) {
+				snprintf(buf, sizeof(buf), "TreeList sort column %d %s", ev->col, ev->value > 0 ? "ascending" : "descending");
+				mkgui_statusbar_set(win, ID_STATUSBAR, 0, buf);
+			}
+		} break;
+
 		case MKGUI_EVENT_SCROLL: {
 			snprintf(buf, sizeof(buf), "Scroll: %d", ev->value);
 			mkgui_statusbar_set(win, ID_STATUSBAR, 0, buf);
@@ -586,7 +600,7 @@ static void demo_event(struct mkgui_window *win, struct mkgui_event *ev, void *u
 		} break;
 
 		case MKGUI_EVENT_CONTEXT: {
-			if(ev->id == ID_LISTVIEW1 || ev->id == ID_GRIDVIEW1 || ev->id == ID_ITEMVIEW1 || ev->id == ID_RICHLIST1) {
+			if(ev->id == ID_LISTVIEW1 || ev->id == ID_GRIDVIEW1 || ev->id == ID_ITEMVIEW1 || ev->id == ID_RICHLIST1 || ev->id == ID_TREELIST1) {
 				mkgui_context_menu_clear(win);
 				mkgui_context_menu_add(win, ID_CTX_CUT, "Cut", "content-cut", 0);
 				mkgui_context_menu_add(win, ID_CTX_COPY, "Copy", "content-copy", 0);
@@ -802,6 +816,8 @@ int main(void) {
 		MKGUI_W(MKGUI_VBOX,     ID_DATA_LVBOX,"",                  "", ID_DATA_SPLIT, 0, 0, MKGUI_REGION_LEFT, 0, 0),
 		MKGUI_W(MKGUI_LABEL,    ID_LV_LBL,   "Listview (1M rows):", "", ID_DATA_LVBOX, 0, 20, MKGUI_FIXED, 0, 0),
 		MKGUI_W(MKGUI_LISTVIEW, ID_LISTVIEW1, "",                  "", ID_DATA_LVBOX, 0, 0, 0, 0, 1),
+		MKGUI_W(MKGUI_LABEL,    ID_TLIST_LBL, "TreeList (tree-table):", "", ID_DATA_LVBOX, 0, 20, MKGUI_FIXED, 0, 0),
+		MKGUI_W(MKGUI_TREELIST, ID_TREELIST1, "",                  "", ID_DATA_LVBOX, 0, 0, 0, MKGUI_TREELIST_MULTI_SELECT, 1),
 		MKGUI_W(MKGUI_VBOX,     ID_DATA_RVBOX,"",                  "", ID_DATA_SPLIT, 0, 0, MKGUI_REGION_RIGHT, 0, 0),
 		MKGUI_W(MKGUI_LABEL,    ID_GV_LBL,   "Gridview:",         "", ID_DATA_RVBOX, 0, 20, MKGUI_FIXED, 0, 0),
 		MKGUI_W(MKGUI_GRIDVIEW, ID_GRIDVIEW1, "",                  "", ID_DATA_RVBOX, 0, 120, MKGUI_FIXED, 0, 0),
@@ -911,6 +927,31 @@ int main(void) {
 		{ "Progress", 120, MKGUI_CELL_PROGRESS },
 	};
 	mkgui_listview_setup(win, ID_LISTVIEW1, 1000000, 4, cols, demo_row_cb, NULL);
+
+	/* TreeList: a small tree-table, parent ROMs with clone children. Column 0
+	 * carries the indent + twisty; sorting a header reorders parents at the top
+	 * level and clones within their parent, never across parents. */
+	struct mkgui_column tlcols[] = {
+		{ "Name",         220, MKGUI_CELL_ICON_TEXT },
+		{ "Year",          60, MKGUI_CELL_TEXT },
+		{ "Manufacturer", 160, MKGUI_CELL_TEXT },
+	};
+	mkgui_treelist_setup(win, ID_TREELIST1, 3, tlcols);
+	{
+		const char *pac[]  = { "applications-games\tPac-Man",             "1980", "Namco" };
+		const char *pacj[] = { "applications-games\tPuck Man (Japan)",    "1980", "Namco" };
+		const char *pacm[] = { "applications-games\tPac-Man (Midway)",    "1980", "Midway" };
+		const char *dk[]   = { "applications-games\tDonkey Kong",         "1981", "Nintendo" };
+		const char *dkj[]  = { "applications-games\tDonkey Kong (Japan)", "1981", "Nintendo" };
+		const char *gal[]  = { "applications-games\tGalaga",              "1981", "Namco" };
+		uint32_t tp1 = mkgui_treelist_add(win, ID_TREELIST1, MKGUI_TREELIST_ROOT, pac, NULL);
+		mkgui_treelist_add(win, ID_TREELIST1, tp1, pacj, NULL);
+		mkgui_treelist_add(win, ID_TREELIST1, tp1, pacm, NULL);
+		uint32_t tp2 = mkgui_treelist_add(win, ID_TREELIST1, MKGUI_TREELIST_ROOT, dk, NULL);
+		mkgui_treelist_add(win, ID_TREELIST1, tp2, dkj, NULL);
+		mkgui_treelist_add(win, ID_TREELIST1, MKGUI_TREELIST_ROOT, gal, NULL);
+		mkgui_treelist_expand_all(win, ID_TREELIST1);
+	}
 
 	struct mkgui_grid_column gcols[] = {
 		{ "Source", 80, MKGUI_GRID_TEXT },
