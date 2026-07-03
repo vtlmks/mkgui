@@ -887,15 +887,22 @@ static void platform_wait_event(struct mkgui_window *win, int64_t timeout_ns) {
 		}
 		wait_ms = (DWORD)ms;
 	}
-	for(uint32_t i = 0; i < win->timer_count; ++i) {
-		if(win->timers[i].active) {
-			uint64_t timer_ms = win->timers[i].interval_ns / 1000000ull;
-			if(timer_ms < 1) {
-				timer_ms = 1;
-			}
+	// Bound the wait by every window's active timers, not just the anchor
+	// window's. A timer on a transient window (e.g. a progress dialog) must
+	// wake an otherwise-idle loop too, or it silently never fires.
+	struct mkgui_ctx *ctx = win->ctx;
+	for(uint32_t w = 0; w < ctx->window_count; ++w) {
+		struct mkgui_window *cw = ctx->windows[w];
+		for(uint32_t i = 0; i < cw->timer_count; ++i) {
+			if(cw->timers[i].active) {
+				uint64_t timer_ms = cw->timers[i].interval_ns / 1000000ull;
+				if(timer_ms < 1) {
+					timer_ms = 1;
+				}
 
-			if(wait_ms == INFINITE || timer_ms < wait_ms) {
-				wait_ms = (DWORD)timer_ms;
+				if(wait_ms == INFINITE || timer_ms < wait_ms) {
+					wait_ms = (DWORD)timer_ms;
+				}
 			}
 		}
 	}

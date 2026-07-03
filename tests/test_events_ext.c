@@ -12,6 +12,8 @@
 
 #include "../mkgui.c"
 
+#include <signal.h>
+
 static uint32_t tests_run;
 static uint32_t tests_passed;
 static uint32_t tests_failed;
@@ -1252,6 +1254,76 @@ static void test_timer_event(void) {
 // cb==NULL. This is an API inconsistency -- the NULL check should be
 // removed to allow event-based timers.
 
+static volatile sig_atomic_t idle_wd_fired;
+static void idle_wd_handler(int sig) {
+	(void)sig;
+	idle_wd_fired = 1;
+}
+
+static uint32_t transient_timer_fired;
+static void transient_timer_cb(struct mkgui_window *win, uint32_t timer_id, void *userdata) {
+	(void)win; (void)timer_id; (void)userdata;
+	transient_timer_fired = 1;
+}
+
+// [=]===^=[ test_timer_wakes_idle_on_transient_window ]===========[=]
+// Regression: a timer on a non-primary window must wake an otherwise-idle
+// wait. platform_wait_event used to fold only the anchor (primary) window's
+// timer fds into ppoll, so a transient window's timer never woke the loop once
+// X traffic went quiet, and mkgui_ctx_wait blocked forever. The SIGALRM
+// watchdog turns that infinite block into a test failure instead of a hang.
+static void test_timer_wakes_idle_on_transient_window(void) {
+	TEST_BEGIN("timer: transient-window timer wakes an idle wait");
+	enum { PWIN = 1, PLBL = 2, TWIN = 3, TLBL = 4 };
+	struct mkgui_widget pw[] = {
+		MKGUI_W(MKGUI_WINDOW, PWIN, "Primary",   "", 0,    300, 200, 0, 0, 0),
+		MKGUI_W(MKGUI_LABEL,  PLBL, "P",         "", PWIN, 0, 0, 0, 0, 0),
+	};
+	struct mkgui_widget tw[] = {
+		MKGUI_W(MKGUI_WINDOW, TWIN, "Transient", "", 0,    200, 120, 0, 0, 0),
+		MKGUI_W(MKGUI_LABEL,  TLBL, "T",         "", TWIN, 0, 0, 0, 0, 0),
+	};
+	struct mkgui_ctx *ctx = mkgui_ctx_create();
+	struct mkgui_window *primary = mkgui_window_create(ctx, NULL, pw, 2, NULL, 0, 0);
+	struct mkgui_window *transient = mkgui_window_create(ctx, primary, tw, 2, NULL, 0, 0);
+	CHECK(primary && transient, "window creation failed");
+	if(primary && transient) {
+		// Drain all startup mapping/expose traffic so the next wait genuinely
+		// blocks on ppoll rather than returning on already-queued events.
+		for(uint32_t i = 0; i < 20; ++i) {
+			drain_events(primary);
+			drain_events(transient);
+			struct timespec s = {0, 5000000};
+			nanosleep(&s, NULL);
+		}
+
+		transient_timer_fired = 0;
+		uint32_t tid = mkgui_window_add_timer(transient, 30000000, transient_timer_cb, NULL);
+		CHECK(tid != 0, "timer creation failed");
+
+		idle_wd_fired = 0;
+		struct sigaction sa;
+		memset(&sa, 0, sizeof(sa));
+		sa.sa_handler = idle_wd_handler;
+		sigaction(SIGALRM, &sa, NULL);
+		alarm(2);
+
+		while(!transient_timer_fired && !idle_wd_fired) {
+			mkgui_ctx_wait(ctx);
+			drain_events(primary);
+			drain_events(transient);
+		}
+		alarm(0);
+
+		CHECK(transient_timer_fired, "transient-window timer callback never fired");
+		CHECK(!idle_wd_fired, "wait blocked; transient-window timer did not wake the idle loop");
+
+		mkgui_window_remove_timer(transient, tid);
+	}
+	mkgui_ctx_destroy(ctx);
+	TEST_END();
+}
+
 // ---------------------------------------------------------------------------
 // Context menu item selection
 // ---------------------------------------------------------------------------
@@ -1932,6 +2004,7 @@ int main(void) {
 	test_combobox_submit();
 	test_datepicker_changed();
 	test_timer_event();
+	test_timer_wakes_idle_on_transient_window();
 	test_context_menu_event();
 	test_gridview_keyboard_select();
 	test_gridview_check();

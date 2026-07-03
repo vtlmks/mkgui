@@ -662,16 +662,24 @@ static void platform_wait_event(struct mkgui_window *win, int64_t timeout_ns) {
 		return;
 	}
 	XFlush(win->plat.dpy);
-	struct pollfd pfds[1 + MKGUI_MAX_TIMERS];
+	struct pollfd pfds[1 + MKGUI_MAX_WINDOWS * MKGUI_MAX_TIMERS];
 	uint32_t nfds = 0;
 	pfds[nfds].fd = ConnectionNumber(win->plat.dpy);
 	pfds[nfds].events = POLLIN;
 	++nfds;
-	for(uint32_t i = 0; i < win->timer_count; ++i) {
-		if(win->timers[i].active && win->timers[i].fd >= 0) {
-			pfds[nfds].fd = win->timers[i].fd;
-			pfds[nfds].events = POLLIN;
-			++nfds;
+	// Fold every window's active timer fds into the wait, not just the anchor
+	// window's. A timer on a transient window (e.g. a progress dialog) must
+	// wake an otherwise-idle loop too, or once X traffic stops ppoll blocks
+	// forever and that timer silently never fires.
+	struct mkgui_ctx *ctx = win->ctx;
+	for(uint32_t w = 0; w < ctx->window_count; ++w) {
+		struct mkgui_window *cw = ctx->windows[w];
+		for(uint32_t i = 0; i < cw->timer_count; ++i) {
+			if(cw->timers[i].active && cw->timers[i].fd >= 0) {
+				pfds[nfds].fd = cw->timers[i].fd;
+				pfds[nfds].events = POLLIN;
+				++nfds;
+			}
 		}
 	}
 	if(timeout_ns < 0) {

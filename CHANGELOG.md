@@ -67,6 +67,10 @@ All notable changes to mkgui. Pre-1.0 betas may break the API between releases.
 - **Single nanosecond-only time API.** `mkgui_time_ms()`, `mkgui_time_us()`, and `mkgui_sleep_ms()` are gone. Use `mkgui_now_ns()` (monotonic ns, `uint64_t`) and `mkgui_sleep_ns(ns)`. Convert to other units at the call site: `(uint32_t)(mkgui_now_ns() / 1000000ull)` for ms, `(double)mkgui_now_ns() * 1e-3` for us. One time unit, one sleep function, no choice paralysis.
 - **Clipboard size limit removed.** Internal selection storage no longer has the fixed 4 KB cap; it grows on demand, so copy and paste handle arbitrarily large text. The Linux backend now implements the X11 INCR protocol on both sides (owner and requestor), streaming selections that exceed a single X request in chunks; Win32 already handled arbitrary sizes via the OS clipboard.
 
+### Fixed
+
+- **Timers on non-primary windows now fire when the loop is idle.** The idle wait only folded the primary (anchor) window's timer fds into `ppoll` (Linux) / bounded `MsgWaitForMultipleObjects` by its timers (Win32), so a timer on a transient window (e.g. a progress dialog's heartbeat) silently stopped firing once other event traffic went quiet, blocking the loop indefinitely. The wait now spans every window on the ctx, so app timers can live on whichever window owns them.
+
 ### Migration
 
 See [`documentation/migration_v0.3.0-beta.md`](documentation/migration_v0.3.0-beta.md) for the full rename table, code transformation examples, and a sed script that handles ~95% of a typical migration mechanically. The remaining 5% (lifecycle pair in `main()`, child window creation, callbacks calling ctx-scoped functions) needs hand-fixing per the patterns documented.
