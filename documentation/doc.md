@@ -2234,6 +2234,18 @@ if(mkgui_dialog_save(ctx, &opts)) {
 
 Returns 1 if the user confirmed, 0 if cancelled. If the user types a filename without an extension and a filter is active, the first extension from the active filter is appended automatically. If the target file already exists, an overwrite confirmation dialog is shown.
 
+### Folder dialog
+
+```c
+struct mkgui_file_dialog_opts opts = {0};
+opts.start_path = "/home/user/roms";
+if(mkgui_dialog_folder(ctx, &opts)) {
+    printf("Folder: %s\n", mkgui_dialog_get_path(ctx, 0));
+}
+```
+
+Returns 1 if the user confirmed, 0 if cancelled. The list shows directories only; the filename/filter row is hidden and the confirm button reads "Select". Double-click enters a folder; the returned path is the highlighted subfolder, or the folder currently shown if none is highlighted (so "Select" with no selection picks the directory you are browsing). The `filters`, `default_name`, and `multi_select` fields are ignored in this mode. The toolbar's "New Folder" button works, letting the user create and then select a directory.
+
 ### Dialog window
 
 Dialogs open as separate, WM-decorated X11 windows (not overlays). They are:
@@ -2246,7 +2258,7 @@ The dialog window is centered on the parent window when opened.
 
 ### Dialog layout
 
-Both dialogs feature:
+The dialogs feature:
 - Toolbar with back/forward/up navigation buttons
 - Breadcrumb path bar (MKGUI_PATHBAR) showing clickable directory segments; click to navigate, click background to type a path directly
 - Left sidebar with shortcuts: Home, Desktop, Documents, Downloads, GTK bookmarks, and mounted volumes from `/media/` and `/mnt/`
@@ -2266,6 +2278,7 @@ The save dialog adds a "File name:" input row and a "New Folder" button at the b
 ```c
 uint32_t mkgui_dialog_open(struct mkgui_window *win, const struct mkgui_file_dialog_opts *opts);
 uint32_t mkgui_dialog_save(struct mkgui_window *win, const struct mkgui_file_dialog_opts *opts);
+uint32_t mkgui_dialog_folder(struct mkgui_window *win, const struct mkgui_file_dialog_opts *opts);
 const char *mkgui_dialog_get_path(struct mkgui_window *win, uint32_t index);
 ```
 

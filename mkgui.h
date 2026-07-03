@@ -1057,6 +1057,7 @@ MKGUI_API uint32_t mkgui_dialog_confirm(struct mkgui_window *win, const char *ti
 MKGUI_API uint32_t mkgui_dialog_input(struct mkgui_window *win, const char *title, const char *prompt, const char *default_text, char *out, uint32_t out_size);
 MKGUI_API uint32_t mkgui_dialog_open(struct mkgui_window *win, const struct mkgui_file_dialog_opts *opts);
 MKGUI_API uint32_t mkgui_dialog_save(struct mkgui_window *win, const struct mkgui_file_dialog_opts *opts);
+MKGUI_API uint32_t mkgui_dialog_folder(struct mkgui_window *win, const struct mkgui_file_dialog_opts *opts);
 MKGUI_API const char *mkgui_dialog_get_path(struct mkgui_window *win, uint32_t index);
 
 // ---------------------------------------------------------------------------

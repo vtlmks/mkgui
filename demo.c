@@ -25,7 +25,7 @@ enum {
 	ID_WINDOW = 0,
 
 	ID_MENU, ID_FILE_MENU, ID_EDIT_MENU, ID_VIEW_MENU, ID_HELP_MENU,
-	ID_FILE_NEW, ID_OPEN, ID_SAVE, ID_FILE_SEP1, ID_EXIT,
+	ID_FILE_NEW, ID_OPEN, ID_SAVE, ID_SELECT_FOLDER, ID_FILE_SEP1, ID_EXIT,
 	ID_EDIT_CUT, ID_COPY, ID_PASTE,
 	ID_VIEW_GRID, ID_VIEW_STATUS, ID_VIEW_SEP1,
 	ID_VIEW_SMALL, ID_VIEW_MEDIUM, ID_VIEW_LARGE,
@@ -345,6 +345,14 @@ static void demo_handle_file_action(struct mkgui_window *win, uint32_t id) {
 		if(mkgui_dialog_save(win, &save_opts)) {
 			char buf[MKGUI_PATH_MAX + 320];
 			snprintf(buf, sizeof(buf), "Save to: %s", mkgui_dialog_get_path(win, 0));
+			mkgui_statusbar_set(win, ID_STATUSBAR, 0, buf);
+		}
+
+	} else if(id == ID_SELECT_FOLDER) {
+		struct mkgui_file_dialog_opts folder_opts = {0};
+		if(mkgui_dialog_folder(win, &folder_opts)) {
+			char buf[MKGUI_PATH_MAX + 320];
+			snprintf(buf, sizeof(buf), "Folder: %s", mkgui_dialog_get_path(win, 0));
 			mkgui_statusbar_set(win, ID_STATUSBAR, 0, buf);
 		}
 
@@ -690,6 +698,7 @@ int main(void) {
 		MKGUI_W(MKGUI_MENUITEM, ID_FILE_NEW,  "New",               "document-new",       ID_FILE_MENU, 0, 0, 0, 0, 0),
 		MKGUI_W(MKGUI_MENUITEM, ID_OPEN,      "Open",              "document-open",      ID_FILE_MENU, 0, 0, 0, 0, 0),
 		MKGUI_W(MKGUI_MENUITEM, ID_SAVE,      "Save",              "document-save",      ID_FILE_MENU, 0, 0, 0, 0, 0),
+		MKGUI_W(MKGUI_MENUITEM, ID_SELECT_FOLDER, "Select Folder...", "folder-open",     ID_FILE_MENU, 0, 0, 0, 0, 0),
 		MKGUI_W(MKGUI_MENUITEM, ID_FILE_SEP1, "",                  "",                   ID_FILE_MENU, 0, 0, 0, MKGUI_MENUITEM_SEPARATOR, 0),
 		MKGUI_W(MKGUI_MENUITEM, ID_EXIT,      "Exit",              "application-exit",   ID_FILE_MENU, 0, 0, 0, 0, 0),
 		MKGUI_W(MKGUI_MENUITEM, ID_EDIT_CUT,  "Cut",               "edit-cut",           ID_EDIT_MENU, 0, 0, 0, 0, 0),

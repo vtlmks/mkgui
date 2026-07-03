@@ -399,6 +399,10 @@ static void fd_scan_dir(void) {
 		info.mtime = 0;
 		mkgui_path_stat(fullpath, &info);
 
+		if(fd->mode == 2 && !info.is_dir) {
+			continue;
+		}
+
 		if(!info.is_dir && filter_pat && !fd_match_pattern(de->name, filter_pat)) {
 			continue;
 		}
@@ -852,6 +856,23 @@ static struct fd_entry *fd_filtered_entry(uint32_t row) {
 static void fd_build_results(struct mkgui_window *dlg) {
 	fd_result_count = 0;
 
+	if(fd->mode == 2) {
+		struct mkgui_listview_data *lv = find_listv_data(dlg, FD_ID_FILES);
+		struct fd_entry *e = lv ? fd_filtered_entry((uint32_t)lv->selected_row) : NULL;
+		if(e && e->is_dir && strcmp(e->name, "..") != 0) {
+			if(strcmp(fd->path, "/") == 0) {
+				snprintf(fd_results[0], sizeof(fd_results[0]), "/%s", e->name);
+			} else {
+				snprintf(fd_results[0], sizeof(fd_results[0]), "%s/%s", fd->path, e->name);
+			}
+		} else {
+			// nothing (or "..") highlighted: pick the folder we are in
+			snprintf(fd_results[0], sizeof(fd_results[0]), "%s", fd->path);
+		}
+		fd_result_count = 1;
+		return;
+	}
+
 	if(fd->mode == 1) {
 		const char *name = mkgui_input_get(dlg, FD_ID_NAME_INPUT);
 		if(name && name[0] != '\0') {
@@ -1104,10 +1125,20 @@ static uint32_t fd_run_dialog(struct mkgui_window *win, uint32_t mode, const str
 	popup_destroy_all(win);
 
 	uint32_t multi = (mode == 0 && opts && opts->multi_select) ? MKGUI_LISTVIEW_MULTI_SELECT : 0;
-	char *confirm_label = (mode == 0) ? "Open" : "Save";
-	char *title = (mode == 0) ? "Open File" : "Save File";
+	char *confirm_label = "Open";
+	char *title = "Open File";
+	if(mode == 1) {
+		confirm_label = "Save";
+		title = "Save File";
+	} else if(mode == 2) {
+		confirm_label = "Select";
+		title = "Select Folder";
+	}
 
-	uint32_t has_filters = (fd->filter_count > 0) ? 0 : MKGUI_HIDDEN;
+	// Folder-pick mode has no filename to type and no extension filter, so hide
+	// the whole name/filter row; MKGUI_HIDDEN collapses it out of the layout.
+	uint32_t name_row_hidden = (mode == 2) ? MKGUI_HIDDEN : 0;
+	uint32_t has_filters = (fd->filter_count > 0 && mode != 2) ? 0 : MKGUI_HIDDEN;
 
 	struct mkgui_widget widgets[] = {
 		MKGUI_W(MKGUI_WINDOW,   FD_ID_WINDOW,        "",              "",             0,                  FD_INIT_W, FD_INIT_H, 0, 0, 0),
@@ -1126,7 +1157,7 @@ static uint32_t fd_run_dialog(struct mkgui_window *win, uint32_t mode, const str
 		MKGUI_W(MKGUI_LISTVIEW, FD_ID_BOOKMARKS,      "",              "",             FD_ID_SPLIT,        0, 0, MKGUI_REGION_LEFT, 0, 0),
 		MKGUI_W(MKGUI_LISTVIEW, FD_ID_FILES,          "",              "",             FD_ID_SPLIT,        0, 0, MKGUI_REGION_RIGHT, multi | MKGUI_LISTVIEW_EDITABLE, 0),
 
-		MKGUI_W(MKGUI_HBOX,     FD_ID_NAME_HBOX,      "",              "",             FD_ID_CONTENT_VBOX, 0, 24, MKGUI_FIXED, 0, 0),
+		MKGUI_W(MKGUI_HBOX,     FD_ID_NAME_HBOX,      "",              "",             FD_ID_CONTENT_VBOX, 0, 24, MKGUI_FIXED | name_row_hidden, 0, 0),
 		MKGUI_W(MKGUI_LABEL,    FD_ID_NAME_LABEL,     "File name:",    "",             FD_ID_NAME_HBOX,    80, 0, MKGUI_FIXED, 0, 0),
 		MKGUI_W(MKGUI_INPUT,    FD_ID_NAME_INPUT,     "",              "",             FD_ID_NAME_HBOX,    0, 0, 0, 0, 1),
 		MKGUI_W(MKGUI_LABEL,    FD_ID_FILTER_LABEL,   "Filter:",       "",             FD_ID_NAME_HBOX,    50, 0, MKGUI_FIXED | has_filters, 0, 0),
@@ -1434,6 +1465,12 @@ MKGUI_API uint32_t mkgui_dialog_open(struct mkgui_window *win, const struct mkgu
 MKGUI_API uint32_t mkgui_dialog_save(struct mkgui_window *win, const struct mkgui_file_dialog_opts *opts) {
 	MKGUI_CHECK_VAL(win, 0);
 	return fd_run_dialog(win, 1, opts);
+}
+
+// [=]===^=[ mkgui_dialog_folder ]==================================[=]
+MKGUI_API uint32_t mkgui_dialog_folder(struct mkgui_window *win, const struct mkgui_file_dialog_opts *opts) {
+	MKGUI_CHECK_VAL(win, 0);
+	return fd_run_dialog(win, 2, opts);
 }
 
 // [=]===^=[ mkgui_dialog_get_path ]==================================[=]
