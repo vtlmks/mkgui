@@ -1324,6 +1324,65 @@ static void test_timer_wakes_idle_on_transient_window(void) {
 	TEST_END();
 }
 
+static uint32_t self_close_fired;
+static void self_close_timer_cb(struct mkgui_window *win, uint32_t timer_id, void *userdata) {
+	(void)timer_id; (void)userdata;
+	self_close_fired = 1;
+	// The window closes itself from inside its own timer callback. With the
+	// deferred-destroy contract this only flags it; an inline free here would
+	// leave the timer loop (mkgui.c timer walk) iterating freed memory.
+	mkgui_window_close(win);
+}
+
+// [=]===^=[ test_window_self_close_from_timer ]===================[=]
+// Regression: a window must be able to destroy itself from its own callback.
+// mkgui_window_close flags for deferred destroy; mkgui_ctx_reap_closed frees it
+// later, outside any poll. Run this under AddressSanitizer -- an inline destroy
+// in the callback would be a use-after-free the moment the timer loop resumes.
+static void test_window_self_close_from_timer(void) {
+	TEST_BEGIN("window: self-close from own timer callback is safe (deferred)");
+	enum { PWIN = 1, PLBL = 2, TWIN = 3, TLBL = 4 };
+	struct mkgui_widget pw[] = {
+		MKGUI_W(MKGUI_WINDOW, PWIN, "Primary",   "", 0,    300, 200, 0, 0, 0),
+		MKGUI_W(MKGUI_LABEL,  PLBL, "P",         "", PWIN, 0, 0, 0, 0, 0),
+	};
+	struct mkgui_widget tw[] = {
+		MKGUI_W(MKGUI_WINDOW, TWIN, "Transient", "", 0,    200, 120, 0, 0, 0),
+		MKGUI_W(MKGUI_LABEL,  TLBL, "T",         "", TWIN, 0, 0, 0, 0, 0),
+	};
+	struct mkgui_ctx *ctx = mkgui_ctx_create();
+	struct mkgui_window *primary = mkgui_window_create(ctx, NULL, pw, 2, NULL, 0, 0);
+	struct mkgui_window *transient = mkgui_window_create(ctx, primary, tw, 2, NULL, 0, 0);
+	CHECK(primary && transient, "window creation failed");
+	if(primary && transient) {
+		CHECK(ctx->window_count == 2, "expected two windows on the ctx");
+		self_close_fired = 0;
+		uint32_t tid = mkgui_window_add_timer(transient, 5000000, self_close_timer_cb, NULL);
+		CHECK(tid != 0, "timer creation failed");
+
+		// Host-owned loop: poll every live window (which fires the transient's
+		// timer -> it closes itself), then reap outside the poll.
+		struct mkgui_event ev;
+		uint32_t iter = 0;
+		while(ctx->window_count > 1 && iter < 400) {
+			for(uint32_t i = 0; i < ctx->window_count; ++i) {
+				while(mkgui_window_poll(ctx->windows[i], &ev)) {
+				}
+			}
+			mkgui_ctx_reap_closed(ctx);
+			struct timespec s = {0, 2000000};
+			nanosleep(&s, NULL);
+			++iter;
+		}
+
+		CHECK(self_close_fired, "timer callback never fired");
+		CHECK(ctx->window_count == 1, "self-closed window was not reaped");
+		CHECK(ctx->windows[0] == primary, "primary window did not survive the reap");
+	}
+	mkgui_ctx_destroy(ctx);
+	TEST_END();
+}
+
 // ---------------------------------------------------------------------------
 // Context menu item selection
 // ---------------------------------------------------------------------------
@@ -2005,6 +2064,7 @@ int main(void) {
 	test_datepicker_changed();
 	test_timer_event();
 	test_timer_wakes_idle_on_transient_window();
+	test_window_self_close_from_timer();
 	test_context_menu_event();
 	test_gridview_keyboard_select();
 	test_gridview_check();

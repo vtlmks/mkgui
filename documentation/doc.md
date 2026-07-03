@@ -477,12 +477,16 @@ uint32_t mkgui_ctx_should_quit(struct mkgui_ctx *ctx);
 void mkgui_ctx_wait(struct mkgui_ctx *ctx);
 void mkgui_ctx_wait_until(struct mkgui_ctx *ctx, uint64_t deadline_ns);
 void mkgui_ctx_pump_others(struct mkgui_ctx *ctx);
+void mkgui_ctx_reap_closed(struct mkgui_ctx *ctx);
 uint32_t mkgui_window_poll(struct mkgui_window *win, struct mkgui_event *ev);
 uint64_t mkgui_now_ns(void);
 
 // Per-window close flag (default: X close button auto-sets this; app can clear)
 void mkgui_window_set_close(struct mkgui_window *win, uint32_t value);
 uint32_t mkgui_window_should_close(struct mkgui_window *win);
+
+// Deferred self-destroy (safe to call from a window's own callback)
+void mkgui_window_close(struct mkgui_window *win);
 
 // Window operations
 void mkgui_window_show(struct mkgui_window *win);
@@ -508,7 +512,9 @@ void mkgui_window_remove_timer(struct mkgui_window *win, uint32_t timer_id);
 
 `mkgui_window_create` creates a window on the ctx. Pass `parent=NULL` for top-level windows, `parent=existing_window` for transient/dialog windows (sets X11 transient-for hint / Win32 owner). `title=NULL` and `w=h=0` make the window inherit those values from the `MKGUI_WINDOW` widget in `widgets[]`.
 
-`mkgui_window_destroy` destroys a window. Each window created via `mkgui_window_create` must be destroyed; destroying a window does not destroy its ctx.
+`mkgui_window_destroy` destroys a window immediately and synchronously (it frees the window, so the pointer is dangling on return). Each window created via `mkgui_window_create` must be destroyed; destroying a window does not destroy its ctx. **Never call it on a window from inside that window's own event or timer callback** -- the poll/timer loop is still iterating the window and would touch freed memory. Use `mkgui_window_close` for that.
+
+`mkgui_window_close` requests *deferred* destruction: it only flags the window, so it is safe to call from anywhere, including the window's own callback (e.g. a progress dialog that tears itself down when its worker finishes). The window is actually destroyed by `mkgui_ctx_reap_closed`, which runs at a point where nothing is polling a window. `mkgui_ctx_run` calls the reaper at the top of its loop automatically; a host-owned loop must call `mkgui_ctx_reap_closed(ctx)` itself once per iteration, outside its poll calls. Closing the primary window ends `mkgui_ctx_run` (like `should_close`); the primary is freed by `mkgui_ctx_destroy`, never reaped mid-loop.
 
 `mkgui_window_set_title` changes the window title bar text at runtime. Does not trigger a widget redraw.
 

@@ -551,11 +551,22 @@ MKGUI_API void mkgui_ctx_quit(struct mkgui_ctx *ctx);
 MKGUI_API void mkgui_ctx_set_quit(struct mkgui_ctx *ctx, uint32_t value);
 MKGUI_API void mkgui_ctx_pump_others(struct mkgui_ctx *ctx);
 
+// Destroy every non-primary window flagged by mkgui_window_close, at a point
+// where nothing is polling a window. mkgui_ctx_run calls this at the top of its
+// loop; host-owned loops call it once per iteration outside their polls.
+MKGUI_API void mkgui_ctx_reap_closed(struct mkgui_ctx *ctx);
+
 // Per-window close flag. Default behavior on X close button auto-sets to 1.
 // App can cancel by calling mkgui_window_set_close(win, 0) from the
 // MKGUI_EVENT_CLOSE handler.
 MKGUI_API void mkgui_window_set_close(struct mkgui_window *win, uint32_t value);
 MKGUI_API uint32_t mkgui_window_should_close(struct mkgui_window *win);
+
+// Request deferred destruction of a window. Safe to call from inside the
+// window's own event or timer callback (unlike mkgui_window_destroy, which
+// frees immediately). The window is destroyed later by mkgui_ctx_reap_closed.
+// Flagging the primary window ends mkgui_ctx_run.
+MKGUI_API void mkgui_window_close(struct mkgui_window *win);
 
 // Host-owned main loop. The host calls mkgui_window_poll() to drain queued
 // events from a specific window (non-blocking) and mkgui_ctx_wait_until()

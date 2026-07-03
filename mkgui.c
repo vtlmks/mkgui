@@ -928,6 +928,7 @@ struct mkgui_window {
 #endif
 	uint32_t anim_active;
 	uint32_t should_close;
+	uint32_t destroy_pending;
 	uint32_t window_visible;
 	uint32_t hide_on_close;
 	uint32_t undecorated;
@@ -8872,6 +8873,11 @@ MKGUI_API void mkgui_ctx_run(struct mkgui_ctx *ctx, mkgui_event_cb cb, void *use
 	MKGUI_CHECK(ctx);
 	struct mkgui_window *primary = ctx->primary;
 	for(;;) {
+		// Reap windows that closed themselves last iteration, before any poll
+		// walks the registry -- this is the only safe point to free a window
+		// that self-destroyed from its own callback.
+		mkgui_ctx_reap_closed(ctx);
+
 		uint32_t any_visible = 0;
 		for(uint32_t i = 0; i < g_ctx->window_count; ++i) {
 			if(g_ctx->windows[i]->window_visible) {
@@ -8879,7 +8885,7 @@ MKGUI_API void mkgui_ctx_run(struct mkgui_ctx *ctx, mkgui_event_cb cb, void *use
 				break;
 			}
 		}
-		if(ctx->should_quit || (primary && primary->should_close) || !any_visible) {
+		if(ctx->should_quit || (primary && (primary->should_close || primary->destroy_pending)) || !any_visible) {
 			break;
 		}
 
@@ -8893,7 +8899,7 @@ MKGUI_API void mkgui_ctx_run(struct mkgui_ctx *ctx, mkgui_event_cb cb, void *use
 		}
 		for(uint32_t i = 0; i < g_ctx->window_count; ++i) {
 			struct mkgui_window *c = g_ctx->windows[i];
-			if(c == primary || c->should_close || !c->event_cb) {
+			if(c == primary || c->should_close || c->destroy_pending || !c->event_cb) {
 				continue;
 			}
 			while(mkgui_window_poll(c, &ev)) {
@@ -8908,7 +8914,7 @@ MKGUI_API void mkgui_ctx_run(struct mkgui_ctx *ctx, mkgui_event_cb cb, void *use
 				break;
 			}
 		}
-		if(ctx->should_quit || (primary && primary->should_close) || !any_visible) {
+		if(ctx->should_quit || (primary && (primary->should_close || primary->destroy_pending)) || !any_visible) {
 			break;
 		}
 		mkgui_ctx_wait(ctx);
@@ -8937,11 +8943,32 @@ MKGUI_API void mkgui_ctx_pump_others(struct mkgui_ctx *ctx) {
 	struct mkgui_event ev;
 	for(uint32_t i = 0; i < ctx->window_count; ++i) {
 		struct mkgui_window *c = ctx->windows[i];
-		if(c == ctx->primary || c->should_close || !c->event_cb) {
+		if(c == ctx->primary || c->should_close || c->destroy_pending || !c->event_cb) {
 			continue;
 		}
 		while(mkgui_window_poll(c, &ev)) {
 			c->event_cb(c, &ev, c->event_cb_data);
+		}
+	}
+}
+
+// [=]===^=[ mkgui_ctx_reap_closed ]==================================[=]
+// Destroy every non-primary window flagged by mkgui_window_close. Call it
+// once per iteration at a point where nothing is polling a window (the top of
+// the loop, outside every mkgui_window_poll). mkgui_ctx_run does this itself;
+// host-owned loops must call it themselves. The primary is never reaped here --
+// closing it ends the loop and mkgui_ctx_destroy frees it.
+MKGUI_API void mkgui_ctx_reap_closed(struct mkgui_ctx *ctx) {
+	MKGUI_CHECK(ctx);
+	uint32_t i = 0;
+	while(i < ctx->window_count) {
+		struct mkgui_window *c = ctx->windows[i];
+		if(c->destroy_pending && c != ctx->primary) {
+			// mkgui_window_destroy swaps the last window into slot i and
+			// decrements the count, so re-examine slot i without advancing.
+			mkgui_window_destroy(c);
+		} else {
+			++i;
 		}
 	}
 }
@@ -8956,6 +8983,20 @@ MKGUI_API void mkgui_window_set_close(struct mkgui_window *win, uint32_t value) 
 MKGUI_API uint32_t mkgui_window_should_close(struct mkgui_window *win) {
 	MKGUI_CHECK_VAL(win, 1);
 	return win->should_close;
+}
+
+// [=]===^=[ mkgui_window_close ]======================================[=]
+// Request deferred destruction of a window. Only flags it; the actual
+// mkgui_window_destroy happens later at a point where no poll is walking the
+// window (mkgui_ctx_reap_closed, called at the top of mkgui_ctx_run's loop, or
+// by a host-owned loop). This makes it safe for a window to close itself from
+// inside its own event or timer callback -- an immediate destroy there would
+// free the window while its poll/timer loop is still iterating it. Flagging the
+// primary window ends mkgui_ctx_run (like should_close); the primary is freed by
+// mkgui_ctx_destroy, never reaped mid-loop.
+MKGUI_API void mkgui_window_close(struct mkgui_window *win) {
+	MKGUI_CHECK(win);
+	win->destroy_pending = 1;
 }
 
 // [=]===^=[ mkgui_window_show ]===================================[=]
