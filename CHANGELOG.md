@@ -2,6 +2,27 @@
 
 All notable changes to mkgui. Pre-1.0 betas may break the API between releases.
 
+## v0.4.0-beta
+
+### Added
+
+- **`mkgui_window_close` / `mkgui_ctx_reap_closed` (deferred window destroy).** `mkgui_window_close` flags a window for destruction instead of freeing it immediately, so a window can safely tear itself down from inside its own event or timer callback (`mkgui_window_destroy` there is a use-after-free -- the poll/timer loop is still walking the window). The flagged windows are reaped by `mkgui_ctx_reap_closed`, which `mkgui_ctx_run` calls at the top of its loop; host-owned loops call it once per iteration outside their polls. Closing the primary window ends `mkgui_ctx_run`.
+- **`mkgui_dialog_folder` (directory picker).** A third file-dialog mode alongside open/save: lists directories only, hides the filename/filter row, and confirms with "Select". Returns the highlighted subfolder or the folder currently being browsed when nothing is highlighted. Same `mkgui_file_dialog_opts` / `mkgui_dialog_get_path` surface as the other two.
+- **`MKGUI_TREELIST` widget (columned tree / tree-table).** A listview whose rows nest into an expandable hierarchy, with the disclosure twisty and indentation in column 0 and full listview column machinery (per-column cell types, sortable/resizable/reorderable headers, multi-select, horizontal + vertical scroll). Retained node model with stable handle-based selection that survives expand/collapse; sorting is per-parent (siblings reorder within their parent, never across parents). Set up with `mkgui_treelist_setup()` and populate with `mkgui_treelist_add()`; see `documentation/doc.md` for the full API.
+- **`GRIDVIEW_SELECT` and `LOGVIEW_LINE_CLICKED` events.** The gridview now emits a selection event and the logview a line-click event, dispatched through the same path as the other widget events.
+- **Win32 platform test harness and broader event-injection coverage.** A mingw-built, wine-run test exercises the divergent Win32 windowing and message-translation surface; the Linux event-injection suite was extended to cover every event type plus payload and negative-path cases.
+
+### Changed
+
+- **Clipboard size limit removed.** Internal selection storage no longer has the fixed 4 KB cap; it grows on demand, so copy and paste handle arbitrarily large text. The Linux backend now implements the X11 INCR protocol on both sides (owner and requestor), streaming selections that exceed a single X request in chunks; Win32 already handled arbitrary sizes via the OS clipboard.
+- **X11 framebuffer reused across resizes.** The XShm-backed framebuffer is grown in place on resize instead of being torn down and recreated, avoiding a shared-memory segment allocation on every resize step.
+
+### Fixed
+
+- **Timers on non-primary windows now fire when the loop is idle.** The idle wait only folded the primary (anchor) window's timer fds into `ppoll` (Linux) / bounded `MsgWaitForMultipleObjects` by its timers (Win32), so a timer on a transient window (e.g. a progress dialog's heartbeat) silently stopped firing once other event traffic went quiet, blocking the loop indefinitely. The wait now spans every window on the ctx, so app timers can live on whichever window owns them.
+- **Editor: the right inspector panel scrolls when its property groups overflow.**
+- **Editor: inactive-tab container outlines and their nested children are no longer drawn.**
+
 ## v0.3.0-beta
 
 ### Breaking
@@ -43,9 +64,6 @@ All notable changes to mkgui. Pre-1.0 betas may break the API between releases.
 
 ### Added
 
-- **`mkgui_window_close` / `mkgui_ctx_reap_closed` (deferred window destroy).** `mkgui_window_close` flags a window for destruction instead of freeing it immediately, so a window can safely tear itself down from inside its own event or timer callback (`mkgui_window_destroy` there is a use-after-free -- the poll/timer loop is still walking the window). The flagged windows are reaped by `mkgui_ctx_reap_closed`, which `mkgui_ctx_run` calls at the top of its loop; host-owned loops call it once per iteration outside their polls. Closing the primary window ends `mkgui_ctx_run`.
-- **`mkgui_dialog_folder` (directory picker).** A third file-dialog mode alongside open/save: lists directories only, hides the filename/filter row, and confirms with "Select". Returns the highlighted subfolder or the folder currently being browsed when nothing is highlighted. Same `mkgui_file_dialog_opts` / `mkgui_dialog_get_path` surface as the other two.
-- **`MKGUI_TREELIST` widget (columned tree / tree-table).** A listview whose rows nest into an expandable hierarchy, with the disclosure twisty and indentation in column 0 and full listview column machinery (per-column cell types, sortable/resizable/reorderable headers, multi-select, horizontal + vertical scroll). Retained node model with stable handle-based selection that survives expand/collapse; sorting is per-parent (siblings reorder within their parent, never across parents). Set up with `mkgui_treelist_setup()` and populate with `mkgui_treelist_add()`; see `documentation/doc.md` for the full API.
 - **Host-owned main loop.** For game-style loops or custom pacing:
   - `mkgui_now_ns()` — monotonic clock in nanoseconds (`uint64_t`).
   - `mkgui_ctx_wait_until(ctx, deadline_ns)` — blocks until an event, an animation step, a tooltip/toast deadline, or the caller's absolute ns deadline, whichever fires first.
@@ -66,11 +84,6 @@ All notable changes to mkgui. Pre-1.0 betas may break the API between releases.
 - **`mkgui_ctx_set_theme` and `mkgui_ctx_set_scale` apply to all windows on the ctx.** Previously each window held its own theme/scale; new ctx-level setters iterate and update every window in the registry.
 - **`mkgui_window_create` returns `NULL` when the window registry is full** (`MKGUI_MAX_WINDOWS` = 16). Previously it would silently create an untracked window.
 - **Single nanosecond-only time API.** `mkgui_time_ms()`, `mkgui_time_us()`, and `mkgui_sleep_ms()` are gone. Use `mkgui_now_ns()` (monotonic ns, `uint64_t`) and `mkgui_sleep_ns(ns)`. Convert to other units at the call site: `(uint32_t)(mkgui_now_ns() / 1000000ull)` for ms, `(double)mkgui_now_ns() * 1e-3` for us. One time unit, one sleep function, no choice paralysis.
-- **Clipboard size limit removed.** Internal selection storage no longer has the fixed 4 KB cap; it grows on demand, so copy and paste handle arbitrarily large text. The Linux backend now implements the X11 INCR protocol on both sides (owner and requestor), streaming selections that exceed a single X request in chunks; Win32 already handled arbitrary sizes via the OS clipboard.
-
-### Fixed
-
-- **Timers on non-primary windows now fire when the loop is idle.** The idle wait only folded the primary (anchor) window's timer fds into `ppoll` (Linux) / bounded `MsgWaitForMultipleObjects` by its timers (Win32), so a timer on a transient window (e.g. a progress dialog's heartbeat) silently stopped firing once other event traffic went quiet, blocking the loop indefinitely. The wait now spans every window on the ctx, so app timers can live on whichever window owns them.
 
 ### Migration
 
