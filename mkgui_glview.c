@@ -27,7 +27,7 @@ static void glview_sync_all(struct mkgui_window *win) {
 		uint32_t vis = widget_visible(win, (uint32_t)idx);
 		if(vis != gv->visible) {
 			gv->visible = vis;
-			platform_glview_show(win, gv, vis);
+			mkwin_glview_show(gv->mkwin,vis);
 		}
 
 		if(!vis) {
@@ -60,7 +60,7 @@ static void glview_sync_all(struct mkgui_window *win) {
 			gv->last_y = ry;
 			gv->last_w = rw;
 			gv->last_h = rh;
-			platform_glview_reposition(win, gv, rx, ry, rw, rh);
+			mkwin_glview_reposition(gv->mkwin, rx, ry, rw, rh);
 		}
 	}
 }
@@ -126,7 +126,8 @@ MKGUI_API uint32_t mkgui_glview_init(struct mkgui_window *win, uint32_t id) {
 		rh = 1;
 	}
 
-	if(!platform_glview_create(win, gv, rx, ry, rw, rh)) {
+	gv->mkwin = mkwin_glview_create(win->mkwin, rx, ry, rw, rh);
+	if(!gv->mkwin) {
 		return 0;
 	}
 
@@ -138,7 +139,7 @@ MKGUI_API uint32_t mkgui_glview_init(struct mkgui_window *win, uint32_t id) {
 	gv->last_h = rh;
 
 	if(!gv->visible) {
-		platform_glview_show(win, gv, 0);
+		mkwin_glview_show(gv->mkwin,0);
 	}
 
 	return 1;
@@ -151,7 +152,8 @@ MKGUI_API void mkgui_glview_destroy(struct mkgui_window *win, uint32_t id) {
 	if(!gv || !gv->created) {
 		return;
 	}
-	platform_glview_destroy(win, gv);
+	mkwin_glview_destroy(gv->mkwin);
+	gv->mkwin = NULL;
 	gv->created = 0;
 }
 
@@ -187,7 +189,7 @@ MKGUI_API HWND mkgui_glview_get_hwnd(struct mkgui_window *win, uint32_t id) {
 	if(!gv || !gv->created) {
 		return NULL;
 	}
-	return gv->plat.hwnd;
+	return (HWND)mkwin_glview_handle(gv->mkwin);
 }
 #else
 MKGUI_API Window mkgui_glview_get_x11_window(struct mkgui_window *win, uint32_t id) {
@@ -196,12 +198,12 @@ MKGUI_API Window mkgui_glview_get_x11_window(struct mkgui_window *win, uint32_t 
 	if(!gv || !gv->created) {
 		return 0;
 	}
-	return gv->plat.xwin;
+	return (Window)(uintptr_t)mkwin_glview_handle(gv->mkwin);
 }
 
 // [=]===^=[ mkgui_glview_get_x11_display ]========================[=]
 MKGUI_API Display *mkgui_glview_get_x11_display(struct mkgui_window *win) {
 	MKGUI_CHECK_VAL(win, NULL);
-	return win->plat.dpy;
+	return (Display *)mkwin_display(win->mkwin);
 }
 #endif

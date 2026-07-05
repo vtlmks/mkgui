@@ -219,7 +219,7 @@ mkgui auto-detects display DPI on startup (via Xft.dpi on Linux, GetDpiForWindow
 mkgui_ctx_set_scale(ctx, 2.0f);  // 2x scale for HiDPI displays
 ```
 
-Or set the `MKGUI_SCALE` environment variable before launching: `MKGUI_SCALE=1.5`, `MKGUI_SCALE=150%`, or `MKGUI_SCALE=144dpi`. The env var takes precedence over auto-detection.
+Or set the `MKWIN_SCALE` environment variable before launching: `MKWIN_SCALE=1.5`, `MKWIN_SCALE=150%`, or `MKWIN_SCALE=144dpi`. The env var takes precedence over auto-detection.
 
 All widgets, fonts, spacing, icons, and dialog windows scale automatically. The scale factor can be changed at runtime. Range: 0.5 to 4.0.
 

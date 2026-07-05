@@ -346,7 +346,7 @@ static void datepicker_open_popup(struct mkgui_window *win, uint32_t widget_id) 
 	}
 
 	int32_t abs_x, abs_y;
-	platform_translate_coords(win, win->rects[widx].x, win->rects[widx].y + win->rects[widx].h, &abs_x, &abs_y);
+	mkwin_translate_coords(win->mkwin, win->rects[widx].x, win->rects[widx].y + win->rects[widx].h, &abs_x, &abs_y);
 
 	int32_t cal_w = sc(win, DATEPICKER_CAL_W_PX);
 	int32_t cal_h = sc(win, DATEPICKER_HDR_H_PX) + 12 * win->row_height + sc(win, 4);
@@ -355,8 +355,8 @@ static void datepicker_open_popup(struct mkgui_window *win, uint32_t widget_id) 
 	if(p) {
 		render_datepicker_popup(win, p, dp, -1);
 		flush_text_popup(win, p);
-		platform_popup_blit(win, p);
-		platform_flush(win);
+		mkwin_popup_present(p->mkwin);
+		mkwin_flush(win->mkwin);
 	}
 }
 

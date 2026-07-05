@@ -42,7 +42,7 @@ static uint32_t tests_failed;
 // ---------------------------------------------------------------------------
 
 static void flush_x_events(struct mkgui_window *win) {
-	XSync(win->plat.dpy, True);
+	XSync(win->mkwin->dpy, True);
 }
 
 static void run_layout(struct mkgui_window *win) {
@@ -55,32 +55,32 @@ static void run_layout(struct mkgui_window *win) {
 }
 
 static void inject_press(struct mkgui_window *win, int32_t x, int32_t y, uint32_t button, uint32_t keymod) {
-	struct mkgui_plat_event pev;
+	struct mkwin_event pev;
 	memset(&pev, 0, sizeof(pev));
-	pev.type = MKGUI_PLAT_BUTTON_PRESS;
+	pev.type = MKWIN_EV_BUTTON_PRESS;
 	pev.x = x;
 	pev.y = y;
 	pev.button = button;
 	pev.keymod = keymod;
 	pev.popup_idx = -1;
-	platform_deferred_push(win, &pev);
+	mkwin_deferred_push(win->mkwin, &pev);
 }
 
 static void inject_release(struct mkgui_window *win, int32_t x, int32_t y, uint32_t button) {
-	struct mkgui_plat_event pev;
+	struct mkwin_event pev;
 	memset(&pev, 0, sizeof(pev));
-	pev.type = MKGUI_PLAT_BUTTON_RELEASE;
+	pev.type = MKWIN_EV_BUTTON_RELEASE;
 	pev.x = x;
 	pev.y = y;
 	pev.button = button;
 	pev.popup_idx = -1;
-	platform_deferred_push(win, &pev);
+	mkwin_deferred_push(win->mkwin, &pev);
 }
 
 static void inject_key(struct mkgui_window *win, uint32_t keysym, uint32_t keymod) {
-	struct mkgui_plat_event pev;
+	struct mkwin_event pev;
 	memset(&pev, 0, sizeof(pev));
-	pev.type = MKGUI_PLAT_KEY;
+	pev.type = MKWIN_EV_KEY;
 	pev.keysym = keysym;
 	pev.keymod = keymod;
 	pev.popup_idx = -1;
@@ -89,17 +89,17 @@ static void inject_key(struct mkgui_window *win, uint32_t keysym, uint32_t keymo
 		pev.text[1] = '\0';
 		pev.text_len = 1;
 	}
-	platform_deferred_push(win, &pev);
+	mkwin_deferred_push(win->mkwin, &pev);
 }
 
 static void inject_motion(struct mkgui_window *win, int32_t x, int32_t y) {
-	struct mkgui_plat_event pev;
+	struct mkwin_event pev;
 	memset(&pev, 0, sizeof(pev));
-	pev.type = MKGUI_PLAT_MOTION;
+	pev.type = MKWIN_EV_MOTION;
 	pev.x = x;
 	pev.y = y;
 	pev.popup_idx = -1;
-	platform_deferred_push(win, &pev);
+	mkwin_deferred_push(win->mkwin, &pev);
 }
 
 static void widget_center(struct mkgui_window *win, uint32_t id, int32_t *cx, int32_t *cy) {
@@ -153,7 +153,7 @@ static uint32_t poll_for_event(struct mkgui_window *win, uint32_t event_type, ui
 			found = 1;
 		}
 
-		if(!got && win->plat.deferred_head == win->plat.deferred_tail) {
+		if(!got && win->mkwin->deferred_head == win->mkwin->deferred_tail) {
 			// One more poll to catch hover/focus state changes
 			mkgui_window_poll(win, &ev);
 			if(ev.type == event_type && (target_id == 0 || ev.id == target_id)) {
@@ -737,12 +737,12 @@ static void test_split_drag_event(void) {
 		inject_motion(win, sx, sy);
 		inject_press(win, sx, sy, 1, 0);
 		poll_for_event(win, MKGUI_EVENT_NONE, 0);
-		struct mkgui_plat_event pev;
+		struct mkwin_event pev;
 		memset(&pev, 0, sizeof(pev));
-		pev.type = MKGUI_PLAT_MOTION;
+		pev.type = MKWIN_EV_MOTION;
 		pev.x = sx;
 		pev.y = sy + 20;
-		platform_deferred_push(win, &pev);
+		mkwin_deferred_push(win->mkwin, &pev);
 		inject_release(win, sx, sy + 20, 1);
 		CHECK(poll_for_event(win, MKGUI_EVENT_SPLIT_MOVED, SPLIT), "expected SPLIT_MOVED event");
 		mkgui_window_destroy(win);

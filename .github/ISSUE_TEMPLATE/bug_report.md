@@ -33,4 +33,4 @@ This is required. Pick one:
 ```
 
 **Additional context**
-Stack traces, screenshots, log output, relevant environment variables (`MKGUI_SCALE`, `MKGUI_ICON_THEME`, etc.), or anything else that helps isolate the issue.
+Stack traces, screenshots, log output, relevant environment variables (`MKWIN_SCALE`, `MKGUI_ICON_THEME`, etc.), or anything else that helps isolate the issue.

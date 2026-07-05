@@ -55,85 +55,33 @@
 #define MKGUI_GLYPH_MAX_BMP   4096
 
 // ---------------------------------------------------------------------------
-// Platform event types
+// Platform layer (mkwin): window/input/blit lives in the mkwin sibling library.
+// It provides struct mkwin_window, struct mkwin_event, MKWIN_EV_*/MKWIN_CURSOR_*
+// and the mkwin_* API used throughout this file.
+//
+// mkgui always uses mkwin's font rasterisation (text rendering) and glview
+// child-window primitive (the MKGUI_GLVIEW widget), so it enables those mkwin
+// modules here rather than making every consumer pass -DMKWIN_FONT/-DMKWIN_GLVIEW.
 // ---------------------------------------------------------------------------
 
-enum {
-	MKGUI_PLAT_NONE,
-	MKGUI_PLAT_EXPOSE,
-	MKGUI_PLAT_RESIZE,
-	MKGUI_PLAT_MOTION,
-	MKGUI_PLAT_BUTTON_PRESS,
-	MKGUI_PLAT_BUTTON_RELEASE,
-	MKGUI_PLAT_KEY,
-	MKGUI_PLAT_CLOSE,
-	MKGUI_PLAT_LEAVE,
-	MKGUI_PLAT_FOCUS_OUT,
-	MKGUI_PLAT_DROP,
-};
+#define MKWIN_FONT
+#define MKWIN_GLVIEW
 
-enum {
-	MKGUI_CURSOR_DEFAULT,
-	MKGUI_CURSOR_H_RESIZE,
-	MKGUI_CURSOR_V_RESIZE,
-};
-
-struct mkgui_plat_event {
-	uint32_t type;
-	int32_t x, y;
-	int32_t width, height;
-	uint32_t button;
-	uint32_t keysym;
-	uint32_t keymod;
-	char text[32];
-	int32_t text_len;
-	int32_t popup_idx;
-};
-
-// ---------------------------------------------------------------------------
-// Platform types
-// ---------------------------------------------------------------------------
-
+#include "mkwin.h"
 #ifdef _WIN32
-#include "platform_win32_types.h"
+#include "mkwin_types_win32.h"
 #else
-#include "platform_linux_types.h"
+#include "mkwin_types_linux.h"
 #endif
 
 // [=]===^=[ mkgui_sleep_ns ]======================================[=]
-// Sleep for the given number of nanoseconds. On Windows, ms-granular at
-// the kernel level (Sleep ceils to ms; sub-ms requires a waitable timer).
 MKGUI_API void mkgui_sleep_ns(uint64_t ns) {
-#ifdef _WIN32
-	DWORD ms = (DWORD)((ns + 999999ull) / 1000000ull);
-	Sleep(ms);
-#else
-	struct timespec ts;
-	ts.tv_sec  = (time_t)(ns / 1000000000ull);
-	ts.tv_nsec = (long)(ns % 1000000000ull);
-	nanosleep(&ts, NULL);
-#endif
+	mkwin_sleep_ns(ns);
 }
 
 // [=]===^=[ mkgui_now_ns ]========================================[=]
-// Monotonic clock in nanoseconds. Same epoch the library uses internally,
-// so host deadlines and library deadlines are commensurable.
 MKGUI_API uint64_t mkgui_now_ns(void) {
-#ifdef _WIN32
-	static int64_t freq;
-	if(!freq) {
-		QueryPerformanceFrequency((LARGE_INTEGER *)&freq);
-	}
-	int64_t now;
-	QueryPerformanceCounter((LARGE_INTEGER *)&now);
-	uint64_t q = (uint64_t)now / (uint64_t)freq;
-	uint64_t r = (uint64_t)now % (uint64_t)freq;
-	return q * 1000000000ull + (r * 1000000000ull) / (uint64_t)freq;
-#else
-	struct timespec ts;
-	clock_gettime(CLOCK_MONOTONIC, &ts);
-	return (uint64_t)ts.tv_sec * 1000000000ull + (uint64_t)ts.tv_nsec;
-#endif
+	return mkwin_now_ns();
 }
 
 // ---------------------------------------------------------------------------
@@ -539,7 +487,7 @@ struct mkgui_glview_data {
 	uint32_t created;
 	uint32_t visible;
 	int32_t last_x, last_y, last_w, last_h;
-	struct mkgui_glview_platform plat;
+	struct mkwin_glview *mkwin;
 };
 
 struct mkgui_canvas_data {
@@ -600,7 +548,7 @@ static uint8_t *glyph_atlas;
 static uint8_t glyph_staging[MKGUI_GLYPH_COUNT][MKGUI_GLYPH_MAX_BMP];
 
 struct mkgui_popup {
-	struct mkgui_popup_platform plat;
+	struct mkwin_popup *mkwin;
 	uint32_t *pixels;
 	int32_t x, y, w, h;
 	uint32_t widget_id;
@@ -777,10 +725,10 @@ struct mkgui_ctx;
 
 struct mkgui_window {
 	struct mkgui_ctx *ctx;        // back-pointer to the owning application ctx
-	struct mkgui_platform plat;
+	struct mkwin_window *mkwin;   // window/input/blit handle (mkwin library)
 
-	uint32_t *pixels;
-	int32_t win_w, win_h;
+	uint32_t *pixels;             // published by mkwin (see struct mkwin_host at create)
+	int32_t win_w, win_h;         // published by mkwin
 
 	struct mkgui_window_arenas arenas;
 
@@ -958,9 +906,7 @@ struct mkgui_window {
 	struct mkgui_accel accels[MKGUI_MAX_ACCELS];
 	uint32_t accel_count;
 
-	char *drop_files[MKGUI_DROP_MAX];
-	uint32_t drop_count;
-	uint32_t drop_enabled;
+	uint32_t drop_enabled;        // drop file storage is owned by mkwin
 
 	double perf_layout_us;
 	double perf_render_us;
@@ -2662,8 +2608,6 @@ static void layout_node(struct mkgui_window *win, uint32_t idx) {
 	lc_layout_node(win, &lc, idx);
 }
 
-static void platform_set_min_size(struct mkgui_window *win, int32_t min_w, int32_t min_h);
-static void platform_font_set_size(struct mkgui_window *win, int32_t pixel_size);
 
 // [=]===^=[ layout_min_size ]======================================[=]
 // Uses the same measure_container path the layout engine uses for
@@ -2792,7 +2736,7 @@ static void layout_compute_min_size(struct mkgui_window *win, uint32_t win_idx) 
 	}
 	min_w += win->box_pad * 2;
 	min_h += win->box_pad * 2;
-	platform_set_min_size(win, min_w, min_h);
+	mkwin_set_min_size(win->mkwin, min_w, min_h);
 }
 
 // [=]===^=[ layout_widgets ]====================================[=]
@@ -2897,10 +2841,121 @@ static void mkgui_resize_render(struct mkgui_window *win) {
 #include "mkgui_drop.c"
 
 #ifdef _WIN32
-#include "platform_win32.c"
+#include "mkwin_win32.c"
 #else
-#include "platform_linux.c"
+#include "mkwin_linux.c"
 #endif
+
+// ---------------------------------------------------------------------------
+// Font: mkwin rasterizes one glyph at a time; the atlas/staging policy is ours.
+// ---------------------------------------------------------------------------
+
+static struct mkwin_font *mkgui_font;
+
+// [=]===^=[ mkgui_font_load_glyphs ]==============================[=]
+// Pull every glyph in our range from the open mkwin font into the staging
+// buffers and metrics table, then pack the atlas. Advance-only glyphs (spaces)
+// and any that fail to render fall back to a scaled default width.
+static void mkgui_font_load_glyphs(struct mkgui_window *win) {
+	for(uint32_t c = MKGUI_GLYPH_FIRST; c <= MKGUI_GLYPH_LAST; ++c) {
+		uint32_t gi = c - MKGUI_GLYPH_FIRST;
+		struct mkgui_glyph *g = &win->glyphs[gi];
+		memset(g, 0, sizeof(*g));
+		memset(glyph_staging[gi], 0, MKGUI_GLYPH_MAX_BMP);
+
+		struct mkwin_glyph_bitmap gb;
+		if(!mkwin_font_glyph(mkgui_font, c, &gb)) {
+			g->advance = sc(win, 7);
+			continue;
+		}
+		g->width = gb.width;
+		g->height = gb.height;
+		g->bearing_x = gb.bearing_x;
+		g->bearing_y = gb.bearing_y;
+		g->advance = gb.advance ? gb.advance : sc(win, 7);
+		if(gb.coverage && gb.width > 0 && gb.height > 0) {
+			uint32_t bmp_size = (uint32_t)(gb.width * gb.height);
+			if(bmp_size > MKGUI_GLYPH_MAX_BMP) {
+				bmp_size = MKGUI_GLYPH_MAX_BMP;
+			}
+			memcpy(glyph_staging[gi], gb.coverage, bmp_size);
+		}
+	}
+	win->char_width = win->glyphs['M' - MKGUI_GLYPH_FIRST].advance;
+	if(win->char_width == 0) {
+		win->char_width = sc(win, 7);
+	}
+	glyph_atlas_build(win);
+}
+
+// [=]===^=[ mkgui_font_fallback ]=================================[=]
+static void mkgui_font_fallback(struct mkgui_window *win) {
+	win->font_ascent = sc(win, 11);
+	win->font_height = sc(win, 13);
+	win->char_width = sc(win, 7);
+}
+
+// [=]===^=[ mkgui_font_init ]=====================================[=]
+static void mkgui_font_init(struct mkgui_window *win) {
+	int32_t ascent = 0, height = 0;
+	mkgui_font = mkwin_font_open(NULL, (int32_t)(13.0f * win->scale + 0.5f), &ascent, &height);
+	if(!mkgui_font) {
+		mkgui_font_fallback(win);
+		return;
+	}
+	win->font_ascent = ascent;
+	win->font_height = height;
+	mkgui_font_load_glyphs(win);
+}
+
+// [=]===^=[ mkgui_font_set_size ]=================================[=]
+static void mkgui_font_set_size(struct mkgui_window *win, int32_t pixel_size) {
+	if(!mkgui_font) {
+		mkgui_font_fallback(win);
+		return;
+	}
+	int32_t ascent = 0, height = 0;
+	mkwin_font_set_size(mkgui_font, pixel_size, &ascent, &height);
+	win->font_ascent = ascent;
+	win->font_height = height;
+	mkgui_font_load_glyphs(win);
+}
+
+// [=]===^=[ mkgui_font_fini ]=====================================[=]
+static void mkgui_font_fini(struct mkgui_window *win) {
+	(void)win;
+	mkwin_font_close(mkgui_font);
+	mkgui_font = NULL;
+}
+
+// [=]===^=[ mkgui_modal_frame ]===================================[=]
+// mkwin fires this each frame of a platform modal move/resize loop (Win32),
+// when our own event loop is suspended: advance animation, service timers, and
+// repaint so the UI stays live while the window is being dragged/resized.
+static void mkgui_modal_frame(struct mkwin_window *mkwin_win, void *user) {
+	(void)mkwin_win;
+	struct mkgui_window *win = (struct mkgui_window *)user;
+#ifdef _WIN32
+	int64_t now;
+	QueryPerformanceCounter((LARGE_INTEGER *)&now);
+	double dt = (double)(now - win->anim_prev) / (double)win->perf_freq;
+	win->anim_prev = now;
+	win->anim_time += dt;
+	for(uint32_t ti = 0; ti < win->timer_count; ++ti) {
+		struct mkgui_timer *t = &win->timers[ti];
+		if(t->active && t->handle && WaitForSingleObject(t->handle, 0) == WAIT_OBJECT_0) {
+			++t->fire_count;
+			LARGE_INTEGER next;
+			next.QuadPart = t->epoch.QuadPart + (int64_t)(t->fire_count * (t->interval_ns / 100));
+			SetWaitableTimer(t->handle, &next, 0, NULL, NULL, FALSE);
+			if(t->cb) {
+				t->cb(win, t->id, t->userdata);
+			}
+		}
+	}
+#endif
+	mkgui_resize_render(win);
+}
 
 // [=]===^=[ mkgui_drop_enable ]=================================[=]
 MKGUI_API void mkgui_drop_enable(struct mkgui_window *win) {
@@ -2909,7 +2964,7 @@ MKGUI_API void mkgui_drop_enable(struct mkgui_window *win) {
 		return;
 	}
 	win->drop_enabled = 1;
-	platform_drop_enable(win);
+	mkwin_drop_enable(win->mkwin);
 }
 
 // ---------------------------------------------------------------------------
@@ -2924,9 +2979,11 @@ static struct mkgui_popup *popup_create(struct mkgui_window *win, int32_t x, int
 	struct mkgui_popup *p = &win->popups[win->popup_count];
 	memset(p, 0, sizeof(*p));
 
-	if(!platform_popup_init(win, p, x, y, w, h)) {
+	p->mkwin = mkwin_popup_open(win->mkwin, x, y, w, h);
+	if(!p->mkwin) {
 		return NULL;
 	}
+	p->pixels = mkwin_popup_framebuffer(p->mkwin);
 
 	p->x = x;
 	p->y = y;
@@ -2947,7 +3004,8 @@ static void popup_destroy(struct mkgui_window *win, uint32_t popup_idx) {
 		return;
 	}
 	struct mkgui_popup *p = &win->popups[popup_idx];
-	platform_popup_fini(win, p);
+	mkwin_popup_close(p->mkwin);
+	p->mkwin = NULL;
 	p->active = 0;
 
 	for(uint32_t i = popup_idx; i < win->popup_count - 1; ++i) {
@@ -4105,7 +4163,7 @@ static void mkgui_remove_aux_(struct mkgui_window *win, uint32_t id, uint32_t ty
 			for(uint32_t i = 0; i < win->glview_count; ++i) {
 				if(win->glviews[i].id == id) {
 					if(win->glviews[i].created) {
-						platform_glview_destroy(win, &win->glviews[i]);
+						mkwin_glview_destroy(win->glviews[i].mkwin);
 					}
 
 					if(i < win->glview_count - 1) {
@@ -4499,36 +4557,39 @@ MKGUI_API struct mkgui_window *mkgui_window_create(struct mkgui_ctx *ctx, struct
 	win->scale = share_from ? share_from->scale : ctx->scale;
 	mkgui_recompute_metrics(win);
 
-	uint32_t plat_ok;
-	if(share_from) {
-		int32_t sw = parent ? sc(win, init_w) : init_w;
-		int32_t sh = parent ? sc(win, init_h) : init_h;
-		plat_ok = platform_init_child(win, share_from, parent, use_title, sw, sh, window_style);
-	} else {
-		// Copy ctx's app_class onto the window so platform_init can read it
-		// from the conventional place; mkgui_ctx_set_app_class keeps the two
-		// in sync.
-		snprintf(win->app_class, sizeof(win->app_class), "%s", ctx->app_class);
-		plat_ok = platform_init(win, use_title, init_w, init_h, window_style);
-	}
-	if(!plat_ok) {
+	// Child windows are created at the parent's DPI-scaled pixel size; a
+	// top-level uses the requested size and lets scale detection resize it.
+	// mkwin opens (or shares) the display internally keyed on parent.
+	snprintf(win->app_class, sizeof(win->app_class), "%s", ctx->app_class);
+	int32_t init_ww = parent ? sc(win, init_w) : init_w;
+	int32_t init_hh = parent ? sc(win, init_h) : init_h;
+	// mkwin owns pixels/win_w/win_h and publishes them into these fields; scale
+	// stays ours (out_scale NULL) so child windows keep the parent's scale.
+	struct mkwin_host host;
+	host.out_fb = &win->pixels;
+	host.out_w = &win->win_w;
+	host.out_h = &win->win_h;
+	host.out_scale = NULL;
+	win->mkwin = mkwin_open(parent ? parent->mkwin : NULL, use_title, init_ww, init_hh, window_style, win->app_class, &host);
+	if(!win->mkwin) {
 		mkgui_free_arrays(win);
 		free(win);
 		return NULL;
 	}
+	mkwin_set_modal_frame_cb(win->mkwin, mkgui_modal_frame, win);
 
 	win->hide_on_close = (window_style & MKGUI_WINDOW_HIDE_ON_CLOSE) ? 1 : 0;
 	win->undecorated   = (window_style & MKGUI_WINDOW_UNDECORATED) ? 1 : 0;
 	win->canvas_window = (window_style & MKGUI_WINDOW_CANVAS) ? 1 : 0;
 
 	if(!share_from) {
-		float detected = platform_detect_scale(win);
+		float detected = mkwin_scale(win->mkwin);
 		if(detected > 1.01f) {
 			win->scale = detected;
 			mkgui_recompute_metrics(win);
 			int32_t new_w = (int32_t)(init_w * detected + 0.5f);
 			int32_t new_h = (int32_t)(init_h * detected + 0.5f);
-			platform_resize_window(win, new_w, new_h);
+			mkwin_resize(win->mkwin, new_w, new_h);
 		}
 	}
 
@@ -4541,8 +4602,7 @@ MKGUI_API struct mkgui_window *mkgui_window_create(struct mkgui_ctx *ctx, struct
 		if(!text_cmd_arena.base) {
 			if(!text_cmd_init()) {
 				mkgui_free_arrays(win);
-				platform_window_destroy(win);
-				platform_ctx_destroy(win);
+				mkwin_destroy(win->mkwin);
 				free(win);
 				return NULL;
 			}
@@ -4550,12 +4610,11 @@ MKGUI_API struct mkgui_window *mkgui_window_create(struct mkgui_ctx *ctx, struct
 
 		if(!layout_arena_init()) {
 			mkgui_free_arrays(win);
-			platform_window_destroy(win);
-			platform_ctx_destroy(win);
+			mkwin_destroy(win->mkwin);
 			free(win);
 			return NULL;
 		}
-		platform_font_init(win);
+		mkgui_font_init(win);
 		mkgui_icon_init();
 	} else {
 		memcpy(win->glyphs, share_from->glyphs, sizeof(win->glyphs));
@@ -4587,7 +4646,7 @@ MKGUI_API struct mkgui_window *mkgui_window_create(struct mkgui_ctx *ctx, struct
 	}
 
 	if(!(window_style & MKGUI_WINDOW_HIDDEN)) {
-		platform_window_map(win);
+		mkwin_map(win->mkwin);
 		win->window_visible = 1;
 	}
 
@@ -4605,7 +4664,7 @@ MKGUI_API void mkgui_ctx_set_app_class(struct mkgui_ctx *ctx, const char *app_cl
 	for(uint32_t i = 0; i < ctx->window_count; ++i) {
 		struct mkgui_window *win = ctx->windows[i];
 		snprintf(win->app_class, sizeof(win->app_class), "%s", app_class);
-		platform_set_class_hint(&win->plat, win->plat.is_child ? "dialog" : "main", win->app_class);
+		mkwin_set_class_hint(win->mkwin, mkwin_is_child(win->mkwin) ? "dialog" : "main", win->app_class);
 	}
 }
 
@@ -4615,11 +4674,7 @@ MKGUI_API void mkgui_window_set_title(struct mkgui_window *win, const char *titl
 	if(!title) {
 		title = "";
 	}
-#ifdef _WIN32
-	SetWindowTextA(win->plat.hwnd, title);
-#else
-	XStoreName(win->plat.dpy, win->plat.win, title);
-#endif
+	mkwin_set_title(win->mkwin, title);
 }
 
 // [=]===^=[ mkgui_window_set_instance ]============================[=]
@@ -4632,7 +4687,7 @@ MKGUI_API void mkgui_window_set_instance(struct mkgui_window *win, const char *i
 	} else if(win->parent && win->parent->app_class[0]) {
 		cls = win->parent->app_class;
 	}
-	platform_set_class_hint(&win->plat, instance, cls);
+	mkwin_set_class_hint(win->mkwin, instance, cls);
 }
 
 // [=]===^=[ mkgui_window_set_icon ]================================[=]
@@ -4642,7 +4697,9 @@ MKGUI_API void mkgui_window_set_icon(struct mkgui_window *win, const struct mkgu
 	if(count == 0) {
 		return;
 	}
-	platform_set_window_icon(&win->plat, sizes, count);
+	// struct mkgui_icon_size and struct mkwin_icon_size are layout-identical
+	// ({pixels, w, h}); the public mkgui type can't name the mkwin one.
+	mkwin_set_icon(win->mkwin, (const struct mkwin_icon_size *)sizes, count);
 }
 
 // [=]===^=[ mkgui_ctx_set_theme ]====================================[=]
@@ -4676,7 +4733,7 @@ MKGUI_API void mkgui_ctx_set_scale(struct mkgui_ctx *ctx, float scale) {
 		float old_scale = win->scale > 0.0f ? win->scale : 1.0f;
 		win->scale = scale;
 		mkgui_recompute_metrics(win);
-		platform_font_set_size(win, (int32_t)(13.0f * scale + 0.5f));
+		mkgui_font_set_size(win, (int32_t)(13.0f * scale + 0.5f));
 		svg_rerasterize_all(win, scale / old_scale);
 		dirty_all(win);
 	}
@@ -4908,7 +4965,6 @@ MKGUI_API void mkgui_window_destroy(struct mkgui_window *win) {
 		return;
 	}
 	struct mkgui_ctx *ctx = win->ctx;
-	drop_free(win);
 	for(uint32_t i = 0; i < ctx->window_count; ++i) {
 		if(ctx->windows[i] == win) {
 			ctx->windows[i] = ctx->windows[--ctx->window_count];
@@ -4946,7 +5002,7 @@ MKGUI_API void mkgui_window_destroy(struct mkgui_window *win) {
 	free(win->clip_text);
 	for(uint32_t i = 0; i < win->glview_count; ++i) {
 		if(win->glviews[i].created) {
-			platform_glview_destroy(win, &win->glviews[i]);
+			mkwin_glview_destroy(win->glviews[i].mkwin);
 		}
 	}
 	for(uint32_t i = 0; i < win->timer_count; ++i) {
@@ -4957,23 +5013,23 @@ MKGUI_API void mkgui_window_destroy(struct mkgui_window *win) {
 		}
 #else
 		if(win->timers[i].fd >= 0) {
+			mkwin_wait_fd_remove(win->timers[i].fd);
 			close(win->timers[i].fd);
 		}
 #endif
 	}
 	win->timer_count = 0;
 	mkgui_free_arrays(win);
-	platform_window_destroy(win);
-	// Last window on this ctx: tear down ctx-shared resources (font lib,
-	// SVG arenas, text-cmd arena, layout arenas, platform display/IM).
-	// Order independent of which window was created first.
+	// Last window on this ctx: tear down ctx-shared resources (font, SVG arenas,
+	// text-cmd arena, layout arenas). mkwin_destroy then does per-window teardown
+	// and, when this is the last mkwin window, closes the shared display/IM.
 	if(ctx->window_count == 0) {
-		platform_font_fini(win);
+		mkgui_font_fini(win);
 		svg_cleanup();
 		text_cmd_fini();
 		layout_arena_fini();
-		platform_ctx_destroy(win);
 	}
+	mkwin_destroy(win->mkwin);
 	free(win);
 }
 
@@ -5000,18 +5056,9 @@ MKGUI_API void mkgui_ctx_destroy(struct mkgui_ctx *ctx) {
 
 // [=]===^=[ mkgui_resize_render_impl ]=============================[=]
 static void mkgui_resize_render_impl(struct mkgui_window *win) {
-#ifdef _WIN32
-	RECT rc;
-	GetClientRect(win->plat.hwnd, &rc);
-	int32_t nw = rc.right - rc.left;
-	int32_t nh = rc.bottom - rc.top;
-	if(nw > 0 && nh > 0 && (nw != win->win_w || nh != win->win_h)) {
-		win->win_w = nw;
-		win->win_h = nh;
-		platform_fb_resize(win);
-		dirty_all(win);
-	}
-#endif
+	// mkwin already resized its framebuffer and published win_w/win_h on WM_SIZE;
+	// we just repaint at the current size for live-resize feedback.
+	dirty_all(win);
 	mkgui_flush(win);
 }
 
@@ -5150,31 +5197,25 @@ MKGUI_API uint32_t mkgui_window_poll(struct mkgui_window *win, struct mkgui_even
 		}
 	}
 
-	while(platform_pending(win)) {
-		struct mkgui_plat_event pev;
-		platform_next_event(win, &pev);
-
+	struct mkwin_event pev;
+	while(mkwin_poll(win->mkwin, &pev)) {
 		int32_t popup_idx = pev.popup_idx;
 
 		switch(pev.type) {
 			// -=[ EXPOSE ]=-
-			case MKGUI_PLAT_EXPOSE: {
+			case MKWIN_EV_EXPOSE: {
 				dirty_all(win);
 			} break;
 
 			// -=[ RESIZE ]=-
-			case MKGUI_PLAT_RESIZE: {
-				if(pev.width != win->win_w || pev.height != win->win_h) {
-					win->win_w = pev.width;
-					win->win_h = pev.height;
-					platform_fb_resize(win);
-					dirty_all(win);
-					ev->type = MKGUI_EVENT_RESIZE;
-				}
+			// mkwin already resized its framebuffer and published win_w/win_h.
+			case MKWIN_EV_RESIZE: {
+				dirty_all(win);
+				ev->type = MKGUI_EVENT_RESIZE;
 			} break;
 
 			// -=[ MOUSE MOVE ]=-
-			case MKGUI_PLAT_MOTION: {
+			case MKWIN_EV_MOTION: {
 				// popups are separate platform windows with independent hover
 				// tracking; a motion event targets either a popup or the main
 				// window, never both, so handle popup motion and break early
@@ -5810,39 +5851,39 @@ MKGUI_API uint32_t mkgui_window_poll(struct mkgui_window *win, struct mkgui_even
 					}
 				}
 
-				uint32_t cursor_type = MKGUI_CURSOR_DEFAULT;
+				uint32_t cursor_type = MKWIN_CURSOR_DEFAULT;
 				if(win->press_id) {
 					struct mkgui_widget *pw = find_widget(win, win->press_id);
 					if(pw) {
 						if(pw->type == MKGUI_HSPLIT) {
-							cursor_type = MKGUI_CURSOR_V_RESIZE;
+							cursor_type = MKWIN_CURSOR_V_RESIZE;
 						} else if(pw->type == MKGUI_VSPLIT) {
-							cursor_type = MKGUI_CURSOR_H_RESIZE;
+							cursor_type = MKWIN_CURSOR_H_RESIZE;
 						}
 					}
 				}
 
-				if(cursor_type == MKGUI_CURSOR_DEFAULT && hi >= 0) {
+				if(cursor_type == MKWIN_CURSOR_DEFAULT && hi >= 0) {
 					uint32_t htype = win->widgets[hi].type;
 					if(htype == MKGUI_HSPLIT) {
-						cursor_type = MKGUI_CURSOR_V_RESIZE;
+						cursor_type = MKWIN_CURSOR_V_RESIZE;
 					} else if(htype == MKGUI_VSPLIT) {
-						cursor_type = MKGUI_CURSOR_H_RESIZE;
+						cursor_type = MKWIN_CURSOR_H_RESIZE;
 					} else if(htype == MKGUI_LISTVIEW) {
 						if(listview_divider_hit(win, (uint32_t)hi, win->mouse_x, win->mouse_y) >= 0) {
-							cursor_type = MKGUI_CURSOR_H_RESIZE;
+							cursor_type = MKWIN_CURSOR_H_RESIZE;
 						}
 					} else if(htype == MKGUI_TREELIST) {
 						if(treelist_divider_hit(win, (uint32_t)hi, win->mouse_x, win->mouse_y) >= 0) {
-							cursor_type = MKGUI_CURSOR_H_RESIZE;
+							cursor_type = MKWIN_CURSOR_H_RESIZE;
 						}
 					} else if(htype == MKGUI_GRIDVIEW) {
 						if(gridview_divider_hit(win, (uint32_t)hi, win->mouse_x, win->mouse_y) >= 0) {
-							cursor_type = MKGUI_CURSOR_H_RESIZE;
+							cursor_type = MKWIN_CURSOR_H_RESIZE;
 						}
 					}
 				}
-				platform_set_cursor(win, cursor_type);
+				mkwin_set_cursor(win->mkwin, cursor_type);
 
 				if(win->popup_count > 0 && hi >= 0 && win->widgets[hi].type == MKGUI_MENUITEM) {
 					struct mkgui_widget *mw = &win->widgets[hi];
@@ -5856,7 +5897,7 @@ MKGUI_API uint32_t mkgui_window_poll(struct mkgui_window *win, struct mkgui_even
 			} break;
 
 			// -=[ BUTTON PRESS ]=-
-			case MKGUI_PLAT_BUTTON_PRESS: {
+			case MKWIN_EV_BUTTON_PRESS: {
 				// Toast and banner clicks dismiss the notification without
 				// reaching the underlying widget. Only left-click.
 				if(pev.button == 1 && popup_idx < 0 && notify_handle_click(win, win->mouse_x, win->mouse_y)) {
@@ -7488,7 +7529,7 @@ MKGUI_API uint32_t mkgui_window_poll(struct mkgui_window *win, struct mkgui_even
 			} break;
 
 			// -=[ BUTTON RELEASE ]=-
-			case MKGUI_PLAT_BUTTON_RELEASE: {
+			case MKWIN_EV_BUTTON_RELEASE: {
 				// buttons 4+ are scroll wheel; their "release" is meaningless
 				// and must not trigger drag completion or click logic
 				if(pev.button >= 4) {
@@ -7812,7 +7853,7 @@ MKGUI_API uint32_t mkgui_window_poll(struct mkgui_window *win, struct mkgui_even
 			} break;
 
 			// -=[ KEY ]=-
-			case MKGUI_PLAT_KEY: {
+			case MKWIN_EV_KEY: {
 				uint32_t ks = pev.keysym;
 
 				if(win->popup_count > 0 && win->popups[win->popup_count - 1].widget_id == MKGUI_CTXMENU_POPUP_ID) {
@@ -8027,9 +8068,9 @@ MKGUI_API uint32_t mkgui_window_poll(struct mkgui_window *win, struct mkgui_even
 								if(input_has_selection(inp)) {
 									uint32_t lo, hi;
 									input_sel_range(inp, &lo, &hi);
-									platform_clipboard_set(win, inp->text + lo, hi - lo);
+									mkwin_clipboard_set(win->mkwin, inp->text + lo, hi - lo);
 								} else {
-									platform_clipboard_set(win, inp->text, (uint32_t)strlen(inp->text));
+									mkwin_clipboard_set(win->mkwin, inp->text, (uint32_t)strlen(inp->text));
 								}
 							}
 
@@ -8039,9 +8080,9 @@ MKGUI_API uint32_t mkgui_window_poll(struct mkgui_window *win, struct mkgui_even
 								if(textarea_has_selection(ta)) {
 									uint32_t lo, hi;
 									textarea_sel_range(ta, &lo, &hi);
-									platform_clipboard_set(win, ta->text + lo, hi - lo);
+									mkwin_clipboard_set(win->mkwin, ta->text + lo, hi - lo);
 								} else {
-									platform_clipboard_set(win, ta->text, ta->text_len);
+									mkwin_clipboard_set(win->mkwin, ta->text, ta->text_len);
 								}
 							}
 
@@ -8063,7 +8104,7 @@ MKGUI_API uint32_t mkgui_window_poll(struct mkgui_window *win, struct mkgui_even
 									char *buf = (char *)malloc(total + 1);
 									if(buf) {
 										uint32_t written = mkgui_logview_get_selection_text(win, win->focus_id, buf, total + 1);
-										platform_clipboard_set(win, buf, written);
+										mkwin_clipboard_set(win->mkwin, buf, written);
 										free(buf);
 									}
 								}
@@ -8075,9 +8116,9 @@ MKGUI_API uint32_t mkgui_window_poll(struct mkgui_window *win, struct mkgui_even
 								if(pb->edit_sel_start != pb->edit_sel_end) {
 									uint32_t lo = pb->edit_sel_start < pb->edit_sel_end ? pb->edit_sel_start : pb->edit_sel_end;
 									uint32_t hi = pb->edit_sel_start < pb->edit_sel_end ? pb->edit_sel_end : pb->edit_sel_start;
-									platform_clipboard_set(win, pb->edit_buf + lo, hi - lo);
+									mkwin_clipboard_set(win->mkwin, pb->edit_buf + lo, hi - lo);
 								} else {
-									platform_clipboard_set(win, pb->edit_buf, (uint32_t)strlen(pb->edit_buf));
+									mkwin_clipboard_set(win->mkwin, pb->edit_buf, (uint32_t)strlen(pb->edit_buf));
 								}
 							}
 
@@ -8087,9 +8128,9 @@ MKGUI_API uint32_t mkgui_window_poll(struct mkgui_window *win, struct mkgui_even
 								if(combobox_has_selection(cb)) {
 									uint32_t lo = cb->sel_start < cb->sel_end ? cb->sel_start : cb->sel_end;
 									uint32_t hi = cb->sel_start < cb->sel_end ? cb->sel_end : cb->sel_start;
-									platform_clipboard_set(win, cb->text + lo, hi - lo);
+									mkwin_clipboard_set(win->mkwin, cb->text + lo, hi - lo);
 								} else {
-									platform_clipboard_set(win, cb->text, (uint32_t)strlen(cb->text));
+									mkwin_clipboard_set(win->mkwin, cb->text, (uint32_t)strlen(cb->text));
 								}
 							}
 						}
@@ -8103,7 +8144,7 @@ MKGUI_API uint32_t mkgui_window_poll(struct mkgui_window *win, struct mkgui_even
 								input_undo_push_force(inp);
 								uint32_t lo, hi;
 								input_sel_range(inp, &lo, &hi);
-								platform_clipboard_set(win, inp->text + lo, hi - lo);
+								mkwin_clipboard_set(win->mkwin, inp->text + lo, hi - lo);
 								input_delete_selection(inp);
 								dirty_widget_id(win, win->focus_id);
 								input_scroll_to_cursor(win, win->focus_id);
@@ -8118,7 +8159,7 @@ MKGUI_API uint32_t mkgui_window_poll(struct mkgui_window *win, struct mkgui_even
 								textarea_undo_push_force(ta);
 								uint32_t lo, hi;
 								textarea_sel_range(ta, &lo, &hi);
-								platform_clipboard_set(win, ta->text + lo, hi - lo);
+								mkwin_clipboard_set(win->mkwin, ta->text + lo, hi - lo);
 								textarea_delete_selection(ta);
 								dirty_widget_id(win, win->focus_id);
 								textarea_scroll_to_cursor(win, win->focus_id);
@@ -8132,7 +8173,7 @@ MKGUI_API uint32_t mkgui_window_poll(struct mkgui_window *win, struct mkgui_even
 							if(pb && pb->editing && pb->edit_sel_start != pb->edit_sel_end) {
 								uint32_t lo = pb->edit_sel_start < pb->edit_sel_end ? pb->edit_sel_start : pb->edit_sel_end;
 								uint32_t hi = pb->edit_sel_start < pb->edit_sel_end ? pb->edit_sel_end : pb->edit_sel_start;
-								platform_clipboard_set(win, pb->edit_buf + lo, hi - lo);
+								mkwin_clipboard_set(win->mkwin, pb->edit_buf + lo, hi - lo);
 								struct mkgui_text_edit te = {pb->edit_buf, (uint32_t)sizeof(pb->edit_buf), pb->edit_cursor, pb->edit_sel_start, pb->edit_sel_end, pb->edit_scroll_x};
 								textedit_delete_selection(&te);
 								pb->edit_cursor = te.cursor;
@@ -8147,7 +8188,7 @@ MKGUI_API uint32_t mkgui_window_poll(struct mkgui_window *win, struct mkgui_even
 							if(cb && combobox_has_selection(cb)) {
 								uint32_t lo = cb->sel_start < cb->sel_end ? cb->sel_start : cb->sel_end;
 								uint32_t hi = cb->sel_start < cb->sel_end ? cb->sel_end : cb->sel_start;
-								platform_clipboard_set(win, cb->text + lo, hi - lo);
+								mkwin_clipboard_set(win->mkwin, cb->text + lo, hi - lo);
 								combobox_delete_selection(cb);
 								cb->selected = -1;
 								{ size_t _l = strlen(cb->text); if(_l >= MKGUI_MAX_TEXT) { _l = MKGUI_MAX_TEXT - 1; } memcpy(cb->prev_text, cb->text, _l); cb->prev_text[_l] = '\0'; }
@@ -8165,7 +8206,7 @@ MKGUI_API uint32_t mkgui_window_poll(struct mkgui_window *win, struct mkgui_even
 					if(fw && (ks == 'v' || ks == 'V')) {
 						if(fw->type == MKGUI_INPUT && !(fw->style & MKGUI_INPUT_READONLY)) {
 							uint32_t clip_len = 0;
-							char *clip_buf = platform_clipboard_get_alloc(win, &clip_len);
+							char *clip_buf = mkwin_clipboard_get(win->mkwin, &clip_len);
 							if(clip_buf && clip_len > 0) {
 								struct mkgui_input_data *inp = find_input_data(win, win->focus_id);
 								if(inp) {
@@ -8197,7 +8238,7 @@ MKGUI_API uint32_t mkgui_window_poll(struct mkgui_window *win, struct mkgui_even
 
 						} else if(fw->type == MKGUI_TEXTAREA && !(fw->style & MKGUI_TEXTAREA_READONLY)) {
 							uint32_t clip_len = 0;
-							char *clip_buf = platform_clipboard_get_alloc(win, &clip_len);
+							char *clip_buf = mkwin_clipboard_get(win->mkwin, &clip_len);
 							if(clip_buf && clip_len > 0) {
 								struct mkgui_textarea_data *ta = find_textarea_data(win, win->focus_id);
 								if(ta) {
@@ -8233,7 +8274,7 @@ MKGUI_API uint32_t mkgui_window_poll(struct mkgui_window *win, struct mkgui_even
 							struct mkgui_pathbar_data *pb = find_pathbar_data(win, win->focus_id);
 							if(pb && pb->editing) {
 								uint32_t clip_len = 0;
-								char *clip_buf = platform_clipboard_get_alloc(win, &clip_len);
+								char *clip_buf = mkwin_clipboard_get(win->mkwin, &clip_len);
 								if(clip_buf && clip_len > 0) {
 									for(uint32_t ci = 0; ci < clip_len; ++ci) {
 										if(clip_buf[ci] == '\n' || clip_buf[ci] == '\r') {
@@ -8254,7 +8295,7 @@ MKGUI_API uint32_t mkgui_window_poll(struct mkgui_window *win, struct mkgui_even
 
 						} else if(fw->type == MKGUI_COMBOBOX) {
 							uint32_t clip_len = 0;
-							char *clip_buf = platform_clipboard_get_alloc(win, &clip_len);
+							char *clip_buf = mkwin_clipboard_get(win->mkwin, &clip_len);
 							if(clip_buf && clip_len > 0) {
 								struct mkgui_combobox_data *cb = find_combobox_data(win, win->focus_id);
 								if(cb) {
@@ -8471,11 +8512,11 @@ MKGUI_API uint32_t mkgui_window_poll(struct mkgui_window *win, struct mkgui_even
 			} break;
 
 			// -=[ CLOSE ]=-
-			case MKGUI_PLAT_CLOSE: {
+			case MKWIN_EV_CLOSE: {
 				ev->type = MKGUI_EVENT_CLOSE;
 				if(win->hide_on_close) {
 					if(win->window_visible) {
-						platform_window_unmap(win);
+						mkwin_unmap(win->mkwin);
 						win->window_visible = 0;
 					}
 				} else {
@@ -8485,7 +8526,7 @@ MKGUI_API uint32_t mkgui_window_poll(struct mkgui_window *win, struct mkgui_even
 			} break;
 
 			// -=[ FOCUS OUT ]=-
-			case MKGUI_PLAT_FOCUS_OUT: {
+			case MKWIN_EV_FOCUS_OUT: {
 				if(win->popup_count > 0) {
 					popup_destroy_all(win);
 					dirty_all(win);
@@ -8493,7 +8534,7 @@ MKGUI_API uint32_t mkgui_window_poll(struct mkgui_window *win, struct mkgui_even
 			} break;
 
 			// -=[ LEAVE ]=-
-			case MKGUI_PLAT_LEAVE: {
+			case MKWIN_EV_LEAVE: {
 				if(win->hover_id) {
 					dirty_widget_id(win, win->hover_id);
 					win->hover_id = 0;
@@ -8515,11 +8556,12 @@ MKGUI_API uint32_t mkgui_window_poll(struct mkgui_window *win, struct mkgui_even
 			} break;
 
 			// -=[ DROP ]=-
-			case MKGUI_PLAT_DROP: {
-				if(win->drop_count > 0) {
+			case MKWIN_EV_DROP: {
+				uint32_t dc = mkwin_drop_count(win->mkwin);
+				if(dc > 0) {
 					ev->type = MKGUI_EVENT_FILE_DROP;
 					ev->id = 0;
-					ev->value = (int32_t)win->drop_count;
+					ev->value = (int32_t)dc;
 					return 1;
 				}
 			} break;
@@ -8562,9 +8604,7 @@ MKGUI_API uint32_t mkgui_window_poll(struct mkgui_window *win, struct mkgui_even
 // [=]===^=[ mkgui_flush ]========================================[=]
 static void mkgui_flush(struct mkgui_window *win) {
 	if(win->dirty) {
-#ifndef _WIN32
-		XSync(win->plat.dpy, False);
-#endif
+		mkwin_sync(win->mkwin);
 		double t0 = ((double)mkgui_now_ns() * 1e-3);
 		layout_widgets(win);
 		glview_sync_all(win);
@@ -8582,10 +8622,10 @@ static void mkgui_flush(struct mkgui_window *win) {
 		double t2 = ((double)mkgui_now_ns() * 1e-3);
 
 		if(win->dirty_full || win->render_cb) {
-			platform_blit(win);
+			mkwin_present(win->mkwin);
 		} else {
 			for(uint32_t d = 0; d < win->dirty_count; ++d) {
-				platform_blit_region(win, win->dirty_rects[d].x, win->dirty_rects[d].y, win->dirty_rects[d].w, win->dirty_rects[d].h);
+				mkwin_present_region(win->mkwin, win->dirty_rects[d].x, win->dirty_rects[d].y, win->dirty_rects[d].w, win->dirty_rects[d].h);
 			}
 		}
 		double t3 = ((double)mkgui_now_ns() * 1e-3);
@@ -8602,7 +8642,7 @@ static void mkgui_flush(struct mkgui_window *win) {
 			if(p->widget_id == MKGUI_CTXMENU_POPUP_ID) {
 				render_ctxmenu_popup(win, p, p->hover_item);
 				flush_text_popup(win, p);
-				platform_popup_blit(win, p);
+				mkwin_popup_present(p->mkwin);
 
 			} else {
 				struct mkgui_widget *pw = find_widget(win, p->widget_id);
@@ -8611,7 +8651,7 @@ static void mkgui_flush(struct mkgui_window *win) {
 					if(dd) {
 						render_dropdown_popup(win, p, dd, p->hover_item);
 						flush_text_popup(win, p);
-						platform_popup_blit(win, p);
+						mkwin_popup_present(p->mkwin);
 					}
 
 				} else if(pw && pw->type == MKGUI_COMBOBOX) {
@@ -8619,7 +8659,7 @@ static void mkgui_flush(struct mkgui_window *win) {
 					if(cb) {
 						render_combobox_popup(win, p, cb, p->hover_item);
 						flush_text_popup(win, p);
-						platform_popup_blit(win, p);
+						mkwin_popup_present(p->mkwin);
 					}
 
 				} else if(pw && pw->type == MKGUI_DATEPICKER) {
@@ -8628,19 +8668,19 @@ static void mkgui_flush(struct mkgui_window *win) {
 						int32_t hover_day = dp->cal_hover > 0 ? dp->cal_hover : -1;
 						render_datepicker_popup(win, p, dp, hover_day);
 						flush_text_popup(win, p);
-						platform_popup_blit(win, p);
+						mkwin_popup_present(p->mkwin);
 					}
 
 				} else if(pw && pw->type == MKGUI_MENUITEM) {
 					render_menu_popup(win, p, pw->id, p->hover_item);
 					flush_text_popup(win, p);
-					platform_popup_blit(win, p);
+					mkwin_popup_present(p->mkwin);
 				}
 			}
 			p->dirty = 0;
 		}
 
-		platform_flush(win);
+		mkwin_flush(win->mkwin);
 		win->dirty = 0;
 		win->dirty_full = 0;
 		win->dirty_count = 0;
@@ -8698,8 +8738,8 @@ static void mkgui_flush(struct mkgui_window *win) {
 			flush_text(p);
 			render_tooltip(p);
 			flush_text(p);
-			platform_blit(p);
-			platform_flush(p);
+			mkwin_present(p->mkwin);
+			mkwin_flush(p->mkwin);
 			p->dirty = 0;
 			p->dirty_full = 0;
 			p->dirty_count = 0;
@@ -8771,7 +8811,7 @@ MKGUI_API void mkgui_ctx_wait_until(struct mkgui_ctx *ctx, uint64_t deadline_ns)
 	// platform_wait_event blocks on the shared X fd / Win32 queue. Any
 	// window works as the anchor; use the primary.
 	struct mkgui_window *anchor = ctx->primary ? ctx->primary : ctx->windows[0];
-	platform_wait_event(anchor, timeout_ns);
+	mkwin_wait(anchor->mkwin, timeout_ns);
 }
 
 // [=]===^=[ mkgui_ctx_wait ]=========================================[=]
@@ -8825,6 +8865,7 @@ MKGUI_API uint32_t mkgui_window_add_timer(struct mkgui_window *win, uint64_t int
 	its.it_value.tv_nsec = (long)(interval_ns % 1000000000);
 	its.it_interval = its.it_value;
 	timerfd_settime(t->fd, 0, &its, NULL);
+	mkwin_wait_fd_add(t->fd);
 #endif
 	++win->timer_count;
 	return t->id;
@@ -8842,6 +8883,7 @@ MKGUI_API void mkgui_window_remove_timer(struct mkgui_window *win, uint32_t time
 			}
 #else
 			if(win->timers[i].fd >= 0) {
+				mkwin_wait_fd_remove(win->timers[i].fd);
 				close(win->timers[i].fd);
 			}
 #endif
@@ -9005,7 +9047,7 @@ MKGUI_API void mkgui_window_show(struct mkgui_window *win) {
 	if(win->window_visible) {
 		return;
 	}
-	platform_window_map(win);
+	mkwin_map(win->mkwin);
 	win->window_visible = 1;
 	dirty_all(win);
 }
@@ -9016,7 +9058,7 @@ MKGUI_API void mkgui_window_hide(struct mkgui_window *win) {
 	if(!win->window_visible) {
 		return;
 	}
-	platform_window_unmap(win);
+	mkwin_unmap(win->mkwin);
 	win->window_visible = 0;
 }
 
@@ -9029,7 +9071,7 @@ MKGUI_API uint32_t mkgui_window_is_visible(struct mkgui_window *win) {
 // [=]===^=[ mkgui_window_move ]====================================[=]
 MKGUI_API void mkgui_window_move(struct mkgui_window *win, int32_t x, int32_t y) {
 	MKGUI_CHECK(win);
-	platform_move_window(win, x, y);
+	mkwin_move(win->mkwin, x, y);
 }
 
 // [=]===^=[ mkgui_window_get_position ]============================[=]
@@ -9037,13 +9079,13 @@ MKGUI_API void mkgui_window_get_position(struct mkgui_window *win, int32_t *x, i
 	MKGUI_CHECK(win);
 	MKGUI_CHECK(x);
 	MKGUI_CHECK(y);
-	platform_get_window_position(win, x, y);
+	mkwin_position(win->mkwin, x, y);
 }
 
 // [=]===^=[ mkgui_window_begin_drag ]==============================[=]
 MKGUI_API void mkgui_window_begin_drag(struct mkgui_window *win) {
 	MKGUI_CHECK(win);
-	platform_begin_drag(win);
+	mkwin_begin_drag(win->mkwin);
 }
 
 // [=]===^=[ mkgui_window_set_shape ]===============================[=]
@@ -9053,29 +9095,7 @@ MKGUI_API void mkgui_window_set_shape(struct mkgui_window *win, const int32_t *x
 	if(point_count < 3) {
 		return;
 	}
-#ifdef _WIN32
-	POINT *pts = (POINT *)malloc(point_count * sizeof(POINT));
-	if(!pts) {
-		return;
-	}
-	for(uint32_t i = 0; i < point_count; ++i) {
-		pts[i].x = xy_pairs[i * 2];
-		pts[i].y = xy_pairs[i * 2 + 1];
-	}
-	platform_set_shape(win, pts, (int32_t)point_count);
-	free(pts);
-#else
-	XPoint *pts = (XPoint *)malloc(point_count * sizeof(XPoint));
-	if(!pts) {
-		return;
-	}
-	for(uint32_t i = 0; i < point_count; ++i) {
-		pts[i].x = (short)xy_pairs[i * 2];
-		pts[i].y = (short)xy_pairs[i * 2 + 1];
-	}
-	platform_set_shape(win, pts, (int32_t)point_count);
-	free(pts);
-#endif
+	mkwin_set_shape(win->mkwin, xy_pairs, point_count);
 }
 
 // [=]===^=[ mkgui_window_set_shape_mask ]=========================[=]
@@ -9085,58 +9105,13 @@ MKGUI_API void mkgui_window_set_shape_mask(struct mkgui_window *win, const uint3
 	if(w <= 0 || h <= 0) {
 		return;
 	}
-#ifdef _WIN32
-	HRGN combined = CreateRectRgn(0, 0, 0, 0);
-	for(int32_t y = 0; y < h; ++y) {
-		int32_t x = 0;
-		while(x < w) {
-			while(x < w && (argb[y * w + x] >> 24) < alpha_threshold) {
-				++x;
-			}
-			int32_t x0 = x;
-			while(x < w && (argb[y * w + x] >> 24) >= alpha_threshold) {
-				++x;
-			}
-			if(x > x0) {
-				HRGN span = CreateRectRgn(x0, y, x, y + 1);
-				CombineRgn(combined, combined, span, RGN_OR);
-				DeleteObject(span);
-			}
-		}
-	}
-	SetWindowRgn(win->plat.hwnd, combined, TRUE);
-#else
-	Pixmap mask = XCreatePixmap(win->plat.dpy, win->plat.root, (uint32_t)w, (uint32_t)h, 1);
-	GC gc = XCreateGC(win->plat.dpy, mask, 0, NULL);
-	XSetForeground(win->plat.dpy, gc, 0);
-	XFillRectangle(win->plat.dpy, mask, gc, 0, 0, (uint32_t)w, (uint32_t)h);
-	XSetForeground(win->plat.dpy, gc, 1);
-	for(int32_t y = 0; y < h; ++y) {
-		int32_t x = 0;
-		while(x < w) {
-			while(x < w && (argb[y * w + x] >> 24) < alpha_threshold) {
-				++x;
-			}
-			int32_t x0 = x;
-			while(x < w && (argb[y * w + x] >> 24) >= alpha_threshold) {
-				++x;
-			}
-			if(x > x0) {
-				XFillRectangle(win->plat.dpy, mask, gc, x0, y, (uint32_t)(x - x0), 1);
-			}
-		}
-	}
-	XShapeCombineMask(win->plat.dpy, win->plat.win, ShapeBounding, 0, 0, mask, ShapeSet);
-	XFreeGC(win->plat.dpy, gc);
-	XFreePixmap(win->plat.dpy, mask);
-	XFlush(win->plat.dpy);
-#endif
+	mkwin_set_shape_mask(win->mkwin, argb, w, h, alpha_threshold);
 }
 
 // [=]===^=[ mkgui_window_clear_shape ]=============================[=]
 MKGUI_API void mkgui_window_clear_shape(struct mkgui_window *win) {
 	MKGUI_CHECK(win);
-	platform_clear_shape(win);
+	mkwin_clear_shape(win->mkwin);
 }
 
 // [=]===^=[ mkgui_window_resize ]==================================[=]
@@ -9145,7 +9120,7 @@ MKGUI_API void mkgui_window_resize(struct mkgui_window *win, int32_t w, int32_t 
 	if(w <= 0 || h <= 0) {
 		return;
 	}
-	platform_resize_window(win, w, h);
+	mkwin_resize(win->mkwin, w, h);
 }
 
 // [=]===^=[ mkgui_window_invalidate ]=====================================[=]

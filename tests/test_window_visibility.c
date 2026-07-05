@@ -87,19 +87,19 @@ static void test_hide_on_close_intercept(void) {
 	mkgui_window_show(win);
 	CHECK(mkgui_window_is_visible(win) == 1, "show after create");
 
-	XSync(win->plat.dpy, False);
+	XSync(win->mkwin->dpy, False);
 
 	XClientMessageEvent xc;
 	memset(&xc, 0, sizeof(xc));
 	xc.type = ClientMessage;
-	xc.display = win->plat.dpy;
-	xc.window = win->plat.win;
-	xc.message_type = XInternAtom(win->plat.dpy, "WM_PROTOCOLS", False);
+	xc.display = win->mkwin->dpy;
+	xc.window = win->mkwin->win;
+	xc.message_type = XInternAtom(win->mkwin->dpy, "WM_PROTOCOLS", False);
 	xc.format = 32;
-	xc.data.l[0] = (long)win->plat.atoms.wm_delete;
+	xc.data.l[0] = (long)win->mkwin->atoms.wm_delete;
 	xc.data.l[1] = CurrentTime;
-	XSendEvent(win->plat.dpy, win->plat.win, False, NoEventMask, (XEvent *)&xc);
-	XFlush(win->plat.dpy);
+	XSendEvent(win->mkwin->dpy, win->mkwin->win, False, NoEventMask, (XEvent *)&xc);
+	XFlush(win->mkwin->dpy);
 
 	mkgui_ctx_run(mkgui_window_get_ctx(win), NULL, NULL);
 
@@ -143,12 +143,12 @@ static void test_window_move_get_position(void) {
 	struct mkgui_window *win = mkgui_window_create(ctx, NULL, undecorated_widgets, sizeof(undecorated_widgets) / sizeof(undecorated_widgets[0]), NULL, 0, 0);
 	CHECK(win != NULL, "create for move test");
 	mkgui_window_show(win);
-	XSync(win->plat.dpy, False);
+	XSync(win->mkwin->dpy, False);
 	mkgui_window_move(win, 50, 75);
-	XSync(win->plat.dpy, False);
-	while(XPending(win->plat.dpy)) {
+	XSync(win->mkwin->dpy, False);
+	while(XPending(win->mkwin->dpy)) {
 		XEvent xev;
-		XNextEvent(win->plat.dpy, &xev);
+		XNextEvent(win->mkwin->dpy, &xev);
 	}
 	int32_t x = -1, y = -1;
 	mkgui_window_get_position(win, &x, &y);

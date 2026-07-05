@@ -18,6 +18,11 @@ COMMON_CFLAGS+="-Wformat-truncation "
 COMMON_CFLAGS+="-Wno-stringop-truncation "
 COMMON_CFLAGS+="-Wsign-conversion "
 
+# mkwin (window/input/blit layer) is a git submodule at ./mkwin, consumed as
+# source and #included into the mkgui translation unit. mkgui.c enables the
+# mkwin font + glview modules itself, so only the include path is needed here.
+COMMON_CFLAGS+="-Imkwin "
+
 # Baked into libmkgui.a so consumers get the same icon capacity the
 # unity-built tools used to get via their own #define.
 LIB_DEFINES="-DMKGUI_LIBRARY -DMKGUI_MAX_ICONS=32768"

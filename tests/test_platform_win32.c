@@ -66,7 +66,7 @@ static void settle(struct mkgui_window *win) {
 }
 
 static void post_msg(struct mkgui_window *win, UINT msg, WPARAM wp, LPARAM lp) {
-	PostMessageA(win->plat.hwnd, msg, wp, lp);
+	PostMessageA(win->mkwin->hwnd, msg, wp, lp);
 }
 
 // mkgui_window_poll pumps the Win32 message queue internally, so looping it
@@ -113,7 +113,7 @@ static void test_window_lifecycle(void) {
 		struct mkgui_window *win = mkgui_window_create(ctx, NULL, widgets, 1, NULL, 0, 0);
 		CHECK(win, "window_create failed");
 		if(win) {
-			CHECK(win->plat.hwnd != NULL, "HWND is NULL after create");
+			CHECK(win->mkwin->hwnd != NULL, "HWND is NULL after create");
 			settle(win);
 			mkgui_window_destroy(win);
 		}
@@ -130,19 +130,19 @@ static void test_window_lifecycle(void) {
 // [=]===^=[ test_vk_keysym_parity ]===============================[=]
 static void test_vk_keysym_parity(void) {
 	TEST_BEGIN("win32: VK codes translate to canonical MKGUI_KEY_* values");
-	CHECK(platform_translate_vk(VK_BACK)   == MKGUI_KEY_BACKSPACE, "VK_BACK");
-	CHECK(platform_translate_vk(VK_TAB)    == MKGUI_KEY_TAB,       "VK_TAB");
-	CHECK(platform_translate_vk(VK_RETURN) == MKGUI_KEY_RETURN,    "VK_RETURN");
-	CHECK(platform_translate_vk(VK_ESCAPE) == MKGUI_KEY_ESCAPE,    "VK_ESCAPE");
-	CHECK(platform_translate_vk(VK_DELETE) == MKGUI_KEY_DELETE,    "VK_DELETE");
-	CHECK(platform_translate_vk(VK_HOME)   == MKGUI_KEY_HOME,      "VK_HOME");
-	CHECK(platform_translate_vk(VK_LEFT)   == MKGUI_KEY_LEFT,      "VK_LEFT");
-	CHECK(platform_translate_vk(VK_UP)     == MKGUI_KEY_UP,        "VK_UP");
-	CHECK(platform_translate_vk(VK_RIGHT)  == MKGUI_KEY_RIGHT,     "VK_RIGHT");
-	CHECK(platform_translate_vk(VK_DOWN)   == MKGUI_KEY_DOWN,      "VK_DOWN");
-	CHECK(platform_translate_vk(VK_PRIOR)  == MKGUI_KEY_PAGE_UP,   "VK_PRIOR");
-	CHECK(platform_translate_vk(VK_NEXT)   == MKGUI_KEY_PAGE_DOWN, "VK_NEXT");
-	CHECK(platform_translate_vk(VK_END)    == MKGUI_KEY_END,       "VK_END");
+	CHECK(mkwin_translate_vk(VK_BACK)   == MKGUI_KEY_BACKSPACE, "VK_BACK");
+	CHECK(mkwin_translate_vk(VK_TAB)    == MKGUI_KEY_TAB,       "VK_TAB");
+	CHECK(mkwin_translate_vk(VK_RETURN) == MKGUI_KEY_RETURN,    "VK_RETURN");
+	CHECK(mkwin_translate_vk(VK_ESCAPE) == MKGUI_KEY_ESCAPE,    "VK_ESCAPE");
+	CHECK(mkwin_translate_vk(VK_DELETE) == MKGUI_KEY_DELETE,    "VK_DELETE");
+	CHECK(mkwin_translate_vk(VK_HOME)   == MKGUI_KEY_HOME,      "VK_HOME");
+	CHECK(mkwin_translate_vk(VK_LEFT)   == MKGUI_KEY_LEFT,      "VK_LEFT");
+	CHECK(mkwin_translate_vk(VK_UP)     == MKGUI_KEY_UP,        "VK_UP");
+	CHECK(mkwin_translate_vk(VK_RIGHT)  == MKGUI_KEY_RIGHT,     "VK_RIGHT");
+	CHECK(mkwin_translate_vk(VK_DOWN)   == MKGUI_KEY_DOWN,      "VK_DOWN");
+	CHECK(mkwin_translate_vk(VK_PRIOR)  == MKGUI_KEY_PAGE_UP,   "VK_PRIOR");
+	CHECK(mkwin_translate_vk(VK_NEXT)   == MKGUI_KEY_PAGE_DOWN, "VK_NEXT");
+	CHECK(mkwin_translate_vk(VK_END)    == MKGUI_KEY_END,       "VK_END");
 	TEST_END();
 }
 

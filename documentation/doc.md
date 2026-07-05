@@ -1933,10 +1933,10 @@ uint32_t mkgui_icon_browser_theme(struct mkgui_window *win, const char *theme_di
 
 ### Font
 
-Override the font with the `MKGUI_FONT` environment variable:
+Override the font with the `MKWIN_FONT_FILE` environment variable:
 
 ```bash
-MKGUI_FONT=/path/to/font.ttf ./myapp
+MKWIN_FONT_FILE=/path/to/font.ttf ./myapp
 ```
 
 The default font search order prefers proportional sans-serif fonts: Noto Sans, IBM Plex Sans, DejaVu Sans.
@@ -2516,20 +2516,20 @@ mkgui auto-detects the display scale factor on startup:
 - **Linux**: reads `Xft.dpi` from X resources, falls back to physical display DPI
 - **Windows**: uses `GetDpiForWindow()` or `GetDeviceCaps(LOGPIXELSX)`
 
-Override auto-detection with `mkgui_ctx_set_scale()` or the `MKGUI_SCALE` environment variable:
+Override auto-detection with `mkgui_ctx_set_scale()` or the `MKWIN_SCALE` environment variable:
 
 ```c
 void mkgui_ctx_set_scale(struct mkgui_ctx *ctx, float scale);
 float mkgui_ctx_get_scale(struct mkgui_ctx *ctx);
 ```
 
-The `MKGUI_SCALE` environment variable accepts three formats:
+The `MKWIN_SCALE` environment variable accepts three formats:
 
 | Format | Example | Result |
 |--------|---------|--------|
-| Float | `MKGUI_SCALE=1.5` | 1.5x scale |
-| Percentage | `MKGUI_SCALE=150%` | 1.5x scale |
-| DPI | `MKGUI_SCALE=144dpi` | 1.5x scale (144/96) |
+| Float | `MKWIN_SCALE=1.5` | 1.5x scale |
+| Percentage | `MKWIN_SCALE=150%` | 1.5x scale |
+| DPI | `MKWIN_SCALE=144dpi` | 1.5x scale (144/96) |
 
 The environment variable takes precedence over auto-detection. Scale range is 0.5 to 4.0.
 

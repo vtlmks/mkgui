@@ -106,8 +106,8 @@ static void test_two_top_level_windows(void) {
 	struct mkgui_window *b = mkgui_window_create(ctx, NULL, sw, 1, "Second", 320, 240);
 
 	CHECK(a != NULL && b != NULL, "both windows should create");
-	CHECK(a->plat.is_child == 0, "first window must not be is_child");
-	CHECK(b->plat.is_child == 0, "second top-level (parent=NULL) must not be is_child");
+	CHECK(a->mkwin->is_child == 0, "first window must not be is_child");
+	CHECK(b->mkwin->is_child == 0, "second top-level (parent=NULL) must not be is_child");
 	CHECK(b->parent == NULL, "second top-level must have NULL parent");
 	CHECK(ctx->window_count == 2, "expected 2 windows");
 
@@ -142,8 +142,8 @@ static void test_two_windows_with_parent(void) {
 	CHECK(ctx->primary == primary, "primary should be the first window created");
 	CHECK(mkgui_window_get_ctx(secondary) == ctx, "secondary's ctx mismatch");
 	CHECK(secondary->parent == primary, "secondary's parent != primary");
-	CHECK(secondary->plat.is_child == 1, "secondary should be marked as child");
-	CHECK(primary->plat.is_child == 0, "primary should NOT be marked as child");
+	CHECK(secondary->mkwin->is_child == 1, "secondary should be marked as child");
+	CHECK(primary->mkwin->is_child == 0, "primary should NOT be marked as child");
 
 	// destroy secondary first; primary unaffected
 	mkgui_window_destroy(secondary);
@@ -197,14 +197,14 @@ static void test_pump_others(void) {
 	// (EXPOSE only marks the window dirty internally and never reaches
 	// the user cb, so we use a key event which is always delivered.)
 	pump_others_secondary_calls = 0;
-	struct mkgui_plat_event pev = {0};
-	pev.type = MKGUI_PLAT_KEY;
+	struct mkwin_event pev = {0};
+	pev.type = MKWIN_EV_KEY;
 	pev.keysym = 'a';
 	pev.popup_idx = -1;
 #ifdef _WIN32
 	evq_push_ctx(&s->plat, &pev);
 #else
-	platform_deferred_push(s, &pev);
+	mkwin_deferred_push(s->mkwin, &pev);
 #endif
 
 	mkgui_ctx_pump_others(ctx);
@@ -215,7 +215,7 @@ static void test_pump_others(void) {
 #ifdef _WIN32
 	evq_push_ctx(&s->plat, &pev);
 #else
-	platform_deferred_push(s, &pev);
+	mkwin_deferred_push(s->mkwin, &pev);
 #endif
 	uint32_t before = pump_others_secondary_calls;
 	mkgui_ctx_pump_others(ctx);

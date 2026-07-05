@@ -1,6 +1,6 @@
 # mkgui
 
-Minimal GUI toolkit for Linux (X11) and Windows (Win32). Software rendered, single-file unity build. Breeze-inspired styling. No third-party dependencies beyond FreeType2 and Xlib/GDI.
+Minimal GUI toolkit for Linux (X11) and Windows (Win32). Software rendered, unity build (`#include "mkgui.c"`). Breeze-inspired styling. No third-party dependencies beyond FreeType2 and Xlib/GDI. The X11/Win32 windowing layer lives in a small sibling library, [mkwin](https://github.com/vtlmks/mkwin), pulled in as a git submodule.
 
 This is a personal project by a single developer. It works well for what it does, but it has not been exhaustively tested across every platform, hardware configuration, or edge case. Use it, enjoy it, file issues if something breaks -- but don't expect the test coverage of a toolkit backed by a corporation. There are no guarantees, no roadmap, and no promises.
 
@@ -20,12 +20,15 @@ mkgui is in **beta**. The author has used it to ship several working application
 # direct clone pinned to a tag
 git clone https://github.com/<user>/mkgui.git
 cd mkgui
-git checkout v0.2.0-beta
+git checkout v0.5.0-beta
+git submodule update --init --recursive   # fetch the mkwin platform-layer submodule
 
-# or as a submodule
+# or as a submodule of your own project
 git submodule add https://github.com/<user>/mkgui.git mkgui
-cd mkgui && git checkout v0.2.0-beta
+cd mkgui && git checkout v0.5.0-beta && git submodule update --init --recursive
 ```
+
+mkgui's own platform layer, `mkwin`, is itself a submodule, so the `git submodule update --init --recursive` step is required after any clone or checkout -- `mkgui.c` `#include`s the mkwin sources and will not compile without them. (Tags before `v0.5.0-beta` predate the submodule and simply skip that step.)
 
 If you need a fix that only exists on master, open an issue so it can be cherry-picked into the next tag rather than silently depending on a moving target.
 
@@ -37,7 +40,7 @@ If you need a fix that only exists on master, open an issue so it can be cherry-
 - Built-in file dialogs, message boxes, input dialogs, color picker
 - SVG icon system via PlutoSVG (Freedesktop icon naming, theme-aware monochrome)
 - Toolbar display modes: icons only, text only, icons + text
-- DPI scaling with auto-detection and `MKGUI_SCALE` environment variable override
+- DPI scaling with auto-detection and `MKWIN_SCALE` environment variable override
 - Keyboard accelerators with automatic menu shortcut display
 - Undo/redo in text input and textarea widgets
 - External file drag-and-drop (XDnd on Linux, WM_DROPFILES on Windows)
@@ -55,18 +58,21 @@ See [documentation/editor.md](documentation/editor.md) for the full editor guide
 
 ## Getting started
 
-1. Copy the mkgui source into your project
-2. `#include "mkgui.c"` in your application
-3. Compile and link:
+mkgui pulls its X11/Win32 windowing layer from the [mkwin](https://github.com/vtlmks/mkwin) git submodule, so make sure it is checked out -- `mkgui.c` `#include`s the mkwin sources and will not compile without them.
+
+1. Get the mkgui source **with its submodule**: `git clone` the repo, then `git submodule update --init --recursive` (or copy both `mkgui/` and its `mkwin/` subdirectory into your project).
+2. `#include "mkgui.c"` in your application.
+3. Compile and link, adding the mkwin submodule to the include path with `-Imkwin`:
    ```bash
    # Linux
-   gcc -std=c99 -O2 myapp.c -o myapp \
+   gcc -std=c99 -O2 -Imkwin myapp.c -o myapp \
        $(pkg-config --cflags freetype2 fontconfig) -lX11 -lXext \
        $(pkg-config --libs freetype2 fontconfig) -lm
 
    # Windows (MinGW)
-   x86_64-w64-mingw32-gcc -std=c99 -O2 myapp.c -o myapp.exe -lgdi32 -mwindows
+   x86_64-w64-mingw32-gcc -std=c99 -O2 -Imkwin myapp.c -o myapp.exe -lgdi32 -mwindows
    ```
+   `-Imkwin` points at the submodule directory; adjust the path if `mkwin/` is not a subdirectory of your build directory. No `MKWIN_*` defines are needed -- `mkgui.c` enables the mkwin font and glview modules itself.
 4. Place an `icons/` directory next to your executable with SVG icons (see Icon section below)
 
 OpenGL is only required if the application uses the `MKGUI_GLVIEW` widget (add `-lGL` on Linux or `-lopengl32` on Windows). The core library, editor, and all other widgets have no GPU dependency.
@@ -166,7 +172,7 @@ The easiest option is **MSYS2**, which gives you a native MinGW GCC on Windows:
    ```
 4. Build your application (Windows uses GDI for fonts, so no fontconfig is needed):
    ```bash
-   gcc -std=c99 -O2 myapp.c -o myapp.exe -lgdi32 -mwindows
+   gcc -std=c99 -O2 -Imkwin myapp.c -o myapp.exe -lgdi32 -mwindows
    ```
    Add `-lopengl32` only if the application uses `MKGUI_GLVIEW`. Building `demo.c` requires `-lopengl32` since the demo showcases the GL view widget.
 
@@ -177,7 +183,7 @@ Cross-compiling from Linux also works. The included `build.sh` automatically bui
 mkgui also compiles cleanly with `clang-cl` against the MSVC runtime. On Windows, install the **Build Tools for Visual Studio** (or the full IDE) and the **Windows SDK**, then from a Developer Command Prompt:
 
 ```cmd
-clang-cl /O2 ^
+clang-cl /O2 /I mkwin ^
   -DMKGUI_MAX_ICONS=32768 -D_CRT_SECURE_NO_WARNINGS ^
   myapp.c ^
   /link /subsystem:windows /entry:mainCRTStartup ^
@@ -189,7 +195,7 @@ Add `opengl32.lib` if the application uses `MKGUI_GLVIEW`. `/entry:mainCRTStartu
 Cross-compiling from Linux with `clang-cl` is also possible if you have a copy of the MSVC CRT headers/libraries and the Windows SDK. Point clang at them with `/imsvc` for each include directory and `/libpath:` for each library directory, and use `-fuse-ld=lld-link` so the LLVM linker handles the COFF output:
 
 ```bash
-clang-cl /O2 -fuse-ld=lld-link \
+clang-cl /O2 /I mkwin -fuse-ld=lld-link \
   /imsvc <msvc-crt>/include \
   /imsvc <winsdk>/Include/ucrt \
   /imsvc <winsdk>/Include/um \

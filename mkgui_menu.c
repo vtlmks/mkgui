@@ -285,12 +285,12 @@ static void menu_open_popup(struct mkgui_window *win, uint32_t menuitem_id) {
 	}
 
 	int32_t abs_x, abs_y;
-	platform_translate_coords(win, win->rects[mx_idx].x, win->rects[mx_idx].y + win->rects[mx_idx].h, &abs_x, &abs_y);
+	mkwin_translate_coords(win->mkwin, win->rects[mx_idx].x, win->rects[mx_idx].y + win->rects[mx_idx].h, &abs_x, &abs_y);
 
 	int32_t ph = content_h + 2;
 
 	int32_t scr_w, scr_h;
-	platform_screen_size(win, &scr_w, &scr_h);
+	mkwin_screen_size(win->mkwin, &scr_w, &scr_h);
 	if(abs_x + max_w > scr_w) {
 		abs_x = scr_w - max_w;
 	}
@@ -304,8 +304,8 @@ static void menu_open_popup(struct mkgui_window *win, uint32_t menuitem_id) {
 	if(p) {
 		render_menu_popup(win, p, menuitem_id, -1);
 		flush_text_popup(win, p);
-		platform_popup_blit(win, p);
-		platform_flush(win);
+		mkwin_popup_present(p->mkwin);
+		mkwin_flush(win->mkwin);
 	}
 }
 
@@ -328,7 +328,7 @@ static void menu_open_submenu(struct mkgui_window *win, uint32_t popup_idx, uint
 	int32_t sub_y = parent->y + item_y;
 
 	int32_t scr_w, scr_h;
-	platform_screen_size(win, &scr_w, &scr_h);
+	mkwin_screen_size(win->mkwin, &scr_w, &scr_h);
 
 	if(sub_x + max_w > scr_w) {
 		sub_x = parent->x - max_w + 2;
@@ -346,7 +346,7 @@ static void menu_open_submenu(struct mkgui_window *win, uint32_t popup_idx, uint
 	if(p) {
 		render_menu_popup(win, p, submenu_item_id, -1);
 		flush_text_popup(win, p);
-		platform_popup_blit(win, p);
-		platform_flush(win);
+		mkwin_popup_present(p->mkwin);
+		mkwin_flush(win->mkwin);
 	}
 }

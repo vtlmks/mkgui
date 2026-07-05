@@ -129,7 +129,7 @@ static void dropdown_open_popup(struct mkgui_window *win, uint32_t widget_id) {
 	}
 
 	int32_t abs_x, abs_y;
-	platform_translate_coords(win, win->rects[idx].x, win->rects[idx].y + win->rects[idx].h, &abs_x, &abs_y);
+	mkwin_translate_coords(win->mkwin, win->rects[idx].x, win->rects[idx].y + win->rects[idx].h, &abs_x, &abs_y);
 
 	int32_t pw = win->rects[idx].w;
 	int32_t ph = (int32_t)dd->item_count * win->row_height + 2;
@@ -150,8 +150,8 @@ static void dropdown_open_popup(struct mkgui_window *win, uint32_t widget_id) {
 	if(p) {
 		render_dropdown_popup(win, p, dd, -1);
 		flush_text_popup(win, p);
-		platform_popup_blit(win, p);
-		platform_flush(win);
+		mkwin_popup_present(p->mkwin);
+		mkwin_flush(win->mkwin);
 	}
 }
 

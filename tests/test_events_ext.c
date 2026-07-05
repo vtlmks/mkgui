@@ -49,7 +49,7 @@ static uint32_t tests_failed;
 // ---------------------------------------------------------------------------
 
 static void flush_x_events(struct mkgui_window *win) {
-	XSync(win->plat.dpy, True);
+	XSync(win->mkwin->dpy, True);
 }
 
 static void run_layout(struct mkgui_window *win) {
@@ -62,32 +62,32 @@ static void run_layout(struct mkgui_window *win) {
 }
 
 static void inject_press(struct mkgui_window *win, int32_t x, int32_t y, uint32_t button, uint32_t keymod) {
-	struct mkgui_plat_event pev;
+	struct mkwin_event pev;
 	memset(&pev, 0, sizeof(pev));
-	pev.type = MKGUI_PLAT_BUTTON_PRESS;
+	pev.type = MKWIN_EV_BUTTON_PRESS;
 	pev.x = x;
 	pev.y = y;
 	pev.button = button;
 	pev.keymod = keymod;
 	pev.popup_idx = -1;
-	platform_deferred_push(win, &pev);
+	mkwin_deferred_push(win->mkwin, &pev);
 }
 
 static void inject_release(struct mkgui_window *win, int32_t x, int32_t y, uint32_t button) {
-	struct mkgui_plat_event pev;
+	struct mkwin_event pev;
 	memset(&pev, 0, sizeof(pev));
-	pev.type = MKGUI_PLAT_BUTTON_RELEASE;
+	pev.type = MKWIN_EV_BUTTON_RELEASE;
 	pev.x = x;
 	pev.y = y;
 	pev.button = button;
 	pev.popup_idx = -1;
-	platform_deferred_push(win, &pev);
+	mkwin_deferred_push(win->mkwin, &pev);
 }
 
 static void inject_key(struct mkgui_window *win, uint32_t keysym, uint32_t keymod) {
-	struct mkgui_plat_event pev;
+	struct mkwin_event pev;
 	memset(&pev, 0, sizeof(pev));
-	pev.type = MKGUI_PLAT_KEY;
+	pev.type = MKWIN_EV_KEY;
 	pev.keysym = keysym;
 	pev.keymod = keymod;
 	pev.popup_idx = -1;
@@ -96,17 +96,17 @@ static void inject_key(struct mkgui_window *win, uint32_t keysym, uint32_t keymo
 		pev.text[1] = '\0';
 		pev.text_len = 1;
 	}
-	platform_deferred_push(win, &pev);
+	mkwin_deferred_push(win->mkwin, &pev);
 }
 
 static void inject_motion(struct mkgui_window *win, int32_t x, int32_t y) {
-	struct mkgui_plat_event pev;
+	struct mkwin_event pev;
 	memset(&pev, 0, sizeof(pev));
-	pev.type = MKGUI_PLAT_MOTION;
+	pev.type = MKWIN_EV_MOTION;
 	pev.x = x;
 	pev.y = y;
 	pev.popup_idx = -1;
-	platform_deferred_push(win, &pev);
+	mkwin_deferred_push(win->mkwin, &pev);
 }
 
 static void widget_center(struct mkgui_window *win, uint32_t id, int32_t *cx, int32_t *cy) {
@@ -150,7 +150,7 @@ static uint32_t poll_for_event(struct mkgui_window *win, uint32_t event_type, ui
 			found = 1;
 		}
 
-		if(!got && win->plat.deferred_head == win->plat.deferred_tail) {
+		if(!got && win->mkwin->deferred_head == win->mkwin->deferred_tail) {
 			mkgui_window_poll(win, &ev);
 			if(ev.type == event_type && (target_id == 0 || ev.id == target_id)) {
 				found = 1;
@@ -175,7 +175,7 @@ static struct mkgui_event poll_capture(struct mkgui_window *win, uint32_t event_
 			return ev;
 		}
 
-		if(!got && win->plat.deferred_head == win->plat.deferred_tail) {
+		if(!got && win->mkwin->deferred_head == win->mkwin->deferred_tail) {
 			break;
 		}
 	}
@@ -193,29 +193,29 @@ static void drain_events(struct mkgui_window *win) {
 }
 
 static void inject_resize(struct mkgui_window *win, int32_t w, int32_t h) {
-	struct mkgui_plat_event pev;
+	struct mkwin_event pev;
 	memset(&pev, 0, sizeof(pev));
-	pev.type = MKGUI_PLAT_RESIZE;
+	pev.type = MKWIN_EV_RESIZE;
 	pev.width = w;
 	pev.height = h;
 	pev.popup_idx = -1;
-	platform_deferred_push(win, &pev);
+	mkwin_deferred_push(win->mkwin, &pev);
 }
 
 static void inject_close(struct mkgui_window *win) {
-	struct mkgui_plat_event pev;
+	struct mkwin_event pev;
 	memset(&pev, 0, sizeof(pev));
-	pev.type = MKGUI_PLAT_CLOSE;
+	pev.type = MKWIN_EV_CLOSE;
 	pev.popup_idx = -1;
-	platform_deferred_push(win, &pev);
+	mkwin_deferred_push(win->mkwin, &pev);
 }
 
 static void inject_drop(struct mkgui_window *win) {
-	struct mkgui_plat_event pev;
+	struct mkwin_event pev;
 	memset(&pev, 0, sizeof(pev));
-	pev.type = MKGUI_PLAT_DROP;
+	pev.type = MKWIN_EV_DROP;
 	pev.popup_idx = -1;
-	platform_deferred_push(win, &pev);
+	mkwin_deferred_push(win->mkwin, &pev);
 }
 
 // ---------------------------------------------------------------------------
@@ -1787,8 +1787,8 @@ static void test_file_drop(void) {
 	CHECK(win, "create failed");
 	if(win) {
 		run_layout(win);
-		drop_add_path(win, "/tmp/dropped_a.txt");
-		drop_add_path(win, "/tmp/dropped_b.txt");
+		drop_add_path(win->mkwin,"/tmp/dropped_a.txt");
+		drop_add_path(win->mkwin,"/tmp/dropped_b.txt");
 		inject_drop(win);
 		CHECK(poll_for_event(win, MKGUI_EVENT_FILE_DROP, 0), "expected FILE_DROP");
 		CHECK(mkgui_drop_count(win) == 2, "expected drop_count == 2");

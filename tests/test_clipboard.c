@@ -47,10 +47,10 @@ static uint32_t clip_test_internal_large(void) {
 
 	char *src = (char *)malloc(BIG_LEN);
 	clip_fill_pattern(src, BIG_LEN);
-	platform_clipboard_set(win, src, BIG_LEN);
+	mkwin_clipboard_set(win->mkwin, src, BIG_LEN);
 
 	uint32_t got_len = 0;
-	char *got = platform_clipboard_get_alloc(win, &got_len);
+	char *got = mkwin_clipboard_get(win->mkwin, &got_len);
 
 	uint32_t ok = got && got_len == BIG_LEN && memcmp(got, src, BIG_LEN) == 0;
 	if(!ok) {
@@ -85,7 +85,7 @@ static void clip_child_requestor(int ready_fd) {
 	}
 
 	uint32_t got_len = 0;
-	char *got = platform_clipboard_get_alloc(win, &got_len);
+	char *got = mkwin_clipboard_get(win->mkwin, &got_len);
 
 	int status = 0;
 	if(!got) {
@@ -146,11 +146,11 @@ static uint32_t clip_test_incr_roundtrip(void) {
 
 	char *src = (char *)malloc(BIG_LEN);
 	clip_fill_pattern(src, BIG_LEN);
-	platform_clipboard_set(win, src, BIG_LEN);
+	mkwin_clipboard_set(win->mkwin, src, BIG_LEN);
 	free(src);
 	// Make the ownership visible to the child's server-side query before we
 	// release it; XFlush alone only queues the request locally.
-	XSync(win->plat.dpy, False);
+	XSync(win->mkwin->dpy, False);
 
 	char go = 1;
 	if(write(ready[1], &go, 1) != 1) {
@@ -174,7 +174,7 @@ static uint32_t clip_test_incr_roundtrip(void) {
 			waitpid(pid, &status, 0);
 			break;
 		}
-		platform_wait_event(win, 20ll * 1000000ll);
+		mkwin_wait(win->mkwin, 20ll * 1000000ll);
 		struct mkgui_event ev;
 		while(mkgui_window_poll(win, &ev)) {
 		}

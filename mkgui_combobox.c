@@ -209,7 +209,7 @@ static void combobox_open_popup(struct mkgui_window *win, uint32_t widget_id, ui
 	}
 
 	int32_t abs_x, abs_y;
-	platform_translate_coords(win, win->rects[widx].x, win->rects[widx].y + win->rects[widx].h, &abs_x, &abs_y);
+	mkwin_translate_coords(win->mkwin, win->rects[widx].x, win->rects[widx].y + win->rects[widx].h, &abs_x, &abs_y);
 
 	int32_t pw = win->rects[widx].w;
 	int32_t ph = (int32_t)cb->filter_count * win->row_height + 2;
@@ -223,8 +223,8 @@ static void combobox_open_popup(struct mkgui_window *win, uint32_t widget_id, ui
 	if(p) {
 		render_combobox_popup(win, p, cb, -1);
 		flush_text_popup(win, p);
-		platform_popup_blit(win, p);
-		platform_flush(win);
+		mkwin_popup_present(p->mkwin);
+		mkwin_flush(win->mkwin);
 	}
 }
 

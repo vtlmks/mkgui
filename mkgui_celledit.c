@@ -373,9 +373,9 @@ static uint32_t celledit_key(struct mkgui_window *win, struct mkgui_event *ev, u
 			if(textedit_has_selection(&ce->te)) {
 				uint32_t lo, hi;
 				textedit_sel_range(&ce->te, &lo, &hi);
-				platform_clipboard_set(win, ce->text + lo, hi - lo);
+				mkwin_clipboard_set(win->mkwin, ce->text + lo, hi - lo);
 			} else {
-				platform_clipboard_set(win, ce->text, (uint32_t)strlen(ce->text));
+				mkwin_clipboard_set(win->mkwin, ce->text, (uint32_t)strlen(ce->text));
 			}
 			return 1;
 		}
@@ -384,7 +384,7 @@ static uint32_t celledit_key(struct mkgui_window *win, struct mkgui_event *ev, u
 			if(textedit_has_selection(&ce->te)) {
 				uint32_t lo, hi;
 				textedit_sel_range(&ce->te, &lo, &hi);
-				platform_clipboard_set(win, ce->text + lo, hi - lo);
+				mkwin_clipboard_set(win->mkwin, ce->text + lo, hi - lo);
 				textedit_delete_selection(&ce->te);
 				dirty_widget_id(win, ce->widget_id);
 			}
@@ -393,7 +393,7 @@ static uint32_t celledit_key(struct mkgui_window *win, struct mkgui_event *ev, u
 
 		if(ks == 'v' || ks == 'V') {
 			uint32_t clip_len = 0;
-			char *clip_buf = platform_clipboard_get_alloc(win, &clip_len);
+			char *clip_buf = mkwin_clipboard_get(win->mkwin, &clip_len);
 			if(clip_buf && clip_len > 0) {
 				for(uint32_t ci = 0; ci < clip_len; ++ci) {
 					if(clip_buf[ci] == '\n' || clip_buf[ci] == '\r') {

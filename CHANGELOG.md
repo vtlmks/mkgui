@@ -2,6 +2,17 @@
 
 All notable changes to mkgui. Pre-1.0 betas may break the API between releases.
 
+## v0.5.0-beta
+
+### Breaking
+
+- **The platform layer is now the separate `mkwin` library, pulled in as a git submodule.** The X11/Win32 windowing, input, framebuffer blit, clipboard, drag-and-drop, and font rasterisation moved into a standalone sibling project, [mkwin](https://github.com/vtlmks/mkwin), so bespoke applications can share the window layer without the widget toolkit. mkgui consumes it as source from the `mkwin/` submodule -- run `git submodule update --init` after cloning; building from source now passes `-Imkwin -DMKWIN_FONT -DMKWIN_GLVIEW`. Every `MKGUI_API` function is unchanged; only the build inputs change.
+- **Environment variables renamed.** `MKGUI_SCALE` -> `MKWIN_SCALE` (DPI scale override) and `MKGUI_FONT` -> `MKWIN_FONT_FILE` (font-file override), since the mkwin layer now reads them.
+
+### Changed
+
+- **Windowing internals reorganised around mkwin handles.** `struct mkgui_window` holds a `struct mkwin_window *`; mkwin owns the framebuffer, dimensions, and DPI scale and publishes them back into the window's fields, leaving the software renderer and widget code untouched. Platform events arrive as a neutral `struct mkwin_event` drained via `mkwin_poll`; font rasterisation is a per-glyph mkwin primitive with the glyph atlas kept in mkgui. The old in-tree `platform_linux.c` / `platform_win32.c` and their type headers are gone.
+
 ## v0.4.0-beta
 
 ### Added

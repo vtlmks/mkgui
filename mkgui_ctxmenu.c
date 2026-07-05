@@ -230,10 +230,10 @@ MKGUI_API void mkgui_context_menu_show(struct mkgui_window *win) {
 	int32_t abs_x = win->ctxmenu_x;
 	int32_t abs_y = win->ctxmenu_y;
 
-	platform_translate_coords(win, win->mouse_x, win->mouse_y, &abs_x, &abs_y);
+	mkwin_translate_coords(win->mkwin, win->mouse_x, win->mouse_y, &abs_x, &abs_y);
 
 	int32_t scr_w, scr_h;
-	platform_screen_size(win, &scr_w, &scr_h);
+	mkwin_screen_size(win->mkwin, &scr_w, &scr_h);
 	if(abs_x + pw > scr_w) {
 		abs_x = scr_w - pw;
 	}
@@ -254,8 +254,8 @@ MKGUI_API void mkgui_context_menu_show(struct mkgui_window *win) {
 	if(p) {
 		render_ctxmenu_popup(win, p, -1);
 		flush_text_popup(win, p);
-		platform_popup_blit(win, p);
-		platform_flush(win);
+		mkwin_popup_present(p->mkwin);
+		mkwin_flush(win->mkwin);
 	}
 }
 
@@ -272,10 +272,10 @@ MKGUI_API void mkgui_context_menu_show_at(struct mkgui_window *win, int32_t x, i
 	ctxmenu_metrics(win, &pw, &ph);
 
 	int32_t abs_x, abs_y;
-	platform_translate_coords(win, x, y, &abs_x, &abs_y);
+	mkwin_translate_coords(win->mkwin, x, y, &abs_x, &abs_y);
 
 	int32_t scr_w, scr_h;
-	platform_screen_size(win, &scr_w, &scr_h);
+	mkwin_screen_size(win->mkwin, &scr_w, &scr_h);
 	if(abs_x + pw > scr_w) {
 		abs_x = scr_w - pw;
 	}
@@ -296,7 +296,7 @@ MKGUI_API void mkgui_context_menu_show_at(struct mkgui_window *win, int32_t x, i
 	if(p) {
 		render_ctxmenu_popup(win, p, -1);
 		flush_text_popup(win, p);
-		platform_popup_blit(win, p);
-		platform_flush(win);
+		mkwin_popup_present(p->mkwin);
+		mkwin_flush(win->mkwin);
 	}
 }
