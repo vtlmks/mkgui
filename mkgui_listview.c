@@ -121,11 +121,7 @@ static void format_size(int64_t bytes, char *buf, uint32_t buf_size) {
 }
 
 // [=]===^=[ format_date ]========================================[=]
-// Formats a unix timestamp string as "YYYY-MM-DD HH:MM". The caller provides
-// a small fixed buffer (typically 32 bytes) that fits the output. Invalid or
-// out-of-range timestamps render as "-" rather than copying the raw input
-// back verbatim, which would silently truncate if the row callback returned
-// a long string for a CELL_DATE column.
+// Format a unix timestamp as "YYYY-MM-DD HH:MM"; invalid renders as "-".
 static void format_date(char *timestamp_str, char *buf, uint32_t buf_size) {
 	time_t ts = (time_t)strtoll(timestamp_str, NULL, 10);
 	if(ts <= 0) {
@@ -141,9 +137,7 @@ static void format_date(char *timestamp_str, char *buf, uint32_t buf_size) {
 }
 
 // [=]===^=[ render_cell ]========================================[=]
-// Shared by listview and treelist: renders a single cell of the given
-// cell_type. The caller owns column geometry (cx/col_w) so the tree-table can
-// inset column 0 for its indent and twisty without this code knowing about it.
+// Shared by listview and treelist; caller owns column geometry (cx/col_w).
 static void render_cell(struct mkgui_window *win, uint32_t cell_type, char *cell_buf, int32_t cx, int32_t ty, int32_t col_w, int32_t clip_left, int32_t clip_right, int32_t clip_top, int32_t clip_bottom, uint32_t tc, int32_t row_y) {
 	int32_t cell_pad = sc(win, 4);
 	switch(cell_type) {
@@ -926,15 +920,7 @@ static void listview_scroll_to_x(struct mkgui_window *win, uint32_t widget_id, i
 }
 
 // [=]===^=[ handle_listview_click ]=============================[=]
-// Press on a listview. In priority order: horizontal then vertical scrollbar
-// (thumb arms drag, trough pages), a column divider (double-click autosizes,
-// else arms column-resize), a column header (arms reorder-drag), then a data
-// row (multi-select honoring Ctrl/Shift via win->press_mod, double-click, slow
-// re-click of an editable selected row begins inline rename, else select +
-// arm row drag). Returns 1 when a row was hit so the caller ends the press via
-// `return ev->type != NONE`; the rename path leaves ev NONE and thus stops
-// draining without emitting, matching pre-extraction behavior. All scrollbar and
-// column paths return 0 to keep draining. idx == hit result.
+// Press priority: h/v scrollbar, divider, header, then row (Ctrl/Shift multi, double-click, slow re-click renames, else select + arm drag); returns 1 only on an emitted event.
 static uint32_t handle_listview_click(struct mkgui_window *win, struct mkgui_event *ev, uint32_t idx) {
 	struct mkgui_widget *hw = &win->widgets[idx];
 	uint32_t hsb_hit = listview_hscrollbar_hit(win, idx, win->mouse_x, win->mouse_y);

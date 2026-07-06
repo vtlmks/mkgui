@@ -2603,9 +2603,7 @@ static void ed_render_canvas(struct mkgui_window *win, uint32_t id, uint32_t *pi
 		ed_rects[ed_win_idx].h = ed_win_save_h;
 	}
 
-	// Render design-time widget representations
-	// Simple widgets (no aux data) use real render via staging slot 0;
-	// complex widgets use simplified fallback previews.
+	// Simple widgets render for real via staging slot 0; complex ones use fallback previews.
 	struct mkgui_widget save_w0 = win->widgets[0];
 	struct mkgui_rect save_r0 = win->rects[0];
 	uint32_t save_hover = win->hover_id;

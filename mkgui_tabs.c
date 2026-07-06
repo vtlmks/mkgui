@@ -202,8 +202,7 @@ static uint32_t handle_tabs_key(struct mkgui_window *win, struct mkgui_event *ev
 }
 
 // [=]===^=[ handle_tabs_click ]=================================[=]
-// Press on a tab strip: a hit on a tab's close affordance emits TAB_CLOSE; a
-// hit on an inactive tab activates it and emits TAB_CHANGED. idx == hit result.
+// A close-affordance hit emits TAB_CLOSE; an inactive-tab hit activates it and emits TAB_CHANGED.
 static uint32_t handle_tabs_click(struct mkgui_window *win, struct mkgui_event *ev, uint32_t idx) {
 	struct mkgui_widget *hw = &win->widgets[idx];
 	uint32_t close_id = tab_close_hit_test(win, idx, win->mouse_x, win->mouse_y);

@@ -350,7 +350,7 @@ static void fd_scan_dir(void) {
 		if(plen == 0) {
 			return;
 		}
-		// skip ".." at a drive root (e.g. "C:\")
+		// no ".." at a drive root
 		if(!(plen == 3 && fd->path[1] == ':' && fd->path[2] == '\\')) {
 			struct fd_entry *e = &fd->entries[fd->entry_count++];
 			snprintf(e->name, sizeof(e->name), "..");
@@ -1135,8 +1135,7 @@ static uint32_t fd_run_dialog(struct mkgui_window *win, uint32_t mode, const str
 		title = "Select Folder";
 	}
 
-	// Folder-pick mode has no filename to type and no extension filter, so hide
-	// the whole name/filter row; MKGUI_HIDDEN collapses it out of the layout.
+	// Folder-pick mode hides the whole name/filter row.
 	uint32_t name_row_hidden = (mode == 2) ? MKGUI_HIDDEN : 0;
 	uint32_t has_filters = (fd->filter_count > 0 && mode != 2) ? 0 : MKGUI_HIDDEN;
 

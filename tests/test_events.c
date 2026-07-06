@@ -144,9 +144,7 @@ static uint32_t poll_for_event(struct mkgui_window *win, uint32_t event_type, ui
 	flush_x_events(win);
 	uint32_t found = 0;
 	struct mkgui_event ev;
-	// Call mkgui_window_poll repeatedly: it returns 1 if a user event was produced,
-	// 0 if no events remain. Internal state (hover, focus) produces events
-	// on subsequent calls even after platform events are drained.
+	// Poll repeatedly; internal hover/focus state can produce events after platform events drain.
 	for(uint32_t i = 0; i < 50; ++i) {
 		uint32_t got = mkgui_window_poll(win, &ev);
 		if(got && ev.type == event_type && (target_id == 0 || ev.id == target_id)) {

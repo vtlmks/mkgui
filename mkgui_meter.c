@@ -43,7 +43,7 @@ static void render_meter(struct mkgui_window *win, uint32_t idx) {
 	int32_t ih = rh - 2;
 
 	if(vertical) {
-		// zone boundaries in pixels from bottom (thresholds are 0-100 percent)
+		// thresholds are 0-100 percent
 		int32_t z1_px = ih * md->zone_t1 / 100;
 		int32_t z2_px = ih * md->zone_t2 / 100;
 		if(z1_px > ih) {
@@ -54,7 +54,7 @@ static void render_meter(struct mkgui_window *win, uint32_t idx) {
 			z2_px = ih;
 		}
 
-		// draw zones bottom-to-top (zone 1 at bottom, zone 3 at top)
+		// bottom-to-top: zone 1 at bottom, zone 3 at top
 		int32_t fill_h = (int32_t)((int64_t)ih * md->value / md->max_val);
 		if(fill_h < 0) {
 			fill_h = 0;
@@ -144,7 +144,6 @@ static void render_meter(struct mkgui_window *win, uint32_t idx) {
 			draw_rect_fill(win->pixels, win->win_w, win->win_h, bar_x, bar_y, bar_w, fill_h, bar_color);
 		}
 
-		// percentage text
 		if(w->style & MKGUI_METER_TEXT) {
 			char buf[16];
 			int32_t pct = (int32_t)((int64_t)md->value * 100 / md->max_val);
@@ -155,7 +154,7 @@ static void render_meter(struct mkgui_window *win, uint32_t idx) {
 			push_text_clip(tx, ty, buf, win->theme.text, rx + 1, ry + 1, rx + rw - 1, ry + rh - 1);
 		}
 	} else {
-		// horizontal: zones left-to-right (thresholds are 0-100 percent)
+		// thresholds are 0-100 percent
 		int32_t z1_px = iw * md->zone_t1 / 100;
 		int32_t z2_px = iw * md->zone_t2 / 100;
 		if(z1_px > iw) {
@@ -244,7 +243,6 @@ static void render_meter(struct mkgui_window *win, uint32_t idx) {
 			draw_rect_fill(win->pixels, win->win_w, win->win_h, ix, bar_y, fill_w, bar_h, bar_color);
 		}
 
-		// percentage text
 		if(w->style & MKGUI_METER_TEXT) {
 			char buf[16];
 			int32_t pct = (int32_t)((int64_t)md->value * 100 / md->max_val);

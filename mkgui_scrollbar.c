@@ -255,8 +255,7 @@ static void scrollbar_scroll(struct mkgui_window *win, uint32_t id, int32_t dire
 }
 
 // [=]===^=[ handle_scrollbar_click ]============================[=]
-// Press on a scrollbar: a hit on the thumb arms thumb-drag (returns 0); a hit
-// in the trough pages toward the click and emits SCROLL. idx == hit result.
+// Thumb hit arms drag and returns 0; trough hit pages toward the click and emits SCROLL.
 static uint32_t handle_scrollbar_click(struct mkgui_window *win, struct mkgui_event *ev, uint32_t idx) {
 	struct mkgui_widget *hw = &win->widgets[idx];
 	if(scrollbar_hit_thumb(win, idx, win->mouse_x, win->mouse_y)) {

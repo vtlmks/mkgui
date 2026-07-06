@@ -363,9 +363,7 @@ static void render_richlist(struct mkgui_window *win, uint32_t idx) {
 }
 
 // [=]===^=[ handle_richlist_click ]==============================[=]
-// Press on a richlist: a scrollbar-thumb hit arms scroll-drag; a trough hit
-// pages; a row hit selects (or emits DBLCLICK on a quick second click). Returns
-// 1 only when it emits a select/dblclick event. idx == hit result.
+// Returns 1 only on a row select or dblclick; scrollbar hits arm drag or page and return 0.
 static uint32_t handle_richlist_click(struct mkgui_window *win, struct mkgui_event *ev, uint32_t idx) {
 	struct mkgui_widget *hw = &win->widgets[idx];
 	uint32_t rl_sb_hit = richlist_scrollbar_hit(win, idx, win->mouse_x, win->mouse_y);

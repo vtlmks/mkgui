@@ -12,9 +12,7 @@
 #define MKGUI_TL_ARROW_SIZE_PX 6
 #define MKGUI_TL_NONE 0xffffffffu
 
-// File-scope sort context: qsort comparators cannot carry a user pointer, and
-// mkgui is single-threaded, so the active tree and key ride here for the
-// duration of one sort.
+// qsort comparators carry no user pointer; single-threaded, so sort state rides here.
 static struct mkgui_treelist_data *tl_sort_tl;
 static int32_t tl_sort_col;
 static int32_t tl_sort_dir;
@@ -51,8 +49,7 @@ static char *treelist_cell(struct mkgui_treelist_data *tl, uint32_t node, uint32
 }
 
 // [=]===^=[ tl_multi_sel_find ]==================================[=]
-// Selection is stored as stable node handles (1-based), sorted, so it survives
-// expand/collapse of unrelated subtrees where visible offsets would not.
+// Selection uses stable 1-based node handles so it survives expand/collapse.
 static int32_t tl_multi_sel_find(struct mkgui_treelist_data *tl, int32_t handle) {
 	uint32_t lo = 0, hi = tl->multi_sel_count;
 	while(lo < hi) {
@@ -148,8 +145,7 @@ static int32_t treelist_total_col_w(struct mkgui_treelist_data *tl) {
 }
 
 // [=]===^=[ treelist_col0_x ]====================================[=]
-// Display x of logical column 0's left edge; the tree decoration always rides
-// with logical column 0 regardless of where the user reordered it.
+// Display x of logical column 0's left edge; the tree decoration rides column 0.
 static int32_t treelist_col0_x(struct mkgui_window *win, uint32_t idx, struct mkgui_treelist_data *tl) {
 	int32_t cx = win->rects[idx].x + 1 - tl->scroll_x;
 	for(uint32_t d = 0; d < tl->col_count; ++d) {
@@ -202,17 +198,14 @@ static int32_t tl_node_cmp(const void *pa, const void *pb) {
 	}
 
 	if(r == 0) {
-		// Stable within a key: insertion order == node index, links reorder but
-		// the array never moves, so ties keep their original relative order.
+		// Stable tie-break: node index preserves insertion order.
 		r = (ia < ib) ? -1 : (ia > ib) ? 1 : 0;
 	}
 	return tl_sort_dir >= 0 ? r : -r;
 }
 
 // [=]===^=[ treelist_sort_chain ]================================[=]
-// Sorts one sibling chain in place by relinking next_sibling, then recurses
-// into each node's children. Parent links are never touched, so no child is
-// ever promoted or moved across parents.
+// Sort one sibling chain by relinking next_sibling, then recurse; parent links untouched.
 static void treelist_sort_chain(struct mkgui_treelist_data *tl, uint32_t head, uint32_t *out_first, uint32_t *out_last) {
 	uint32_t count = 0;
 	for(uint32_t n = head; n != MKGUI_TL_NONE; n = tl->nodes[n].next_sibling) {
@@ -248,8 +241,7 @@ static void treelist_sort_chain(struct mkgui_treelist_data *tl, uint32_t head, u
 	*out_last = arr[count - 1];
 	free(arr);
 
-	// Walk the freshly relinked list (not arr, which is gone) so the recursion
-	// can reuse the same scratch pattern without aliasing.
+	// Walk the relinked list; arr is already freed.
 	for(uint32_t n = *out_first; n != MKGUI_TL_NONE; n = tl->nodes[n].next_sibling) {
 		if(tl->nodes[n].has_children) {
 			uint32_t cf, cl;
@@ -979,13 +971,7 @@ static void treelist_autosize_col(struct mkgui_window *win, struct mkgui_treelis
 }
 
 // [=]===^=[ handle_treelist_click ]=============================[=]
-// Press on a treelist (columned tree). In priority order: horizontal then
-// vertical scrollbar (thumb arms drag, trough pages), a column divider
-// (double-click autosizes else arms resize), a column header (arms reorder),
-// then a visible row: a twisty hit toggles expand/collapse (EXPAND/COLLAPSE),
-// otherwise select honoring Ctrl/Shift multi-select via win->press_mod
-// (double-click emits DBLCLICK). Returns 1 only when it emits an event; all
-// scrollbar/column paths return 0 to keep draining. idx == hit result.
+// Press priority: h/v scrollbar, divider, header, then row (twisty toggles expand/collapse, else select with Ctrl/Shift multi); returns 1 only on an emitted event.
 static uint32_t handle_treelist_click(struct mkgui_window *win, struct mkgui_event *ev, uint32_t idx) {
 	struct mkgui_widget *hw = &win->widgets[idx];
 	uint32_t hsb_hit = treelist_hscrollbar_hit(win, idx, win->mouse_x, win->mouse_y);

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 // ---------------------------------------------------------------------------
-// Dialog system - professional modal dialogs with icons and text wrapping
+// Dialog system - modal dialogs with icons and text wrapping
 // ---------------------------------------------------------------------------
 
 #define DLG_PAD           16
@@ -92,10 +92,7 @@ static void dlg_render(struct mkgui_window *win, void *userdata) {
 }
 
 // [=]===^=[ dlg_icon_resolve ]=======================================[=]
-// Dialog icons share SVG data with their plain counterparts but are
-// rasterised at dialog_icon_size with a brand-coloured currentColor. The
-// "dlg:" prefix keeps the coloured variant in its own icons[] slot so
-// later widget uses of the same name render with the theme colour.
+// "dlg:" prefix caches the brand-coloured variant in its own icons[] slot, so theme-coloured widget uses of the same name are unaffected.
 static int32_t dlg_icon_resolve(struct mkgui_window *win, uint32_t icon_type) {
 	if(icon_type == 0 || icon_type >= sizeof(dlg_icon_defs) / sizeof(dlg_icon_defs[0])) {
 		return -1;
@@ -110,9 +107,7 @@ static int32_t dlg_icon_resolve(struct mkgui_window *win, uint32_t icon_type) {
 		return idx;
 	}
 
-	// Find or lazy-load the SVG source under the original name so the
-	// same data backs both the dialog-coloured and the theme-coloured
-	// variants.
+	// Lazy-load the SVG source under the original name so one copy backs both variants.
 	uint32_t src_idx = svg_find_source_idx(name);
 	if(src_idx == UINT32_MAX && win->system_theme_count > 0) {
 		src_idx = icon_lazy_load_system(win, name);

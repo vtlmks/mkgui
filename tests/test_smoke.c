@@ -1,12 +1,8 @@
 // Copyright (c) 2026, Peter Fors
 // SPDX-License-Identifier: MIT
 //
-// Smoke + coverage-gap tests for mkgui:
-//   - instantiate every widget type and run a layout + render pass
-//   - SPINNER / RICHLIST / GLVIEW setup and getters
-//   - mkgui_is_shown parent-chain walk (hidden, collapsed group, inactive tab)
-//   - category B getters (window size, anim time, col count/label, today)
-//   - iconbrowser ibt_grid_metrics pure math
+// Smoke + coverage-gap tests: instantiate every widget type and render, view
+// setup/getters, mkgui_is_shown parent-chain walk, misc getters, iconbrowser grid math.
 
 #include "../mkgui.c"
 
@@ -270,7 +266,6 @@ static void test_smoke_all_widget_types(void) {
 		CHECK(idx == (int32_t)i, "find_widget_idx(%u) = %d want %u", win->widgets[i].id, idx, i);
 	}
 
-	// Render pass: force full redraw and render all widgets
 	win->dirty_full = 1;
 	render_widgets(win);
 
@@ -686,8 +681,7 @@ static void test_iconbrowser_grid_metrics(void) {
 	struct mkgui_window *win = mkgui_window_create(ctx, NULL, widgets, 1, NULL, 0, 0);
 	CHECK(win, "create failed");
 	if(win) {
-		// The function uses the iconbrowser global. Allocate a temporary state
-		// matching what the real dialog uses.
+		// ibt_grid_metrics uses the iconbrowser global; allocate a temporary state.
 		struct ib_theme_state *saved = ibt;
 		ibt = (struct ib_theme_state *)calloc(1, sizeof(struct ib_theme_state));
 		CHECK(ibt != NULL, "calloc ib_theme_state");
@@ -987,11 +981,8 @@ static void test_canvas_window_render(void) {
 // ---------------------------------------------------------------------------
 
 // [=]===^=[ test_leaf_widget_has_size ]==========================[=]
-// Every visible leaf widget type with default flags and no explicit
-// w/h must lay out to a non-zero rect. A zero-size rect causes
-// dirty_add to silently drop the widget, so animated widgets never
-// redraw and any per-widget invalidation is a no-op. Catches missing
-// cases in natural_height / natural_width.
+// Every leaf widget type must lay out to a non-zero rect: a zero-size rect makes
+// dirty_add silently drop the widget, so it never redraws. Catches natural_height/width gaps.
 static void test_leaf_widget_has_size(void) {
 	uint32_t leaf_types[] = {
 		MKGUI_BUTTON, MKGUI_LABEL, MKGUI_INPUT, MKGUI_CHECKBOX,

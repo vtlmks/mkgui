@@ -344,12 +344,10 @@ static void blend_icon_row_avx2(uint32_t *rowp, uint32_t *src, int32_t col0, int
 	}
 }
 
-// Function pointer types
 typedef void (*fn_fill_pixels)(uint32_t *, uint32_t, uint32_t);
 typedef void (*fn_blend_glyph_row)(uint32_t *, uint8_t *, int32_t, int32_t, int32_t, uint32_t, uint32_t);
 typedef void (*fn_blend_icon_row)(uint32_t *, uint32_t *, int32_t, int32_t, int32_t);
 
-// Forward declaration
 static void fill_pixels_resolve(uint32_t *dst, uint32_t count, uint32_t color);
 
 // Dispatch pointers
@@ -393,11 +391,8 @@ static inline uint32_t blend_pixel(uint32_t dst, uint32_t color, uint8_t alpha) 
 }
 
 // [=]===^=[ disabled_blend ]====================================[=]
-// Returns fg blended MKGUI_DISABLED_BLEND of the way toward bg when disabled
-// is non-zero, else returns fg unchanged. Used by widget render code to
-// uniformly fade frame/fill/border/accent colors for disabled widgets.
-// Label text is NOT blended; widgets pick theme.text_disabled directly so
-// theme authors can keep it legible against busy backgrounds.
+// Blend fg toward bg by MKGUI_DISABLED_BLEND when disabled, else fg unchanged.
+// Label text is NOT blended (widgets use theme.text_disabled directly) so it stays legible.
 static inline uint32_t disabled_blend(uint32_t fg, uint32_t bg, uint32_t disabled) {
 	if(!disabled) {
 		return fg;
@@ -596,9 +591,7 @@ static void draw_rounded_rect_fill(uint32_t *buf, int32_t bw, int32_t bh, int32_
 }
 
 // [=]===^=[ draw_rounded_rect ]===================================[=]
-// 1px border via overdraw: fill the full rect with border color, then fill
-// an inset rect with the background color. simpler than edge detection and
-// naturally handles rounded corners
+// 1px border via overdraw: fill with border color, then an inset rect with fill color; handles rounded corners naturally.
 static void draw_rounded_rect(uint32_t *buf, int32_t bw, int32_t bh, int32_t x, int32_t y, int32_t w, int32_t h, uint32_t fill, uint32_t border, int32_t radius) {
 	draw_rounded_rect_fill(buf, bw, bh, x, y, w, h, border, radius);
 	if(w > 2 && h > 2) {
@@ -1063,9 +1056,7 @@ static void clip_intersect(int32_t *x1, int32_t *y1, int32_t *x2, int32_t *y2, i
 }
 
 // [=]===^=[ flush_text_to ]======================================[=]
-// text commands are queued in screen coordinates; ox/oy translate them into
-// the target buffer's local space so the same queue can flush to either the
-// main framebuffer (ox=0,oy=0) or a popup window at its own origin
+// Text commands are queued in screen coords; ox/oy translate to the target buffer's local space (framebuffer or popup).
 static void flush_text_to(struct mkgui_window *win, uint32_t *buf, int32_t bw, int32_t bh, int32_t ox, int32_t oy) {
 	for(uint32_t i = 0; i < text_cmd_count; ++i) {
 		struct mkgui_text_cmd *cmd = &text_cmds[i];

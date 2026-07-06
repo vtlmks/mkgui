@@ -170,11 +170,7 @@ static uint32_t spinbox_adjust(struct mkgui_window *win, struct mkgui_event *ev,
 }
 
 // [=]===^=[ handle_spinbox_click ]==============================[=]
-// Press on a spinbox: a hit on the up/down buttons steps the value (auto-repeat
-// armed, may emit SPINBOX_CHANGED); a hit on the field enters inline edit mode.
-// Returns 1 when a stepper button was hit -- the caller then ends the press by
-// returning ev->type != NONE, so a clamped step (no event) still stops draining,
-// matching the pre-extraction behavior. Returns 0 to fall through. idx == hit.
+// A stepper-button hit returns 1 even when the step clamped and emitted no event, so the caller still ends the press; a field hit enters inline edit and returns 0.
 static uint32_t handle_spinbox_click(struct mkgui_window *win, struct mkgui_event *ev, uint32_t idx) {
 	struct mkgui_widget *hw = &win->widgets[idx];
 	int32_t dir = spinbox_btn_hit(win, idx, win->mouse_x, win->mouse_y);

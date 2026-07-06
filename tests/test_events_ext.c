@@ -1,14 +1,8 @@
 // Copyright (c) 2026, Peter Fors
 // SPDX-License-Identifier: MIT
 //
-// Extended event tests for mkgui.
-// Covers events not tested in test_events.c: listview, treeview, gridview,
-// richlist, itemview, pathbar, combobox, datepicker, ipinput, tab close,
-// slider start/end, context menu, context header, and timer; drag/reorder
-// (DRAG_START/END, LISTVIEW_REORDER, LISTVIEW_COL_REORDER, TREEVIEW_MOVE,
-// GRIDVIEW_REORDER), gridview keyboard select and checkbox, cell-edit commit,
-// canvas press/motion/release, and the window-level RESIZE, CLOSE, FILE_DROP,
-// plus logview line clicks.
+// Extended event tests: events, drag/reorder, cell-edit, canvas, timers, and
+// window-level RESIZE/CLOSE/FILE_DROP not covered by test_events.c.
 
 #include "../mkgui.c"
 
@@ -161,9 +155,7 @@ static uint32_t poll_for_event(struct mkgui_window *win, uint32_t event_type, ui
 	return found;
 }
 
-// Like poll_for_event but returns the first matching event so callers can
-// assert on its payload (value/col/keysym). Returns an event of type
-// MKGUI_EVENT_NONE if no match was seen.
+// Like poll_for_event but returns the matching event so callers can assert on its payload; type NONE if no match.
 static struct mkgui_event poll_capture(struct mkgui_window *win, uint32_t event_type, uint32_t target_id) {
 	flush_x_events(win);
 	struct mkgui_event ev;
@@ -1267,11 +1259,8 @@ static void transient_timer_cb(struct mkgui_window *win, uint32_t timer_id, void
 }
 
 // [=]===^=[ test_timer_wakes_idle_on_transient_window ]===========[=]
-// Regression: a timer on a non-primary window must wake an otherwise-idle
-// wait. platform_wait_event used to fold only the anchor (primary) window's
-// timer fds into ppoll, so a transient window's timer never woke the loop once
-// X traffic went quiet, and mkgui_ctx_wait blocked forever. The SIGALRM
-// watchdog turns that infinite block into a test failure instead of a hang.
+// Regression: a timer on a non-primary window must wake an idle wait. Only the
+// primary's timer fds used to be folded into ppoll. SIGALRM watchdog turns a hang into a failure.
 static void test_timer_wakes_idle_on_transient_window(void) {
 	TEST_BEGIN("timer: transient-window timer wakes an idle wait");
 	enum { PWIN = 1, PLBL = 2, TWIN = 3, TLBL = 4 };
@@ -1328,17 +1317,13 @@ static uint32_t self_close_fired;
 static void self_close_timer_cb(struct mkgui_window *win, uint32_t timer_id, void *userdata) {
 	(void)timer_id; (void)userdata;
 	self_close_fired = 1;
-	// The window closes itself from inside its own timer callback. With the
-	// deferred-destroy contract this only flags it; an inline free here would
-	// leave the timer loop (mkgui.c timer walk) iterating freed memory.
+	// Self-close from inside the timer callback: deferred-destroy only flags it; an inline free would leave the timer loop on freed memory.
 	mkgui_window_close(win);
 }
 
 // [=]===^=[ test_window_self_close_from_timer ]===================[=]
-// Regression: a window must be able to destroy itself from its own callback.
-// mkgui_window_close flags for deferred destroy; mkgui_ctx_reap_closed frees it
-// later, outside any poll. Run this under AddressSanitizer -- an inline destroy
-// in the callback would be a use-after-free the moment the timer loop resumes.
+// Regression: a window must destroy itself from its own callback via deferred
+// close, reaped outside any poll. Under ASan an inline destroy would be a use-after-free.
 static void test_window_self_close_from_timer(void) {
 	TEST_BEGIN("window: self-close from own timer callback is safe (deferred)");
 	enum { PWIN = 1, PLBL = 2, TWIN = 3, TLBL = 4 };

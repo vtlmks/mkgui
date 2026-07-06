@@ -34,10 +34,7 @@ static uint32_t logview_ansi_256(uint32_t idx) {
 }
 
 // [=]===^=[ logview_text_at ]====================================[=]
-// Return a pointer to a contiguous copy of the source-line text in the
-// caller-provided scratch buffer. Handles wrap-around inside the circular
-// arena. Returns the scratch pointer if a copy was needed, or a direct arena
-// pointer when the line is already contiguous.
+// Copy a source line into scratch, stitching across the arena wrap.
 static char *logview_text_at(struct mkgui_logview_data *lv, struct mkgui_logview_line *line, char *scratch, uint32_t scratch_size) {
 	uint32_t len = line->len;
 	if(len + 1 > scratch_size) {
@@ -57,8 +54,7 @@ static char *logview_text_at(struct mkgui_logview_data *lv, struct mkgui_logview
 }
 
 // [=]===^=[ logview_get_line ]==================================[=]
-// Return a pointer to the line in the ring identified by its sequence number,
-// or NULL when the line has been evicted.
+// Line by sequence number, or NULL if evicted.
 static struct mkgui_logview_line *logview_get_line(struct mkgui_logview_data *lv, uint64_t seq) {
 	if(seq < lv->line_seq_tail || seq >= lv->line_seq_head) {
 		return NULL;
@@ -83,14 +79,11 @@ static void logview_invalidate_wrap(struct mkgui_logview_data *lv) {
 }
 
 // [=]===^=[ logview_evict_lines_to ]============================[=]
-// Advance line_seq_tail until tail >= new_tail, freeing run-ring entries that
-// belonged to the dropped lines.
+// Advance line_seq_tail to new_tail, dropping evicted lines.
 static void logview_evict_lines_to(struct mkgui_logview_data *lv, uint64_t new_tail) {
 	while(lv->line_seq_tail < new_tail && lv->line_seq_tail < lv->line_seq_head) {
 		struct mkgui_logview_line *line = &lv->lines[lv->line_seq_tail % lv->max_lines];
-		// Runs allocated to this line at the tail of the run ring are dropped
-		// when we move past them; nothing to free, but if this line owned the
-		// oldest runs, advance the run tail conceptually (we use modular math).
+		// Runs use modular offsets, so eviction needs no explicit free.
 		(void)line;
 		++lv->line_seq_tail;
 	}
@@ -116,8 +109,7 @@ static void logview_evict_lines_to(struct mkgui_logview_data *lv, uint64_t new_t
 }
 
 // [=]===^=[ logview_make_room ]=================================[=]
-// Make space in the circular text arena for `need` bytes by evicting lines
-// whose data would be overwritten. Returns 0 if `need` exceeds the arena size.
+// Evict lines until `need` bytes are free in the arena; 0 if need > arena size.
 static uint32_t logview_make_room(struct mkgui_logview_data *lv, uint32_t need) {
 	if(need > lv->arena_bytes) {
 		return 0;
@@ -137,8 +129,7 @@ static uint32_t logview_make_room(struct mkgui_logview_data *lv, uint32_t need) 
 }
 
 // [=]===^=[ logview_arena_write ]===============================[=]
-// Append `len` bytes to the text arena, wrapping physically if the write
-// crosses the arena end. Returns the monotonic offset where the bytes started.
+// Append `len` bytes to the arena, wrapping at the end; returns the start offset.
 static uint64_t logview_arena_write(struct mkgui_logview_data *lv, const char *src, uint32_t len) {
 	uint64_t start = lv->arena_head;
 	uint32_t phys = (uint32_t)(start % lv->arena_bytes);
@@ -169,8 +160,7 @@ static void logview_pending_push_char(struct mkgui_logview_data *lv, char c) {
 }
 
 // [=]===^=[ logview_pending_push_run ]==========================[=]
-// Push a style run for the current pending line if the most recent run uses
-// different colors. Bounded by MKGUI_LOGVIEW_MAX_PENDING_RUN.
+// Push a style run when colors differ from the last; capped at MAX_PENDING_RUN.
 static void logview_pending_push_run(struct mkgui_logview_data *lv) {
 	if(lv->pending_runs_count > 0) {
 		struct mkgui_logview_run *prev = &lv->pending_runs[lv->pending_runs_count - 1];
@@ -206,8 +196,7 @@ static void logview_pending_push_run(struct mkgui_logview_data *lv) {
 }
 
 // [=]===^=[ logview_apply_sgr ]=================================[=]
-// Apply one SGR (Select Graphic Rendition) parameter list. Bytes in
-// `params`/`plen` are the digits-and-semicolons between ESC[ and `m`.
+// Apply one SGR parameter list (the bytes between ESC[ and `m`).
 static void logview_apply_sgr(struct mkgui_logview_data *lv, char *params, uint32_t plen) {
 	uint32_t codes[32];
 	uint32_t ncodes = 0;
@@ -299,8 +288,7 @@ static void logview_apply_sgr(struct mkgui_logview_data *lv, char *params, uint3
 }
 
 // [=]===^=[ logview_commit_line ]===============================[=]
-// Move the in-progress pending line into the line ring, copying text to the
-// arena and runs to the runs ring. Resets pending state.
+// Commit the pending line into the ring, copying text and runs.
 static void logview_commit_line(struct mkgui_logview_data *lv) {
 	if(lv->max_lines == 0 || lv->arena_bytes == 0) {
 		lv->pending_len = 0;
@@ -350,8 +338,7 @@ static void logview_commit_line(struct mkgui_logview_data *lv) {
 }
 
 // [=]===^=[ logview_feed ]======================================[=]
-// Stream `len` raw bytes through the ANSI parser, splitting on '\n' to commit
-// finished lines. Carriage returns are dropped to keep \r\n input clean.
+// Feed raw bytes through the ANSI parser, committing a line on '\n'.
 static void logview_feed(struct mkgui_logview_data *lv, const char *text, uint32_t len) {
 	if(lv->pending_runs_count == 0) {
 		logview_pending_push_run(lv);
@@ -420,8 +407,7 @@ static void logview_feed(struct mkgui_logview_data *lv, const char *text, uint32
 }
 
 // [=]===^=[ logview_wrap_width ]================================[=]
-// Inner content width available for text after subtracting borders, padding,
-// and the vertical scrollbar.
+// Inner text width after borders, padding, and the scrollbar.
 static int32_t logview_wrap_width(struct mkgui_window *win, int32_t rw) {
 	int32_t pad = sc(win, 4);
 	return rw - 2 - pad * 2 - win->scrollbar_w;
@@ -445,8 +431,7 @@ static void logview_vline_push(struct mkgui_logview_data *lv, uint64_t seq, uint
 }
 
 // [=]===^=[ logview_wrap_line ]=================================[=]
-// Append visual lines for one source line. When wrap is disabled, emits a
-// single visual line spanning the whole source line.
+// Append visual lines for one source line; one line when wrap is disabled.
 static void logview_wrap_line(struct mkgui_window *win, struct mkgui_logview_data *lv, uint64_t seq, int32_t avail_w, uint32_t nowrap) {
 	struct mkgui_logview_line *line = logview_get_line(lv, seq);
 	if(!line) {
@@ -471,8 +456,7 @@ static void logview_wrap_line(struct mkgui_window *win, struct mkgui_logview_dat
 		uint32_t lo = start;
 		uint32_t hi = total;
 		uint32_t fit = start;
-		// Binary search the largest prefix that fits in avail_w. Linear walk
-		// is acceptable too but binary search keeps wide lines cheap.
+		// Binary search the largest prefix that fits in avail_w.
 		while(lo < hi) {
 			uint32_t mid = lo + (hi - lo + 1) / 2;
 			char save = text[mid];
@@ -508,8 +492,7 @@ static void logview_wrap_line(struct mkgui_window *win, struct mkgui_logview_dat
 }
 
 // [=]===^=[ logview_rebuild_wrap ]==============================[=]
-// Recompute the visual-line cache when the inner width or row height changed.
-// Appended-but-not-yet-cached lines are also covered by this.
+// Rebuild the visual-line cache when width or row height changed.
 static void logview_rebuild_wrap(struct mkgui_window *win, struct mkgui_logview_data *lv, int32_t rw, uint32_t nowrap) {
 	int32_t avail = nowrap ? 0 : logview_wrap_width(win, rw);
 	if(lv->cached_width != avail || lv->cached_row_h != win->row_height || lv->vline_seq_tail != lv->line_seq_tail) {
@@ -561,10 +544,7 @@ static void logview_apply_stick(struct mkgui_window *win, struct mkgui_logview_d
 }
 
 // [=]===^=[ logview_recompute ]=================================[=]
-// Wrap cache, follow-bottom snap, scroll clamp. The stick_to_end flag is
-// authoritatively maintained by user-scroll handlers, so applying it on every
-// recompute is safe: it's a no-op when the flag is 0, and snaps to bottom
-// when 1 -- which is exactly what we want both after appends and on resize.
+// stick_to_end is maintained by scroll handlers, so snapping every recompute is safe.
 static void logview_recompute(struct mkgui_window *win, struct mkgui_logview_data *lv, int32_t idx) {
 	int32_t rw = win->rects[idx].w;
 	int32_t rh = win->rects[idx].h;
@@ -589,8 +569,7 @@ static uint32_t logview_first_visible_vline(struct mkgui_logview_data *lv, int32
 }
 
 // [=]===^=[ logview_hit_vline ]=================================[=]
-// Translate a (mouse_x, mouse_y) coord to a visual-line index + byte offset
-// inside that visual line.
+// Map a (mouse_x, mouse_y) coord to a visual line and byte offset within it.
 static void logview_hit_vline(struct mkgui_window *win, struct mkgui_logview_data *lv, int32_t rx, int32_t ry, int32_t my, int32_t mx, uint32_t *out_vline, uint32_t *out_off) {
 	*out_vline = 0;
 	*out_off = 0;
@@ -715,8 +694,7 @@ static void logview_sb_drag(struct mkgui_window *win, uint32_t idx, struct mkgui
 }
 
 // [=]===^=[ logview_sel_range ]==================================[=]
-// Sort the selection endpoints into (low, high) order. Returns 0 if there is
-// no active selection.
+// Order the selection endpoints low..high; 0 if no active selection.
 static uint32_t logview_sel_range(struct mkgui_logview_data *lv, uint64_t *lo_seq, uint32_t *lo_off, uint64_t *hi_seq, uint32_t *hi_off) {
 	if(!lv->has_selection) {
 		return 0;
@@ -742,9 +720,7 @@ static uint32_t logview_sel_range(struct mkgui_logview_data *lv, uint64_t *lo_se
 }
 
 // [=]===^=[ logview_vline_to_pos ]==============================[=]
-// Convert (vline index, byte offset within that visual line) to a source-line
-// (seq, byte offset within source line). Out-of-range vline maps to "after the
-// last line", which selection code uses as an open-ended endpoint.
+// Map (vline, offset) to a source (seq, offset); past-end maps after the last line.
 static void logview_vline_to_pos(struct mkgui_logview_data *lv, uint32_t vidx, uint32_t off, uint64_t *out_seq, uint32_t *out_off) {
 	if(vidx >= lv->vline_count) {
 		if(lv->line_seq_head > 0) {
@@ -817,8 +793,7 @@ static void render_logview(struct mkgui_window *win, uint32_t idx) {
 			vend = line->len;
 		}
 
-		// Selection rectangle for this visual line. Selection coordinates are
-		// in source-line space, intersect them with this visual line slice.
+		// Selection coords are in source-line space; intersect with this vline slice.
 		if(has_sel && vl->line_seq >= sel_lo_seq && vl->line_seq <= sel_hi_seq) {
 			uint32_t s0 = voff;
 			uint32_t s1 = vend;
@@ -964,8 +939,7 @@ static void render_logview(struct mkgui_window *win, uint32_t idx) {
 }
 
 // [=]===^=[ logview_free_buffers ]===============================[=]
-// Drop all heap allocations belonging to one logview. Called from clear and
-// from reconfigure (setup with different sizes).
+// Free all heap buffers for one logview.
 static void logview_free_buffers(struct mkgui_logview_data *lv) {
 	free(lv->text_arena);
 	free(lv->lines);
@@ -1164,9 +1138,7 @@ MKGUI_API uint32_t mkgui_logview_get_selection_text(struct mkgui_window *win, ui
 }
 
 // [=]===^=[ handle_logview_click ]==============================[=]
-// Press on a logview: a scrollbar hit arms scroll-drag (returns 0); otherwise
-// set the selection anchor, arm drag-select, and, when the press lands on a
-// retained line, emit LOGVIEW_LINE_CLICKED with the 0-based buffer index.
+// Press: scrollbar hit arms scroll-drag; else set selection anchor and arm drag-select.
 static uint32_t handle_logview_click(struct mkgui_window *win, struct mkgui_event *ev, uint32_t idx) {
 	struct mkgui_widget *hw = &win->widgets[idx];
 	struct mkgui_logview_data *lv = find_logview_data(win, hw->id);
@@ -1194,8 +1166,7 @@ static uint32_t handle_logview_click(struct mkgui_window *win, struct mkgui_even
 	lv->has_selection = 0;
 	win->drag_select_id = hw->id;
 	dirty_widget(win, idx);
-	// Deliver the clicked line as a 0-based index into the retained buffer; a
-	// drag-select may still follow via drag_select_id, mirroring listview.
+	// Clicked line as a 0-based buffer index; drag-select may still follow.
 	if(seq >= lv->line_seq_tail && seq < lv->line_seq_head) {
 		ev->type = MKGUI_EVENT_LOGVIEW_LINE_CLICKED;
 		ev->id = hw->id;

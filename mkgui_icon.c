@@ -3,9 +3,7 @@
 
 
 // [=]===^=[ icon_find_idx_at ]=======================================[=]
-// Look up an icon that was rasterised (or added) at exactly `size`. Misses
-// if the icon exists at other sizes. Pass 0 for raster-only icons added
-// via mkgui_icon_add, whose "size" is implicit in their w/h.
+// Look up an icon rasterised at exactly `size`. Pass 0 for raster-only icons added via mkgui_icon_add.
 static int32_t icon_find_idx_at(const char *name, int32_t size) {
 	if(name[0] == '\0') {
 		return -1;
@@ -14,9 +12,7 @@ static int32_t icon_find_idx_at(const char *name, int32_t size) {
 }
 
 // [=]===^=[ icon_find_idx_any ]======================================[=]
-// Returns the first entry with this name, regardless of size. Used for
-// existence checks where the caller just wants to know whether any
-// variant of the icon has been loaded.
+// First entry with this name at any size (existence check).
 static int32_t icon_find_idx_any(const char *name) {
 	if(name[0] == '\0') {
 		return -1;
@@ -94,11 +90,7 @@ static void svg_strip_style_blocks(char *data, uint32_t len) {
 	}
 }
 
-// Rasterize an SVG at target_size into an owned ARGB buffer, then create
-// or update the icons[] entry keyed on (name, target_size). source_idx
-// links the entry back to its svg_sources[] record so svg_rerasterize_all
-// can find the SVG data on scale/theme change; pass UINT32_MAX for
-// one-shot raster paths that will never re-render.
+// source_idx links the entry to svg_sources[] for re-rasterize on scale/theme change; UINT32_MAX for one-shot paths.
 static int32_t svg_rasterize_icon_ex(const char *name, char *svg_data, uint32_t svg_len, int32_t target_size, uint32_t theme_text_color, uint32_t snap_native, uint32_t source_idx) {
 	if(!svg_data || target_size <= 0) {
 		return -1;
@@ -150,8 +142,7 @@ static int32_t svg_rasterize_icon_ex(const char *name, char *svg_data, uint32_t 
 	}
 	plutovg_surface_destroy(surface);
 
-	// Dedup is (name, target_size) -- same icon at a different size lives
-	// in its own entry so the atlas holds all variants simultaneously
+	// Dedup key is (name, target_size); each size gets its own entry so all variants coexist.
 	int32_t existing = icon_find_idx_at(name, target_size);
 	if(existing >= 0) {
 		struct mkgui_icon *ic = &icons[existing];
@@ -198,10 +189,7 @@ static struct mkgui_svg_source *svg_find_source(char *name) {
 }
 
 // [=]===^=[ svg_source_add ]==========================================[=]
-// Takes ownership of svg_data on success. Returns the source's index, or
-// UINT32_MAX if the table is full -- caller must free svg_data in that
-// case. Duplicate names are rejected; callers should svg_find_source
-// before calling this.
+// Takes ownership of svg_data on success; returns the index, or UINT32_MAX if full (caller frees svg_data).
 static uint32_t svg_source_add(const char *name, char *svg_data, uint32_t svg_len) {
 	if(svg_source_count >= MKGUI_SVG_ICON_MAX) {
 		return UINT32_MAX;
@@ -215,10 +203,7 @@ static uint32_t svg_source_add(const char *name, char *svg_data, uint32_t svg_le
 }
 
 // [=]===^=[ svg_find_source_idx ]====================================[=]
-// Like svg_find_source but returns the index instead of a pointer, so
-// the result stays valid across later svg_source_add calls that may
-// relocate the backing array (currently fixed-size, but callers treat
-// the index as the stable handle).
+// Returns the index (stable handle) rather than a pointer.
 static uint32_t svg_find_source_idx(const char *name) {
 	for(uint32_t i = 0; i < svg_source_count; ++i) {
 		if(strcmp(svg_sources[i].name, name) == 0) {
@@ -239,8 +224,7 @@ static uint32_t icon_dir_exists(const char *path) {
 
 #ifndef _WIN32
 // [=]===^=[ icon_detect_theme_name ]================================[=]
-// Detect the user's icon theme name from config files.
-// Checks: $MKGUI_ICON_THEME env, gtk-4.0/gtk-3.0 settings, kdeglobals.
+// Detect icon theme name from $MKGUI_ICON_THEME, gtk settings, or kdeglobals.
 static void icon_detect_theme_name(char *out, uint32_t out_size) {
 	out[0] = '\0';
 
@@ -444,9 +428,7 @@ static void icon_detect_theme_name(char *out, uint32_t out_size) {
 }
 
 // [=]===^=[ icon_resolve_theme_dirs ]===============================[=]
-// Resolve a theme name to one or more directory paths. Per the XDG Icon
-// Theme Spec, user ($XDG_DATA_HOME/icons) takes precedence over system
-// ($XDG_DATA_DIRS/icons). Writes up to max_out full paths, returns count.
+// Resolve a theme name to directory paths; user ($XDG_DATA_HOME) precedes system ($XDG_DATA_DIRS) per XDG spec.
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wformat-truncation"
 static uint32_t icon_resolve_theme_dirs(const char *theme_name, char (*out)[4096], uint32_t max_out) {
@@ -499,8 +481,7 @@ static uint32_t icon_resolve_theme_dirs(const char *theme_name, char (*out)[4096
 #pragma GCC diagnostic pop
 
 // [=]===^=[ icon_read_inherits ]=====================================[=]
-// Read the Inherits= line from a theme's index.theme file.
-// Writes a comma-separated list of parent theme names to out.
+// Read the Inherits= line (comma-separated parent themes) from index.theme.
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wformat-truncation"
 static void icon_read_inherits(const char *theme_dir, char *out, uint32_t out_size) {
@@ -547,9 +528,7 @@ static void icon_read_inherits(const char *theme_dir, char *out, uint32_t out_si
 #pragma GCC diagnostic pop
 
 // [=]===^=[ icon_build_theme_chain ]=================================[=]
-// Build the full theme search chain: primary theme + all inherited themes.
-// Follows the Inherits= chain recursively, avoids duplicates.
-// Also adds the base variant for -Dark/-Light themes (e.g. Papirus for Papirus-Dark).
+// Build the theme search chain: primary + inherited (Inherits=, deduped), plus the base variant for -Dark/-Light themes.
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wformat-truncation"
 static void icon_build_theme_chain(struct mkgui_window *win, const char *theme_name) {
@@ -646,11 +625,10 @@ static void icon_build_theme_chain(struct mkgui_window *win, const char *theme_n
 	}
 }
 #pragma GCC diagnostic pop
-#endif // _WIN32 (Linux-only XDG/index.theme detection ends here)
+#endif // _WIN32
 
 // [=]===^=[ icon_find_in_system_theme ]==============================[=]
-// Search a Freedesktop icon theme hierarchy for a single icon by name.
-// Returns 1 and writes the full SVG path to out, or 0 if not found.
+// Search a Freedesktop theme dir for an icon by name; writes the SVG path to out, returns 1 on hit.
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wformat-truncation"
 static uint32_t icon_find_in_system_theme(const char *theme_dir, const char *name, char *out, uint32_t out_size) {
@@ -726,9 +704,7 @@ static void icon_neg_cache_add(const char *name) {
 }
 
 // [=]===^=[ icon_lazy_load_system ]=================================[=]
-// Pull an icon's SVG source from the system theme chain and register it
-// in svg_sources. Returns the source index, or UINT32_MAX if the icon is
-// not in any theme (caches the miss to avoid re-scanning on every call).
+// Load an icon's SVG from the theme chain into svg_sources; returns the index or UINT32_MAX (caches misses to avoid re-scanning).
 static uint32_t icon_lazy_load_system(struct mkgui_window *win, const char *name) {
 	if(!win || win->system_theme_count == 0) {
 		return UINT32_MAX;
@@ -772,9 +748,8 @@ static uint32_t icon_lazy_load_system(struct mkgui_window *win, const char *name
 typedef void (*icon_theme_visitor)(const char *theme_dir, const char *theme_name, void *userdata);
 
 // [=]===^=[ icon_try_add_theme ]=====================================[=]
-// If dir_path is a Freedesktop theme directory (contains index.theme), or
-// is a source repo containing icons/<theme>.theme.in (e.g. breeze source),
-// invoke visit() with the resolved theme path and the supplied display name.
+// Invoke visit() if dir_path is a theme dir (index.theme) or a source repo
+// with icons/<theme>.theme.in (e.g. breeze source).
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wformat-truncation"
 static void icon_try_add_theme(const char *dir_path, const char *name, icon_theme_visitor visit, void *userdata) {
@@ -810,8 +785,7 @@ static void icon_try_add_theme(const char *dir_path, const char *name, icon_them
 #pragma GCC diagnostic pop
 
 // [=]===^=[ icon_scan_themes_in_dir ]================================[=]
-// Scan a base directory (e.g. /usr/share/icons) for theme subdirectories.
-// Each subdirectory containing index.theme is reported via visit().
+// Scan base_dir (e.g. /usr/share/icons) for theme subdirs, each reported via visit().
 static void icon_scan_themes_in_dir(const char *base_dir, icon_theme_visitor visit, void *userdata) {
 	struct mkgui_dir d;
 	if(!mkgui_dir_open(&d, base_dir)) {
@@ -833,9 +807,7 @@ static void icon_scan_themes_in_dir(const char *base_dir, icon_theme_visitor vis
 }
 
 // [=]===^=[ icon_scan_local_root ]===================================[=]
-// Enumerate base_dir, treat each direct child as a candidate theme, and
-// descend one level so extracted archives (e.g. papirus-icon-theme-XYZ/
-// Papirus/) are discovered. Used for the runtime drop-in workflow.
+// Scan base_dir and one level deeper so extracted archives (papirus-icon-theme-XYZ/Papirus/) are found.
 static void icon_scan_local_root(const char *base_dir, icon_theme_visitor visit, void *userdata) {
 	struct mkgui_dir d;
 	if(!mkgui_dir_open(&d, base_dir)) {
@@ -872,15 +844,13 @@ static void icon_scan_local_root(const char *base_dir, icon_theme_visitor visit,
 }
 
 // [=]===^=[ icon_scan_local_themes ]=================================[=]
-// Scan the current working directory for theme directories one + two
-// levels deep. Reports each via visit().
+// Scan cwd for theme dirs one and two levels deep, each reported via visit().
 static void icon_scan_local_themes(icon_theme_visitor visit, void *userdata) {
 	icon_scan_local_root(".", visit, userdata);
 }
 
 // [=]===^=[ icon_runtime_visit_theme ]===============================[=]
-// Visitor used by the runtime to populate win->system_theme_dirs[]. Saves
-// "hicolor" for last per Freedesktop fallback semantics.
+// Visitor that populates win->system_theme_dirs[]; defers hicolor to last (Freedesktop fallback).
 struct icon_runtime_scan {
 	struct mkgui_window *win;
 	char hicolor_path[4096];
@@ -902,11 +872,7 @@ static void icon_runtime_visit_theme(const char *theme_dir, const char *theme_na
 }
 
 // [=]===^=[ icon_resolve_at ]========================================[=]
-// Find or produce an icon at (name, size). Tries in order:
-//   1. existing icons[] entry keyed on (name, size)
-//   2. re-rasterise from an already-loaded SVG source at the new size
-//   3. lazy-load the SVG from the system theme then rasterise
-// Returns -1 if no variant can be produced.
+// Find or produce an icon at (name, size): existing entry, else re-rasterise a loaded SVG, else lazy-load from the system theme. -1 if none.
 static int32_t icon_resolve_at(struct mkgui_window *win, const char *name, int32_t size) {
 	int32_t idx = icon_find_idx_at(name, size);
 	if(idx >= 0) {
@@ -940,10 +906,7 @@ static int32_t icon_resolve_at(struct mkgui_window *win, const char *name, int32
 }
 
 // [=]===^=[ icon_resolve ]===========================================[=]
-// Convenience wrapper that resolves at win->icon_size. If win is NULL,
-// falls back to the lazy win (used by internal paths that don't plumb a
-// win through). Returns any existing entry at win->icon_size, or lazy-
-// loads one from the system theme.
+// Resolve at win->icon_size; NULL win falls back to the lazy win.
 static int32_t icon_resolve(struct mkgui_window *win, const char *name) {
 	struct mkgui_window *effective = win;
 	if(!effective) {
@@ -959,9 +922,7 @@ static int32_t icon_resolve(struct mkgui_window *win, const char *name) {
 }
 
 // [=]===^=[ widget_icon_idx ]========================================[=]
-// Resolve a widget's icon at win->icon_size. Fallback to the _missing
-// placeholder (raster icon, any size) so the user can see that an icon
-// failed to load rather than getting nothing.
+// Resolve a widget's icon at win->icon_size; fall back to the _missing placeholder on failure.
 static int32_t widget_icon_idx(struct mkgui_window *win, struct mkgui_widget *w) {
 	if(w->icon[0] == '\0') {
 		return -1;
@@ -974,9 +935,7 @@ static int32_t widget_icon_idx(struct mkgui_window *win, struct mkgui_widget *w)
 }
 
 // [=]===^=[ widget_icon_idx_at ]=====================================[=]
-// Resolve a widget's icon at an explicit size. Used by views (itemview
-// icon mode, file dialog thumbnails) that render at sizes other than
-// win->icon_size.
+// Resolve a widget's icon at an explicit size (itemview icon mode, file dialog thumbnails).
 static int32_t widget_icon_idx_at(struct mkgui_window *win, struct mkgui_widget *w, int32_t size) {
 	if(w->icon[0] == '\0') {
 		return -1;
@@ -1051,9 +1010,7 @@ MKGUI_API int32_t mkgui_icon_add(const char *name, const uint32_t *pixels, int32
 		return -1;
 	}
 
-	// Raster icons use requested_size == 0 (their size is implicit in w/h).
-	// Name dedup ignores size here: adding the same raster name twice
-	// replaces the previous raster regardless of dimensions.
+	// Raster icons use requested_size == 0; re-adding the same name replaces the prior raster regardless of size.
 	int32_t existing = icon_find_idx_at(name, 0);
 	if(existing >= 0) {
 		struct mkgui_icon *ic = &icons[existing];
@@ -1145,9 +1102,7 @@ MKGUI_API int32_t mkgui_icon_load_svg(struct mkgui_window *win, const char *name
 		return -1;
 	}
 
-	// Register the source first so svg_rasterize_icon_ex can point the new
-	// icon entry at it. On svg_sources overflow we still rasterise once but
-	// the icon becomes orphaned (no source for future re-rasterisation).
+	// Register the source first so the icon entry can point at it; on overflow it still rasterises once but is orphaned.
 	uint32_t src_idx = svg_source_add(name, svg_data, svg_len);
 	int32_t target_size = win->icon_size;
 	uint32_t theme_color = win->theme.text & 0x00ffffff;
@@ -1258,13 +1213,9 @@ MKGUI_API uint32_t mkgui_icon_load_svg_dir(struct mkgui_window *win, const char 
 }
 
 // [=]===^=[ svg_rerasterize_all ]====================================[=]
-// Re-rasterise every SVG-sourced icon whose icon name matches its source
-// name (the "primary" icons: buttons, menus, etc.). Skipped:
-//   - raster icons (requested_size == 0, no SVG to re-render from)
-//   - icons with no source (UINT32_MAX, loaded from a one-shot path)
-//   - coloured variants whose name differs from the source (dialog dlg:
-//     icons keep their brand colour and re-resolve when the dialog next
-//     opens, because this code path uses the theme colour)
+// Re-rasterise SVG-sourced icons whose name matches their source (primary
+// icons). Skips raster icons, source-less icons, and coloured variants
+// (dlg: icons keep their brand colour and re-resolve on next open).
 static void svg_rerasterize_all(struct mkgui_window *win, float size_ratio) {
 	if(icon_count == 0) {
 		return;
@@ -1283,9 +1234,7 @@ static void svg_rerasterize_all(struct mkgui_window *win, float size_ratio) {
 		if(new_size < 1) {
 			new_size = 1;
 		}
-		// svg_rasterize_icon_ex dedups by (name, target_size). If the size
-		// changed, the hash slot must follow -- update requested_size on
-		// the entry so the post-rasterize lookup matches the new key.
+		// Rasterize dedups by (name, target_size); bump requested_size so the post-rasterize lookup matches the new key.
 		if(new_size != ic->requested_size) {
 			ic->requested_size = new_size;
 		}

@@ -1,13 +1,8 @@
 // Copyright (c) 2026, Peter Fors
 // SPDX-License-Identifier: MIT
 //
-// Lifecycle and host-loop tests for the v0.3.0-beta API:
-//   - mkgui_ctx_create / mkgui_ctx_destroy (and auto-destroy of windows)
-//   - mkgui_window_create with parent=NULL and parent=other-window
-//   - mkgui_ctx_set_quit / mkgui_ctx_should_quit with cancellation
-//   - mkgui_window_set_close / mkgui_window_should_close with cancellation
-//   - mkgui_ctx_pump_others on a two-window ctx
-//   - Host-owned main loop pattern (mkgui_now_ns + mkgui_ctx_wait_until)
+// Lifecycle and host-loop tests for the v0.3.0-beta ctx/window API:
+// create/destroy, auto-destroy, quit/close cancellation, pump_others, host loop.
 
 #include "../mkgui.c"
 
@@ -192,10 +187,7 @@ static void test_pump_others(void) {
 
 	mkgui_window_set_callback(s, secondary_event_cb, NULL);
 
-	// Inject a synthetic key event into the secondary's deferred queue so
-	// pump_others has a user-facing event to deliver to the callback.
-	// (EXPOSE only marks the window dirty internally and never reaches
-	// the user cb, so we use a key event which is always delivered.)
+	// Inject a key event (EXPOSE never reaches the user cb) so pump_others has something to deliver.
 	pump_others_secondary_calls = 0;
 	struct mkwin_event pev = {0};
 	pev.type = MKWIN_EV_KEY;
@@ -240,19 +232,14 @@ static void test_ctx_destroy_auto_destroys_windows(void) {
 	(void)mkgui_window_create(ctx, p, sw, 1, "S", 200, 150);
 	CHECK(ctx->window_count == 2, "expected 2 windows pre-destroy");
 
-	// Intentionally skip window_destroy calls -- auto-destroy is the
-	// contract. After ctx_destroy, no windows should be tracked anywhere.
+	// Skip window_destroy: auto-destroy on ctx_destroy is the contract.
 	mkgui_ctx_destroy(ctx);
 	CHECK(app_ctx == NULL, "app_ctx should be NULL after ctx_destroy");
 }
 
 // [=]===^=[ test_host_loop_two_windows ]==========================[=]
-// Exercise the host-owned mainloop pattern with two windows. Loop
-// terminates after a fixed number of host ticks (we can't inject real X11
-// close events from a unit test, so we self-terminate via set_quit).
-// Verifies that mkgui_now_ns advances, mkgui_ctx_wait_until honors a
-// near-term deadline, and the loop drains both windows' events without
-// blocking forever.
+// Host-owned mainloop with two windows; self-terminates after fixed ticks.
+// Verifies now_ns advances and wait_until honors a near-term deadline without blocking forever.
 static void test_host_loop_two_windows(void) {
 	fprintf(stderr, "test_host_loop_two_windows...\n");
 

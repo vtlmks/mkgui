@@ -397,9 +397,7 @@ static void textarea_scroll_to_cursor(struct mkgui_window *win, uint32_t widget_
 }
 
 // [=]===^=[ handle_textarea_click ]=============================[=]
-// Press on a textarea: a hit on the scrollbar arms scroll-drag; a hit inside
-// an existing selection arms text drag-and-drop; otherwise place the caret and
-// arm drag-select. Emits no event (returns 0); it only arms shared drag state.
+// Press: scrollbar arms scroll-drag; hit inside selection arms text DnD; else caret + drag-select.
 static uint32_t handle_textarea_click(struct mkgui_window *win, struct mkgui_event *ev, uint32_t idx) {
 	(void)ev;
 	struct mkgui_widget *hw = &win->widgets[idx];

@@ -414,10 +414,7 @@ static void demo_gl_timer(struct mkgui_window *win, uint32_t timer_id, void *use
 }
 
 // [=]===^=[ demo_logview_stress ]==================================[=]
-// Pump n lines through the logview while timing the append phase. The result
-// is written to a label so the user sees the per-line cost without having to
-// look at stdout. Some lines carry ANSI colour markers so the parser runs in
-// the hot path; others are plain to balance the mix.
+// Mix ANSI and plain lines so the colour parser stays on the timed hot path.
 static void demo_logview_stress(struct mkgui_window *win, uint32_t n) {
 	struct timespec t0, t1;
 	clock_gettime(CLOCK_MONOTONIC, &t0);
@@ -937,9 +934,7 @@ int main(void) {
 	};
 	mkgui_listview_setup(win, ID_LISTVIEW1, 1000000, 4, cols, demo_row_cb, NULL);
 
-	/* TreeList: a small tree-table, parent ROMs with clone children. Column 0
-	 * carries the indent + twisty; sorting a header reorders parents at the top
-	 * level and clones within their parent, never across parents. */
+	/* TreeList tree-table: parent ROMs with clone children; column 0 holds the indent + twisty. */
 	struct mkgui_column tlcols[] = {
 		{ "Name",         220, MKGUI_CELL_ICON_TEXT },
 		{ "Year",          60, MKGUI_CELL_TEXT },

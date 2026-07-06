@@ -55,13 +55,8 @@
 #define MKGUI_GLYPH_MAX_BMP   4096
 
 // ---------------------------------------------------------------------------
-// Platform layer (mkwin): window/input/blit lives in the mkwin sibling library.
-// It provides struct mkwin_window, struct mkwin_event, MKWIN_EV_*/MKWIN_CURSOR_*
-// and the mkwin_* API used throughout this file.
-//
-// mkgui always uses mkwin's font rasterisation (text rendering) and glview
-// child-window primitive (the MKGUI_GLVIEW widget), so it enables those mkwin
-// modules here rather than making every consumer pass -DMKWIN_FONT/-DMKWIN_GLVIEW.
+// Platform layer (mkwin): window/input/blit, font rasterisation, glview.
+// Enable MKWIN_FONT/MKWIN_GLVIEW here so consumers need not pass the flags.
 // ---------------------------------------------------------------------------
 
 #define MKWIN_FONT
@@ -267,10 +262,9 @@ struct mkgui_treeview_data {
 	uint32_t order_dirty;
 };
 
-// Columned tree (tree-table). Retained forest whose nodes never move in the
-// array, so a node's array index + 1 is a stable handle that selection and the
-// visible-row index reference across expand/collapse. Sorting only relinks
-// first_child/next_sibling; the array and every handle stay put.
+// Columned tree-table. Nodes never move in the array, so index+1 is a stable
+// handle for selection and visible-row refs across expand/collapse. Sorting
+// only relinks first_child/next_sibling; the array and handles stay put.
 struct mkgui_treelist_node {
 	uint32_t parent;         // node index, or 0xffffffff for a root
 	uint32_t first_child;
@@ -543,7 +537,7 @@ struct mkgui_glyph {
 	uint32_t atlas_offset;
 };
 
-// Glyph atlas: linear uint8_t alpha bitmaps for all 224 glyphs (contiguous per glyph)
+// Glyph atlas: alpha bitmaps, contiguous per glyph.
 static uint8_t *glyph_atlas;
 static uint8_t glyph_staging[MKGUI_GLYPH_COUNT][MKGUI_GLYPH_MAX_BMP];
 
@@ -563,14 +557,9 @@ struct mkgui_popup {
 
 struct mkgui_icon {
 	char name[MKGUI_ICON_NAME_LEN];
-	// Logical size requested by the caller; stored so svg_rerasterize_all
-	// can re-render at the correct size on scale/theme change. 0 for raster
-	// icons added via mkgui_icon_add where size is implicit in w/h.
+	// Logical size for svg_rerasterize_all on scale/theme change. 0 for raster icons.
 	int32_t requested_size;
-	// Index into svg_sources[] for the SVG data that backs this icon, or
-	// UINT32_MAX for raster icons and icons whose source was never cached.
-	// Lets one SVG source back many icon variants (same name at different
-	// sizes, or coloured variants under dlg: prefix).
+	// svg_sources[] index backing this icon, or UINT32_MAX for raster/uncached.
 	uint32_t source_idx;
 	uint32_t *pixels;
 	int32_t w, h;
@@ -578,7 +567,7 @@ struct mkgui_icon {
 	uint32_t custom;
 };
 
-// Icon atlas: linear uint32_t ARGB pixels for all loaded icons (contiguous per icon)
+// Icon atlas: ARGB pixels, contiguous per icon.
 static uint32_t *icon_atlas;
 
 static struct mkgui_icon icons[MKGUI_MAX_ICONS];
@@ -636,8 +625,7 @@ static int32_t icon_hash_lookup_at(const char *name, int32_t size) {
 }
 
 // [=]===^=[ icon_hash_lookup_any ]===================================[=]
-// Linear scan for the first entry with this name, regardless of size.
-// Used for existence checks (does any variant of this icon exist?).
+// First entry with this name at any size; used for existence checks.
 static int32_t icon_hash_lookup_any(const char *name) {
 	for(uint32_t i = 0; i < icon_count; ++i) {
 		if(strcmp(icons[i].name, name) == 0) {
@@ -672,30 +660,23 @@ struct mkgui_accel {
 	uint32_t id;
 };
 
-// Reserve-commit virtual memory arena. Pages are mapped PROT_NONE up front,
-// committed (read/write) on demand in fixed-size bumps. Pointers handed out
-// from .base never move, so callers can cache them across grow operations.
-// The implementation (vm_arena_create/ensure/destroy) is defined below.
+// Reserve-commit arena: pages reserved up front, committed on demand.
+// .base never moves, so callers can cache pointers across grows.
 struct vm_arena {
 	uint8_t *base;
 	size_t reserved;
 	size_t committed;
 };
 
-// One (id, widget-index) slot of the per-window id->index hash. Open
-// addressing, linear probe, empty sentinel idx == UINT32_MAX. Backs the O(1)
-// find_widget/find_widget_idx, rebuilt lazily from the widget array whenever a
-// widget is added or removed (id_index_dirty).
+// One slot of the id->index hash. Open addressing, linear probe, empty
+// sentinel idx == UINT32_MAX. Rebuilt lazily on add/remove (id_index_dirty).
 struct mkgui_id_slot {
 	uint32_t id;
 	uint32_t idx;
 };
 
-// Per-window virtual reserve. One arena per array; the array pointer in
-// mkgui_window is set once to arena.base and stays valid forever. Cap and
-// count fields advance as vm_arena_ensure commits more pages. The reserve
-// is sized so the practical maximum (well past any real-world UI count)
-// fits in committed pages without ever hitting the ceiling.
+// Per-window virtual reserve, one arena per array. The array pointer is set
+// once to arena.base and stays valid forever; cap/count advance as pages commit.
 struct mkgui_window_arenas {
 	struct vm_arena widgets;
 	struct vm_arena rects;
@@ -746,9 +727,8 @@ struct mkgui_window {
 	uint32_t widget_count;
 	uint32_t widget_cap;
 
-	// O(1) id->index map over widgets[]. id_index_cap is a power-of-two slot
-	// count; id_index_dirty forces a rebuild on the next lookup after any
-	// add/remove (indices shift), so the map never goes stale.
+	// O(1) id->index map over widgets[]. id_index_cap is a power-of-two slot count;
+	// id_index_dirty forces a rebuild after add/remove (indices shift).
 	struct mkgui_id_slot *id_index;
 	uint32_t id_index_cap;
 	uint32_t id_index_dirty;
@@ -957,11 +937,8 @@ struct mkgui_window {
 	uint32_t system_theme_count;
 };
 
-// Application-level context. Created once per app via mkgui_ctx_create();
-// owns app-wide state and the window registry. Each window holds a back-
-// pointer via win->ctx. New windows inherit the ctx's theme/scale/app_class
-// defaults at creation time and can be re-themed in bulk via the ctx
-// setters.
+// Application-level context, one per app. Owns app-wide state and the window
+// registry; new windows inherit its theme/scale/app_class defaults at creation.
 #define MKGUI_MAX_WINDOWS 16
 struct mkgui_ctx {
 	struct mkgui_window *windows[MKGUI_MAX_WINDOWS];
@@ -977,10 +954,8 @@ struct mkgui_ctx {
 // Virtual memory arena (reserve-commit, no realloc)
 // ---------------------------------------------------------------------------
 
-// Sized at 1M widgets: an order of magnitude past any conceivable real UI
-// (a desktop full of 100 windows with 100 widgets each is only 10k), while
-// still bounded so the per-win virtual reserve stays sane on 32-bit-virtual
-// hosts. Bumping later is a constant change and a recompile.
+// Sized at 1M widgets: far past any real UI, still bounded so the per-win
+// virtual reserve stays sane on 32-bit-virtual hosts.
 #define MKGUI_VM_MAX_TEXT_CMDS   32768
 #define MKGUI_VM_MAX_WIDGETS     (1u << 20)
 #define MKGUI_VM_MAX_HASH_SLOTS  (MKGUI_VM_MAX_WIDGETS * 2)
@@ -1088,10 +1063,8 @@ static void vm_arena_destroy(struct vm_arena *a) {
 #define MKGUI_GROW_AUX     16
 #define STYLE_BORDER_BIT   (1u << 0)
 
-// Bump the per-array vm_arena to fit at least cap+GROW_AUX elements. The
-// array pointer never moves; only the committed footprint grows. Pages
-// committed by mprotect/VirtualAlloc(COMMIT) are zero-initialised by the
-// kernel, so no memset is required for the new tail.
+// Grow the per-array arena by GROW_AUX. The array pointer never moves.
+// Committed pages are kernel-zeroed, so the new tail needs no memset.
 #define MKGUI_AUX_GROW(arena_ptr, count, cap, type) do { \
 	if((count) >= (cap)) { \
 		uint32_t _nc = (cap) + MKGUI_GROW_AUX; \
@@ -1242,9 +1215,8 @@ static void mkgui_recompute_metrics(struct mkgui_window *win) {
 }
 
 // [=]===^=[ glyph_atlas_build ]====================================[=]
-// Linear layout: each glyph's bitmap is stored contiguously (row-major,
-// no stride padding). Better cache locality than 2D packing since the
-// entire glyph fits in a few cache lines with no gaps.
+// Linear layout: each glyph's bitmap stored contiguously, no stride padding.
+// Better cache locality than 2D packing.
 static void glyph_atlas_build(struct mkgui_window *win) {
 	uint32_t total = 0;
 	for(uint32_t i = 0; i < MKGUI_GLYPH_COUNT; ++i) {
@@ -1311,10 +1283,8 @@ static void icon_atlas_rebuild(void) {
 // ---------------------------------------------------------------------------
 
 // [=]===^=[ id_index_rebuild ]==================================[=]
-// Rebuild the per-window id->index hash from the current widget array. Called
-// lazily by find_widget_idx when id_index_dirty is set (after any add/remove).
-// Keeps the FIRST widget for a duplicate id, matching the linear scan it
-// replaced. id_index_cap is always >= 2 * widget_count, so probing terminates.
+// Rebuild the id->index hash from widgets[]. Keeps the FIRST widget for a
+// duplicate id. id_index_cap >= 2 * widget_count, so probing terminates.
 static void id_index_rebuild(struct mkgui_window *win) {
 	uint32_t mask = win->id_index_cap - 1;
 	for(uint32_t i = 0; i < win->id_index_cap; ++i) {
@@ -1490,12 +1460,8 @@ static uint32_t widget_visible(struct mkgui_window *win, uint32_t idx) {
 // Per-type widget descriptor table
 // ---------------------------------------------------------------------------
 
-// One row per widget type, indexed by the MKGUI_* type enum. This is the single
-// place per-type traits live, replacing the parallel switch(type) blocks that
-// used to be scattered across the file (focusable, vflex, ...). Adding a trait
-// is a new column; adding a widget is a new row. Unlisted types fall through to
-// the zero-initialised default (not focusable, flex height), matching what the
-// old switch defaults returned.
+// One row per widget type, indexed by the MKGUI_* enum. Unlisted types fall
+// through to the zero default: not focusable, flex height.
 struct mkgui_widget_desc {
 	uint8_t focusable;   // base per-type focusability; is_focusable also requires !DISABLED
 	uint8_t fixed_h;     // 1 = holds natural height in a vbox; vflex_default = !fixed_h
@@ -1734,8 +1700,7 @@ static inline int32_t lw_sw(struct mkgui_window *win, int32_t val) {
 
 // [=]===^=[ lc_find_idx ]===========================================[=]
 static uint32_t lc_find_idx(struct layout_ctx *lc, uint32_t id) {
-	// knuth multiplicative hash (golden ratio constant 0x9e3779b1) for good
-	// distribution across power-of-two table sizes
+	// knuth multiplicative hash (0x9e3779b1) for good spread over power-of-two tables
 	uint32_t h = (id * 2654435761u) & lc->hash_mask;
 	for(;;) {
 		if(lc->id_map[h].idx == UINT32_MAX) {
@@ -1821,11 +1786,8 @@ static void layout_build_index(struct mkgui_window *win) {
 }
 
 
-// Single-line controls hold their natural height in a VBOX rather than
-// stretching to share leftover space. Setting weight > 0 explicitly opts
-// the widget back into flex behaviour. This matches Qt/GTK size-policy
-// conventions and prevents text carets from rendering at half-window
-// height when a user drops an input next to a weighted sibling.
+// Single-line controls hold their natural height in a VBOX instead of
+// stretching; weight > 0 opts back into flex.
 // [=]===^=[ widget_vflex_default ]==================================[=]
 static uint32_t widget_vflex_default(uint32_t widget_type) {
 	return !widget_desc[widget_type].fixed_h;
@@ -2466,10 +2428,8 @@ static void lc_layout_node(struct mkgui_window *win, struct layout_ctx *lc, uint
 						cw = min_cw;
 					}
 				}
-				// Cross-axis (height) placement. Single-line leaves hold their
-				// natural height and center vertically so e.g. an OK/Cancel row
-				// doesn't stretch its buttons to fill the HBOX. Multi-line leaves
-				// and containers fill the full height (existing behaviour).
+				// Cross-axis placement: single-line leaves hold natural height and
+				// center vertically (so an OK/Cancel row doesn't stretch); others fill.
 				int32_t cy_child = py;
 				int32_t ch_child = ph;
 				uint32_t align = jw->flags & MKGUI_ALIGN_MASK;
@@ -2862,11 +2822,8 @@ static int32_t hit_test(struct mkgui_window *win, int32_t mx, int32_t my) {
 // Window registry
 // ---------------------------------------------------------------------------
 
-// Single process-global ctx pointer. Set by mkgui_ctx_create, cleared by
-// mkgui_ctx_destroy. Lets platform-level callbacks (X11 event router,
-// Win32 WndProc) find the window registry without threading ctx through
-// every layer. The canonical window list lives on ctx->windows[]; this is
-// only a pointer to it, not a duplicate.
+// Process-global ctx pointer so platform callbacks (X11 router, Win32 WndProc)
+// reach the window registry. Points at ctx->windows[], not a duplicate.
 static struct mkgui_ctx *app_ctx;
 
 // ---------------------------------------------------------------------------
@@ -2879,12 +2836,9 @@ static void mkgui_resize_render(struct mkgui_window *win) {
 	mkgui_resize_render_impl(win);
 }
 
-// Cell-edit (inline rename) is a cross-widget service defined in
-// mkgui_celledit.c, which is #included after the list/tree widgets because it
-// depends on their cell-geometry helpers. Those widgets' press/key handlers, in
-// turn, start an edit via celledit_begin -- a genuine circular dependency, so
-// the entry point is forward-declared here (the sanctioned exception to the
-// no-forward-declaration rule).
+// celledit_begin lives in mkgui_celledit.c (included after the list/tree
+// widgets it depends on), but those widgets call it: a genuine circular
+// dependency, so it is forward-declared here.
 static void celledit_begin(struct mkgui_window *win, uint32_t widget_id, int32_t row, int32_t col, const char *text);
 
 #include "mkgui_drop.c"
@@ -2902,9 +2856,7 @@ static void celledit_begin(struct mkgui_window *win, uint32_t widget_id, int32_t
 static struct mkwin_font *mkgui_font;
 
 // [=]===^=[ mkgui_font_load_glyphs ]==============================[=]
-// Pull every glyph in our range from the open mkwin font into the staging
-// buffers and metrics table, then pack the atlas. Advance-only glyphs (spaces)
-// and any that fail to render fall back to a scaled default width.
+// Advance-only glyphs (spaces) and glyphs that fail to render fall back to a scaled default width.
 static void mkgui_font_load_glyphs(struct mkgui_window *win) {
 	for(uint32_t c = MKGUI_GLYPH_FIRST; c <= MKGUI_GLYPH_LAST; ++c) {
 		uint32_t gi = c - MKGUI_GLYPH_FIRST;
@@ -2978,9 +2930,8 @@ static void mkgui_font_fini(struct mkgui_window *win) {
 }
 
 // [=]===^=[ mkgui_modal_frame ]===================================[=]
-// mkwin fires this each frame of a platform modal move/resize loop (Win32),
-// when our own event loop is suspended: advance animation, service timers, and
-// repaint so the UI stays live while the window is being dragged/resized.
+// mkwin calls this each frame of a Win32 modal move/resize loop, while our
+// event loop is suspended: advance animation, service timers, and repaint.
 static void mkgui_modal_frame(struct mkwin_window *mkwin_win, void *user) {
 	(void)mkwin_win;
 	struct mkgui_window *win = (struct mkgui_window *)user;
@@ -3231,9 +3182,7 @@ plutovg_surface_t *plutovg_surface_load_from_image_data(const void *d, int l) { 
 
 // [=]===^=[ render_widget ]=====================================[=]
 // [=]===^=[ render_box ]========================================[=]
-// VBOX/HBOX/FORM draw their optional border (as a panel) plus, when the
-// MKGUI_SCROLL flag is set and the content overflows, a scrollbar track and
-// thumb along whichever axis overflows.
+// Optional border (as a panel), plus a scrollbar on any overflowing axis when MKGUI_SCROLL is set.
 static void render_box(struct mkgui_window *win, uint32_t idx) {
 if(win->widgets[idx].style & STYLE_BORDER_BIT) {
 	render_panel(win, idx);
@@ -4303,10 +4252,9 @@ MKGUI_API uint32_t mkgui_widget_remove(struct mkgui_window *win, uint32_t id) {
 // Public API
 // ---------------------------------------------------------------------------
 
-// Reserve a per-win vm_arena large enough for the practical maximum element
-// count of one aux array. The reserve is virtual-only (PROT_NONE on Linux,
-// MEM_RESERVE on Windows) so the cost is address-space, not RAM. Pages get
-// faulted in zero-filled as MKGUI_AUX_GROW bumps the committed footprint.
+// Reserve a per-win arena for the practical max of one aux array. The reserve
+// is virtual-only, so the cost is address-space, not RAM; pages fault in
+// zero-filled as MKGUI_AUX_GROW commits more.
 // [=]===^=[ mkgui_aux_arena_create ]=============================[=]
 static uint32_t mkgui_aux_arena_create(struct vm_arena *a, size_t elem_size, uint32_t initial_cap) {
 	size_t reserve_bytes = (size_t)MKGUI_VM_MAX_WIDGETS * elem_size;
@@ -4474,8 +4422,7 @@ static void mkgui_free_arrays(struct mkgui_window *win) {
 }
 
 // [=]===^=[ mkgui_ctx_create ]===================================[=]
-// Allocate the application-level context. No display is opened here; the
-// first mkgui_window_create on this ctx is what opens it.
+// No display is opened here; the first mkgui_window_create opens it.
 MKGUI_API struct mkgui_ctx *mkgui_ctx_create(void) {
 	struct mkgui_ctx *ctx = (struct mkgui_ctx *)calloc(1, sizeof(struct mkgui_ctx));
 	if(!ctx) {
@@ -4536,10 +4483,8 @@ MKGUI_API struct mkgui_window *mkgui_window_create(struct mkgui_ctx *ctx, struct
 		}
 	}
 
-	// Effective parent for display sharing: explicit parent if given, else
-	// the first existing window on this ctx (any will do since they share
-	// the X display). NULL means this is the first window and platform_init
-	// must open the display.
+	// Effective parent for display sharing: explicit parent, else any existing
+	// window on this ctx. NULL means this is the first window; the display opens now.
 	struct mkgui_window *share_from = parent;
 	if(!share_from && ctx->window_count > 0) {
 		share_from = ctx->windows[0];
@@ -4548,9 +4493,8 @@ MKGUI_API struct mkgui_window *mkgui_window_create(struct mkgui_ctx *ctx, struct
 	win->scale = share_from ? share_from->scale : ctx->scale;
 	mkgui_recompute_metrics(win);
 
-	// Child windows are created at the parent's DPI-scaled pixel size; a
-	// top-level uses the requested size and lets scale detection resize it.
-	// mkwin opens (or shares) the display internally keyed on parent.
+	// Child windows use the parent's DPI-scaled pixel size; a top-level uses
+	// the requested size and lets scale detection resize it.
 	snprintf(win->app_class, sizeof(win->app_class), "%s", ctx->app_class);
 	int32_t init_ww = parent ? sc(win, init_w) : init_w;
 	int32_t init_hh = parent ? sc(win, init_h) : init_h;
@@ -4645,9 +4589,7 @@ MKGUI_API struct mkgui_window *mkgui_window_create(struct mkgui_ctx *ctx, struct
 }
 
 // [=]===^=[ mkgui_ctx_set_app_class ]================================[=]
-// Sets the WM_CLASS / Win32 class name used by future windows. Also
-// updates every existing window on this ctx so the WM picks up the
-// change immediately.
+// Also updates every existing window on this ctx so the WM picks it up now.
 MKGUI_API void mkgui_ctx_set_app_class(struct mkgui_ctx *ctx, const char *app_class) {
 	MKGUI_CHECK(ctx);
 	MKGUI_CHECK(app_class);
@@ -4694,8 +4636,7 @@ MKGUI_API void mkgui_window_set_icon(struct mkgui_window *win, const struct mkgu
 }
 
 // [=]===^=[ mkgui_ctx_set_theme ]====================================[=]
-// Sets the default theme for new windows and applies to every existing
-// window on this ctx.
+// Default theme for new windows; also applied to every existing window.
 MKGUI_API void mkgui_ctx_set_theme(struct mkgui_ctx *ctx, struct mkgui_theme theme) {
 	MKGUI_CHECK(ctx);
 	ctx->theme = theme;
@@ -4708,8 +4649,7 @@ MKGUI_API void mkgui_ctx_set_theme(struct mkgui_ctx *ctx, struct mkgui_theme the
 }
 
 // [=]===^=[ mkgui_ctx_set_scale ]=====================================[=]
-// Sets the default scale for new windows and applies to every existing
-// window on this ctx.
+// Default scale for new windows; also applied to every existing window.
 MKGUI_API void mkgui_ctx_set_scale(struct mkgui_ctx *ctx, float scale) {
 	MKGUI_CHECK(ctx);
 	if(scale < 0.5f) {
@@ -4816,10 +4756,9 @@ MKGUI_API uint32_t mkgui_get_visible(struct mkgui_window *win, uint32_t id) {
 	return (w->flags & MKGUI_HIDDEN) ? 0 : 1;
 }
 
-// Effective-visibility check: walks the parent chain, accounts for hidden
-// ancestors and non-active tabs. Use this to gate expensive per-frame work
-// (GL rendering, etc.) that only needs to happen when the widget is actually
-// on screen. mkgui_get_visible only reports the widget's own HIDDEN flag.
+// Effective-visibility check: walks the parent chain (hidden ancestors,
+// non-active tabs). Use to gate per-frame work; mkgui_get_visible reports
+// only the widget's own HIDDEN flag.
 
 // [=]===^=[ mkgui_is_shown ]========================================[=]
 MKGUI_API uint32_t mkgui_is_shown(struct mkgui_window *win, uint32_t id) {
@@ -5011,9 +4950,8 @@ MKGUI_API void mkgui_window_destroy(struct mkgui_window *win) {
 	}
 	win->timer_count = 0;
 	mkgui_free_arrays(win);
-	// Last window on this ctx: tear down ctx-shared resources (font, SVG arenas,
-	// text-cmd arena, layout arenas). mkwin_destroy then does per-window teardown
-	// and, when this is the last mkwin window, closes the shared display/IM.
+	// Last window on this ctx: tear down ctx-shared resources (font, SVG,
+	// text-cmd, layout arenas). mkwin_destroy then handles per-window teardown.
 	if(ctx->window_count == 0) {
 		mkgui_font_fini(win);
 		svg_cleanup();
@@ -5025,9 +4963,8 @@ MKGUI_API void mkgui_window_destroy(struct mkgui_window *win) {
 }
 
 // [=]===^=[ mkgui_ctx_destroy ]==================================[=]
-// Free the context. Auto-destroys any windows still alive on this ctx so
-// callers that forget to destroy windows first don't leak platform
-// resources.
+// Auto-destroys any windows still alive on this ctx so a forgetful caller
+// doesn't leak platform resources.
 MKGUI_API void mkgui_ctx_destroy(struct mkgui_ctx *ctx) {
 	if(!ctx) {
 		return;
@@ -5053,13 +4990,10 @@ static void mkgui_resize_render_impl(struct mkgui_window *win) {
 	mkgui_flush(win);
 }
 
-// Per-type press dispatch for the widgets whose button-press handler has the
-// uniform (win, ev, idx) shape. Widgets with special press behaviour (focus,
-// popups, the combobox/dropdown reopen guard) are handled explicitly before
-// this table and have no entry here. discrete preserves the two original
-// poll-return forms exactly: 1 = the handler returns nonzero only with an event
-// set, so poll returns 1; 0 = the handler may consume without an event, so poll
-// returns ev->type != NONE (listview/itemview/treeview/spinbox).
+// Per-type press dispatch for widgets whose handler has the (win, ev, idx)
+// shape. Widgets with special press behaviour are handled before this table.
+// discrete: 1 = handler sets an event when it returns nonzero, so poll returns
+// 1; 0 = handler may consume without an event, so poll returns ev->type != NONE.
 struct mkgui_press_desc {
 	uint32_t (*fn)(struct mkgui_window *win, struct mkgui_event *ev, uint32_t idx);
 	uint8_t discrete;
@@ -5081,11 +5015,9 @@ static struct mkgui_press_desc press_desc[] = {
 	[MKGUI_SPINBOX]   = { handle_spinbox_click, 0 },
 };
 
-// Per-type key dispatch for the focused widget. Every key handler shares the
-// superset signature (win, ev, ks, keymod, buf, len); handlers that only care
-// about the keysym ignore the trailing text-entry arguments. Types with no key
-// handling have a NULL entry. All key handlers return nonzero to mean "consumed,
-// poll returns 1", so this needs no discrete flag (unlike press_desc).
+// Per-type key dispatch for the focused widget. All handlers share the superset
+// signature (win, ev, ks, keymod, buf, len) and return nonzero for "consumed",
+// so no discrete flag is needed (unlike press_desc).
 static uint32_t (*key_desc[])(struct mkgui_window *win, struct mkgui_event *ev, uint32_t ks, uint32_t keymod, char *buf, int32_t len) = {
 	[MKGUI_INPUT]      = handle_input_key,
 	[MKGUI_BUTTON]     = handle_button_key,
@@ -5109,19 +5041,17 @@ static uint32_t (*key_desc[])(struct mkgui_window *win, struct mkgui_event *ev, 
 	[MKGUI_DATEPICKER] = handle_datepicker_key,
 };
 
-// Per-type release dispatch for widgets that finish a drag interaction on
-// button-release (the slider thumb, the split handles). Returns the handler
-// result directly; types without a drag-release have a NULL entry.
+// Per-type release dispatch for widgets that finish a drag on button-release
+// (slider thumb, split handles).
 static uint32_t (*release_desc[])(struct mkgui_window *win, struct mkgui_event *ev, uint32_t id) = {
 	[MKGUI_SLIDER] = handle_slider_release,
 	[MKGUI_HSPLIT] = handle_split_release,
 	[MKGUI_VSPLIT] = handle_split_release,
 };
 
-// Per-type click dispatch for widgets whose click fires when the release lands
-// on the same widget as the press. These take the widget pointer. direct
-// preserves radio's `return handler(...)` (poll returns the result even when 0);
-// the others only make poll return when the handler reports an event.
+// Per-type click dispatch: fires when release lands on the press widget.
+// direct: 1 = poll returns the handler result even when 0 (radio); else
+// poll returns only when the handler reports an event.
 struct mkgui_click_desc {
 	uint32_t (*fn)(struct mkgui_window *win, struct mkgui_event *ev, struct mkgui_widget *w);
 	uint8_t direct;
@@ -5238,12 +5168,9 @@ MKGUI_API uint32_t mkgui_window_poll(struct mkgui_window *win, struct mkgui_even
 		}
 	}
 
-	// widget_visible walks layout_parent[], which is a file-scope scratch
-	// buffer rebuilt per layout pass. If the most recent flush was for a
-	// different window (e.g. parent flushed before we get here, or this is
-	// our first poll), layout_parent indexes refer to that other window
-	// and the visibility walk produces garbage. Rebuild for THIS window
-	// before any widget-visibility check.
+	// widget_visible walks layout_parent[], a file-scope scratch buffer rebuilt
+	// per layout pass. If the last flush was for a different window, those indices
+	// refer to it and the visibility walk is garbage. Rebuild for THIS window first.
 	layout_build_index(win);
 
 	win->anim_active = 0;
@@ -8276,14 +8203,11 @@ MKGUI_API uint32_t mkgui_window_should_close(struct mkgui_window *win) {
 }
 
 // [=]===^=[ mkgui_window_close ]======================================[=]
-// Request deferred destruction of a window. Only flags it; the actual
-// mkgui_window_destroy happens later at a point where no poll is walking the
-// window (mkgui_ctx_reap_closed, called at the top of mkgui_ctx_run's loop, or
-// by a host-owned loop). This makes it safe for a window to close itself from
-// inside its own event or timer callback -- an immediate destroy there would
-// free the window while its poll/timer loop is still iterating it. Flagging the
-// primary window ends mkgui_ctx_run (like should_close); the primary is freed by
-// mkgui_ctx_destroy, never reaped mid-loop.
+// Request deferred destruction. Only flags it; the actual destroy happens
+// later at a point where no poll is walking the window (mkgui_ctx_reap_closed).
+// This makes it safe for a window to close itself from its own callback, where
+// an immediate destroy would free the window mid-iteration. Flagging the
+// primary ends mkgui_ctx_run; the primary is freed by mkgui_ctx_destroy.
 MKGUI_API void mkgui_window_close(struct mkgui_window *win) {
 	MKGUI_CHECK(win);
 	win->destroy_pending = 1;

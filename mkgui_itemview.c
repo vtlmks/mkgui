@@ -136,10 +136,7 @@ static void itemview_get_label(struct mkgui_itemview_data *iv, uint32_t item, ch
 }
 
 // [=]===^=[ itemview_icon_render_size ]===========================[=]
-// Per-view-mode icon size: ICON and THUMBNAIL views draw larger icons
-// than the default win->icon_size used by buttons and menus. THUMBNAIL
-// honours iv->thumb_size if the caller set it, falling back to the
-// default. COMPACT and DETAIL use win->icon_size.
+// Per-view-mode icon size; ICON/THUMBNAIL draw larger than win->icon_size.
 static int32_t itemview_icon_render_size(struct mkgui_window *win, struct mkgui_itemview_data *iv) {
 	switch(iv->view_mode) {
 		case MKGUI_VIEW_ICON: {
@@ -890,12 +887,7 @@ static int32_t itemview_hit_item(struct mkgui_window *win, uint32_t idx, struct 
 }
 
 // [=]===^=[ handle_itemview_click ]=============================[=]
-// Press on an itemview: scrollbar thumb arms scroll-drag, trough pages, and an
-// item hit selects / double-clicks / (on a slow second click of an editable
-// selected item) begins inline rename. Returns 1 when an item was hit so the
-// caller ends the press via `return ev->type != NONE` -- the rename path leaves
-// ev NONE and thus stops draining without emitting, as it did pre-extraction.
-// idx == hit result.
+// Press: scrollbar thumb drags, trough pages, item hit selects/double-clicks/(slow click) renames.
 static uint32_t handle_itemview_click(struct mkgui_window *win, struct mkgui_event *ev, uint32_t idx) {
 	struct mkgui_widget *hw = &win->widgets[idx];
 	uint32_t iv_sb_hit = itemview_scrollbar_hit(win, idx, win->mouse_x, win->mouse_y);

@@ -242,8 +242,7 @@ static uint32_t handle_input_key(struct mkgui_window *win, struct mkgui_event *e
 }
 
 // [=]===^=[ handle_input_click ]====================================[=]
-// Press on an input: double-click selects all, single click positions the
-// caret and arms drag-select. idx is the widget's index (== hit-test result).
+// idx is the widget's index (== hit-test result).
 static void handle_input_click(struct mkgui_window *win, uint32_t idx) {
 	struct mkgui_widget *hw = &win->widgets[idx];
 	struct mkgui_input_data *inp = find_input_data(win, hw->id);

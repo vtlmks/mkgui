@@ -372,12 +372,7 @@ static uint32_t treeview_arrow_hit(struct mkgui_window *win, uint32_t widget_idx
 }
 
 // [=]===^=[ handle_treeview_click ]=============================[=]
-// Press on a treeview: a hit on an expander arrow toggles the node
-// (EXPAND/COLLAPSE); otherwise select the node (double-click emits DBLCLICK, a
-// slow re-click of an editable selected node begins inline rename) and arm node
-// drag. Returns 1 when a node was hit so the caller ends the press via
-// `return ev->type != NONE`; the rename path leaves ev NONE and stops draining
-// without emitting, matching pre-extraction behavior. idx == hit result.
+// Press: arrow hit toggles expand/collapse; else select (double-click, slow re-click renames) and arm drag.
 static uint32_t handle_treeview_click(struct mkgui_window *win, struct mkgui_event *ev, uint32_t idx) {
 	int32_t node_idx = treeview_row_hit(win, idx, win->mouse_y);
 	if(node_idx < 0) {

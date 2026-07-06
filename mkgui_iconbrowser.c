@@ -45,10 +45,8 @@ struct ib_theme_state {
 	char result_name[IB_ICON_NAME];
 	char result_path[1024];
 
-	// Browser's own thumbnail storage: one ARGB pixel buffer per theme icon,
-	// sized size*size. NULL until rasterized. Indexed by theme icon index
-	// (the index into names[]/paths[]), not by filtered index, so narrowing
-	// the filter and widening it again doesn't force re-rasterization.
+	// One ARGB thumbnail per theme icon (size*size), NULL until rasterized.
+	// Indexed by theme icon index, not filtered index, so re-filtering doesn't force re-rasterization.
 	uint32_t *thumb[IB_THEME_MAX_ICONS];
 
 	// Grid state
@@ -70,9 +68,7 @@ struct ib_theme_state {
 static struct ib_theme_state *ibt;
 
 // [=]===^=[ ibt_visit_theme ]=======================================[=]
-// Visitor passed to the shared scanners in mkgui_icon.c. Appends each
-// reported theme to ibt->theme_dirs/names with dedup against the existing
-// set (multiple scan roots can resolve to the same directory).
+// Visitor for the shared scanners; appends each theme to ibt->theme_dirs/names, deduped (scan roots can overlap).
 static void ibt_visit_theme(const char *theme_dir, const char *theme_name, void *userdata) {
 	(void)userdata;
 	if(ibt->theme_count >= IB_MAX_THEMES) {
@@ -129,8 +125,7 @@ static void ibt_scan_local_themes(void) {
 		}
 	}
 #else
-	// scan next to the executable so launching via Start Menu / shortcut
-	// still finds themes extracted into the install directory
+	// scan next to the executable so Start Menu / shortcut launches still find installed themes
 	{
 		char exe_path[2048];
 		DWORD len = GetModuleFileNameA(NULL, exe_path, sizeof(exe_path));
@@ -506,8 +501,7 @@ static void ibt_filter(const char *search) {
 	}
 }
 
-// Rasterize one SVG into a freshly-malloc'd ARGB buffer of size*size pixels.
-// Caller owns the returned buffer. Never touches the main icon system.
+// Rasterize one SVG into a fresh size*size ARGB buffer (caller owns it); never touches the main icon system.
 
 // [=]===^=[ ibt_rasterize ]==========================================[=]
 static uint32_t *ibt_rasterize(struct mkgui_window *win, const char *path, int32_t size) {
@@ -555,9 +549,7 @@ static uint32_t *ibt_rasterize(struct mkgui_window *win, const char *path, int32
 	return argb;
 }
 
-// Rasterize every icon in the current filtered set that doesn't already have
-// a thumbnail cached. All storage is local to the browser; the main icon
-// system is never touched.
+// Rasterize every filtered icon lacking a cached thumbnail; storage is browser-local, main icon system untouched.
 
 // [=]===^=[ ibt_preload_filtered ]===================================[=]
 static void ibt_preload_filtered(struct mkgui_window *win) {
@@ -570,8 +562,7 @@ static void ibt_preload_filtered(struct mkgui_window *win) {
 	}
 }
 
-// Grid layout: items flow top-to-bottom in columns, columns flow left-to-right,
-// horizontally scrollable. Each column has rows_per_col items stacked vertically.
+// Grid: items flow top-to-bottom in columns, columns left-to-right, horizontally scrollable.
 
 #define IB_GRID_ROW_H_PX 22
 #define IB_GRID_COL_W_PX 180
@@ -710,12 +701,9 @@ static int32_t ibt_hit_test(struct mkgui_window *dlg, int32_t mx, int32_t my, ui
 	return item;
 }
 
-// Sync the scrollbar's range and value to the current layout state. Writes
-// directly to the scrollbar's fields to preserve the current value across
-// calls (mkgui_scrollbar_setup would reset it to 0 every time). Safe to call
-// every frame and no-op before layout has produced a valid canvas rect.
-// The scrollbar API treats max_value as total content size and page_size as
-// visible portion; max scroll position is max_value - page_size.
+// Sync scrollbar range/value to layout, writing fields directly to preserve
+// the value (mkgui_scrollbar_setup resets to 0). max_value = content size,
+// page_size = visible, max scroll = max_value - page_size.
 
 // [=]===^=[ ibt_update_scroll_range ]================================[=]
 static void ibt_update_scroll_range(struct mkgui_window *dlg, uint32_t grid_id, uint32_t scroll_id) {
@@ -764,8 +752,7 @@ static void ibt_confirm_selection(uint32_t filtered_item) {
 	ibt->confirmed = 1;
 }
 
-// Free every thumbnail buffer the browser rasterized. Called on theme switch
-// (all thumbs are invalid) and on browser close.
+// Free every rasterized thumbnail. Called on theme switch and browser close.
 
 // [=]===^=[ ibt_free_thumbs ]========================================[=]
 static void ibt_free_thumbs(void) {
@@ -854,9 +841,7 @@ MKGUI_API uint32_t mkgui_icon_browser(struct mkgui_window *win, int32_t size, ch
 	ibt_filter(NULL);
 	ibt_preload_filtered(dlg);
 
-	// Bootstrap the scrollbar's aux data so find_scrollbar_data returns
-	// non-NULL. Values are placeholders - the per-frame update installs the
-	// real range once layout has produced a valid canvas rect.
+	// Bootstrap scrollbar aux data so find_scrollbar_data is non-NULL; the per-frame update installs the real range.
 	mkgui_scrollbar_setup(dlg, IB_TH_HSCROLL, 1, 1);
 
 	mkgui_set_focus(dlg, IB_TH_SEARCH);
@@ -938,9 +923,7 @@ MKGUI_API uint32_t mkgui_icon_browser(struct mkgui_window *win, int32_t size, ch
 			}
 		}
 
-		// Detect press on the grid canvas: select on first click, confirm on
-		// double-click. win->press_id is set by mkgui_window_poll; we only act on
-		// the rising edge (new press this frame).
+		// Grid press: select on click, confirm on double-click. Act only on the rising edge (new press this frame).
 		if(dlg->press_id == IB_TH_GRID && !was_press) {
 			int32_t item = ibt_hit_test(dlg, dlg->mouse_x, dlg->mouse_y, IB_TH_GRID);
 			if(item >= 0) {
@@ -958,16 +941,9 @@ MKGUI_API uint32_t mkgui_icon_browser(struct mkgui_window *win, int32_t size, ch
 		}
 		was_press = (dlg->press_id != 0);
 
-		// Reconcile scrollbar and our scroll_x each frame. This is where
-		// layout-driven updates happen (initial size, resize, filter change
-		// all manifest as changes to the canvas rect).
-		//
-		// 1. Read the scrollbar. If it changed since we last wrote to it,
-		//    the user moved it (drag, wheel, click) - copy into scroll_x.
-		// 2. Re-run the range update: reads current canvas rect, rewrites
-		//    max_value/page_size from current filtered_count, clamps
-		//    scroll_x, writes scroll_x back to the scrollbar.
-		// 3. Remember what we wrote so the next frame can detect user input.
+		// Reconcile scrollbar and scroll_x each frame: if the scrollbar changed
+		// since we last wrote it the user moved it (copy in), then re-run the
+		// range update and remember what we wrote to detect input next frame.
 		int32_t cur_sb = mkgui_scrollbar_get(dlg, IB_TH_HSCROLL);
 		if(cur_sb != last_sb_value) {
 			ibt->scroll_x = cur_sb;

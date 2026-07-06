@@ -1,9 +1,8 @@
 // Copyright (c) 2026, Peter Fors
 // SPDX-License-Identifier: MIT
 
-// Drop-file storage, URI parsing and the platform hookup now live in mkwin;
-// these public entry points forward to it. mkgui_drop_enable is implemented in
-// mkgui.c after the platform include.
+// Storage and URI parsing live in mkwin; these forward to it.
+// mkgui_drop_enable is in mkgui.c, after the platform include.
 
 // [=]===^=[ mkgui_drop_count ]==================================[=]
 MKGUI_API uint32_t mkgui_drop_count(struct mkgui_window *win) {

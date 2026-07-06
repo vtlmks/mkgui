@@ -72,8 +72,7 @@ static uint32_t split_bar_hit(struct mkgui_window *win, uint32_t idx, int32_t mx
 }
 
 // [=]===^=[ handle_split_release ]==============================[=]
-// End of a split-bar drag: the ratio is already committed during MOVE, so
-// release only needs to announce the final position.
+// Ratio is committed during MOVE; release only announces the final position.
 static uint32_t handle_split_release(struct mkgui_window *win, struct mkgui_event *ev, uint32_t id) {
 	ev->type = MKGUI_EVENT_SPLIT_MOVED;
 	ev->id = id;

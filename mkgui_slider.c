@@ -231,7 +231,6 @@ static uint32_t handle_slider_key(struct mkgui_window *win, struct mkgui_event *
 }
 
 // [=]===^=[ handle_slider_release ]=============================[=]
-// End of a slider drag: emit SLIDER_END carrying the settled value.
 static uint32_t handle_slider_release(struct mkgui_window *win, struct mkgui_event *ev, uint32_t id) {
 	struct mkgui_slider_data *sd = find_slider_data(win, id);
 	ev->type = MKGUI_EVENT_SLIDER_END;
@@ -241,9 +240,7 @@ static uint32_t handle_slider_release(struct mkgui_window *win, struct mkgui_eve
 }
 
 // [=]===^=[ handle_slider_click ]===============================[=]
-// Press on a slider: clicking the thumb starts a drag from the current value;
-// clicking the track jumps the value to the click position. Either way emit
-// SLIDER_START and arm the drag via drag_slider_offset. idx == hit result.
+// Thumb click drags from the current value; track click jumps to the click; both emit SLIDER_START and arm drag_slider_offset.
 static uint32_t handle_slider_click(struct mkgui_window *win, struct mkgui_event *ev, uint32_t idx) {
 	struct mkgui_widget *hw = &win->widgets[idx];
 	struct mkgui_slider_data *sd = find_slider_data(win, hw->id);

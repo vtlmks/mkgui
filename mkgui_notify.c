@@ -18,9 +18,7 @@ struct notify_palette {
 	char *icon_name;
 };
 
-// Saturated severity palette. These are the same info/warning/error accent
-// colors used by the dialog windows (mkgui_dialogs.c); success is green.
-// White text reads cleanly on all four.
+// Severity palette matching the dialog accent colors; success is green, white text reads on all four.
 static struct notify_palette notify_pal[4] = {
 	{ 0x3daee9, 0xffffff, "dialog-information" },  // INFO
 	{ 0x27ae60, 0xffffff, "dialog-ok"          },  // SUCCESS
@@ -188,8 +186,7 @@ static uint32_t toast_alloc_slot(struct mkgui_window *win) {
 			return i;
 		}
 	}
-	// All slots in use: shift everything down, freeing the last slot.
-	// Oldest toast (slot 0) is dropped. This keeps newest-at-bottom order.
+	// All slots full: shift down, dropping oldest (slot 0), keeping newest-at-bottom order.
 	for(uint32_t i = 0; i < MKGUI_MAX_TOASTS - 1; ++i) {
 		win->toasts[i] = win->toasts[i + 1];
 	}
@@ -218,8 +215,7 @@ MKGUI_API void mkgui_toast_ex(struct mkgui_window *win, uint32_t severity, const
 	t->expire_ms = duration_ms ? (uint32_t)(mkgui_now_ns() / 1000000ull) + duration_ms : 0;
 	t->x = t->y = t->w = t->h = 0;
 	snprintf(t->text, sizeof(t->text), "%s", text);
-	// Pre-resolve the severity icon so the system-theme lazy-load happens
-	// once here rather than on every render pass.
+	// Pre-resolve the severity icon so lazy-load happens once, not per render pass.
 	icon_resolve(win, notify_palette_for(t->severity)->icon_name);
 	dirty_all(win);
 }
@@ -381,8 +377,7 @@ MKGUI_API uint32_t mkgui_banner_active(struct mkgui_window *win) {
 // ---------------------------------------------------------------------------
 
 // [=]===^=[ render_notify ]===========================================[=]
-// Called from mkgui_flush after widget rendering. Banner first (underneath
-// any overlapping toasts), then toasts (always on top).
+// Called from mkgui_flush after widgets: banner first, toasts on top.
 static void render_notify(struct mkgui_window *win) {
 	render_banner(win);
 	render_toasts(win);

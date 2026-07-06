@@ -508,10 +508,7 @@ static void gridview_scroll_to_y(struct mkgui_window *win, uint32_t id, int32_t 
 }
 
 // [=]===^=[ handle_gridview_click ]=============================[=]
-// Press on a gridview: scrollbar thumb arms drag, trough pages; a column
-// divider double-click autosizes else arms resize; a data cell selects and,
-// for check-type columns, toggles the bit (GRID_CHECK) otherwise emits
-// GRID_CLICK. Returns 1 only when it emits an event. idx == hit result.
+// Press: scrollbar thumb drags, trough pages; divider autosizes/resizes; cell selects (check columns toggle the bit, else GRID_CLICK).
 static uint32_t handle_gridview_click(struct mkgui_window *win, struct mkgui_event *ev, uint32_t idx) {
 	struct mkgui_widget *hw = &win->widgets[idx];
 	uint32_t gv_sb_hit = gridview_scrollbar_hit(win, idx, win->mouse_x, win->mouse_y);
@@ -700,8 +697,7 @@ static uint32_t handle_gridview_key(struct mkgui_window *win, struct mkgui_event
 	}
 	gridview_clamp_scroll(win, gv, content_h);
 	dirty_all(win);
-	// Keyboard row navigation (up/down/page/home/end) is a selection change;
-	// column focus moves (left/right) and mouse cell clicks emit GRID_CLICK.
+	// Row navigation is a selection change; left/right and cell clicks emit GRID_CLICK.
 	ev->type = MKGUI_EVENT_GRIDVIEW_SELECT;
 	ev->id = win->focus_id;
 	ev->value = gv->selected_row;

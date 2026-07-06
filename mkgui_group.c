@@ -85,7 +85,6 @@ MKGUI_API uint32_t mkgui_group_get_collapsed(struct mkgui_window *win, uint32_t 
 }
 
 // [=]===^=[ handle_group_click ]================================[=]
-// Clicking a collapsible group's header toggles the collapsed state.
 static uint32_t handle_group_click(struct mkgui_window *win, struct mkgui_event *ev, struct mkgui_widget *w) {
 	if(!(w->style & MKGUI_GROUP_COLLAPSIBLE)) {
 		return 0;

@@ -1,11 +1,9 @@
 // Copyright (c) 2026, Peter Fors
 // SPDX-License-Identifier: MIT
 
-// Filesystem abstraction for directory enumeration and path queries.
-// Windows uses FindFirstFileA / GetFileAttributesExA; POSIX uses opendir /
-// readdir / stat / access. Callers in mkgui_icon.c, mkgui_iconbrowser.c and
-// mkgui_filedialog.c reach file metadata exclusively through this layer so
-// they build identically under MinGW and MSVC/clang-cl as well as POSIX.
+// Filesystem abstraction for directory enumeration and path queries, so callers
+// build identically on Win32 (FindFirstFileA/GetFileAttributesExA) and POSIX
+// (opendir/readdir/stat/access).
 
 #ifndef _WIN32
 #include <dirent.h>
@@ -45,7 +43,6 @@ struct mkgui_path_info {
 // ---------------------------------------------------------------------------
 
 // [=]===^=[ mkgui_dir_open ]=========================================[=]
-// Open a directory for iteration. Returns 1 on success, 0 on failure.
 static int32_t mkgui_dir_open(struct mkgui_dir *d, const char *path) {
 #ifdef _WIN32
 	char pattern[MKGUI_PATH_MAX + 4];
@@ -69,7 +66,6 @@ static int32_t mkgui_dir_open(struct mkgui_dir *d, const char *path) {
 }
 
 // [=]===^=[ mkgui_dir_next ]=========================================[=]
-// Advance the iterator; returns the next entry or NULL when exhausted.
 static struct mkgui_dir_entry *mkgui_dir_next(struct mkgui_dir *d) {
 #ifdef _WIN32
 	if(d->pending) {
@@ -112,7 +108,6 @@ static void mkgui_dir_close(struct mkgui_dir *d) {
 // ---------------------------------------------------------------------------
 
 // [=]===^=[ mkgui_path_stat ]========================================[=]
-// Fill is_dir/size/mtime for a path. Returns 1 on success, 0 on failure.
 static int32_t mkgui_path_stat(const char *path, struct mkgui_path_info *out) {
 #ifdef _WIN32
 	WIN32_FILE_ATTRIBUTE_DATA ad;
@@ -163,9 +158,7 @@ static uint32_t mkgui_path_exists(const char *path) {
 }
 
 // [=]===^=[ mkgui_path_readable ]====================================[=]
-// Win32 has no true R_OK without opening the file; presence is what the
-// existing callers actually need (they attempt to read the file right after),
-// so we report readability as existence there. POSIX uses access(R_OK).
+// Win32 has no R_OK without opening the file; callers read right after, so existence stands in for readability. POSIX uses access(R_OK).
 static uint32_t mkgui_path_readable(const char *path) {
 #ifdef _WIN32
 	return GetFileAttributesA(path) != INVALID_FILE_ATTRIBUTES ? 1 : 0;

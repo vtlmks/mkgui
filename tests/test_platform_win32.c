@@ -1,14 +1,9 @@
 // Copyright (c) 2026, Peter Fors
 // SPDX-License-Identifier: MIT
 //
-// Win32 platform-layer test harness for mkgui (built with mingw, run under
-// wine). The GUI core (plat_event -> mkgui_event) is platform-agnostic and
-// fully covered by the Linux suites; the software renderer and widget data
-// are identical on both platforms. This test exercises only the divergent
-// Win32 surface: windowing lifecycle and the native-message -> plat_event
-// translation in the real WndProc (mouse, keyboard, resize, close), plus the
-// VK -> keysym mapping that must agree with the X11 keysym space the core
-// compares against.
+// Win32 platform-layer tests (mingw, run under wine). The core is covered by the
+// Linux suites; this exercises only the divergent Win32 surface: windowing
+// lifecycle, the WndProc native-message -> plat_event translation, and VK -> keysym mapping.
 
 #include "../mkgui.c"
 
@@ -69,9 +64,7 @@ static void post_msg(struct mkgui_window *win, UINT msg, WPARAM wp, LPARAM lp) {
 	PostMessageA(win->mkwin->hwnd, msg, wp, lp);
 }
 
-// mkgui_window_poll pumps the Win32 message queue internally, so looping it
-// dispatches posted messages through the WndProc and drains the resulting
-// plat_events. Returns the first matching event (type NONE if not seen).
+// mkgui_window_poll pumps the Win32 queue internally, so looping it dispatches posted messages. Returns the first match (type NONE if none).
 static struct mkgui_event poll_capture(struct mkgui_window *win, uint32_t event_type, uint32_t target_id) {
 	struct mkgui_event ev;
 	struct mkgui_event hit;
