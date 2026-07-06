@@ -105,8 +105,19 @@ static void render_checkbox(struct mkgui_window *win, uint32_t idx) {
 	push_text_clip(rx + box_size + sc(win, 6), ty, w->label, tc, rx, ry, rx + rw, ry + rh);
 }
 
+// [=]===^=[ handle_checkbox_click ]=============================[=]
+// Fired from the release path when press and release land on the same checkbox.
+// The widget is redrawn via the release path's was_press dirty, not here.
+static uint32_t handle_checkbox_click(struct mkgui_window *win, struct mkgui_event *ev, struct mkgui_widget *w) {
+	w->style ^= MKGUI_CHECKBOX_CHECKED;
+	ev->type = MKGUI_EVENT_CHECKBOX_CHANGED;
+	ev->id = w->id;
+	ev->value = (w->style & MKGUI_CHECKBOX_CHECKED) ? 1 : 0;
+	return 1;
+}
+
 // [=]===^=[ handle_checkbox_key ]===============================[=]
-static uint32_t handle_checkbox_key(struct mkgui_window *win, struct mkgui_event *ev, uint32_t ks) {
+static uint32_t handle_checkbox_key(struct mkgui_window *win, struct mkgui_event *ev, uint32_t ks, uint32_t keymod, char *buf, int32_t len) {
 	if(ks == MKGUI_KEY_SPACE) {
 		struct mkgui_widget *w = find_widget(win, win->focus_id);
 		if(!w) {

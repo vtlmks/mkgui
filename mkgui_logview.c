@@ -1162,3 +1162,45 @@ MKGUI_API uint32_t mkgui_logview_get_selection_text(struct mkgui_window *win, ui
 	out[written] = '\0';
 	return written;
 }
+
+// [=]===^=[ handle_logview_click ]==============================[=]
+// Press on a logview: a scrollbar hit arms scroll-drag (returns 0); otherwise
+// set the selection anchor, arm drag-select, and, when the press lands on a
+// retained line, emit LOGVIEW_LINE_CLICKED with the 0-based buffer index.
+static uint32_t handle_logview_click(struct mkgui_window *win, struct mkgui_event *ev, uint32_t idx) {
+	struct mkgui_widget *hw = &win->widgets[idx];
+	struct mkgui_logview_data *lv = find_logview_data(win, hw->id);
+	if(!lv) {
+		return 0;
+	}
+	logview_recompute(win, lv, (int32_t)idx);
+	if(logview_has_scrollbar(win, idx, lv)) {
+		int32_t sb_off = logview_sb_hit(win, idx, lv, win->mouse_x, win->mouse_y);
+		if(sb_off >= 0) {
+			win->drag_scrollbar_id = hw->id;
+			win->drag_scrollbar_offset = sb_off;
+			return 0;
+		}
+	}
+	uint32_t vline, off;
+	logview_hit_vline(win, lv, win->rects[idx].x, win->rects[idx].y, win->mouse_y, win->mouse_x, &vline, &off);
+	uint64_t seq;
+	uint32_t soff;
+	logview_vline_to_pos(lv, vline, off, &seq, &soff);
+	lv->sel_anchor_line_seq = seq;
+	lv->sel_anchor_off = soff;
+	lv->sel_cursor_line_seq = seq;
+	lv->sel_cursor_off = soff;
+	lv->has_selection = 0;
+	win->drag_select_id = hw->id;
+	dirty_widget(win, idx);
+	// Deliver the clicked line as a 0-based index into the retained buffer; a
+	// drag-select may still follow via drag_select_id, mirroring listview.
+	if(seq >= lv->line_seq_tail && seq < lv->line_seq_head) {
+		ev->type = MKGUI_EVENT_LOGVIEW_LINE_CLICKED;
+		ev->id = hw->id;
+		ev->value = (int32_t)(seq - lv->line_seq_tail);
+		return 1;
+	}
+	return 0;
+}

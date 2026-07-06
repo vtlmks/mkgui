@@ -9,6 +9,10 @@ COMMON_CFLAGS+="-O2 "
 # COMMON_CFLAGS+="-fno-inline -Wframe-larger-than=100000 "
 COMMON_CFLAGS+="-march=x86-64-v2 "
 COMMON_CFLAGS+="-fwrapv "
+# Pairs with --gc-sections (link) to drop dead leaf code. Not -fdata-sections: it
+# bloats the mingw .exe by moving zero-init statics into file-backed .data.
+COMMON_CFLAGS+="-ffunction-sections "
+COMMON_CFLAGS+="-fno-asynchronous-unwind-tables "
 COMMON_CFLAGS+="-Wall "
 COMMON_CFLAGS+="-Wextra "
 COMMON_CFLAGS+="-Wno-missing-field-initializers "
@@ -18,28 +22,22 @@ COMMON_CFLAGS+="-Wformat-truncation "
 COMMON_CFLAGS+="-Wno-stringop-truncation "
 COMMON_CFLAGS+="-Wsign-conversion "
 
-# mkwin (window/input/blit layer) is a git submodule at ./mkwin, consumed as
-# source and #included into the mkgui translation unit. mkgui.c enables the
-# mkwin font + glview modules itself, so only the include path is needed here.
+# mkwin submodule, #included into the mkgui translation unit; just the include path.
 COMMON_CFLAGS+="-Imkwin "
 
-# Baked into libmkgui.a so consumers get the same icon capacity the
-# unity-built tools used to get via their own #define.
 LIB_DEFINES="-DMKGUI_LIBRARY -DMKGUI_MAX_ICONS=32768"
 
 LINUX_LIBS="$(pkg-config --cflags freetype2 fontconfig) -lX11 -lXext $(pkg-config --libs freetype2 fontconfig) -lm "
 LINUX_DEMO_LIBS="-lGL "
 WINDOWS_LIBS="-lgdi32 -mwindows "
 WINDOWS_DEMO_LIBS="-lopengl32 "
-# Pull winpthread from its static archive on final links: mingw-w64's posix-
-# threads libgcc references it, which otherwise leaves the .exe depending on
-# libwinpthread-1.dll. Only the link steps need it, not the -c compile of mkgui.o.
+# Static-link winpthread so the .exe doesn't depend on libwinpthread-1.dll.
 WINDOWS_PTHREAD="-Wl,-Bstatic -lwinpthread -Wl,-Bdynamic "
 
-# Each argument is either a build mode or a build target. Defaults: normal mode,
-# all target (library + demo + tests + extract_icons + editor). The editor
-# rebuilds with everything else by default so library changes can't leave a
-# stale editor binary on disk; pass 'core' to skip the editor compile.
+LDFLAGS="-Wl,--gc-sections "
+
+# Args are build modes and/or targets. Default: normal mode, all targets. The
+# editor rebuilds with everything by default; pass 'core' to skip it.
 MODE="normal"
 TARGET="all"
 
@@ -97,14 +95,8 @@ if [ -z "$SKIP_WINDOWS" ] && command -v $WINCC &>/dev/null; then
 fi
 
 # -----------------------------------------------------------------------------
-# Phase 1: static libraries (sequential - this is the heavy compile).
-# Building once and linking everyone else against it avoids saturating a
-# laptops; the two libs are independent so they run concurrently. We wait
-# for both before phase 2 because every consumer links against one of them.
-# Both static libraries share the canonical name libmkgui.a; platform is
-# encoded in the parent directory (out/linux/, out/windows/).
-# Editor is special (unity build, uses internals) and does not depend on the
-# library, so we skip this phase when target=editor.
+# Phase 1: the two static libmkgui.a (out/linux/, out/windows/). Every consumer
+# links one of these; the editor is a unity build and skips this phase.
 # -----------------------------------------------------------------------------
 
 if [ "$TARGET" != "editor" ]; then
@@ -144,51 +136,50 @@ fi
 if [ "$TARGET" != "editor" ]; then
 	# Demo: small app, links libmkgui.a
 	(
-		$CC $CFLAGS demo.c out/linux/libmkgui.a -o out/linux/demo $LINUX_LIBS $LINUX_DEMO_LIBS
+		$CC $CFLAGS demo.c out/linux/libmkgui.a -o out/linux/demo $LINUX_LIBS $LINUX_DEMO_LIBS $LDFLAGS
 	) &
 
 	if [ "$WIN_ENABLED" -eq 1 ]; then
 		(
-			$WINCC $CFLAGS demo.c out/windows/libmkgui.a -o out/windows/demo.exe $WINDOWS_LIBS $WINDOWS_DEMO_LIBS $WINDOWS_PTHREAD
+			$WINCC $CFLAGS demo.c out/windows/libmkgui.a -o out/windows/demo.exe $WINDOWS_LIBS $WINDOWS_DEMO_LIBS $WINDOWS_PTHREAD $LDFLAGS
 		) &
 	fi
 
-	# Tests: unity builds (they poke mkgui internals on purpose). Kept unity
-	# rather than polluting the public library with test-only exports.
+	# Tests are unity builds; they use mkgui internals on purpose.
 	(
-		$CC $CFLAGS tests/test_layout.c -o out/linux/test_layout $LINUX_LIBS
+		$CC $CFLAGS tests/test_layout.c -o out/linux/test_layout $LINUX_LIBS $LDFLAGS
 	) &
 
 	(
-		$CC $CFLAGS tests/test_widgets.c -o out/linux/test_widgets $LINUX_LIBS
+		$CC $CFLAGS tests/test_widgets.c -o out/linux/test_widgets $LINUX_LIBS $LDFLAGS
 	) &
 
 	(
-		$CC $CFLAGS tests/test_events.c -o out/linux/test_events $LINUX_LIBS
+		$CC $CFLAGS tests/test_events.c -o out/linux/test_events $LINUX_LIBS $LDFLAGS
 	) &
 
 	(
-		$CC $CFLAGS tests/test_events_ext.c -o out/linux/test_events_ext $LINUX_LIBS
+		$CC $CFLAGS tests/test_events_ext.c -o out/linux/test_events_ext $LINUX_LIBS $LDFLAGS
 	) &
 
 	(
-		$CC $CFLAGS tests/test_smoke.c -o out/linux/test_smoke $LINUX_LIBS
+		$CC $CFLAGS tests/test_smoke.c -o out/linux/test_smoke $LINUX_LIBS $LDFLAGS
 	) &
 
 	(
-		$CC $CFLAGS tests/test_window_visibility.c -o out/linux/test_window_visibility $LINUX_LIBS
+		$CC $CFLAGS tests/test_window_visibility.c -o out/linux/test_window_visibility $LINUX_LIBS $LDFLAGS
 	) &
 
 	(
-		$CC $CFLAGS tests/test_dynamic.c -o out/linux/test_dynamic $LINUX_LIBS
+		$CC $CFLAGS tests/test_dynamic.c -o out/linux/test_dynamic $LINUX_LIBS $LDFLAGS
 	) &
 
 	(
-		$CC $CFLAGS tests/test_lifecycle.c -o out/linux/test_lifecycle $LINUX_LIBS
+		$CC $CFLAGS tests/test_lifecycle.c -o out/linux/test_lifecycle $LINUX_LIBS $LDFLAGS
 	) &
 
 	(
-		$CC $CFLAGS tests/test_clipboard.c -o out/linux/test_clipboard $LINUX_LIBS
+		$CC $CFLAGS tests/test_clipboard.c -o out/linux/test_clipboard $LINUX_LIBS $LDFLAGS
 	) &
 
 	# extract_icons is independent (doesn't use mkgui)
@@ -196,12 +187,11 @@ if [ "$TARGET" != "editor" ]; then
 		$CC -std=gnu99 -O2 -Wall -Wextra -Wno-stringop-truncation -Wno-format-truncation tools/extract_icons.c -o out/linux/extract_icons
 	) &
 
-	# Win32 platform-layer test (unity build, pokes the WndProc). The GUI core
-	# is covered by the Linux suites; this only exercises the divergent Win32
-	# windowing/message-translation surface. Run with: wine out/windows/test_platform_win32.exe
+	# Win32 platform-layer test; covers the divergent Win32 windowing surface.
+	# Run with: wine out/windows/test_platform_win32.exe
 	if [ "$WIN_ENABLED" -eq 1 ]; then
 		(
-			$WINCC $CFLAGS $LIB_DEFINES tests/test_platform_win32.c -o out/windows/test_platform_win32.exe $WINDOWS_LIBS $WINDOWS_PTHREAD -mconsole
+			$WINCC $CFLAGS $LIB_DEFINES tests/test_platform_win32.c -o out/windows/test_platform_win32.exe $WINDOWS_LIBS $WINDOWS_PTHREAD -mconsole $LDFLAGS
 		) &
 	fi
 fi
@@ -209,12 +199,12 @@ fi
 if [ "$TARGET" = "editor" ] || [ "$TARGET" = "all" ]; then
 	# Editor: unity build (shares mkgui's rendering/layout internals)
 	(
-		$CC $CFLAGS editor.c -o out/linux/editor $LINUX_LIBS
+		$CC $CFLAGS editor.c -o out/linux/editor $LINUX_LIBS $LDFLAGS
 	) &
 
 	if [ "$WIN_ENABLED" -eq 1 ]; then
 		(
-			$WINCC $CFLAGS editor.c -o out/windows/editor.exe $WINDOWS_LIBS $WINDOWS_PTHREAD
+			$WINCC $CFLAGS editor.c -o out/windows/editor.exe $WINDOWS_LIBS $WINDOWS_PTHREAD $LDFLAGS
 		) &
 	fi
 fi

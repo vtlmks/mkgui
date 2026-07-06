@@ -191,8 +191,7 @@ static void render_pathbar(struct mkgui_window *win, uint32_t idx) {
 }
 
 // [=]===^=[ handle_pathbar_click ]=================================[=]
-static uint32_t handle_pathbar_click(struct mkgui_window *win, struct mkgui_event *ev, uint32_t idx, int32_t mx, int32_t my) {
-	(void)my;
+static uint32_t handle_pathbar_click(struct mkgui_window *win, struct mkgui_event *ev, uint32_t idx) {
 	struct mkgui_widget *w = &win->widgets[idx];
 	struct mkgui_pathbar_data *pb = find_pathbar_data(win, w->id);
 	if(!pb) {
@@ -202,7 +201,7 @@ static uint32_t handle_pathbar_click(struct mkgui_window *win, struct mkgui_even
 	if(pb->editing) {
 		int32_t rx = win->rects[idx].x;
 		int32_t base_x = rx + sc(win, 4) - pb->edit_scroll_x;
-		uint32_t hit_pos = textedit_hit_cursor(win, pb->edit_buf, base_x, mx);
+		uint32_t hit_pos = textedit_hit_cursor(win, pb->edit_buf, base_x, win->mouse_x);
 		pb->edit_cursor = hit_pos;
 		pb->edit_sel_start = hit_pos;
 		pb->edit_sel_end = hit_pos;
@@ -211,7 +210,7 @@ static uint32_t handle_pathbar_click(struct mkgui_window *win, struct mkgui_even
 		return 0;
 	}
 
-	int32_t seg = pathbar_segment_hit(win, pb, win->rects[idx].x, mx);
+	int32_t seg = pathbar_segment_hit(win, pb, win->rects[idx].x, win->mouse_x);
 	if(seg >= 0) {
 		ev->type = MKGUI_EVENT_PATHBAR_NAV;
 		ev->id = w->id;

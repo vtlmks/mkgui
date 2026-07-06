@@ -371,8 +371,63 @@ static uint32_t treeview_arrow_hit(struct mkgui_window *win, uint32_t widget_idx
 	return (mx >= arrow_x && mx < arrow_x + tree_indent);
 }
 
+// [=]===^=[ handle_treeview_click ]=============================[=]
+// Press on a treeview: a hit on an expander arrow toggles the node
+// (EXPAND/COLLAPSE); otherwise select the node (double-click emits DBLCLICK, a
+// slow re-click of an editable selected node begins inline rename) and arm node
+// drag. Returns 1 when a node was hit so the caller ends the press via
+// `return ev->type != NONE`; the rename path leaves ev NONE and stops draining
+// without emitting, matching pre-extraction behavior. idx == hit result.
+static uint32_t handle_treeview_click(struct mkgui_window *win, struct mkgui_event *ev, uint32_t idx) {
+	int32_t node_idx = treeview_row_hit(win, idx, win->mouse_y);
+	if(node_idx < 0) {
+		return 0;
+	}
+	struct mkgui_widget *hw = &win->widgets[idx];
+	struct mkgui_treeview_data *tv = find_treeview_data(win, hw->id);
+	if(!tv) {
+		return 0;
+	}
+	if(treeview_arrow_hit(win, idx, win->mouse_x, node_idx) && tv->nodes[node_idx].has_children) {
+		tv->nodes[node_idx].expanded = !tv->nodes[node_idx].expanded;
+		dirty_all(win);
+		ev->type = tv->nodes[node_idx].expanded ? MKGUI_EVENT_TREEVIEW_EXPAND : MKGUI_EVENT_TREEVIEW_COLLAPSE;
+		ev->id = hw->id;
+		ev->value = (int32_t)tv->nodes[node_idx].id;
+		return 1;
+	}
+	uint32_t now_ms = (uint32_t)(mkgui_now_ns() / 1000000ull);
+	int32_t node_id = (int32_t)tv->nodes[node_idx].id;
+	uint32_t elapsed = now_ms - win->dblclick_time;
+	uint32_t is_dblclick = (win->dblclick_id == hw->id && win->dblclick_row == node_id && elapsed < 400);
+	uint32_t slow_click = (win->dblclick_id == hw->id && win->dblclick_row == node_id && elapsed >= 400 && elapsed < 1500);
+	uint32_t was_selected = (tv->selected_node == node_id);
+	win->dblclick_id = hw->id;
+	win->dblclick_row = node_id;
+	win->dblclick_time = now_ms;
+	tv->selected_node = node_id;
+	tv->drag_source = node_idx;
+	tv->drag_target = -1;
+	tv->drag_pos = 0;
+	tv->drag_active = 0;
+	tv->drag_start_y = win->mouse_y;
+	dirty_widget(win, idx);
+	if(is_dblclick) {
+		ev->type = MKGUI_EVENT_TREEVIEW_DBLCLICK;
+		win->dblclick_id = 0;
+	} else if(was_selected && slow_click && (hw->style & MKGUI_TREEVIEW_EDITABLE)) {
+		celledit_begin(win, hw->id, node_id, 0, tv->nodes[node_idx].label);
+		return 1;
+	} else {
+		ev->type = MKGUI_EVENT_TREEVIEW_SELECT;
+	}
+	ev->id = hw->id;
+	ev->value = tv->selected_node;
+	return 1;
+}
+
 // [=]===^=[ handle_treeview_key ]================================[=]
-static uint32_t handle_treeview_key(struct mkgui_window *win, struct mkgui_event *ev, uint32_t ks) {
+static uint32_t handle_treeview_key(struct mkgui_window *win, struct mkgui_event *ev, uint32_t ks, uint32_t keymod, char *buf, int32_t len) {
 	struct mkgui_treeview_data *tv = find_treeview_data(win, win->focus_id);
 	if(!tv || tv->node_count == 0) {
 		return 0;

@@ -396,6 +396,42 @@ static void textarea_scroll_to_cursor(struct mkgui_window *win, uint32_t widget_
 	}
 }
 
+// [=]===^=[ handle_textarea_click ]=============================[=]
+// Press on a textarea: a hit on the scrollbar arms scroll-drag; a hit inside
+// an existing selection arms text drag-and-drop; otherwise place the caret and
+// arm drag-select. Emits no event (returns 0); it only arms shared drag state.
+static uint32_t handle_textarea_click(struct mkgui_window *win, struct mkgui_event *ev, uint32_t idx) {
+	(void)ev;
+	struct mkgui_widget *hw = &win->widgets[idx];
+	struct mkgui_textarea_data *ta = find_textarea_data(win, hw->id);
+	if(ta && textarea_has_scrollbar(win, idx, ta)) {
+		int32_t sb_off = textarea_sb_hit(win, idx, ta, win->mouse_x, win->mouse_y);
+		if(sb_off >= 0) {
+			win->drag_scrollbar_id = hw->id;
+			win->drag_scrollbar_offset = sb_off;
+			return 0;
+		}
+	}
+
+	if(ta) {
+		uint32_t hit = textarea_hit_pos(win, ta, win->rects[idx].x, win->rects[idx].y, win->rects[idx].h, win->mouse_x, win->mouse_y);
+		if(textarea_has_selection(ta) && !(hw->style & MKGUI_TEXTAREA_READONLY)) {
+			uint32_t lo, hi2;
+			textarea_sel_range(ta, &lo, &hi2);
+			if(hit >= lo && hit < hi2) {
+				win->drag_text_id = hw->id;
+				win->drag_text_drop_pos = hit;
+				return 0;
+			}
+		}
+		ta->cursor = hit;
+		textarea_clear_selection(ta);
+		win->drag_select_id = hw->id;
+		dirty_widget(win, idx);
+	}
+	return 0;
+}
+
 // [=]===^=[ handle_textarea_key ]================================[=]
 static uint32_t handle_textarea_key(struct mkgui_window *win, struct mkgui_event *ev, uint32_t ks, uint32_t keymod, char *buf, int32_t len) {
 	struct mkgui_textarea_data *ta = find_textarea_data(win, win->focus_id);

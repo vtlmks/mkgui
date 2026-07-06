@@ -83,3 +83,17 @@ MKGUI_API uint32_t mkgui_group_get_collapsed(struct mkgui_window *win, uint32_t 
 	struct mkgui_widget *w = find_widget(win, id);
 	return (w && (w->style & MKGUI_GROUP_COLLAPSED)) ? 1 : 0;
 }
+
+// [=]===^=[ handle_group_click ]================================[=]
+// Clicking a collapsible group's header toggles the collapsed state.
+static uint32_t handle_group_click(struct mkgui_window *win, struct mkgui_event *ev, struct mkgui_widget *w) {
+	if(!(w->style & MKGUI_GROUP_COLLAPSIBLE)) {
+		return 0;
+	}
+	w->style ^= MKGUI_GROUP_COLLAPSED;
+	dirty_all(win);
+	ev->type = MKGUI_EVENT_CLICK;
+	ev->id = w->id;
+	ev->value = (w->style & MKGUI_GROUP_COLLAPSED) ? 1 : 0;
+	return 1;
+}

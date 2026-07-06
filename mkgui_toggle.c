@@ -74,7 +74,7 @@ static void handle_toggle_click(struct mkgui_window *win, struct mkgui_event *ev
 }
 
 // [=]===^=[ handle_toggle_key ]===================================[=]
-static uint32_t handle_toggle_key(struct mkgui_window *win, struct mkgui_event *ev, uint32_t ks) {
+static uint32_t handle_toggle_key(struct mkgui_window *win, struct mkgui_event *ev, uint32_t ks, uint32_t keymod, char *buf, int32_t len) {
 	if(ks == MKGUI_KEY_SPACE || ks == MKGUI_KEY_RETURN) {
 		struct mkgui_toggle_data *td = find_toggle_data(win, win->focus_id);
 		if(!td) {

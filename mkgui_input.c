@@ -241,6 +241,44 @@ static uint32_t handle_input_key(struct mkgui_window *win, struct mkgui_event *e
 	return 0;
 }
 
+// [=]===^=[ handle_input_click ]====================================[=]
+// Press on an input: double-click selects all, single click positions the
+// caret and arms drag-select. idx is the widget's index (== hit-test result).
+static void handle_input_click(struct mkgui_window *win, uint32_t idx) {
+	struct mkgui_widget *hw = &win->widgets[idx];
+	struct mkgui_input_data *inp = find_input_data(win, hw->id);
+	if(!inp) {
+		return;
+	}
+	uint32_t now = (uint32_t)(mkgui_now_ns() / 1000000ull);
+	uint32_t is_dblclick = (win->dblclick_id == hw->id && (now - win->dblclick_time) < 400);
+	win->dblclick_id = hw->id;
+	win->dblclick_time = now;
+	if(is_dblclick) {
+		uint32_t len = (uint32_t)strlen(inp->text);
+		inp->sel_start = 0;
+		inp->sel_end = len;
+		inp->cursor = len;
+		win->dblclick_id = 0;
+	} else {
+		char *display = inp->text;
+		char masked_buf[MKGUI_MAX_TEXT];
+		if(hw->style & MKGUI_INPUT_PASSWORD) {
+			uint32_t mlen = (uint32_t)strlen(inp->text);
+			for(uint32_t mi = 0; mi < mlen && mi < MKGUI_MAX_TEXT - 1; ++mi) {
+				masked_buf[mi] = '*';
+			}
+			masked_buf[mlen < MKGUI_MAX_TEXT - 1 ? mlen : MKGUI_MAX_TEXT - 1] = '\0';
+			display = masked_buf;
+		}
+		inp->cursor = input_hit_cursor(win, inp, display, win->rects[idx].x, win->mouse_x);
+		input_clear_selection(inp);
+		win->drag_select_id = hw->id;
+	}
+	dirty_widget(win, idx);
+	input_scroll_to_cursor(win, hw->id);
+}
+
 // [=]===^=[ mkgui_input_set ]=======================================[=]
 MKGUI_API void mkgui_input_set(struct mkgui_window *win, uint32_t id, const char *text) {
 	MKGUI_CHECK(win);

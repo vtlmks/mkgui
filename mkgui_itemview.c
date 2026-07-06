@@ -889,8 +889,76 @@ static int32_t itemview_hit_item(struct mkgui_window *win, uint32_t idx, struct 
 	return -1;
 }
 
+// [=]===^=[ handle_itemview_click ]=============================[=]
+// Press on an itemview: scrollbar thumb arms scroll-drag, trough pages, and an
+// item hit selects / double-clicks / (on a slow second click of an editable
+// selected item) begins inline rename. Returns 1 when an item was hit so the
+// caller ends the press via `return ev->type != NONE` -- the rename path leaves
+// ev NONE and thus stops draining without emitting, as it did pre-extraction.
+// idx == hit result.
+static uint32_t handle_itemview_click(struct mkgui_window *win, struct mkgui_event *ev, uint32_t idx) {
+	struct mkgui_widget *hw = &win->widgets[idx];
+	uint32_t iv_sb_hit = itemview_scrollbar_hit(win, idx, win->mouse_x, win->mouse_y);
+	if(iv_sb_hit == 1) {
+		win->drag_scrollbar_id = hw->id;
+		win->drag_scrollbar_offset = itemview_thumb_offset(win, idx, win->mouse_x, win->mouse_y);
+		return 0;
+	}
+
+	if(iv_sb_hit == 2 || iv_sb_hit == 3) {
+		itemview_page_scroll(win, idx, iv_sb_hit == 2 ? -1 : 1);
+		return 0;
+	}
+
+	struct mkgui_itemview_data *iv = find_itemview_data(win, hw->id);
+	if(!iv) {
+		return 0;
+	}
+	int32_t item = itemview_hit_item(win, idx, iv, win->mouse_x, win->mouse_y);
+	if(item < 0) {
+		return 0;
+	}
+	uint32_t now = (uint32_t)(mkgui_now_ns() / 1000000ull);
+	uint32_t elapsed = now - win->dblclick_time;
+	uint32_t is_dblclick = (win->dblclick_id == hw->id && win->dblclick_row == item && elapsed < 400);
+	uint32_t slow_click = (win->dblclick_id == hw->id && win->dblclick_row == item && elapsed >= 400 && elapsed < 1500);
+	uint32_t was_selected = (iv->selected == item);
+	win->dblclick_id = hw->id;
+	win->dblclick_row = item;
+	win->dblclick_time = now;
+	iv->selected = item;
+	if(is_dblclick) {
+		ev->type = MKGUI_EVENT_ITEMVIEW_DBLCLICK;
+		win->dblclick_id = 0;
+	} else if(was_selected && slow_click && (hw->style & MKGUI_ITEMVIEW_EDITABLE)) {
+		char label[MKGUI_MAX_TEXT] = {0};
+		if(iv->label_cb) {
+			iv->label_cb((uint32_t)item, label, MKGUI_MAX_TEXT, iv->userdata);
+		}
+		celledit_begin(win, hw->id, item, 0, label);
+		dirty_widget(win, idx);
+		return 1;
+	} else {
+		ev->type = MKGUI_EVENT_ITEMVIEW_SELECT;
+	}
+	ev->id = hw->id;
+	ev->value = item;
+	dirty_widget(win, idx);
+	return 1;
+}
+
 // [=]===^=[ handle_itemview_key ]=================================[=]
-static uint32_t handle_itemview_key(struct mkgui_window *win, struct mkgui_itemview_data *iv, uint32_t widget_idx, uint32_t keysym, struct mkgui_event *ev) {
+static uint32_t handle_itemview_key(struct mkgui_window *win, struct mkgui_event *ev, uint32_t ks, uint32_t keymod, char *buf, int32_t len) {
+	struct mkgui_itemview_data *iv = find_itemview_data(win, win->focus_id);
+	if(!iv) {
+		return 0;
+	}
+	int32_t fi = find_widget_idx(win, win->focus_id);
+	if(fi < 0) {
+		return 0;
+	}
+	uint32_t widget_idx = (uint32_t)fi;
+	uint32_t keysym = ks;
 	int32_t rx = win->rects[widget_idx].x;
 	int32_t ry = win->rects[widget_idx].y;
 	int32_t rw = win->rects[widget_idx].w;

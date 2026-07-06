@@ -169,8 +169,37 @@ static uint32_t spinbox_adjust(struct mkgui_window *win, struct mkgui_event *ev,
 	return 0;
 }
 
+// [=]===^=[ handle_spinbox_click ]==============================[=]
+// Press on a spinbox: a hit on the up/down buttons steps the value (auto-repeat
+// armed, may emit SPINBOX_CHANGED); a hit on the field enters inline edit mode.
+// Returns 1 when a stepper button was hit -- the caller then ends the press by
+// returning ev->type != NONE, so a clamped step (no event) still stops draining,
+// matching the pre-extraction behavior. Returns 0 to fall through. idx == hit.
+static uint32_t handle_spinbox_click(struct mkgui_window *win, struct mkgui_event *ev, uint32_t idx) {
+	struct mkgui_widget *hw = &win->widgets[idx];
+	int32_t dir = spinbox_btn_hit(win, idx, win->mouse_x, win->mouse_y);
+	struct mkgui_spinbox_data *sd = find_spinbox_data(win, hw->id);
+	if(sd) {
+		if(dir != 0) {
+			sd->repeat_dir = dir;
+			sd->repeat_next_ms = (uint32_t)(mkgui_now_ns() / 1000000ull) + 400;
+			int32_t delta = (dir > 0) ? sd->step : -sd->step;
+			spinbox_adjust(win, ev, hw->id, delta);
+			return 1;
+
+		} else {
+			sd->editing = 1;
+			sd->select_all = 1;
+			snprintf(sd->edit_buf, sizeof(sd->edit_buf), "%d", sd->value);
+			sd->edit_len = (uint32_t)strlen(sd->edit_buf);
+			dirty_widget(win, idx);
+		}
+	}
+	return 0;
+}
+
 // [=]===^=[ handle_spinbox_key ]=================================[=]
-static uint32_t handle_spinbox_key(struct mkgui_window *win, struct mkgui_event *ev, uint32_t ks, char *text, int32_t text_len) {
+static uint32_t handle_spinbox_key(struct mkgui_window *win, struct mkgui_event *ev, uint32_t ks, uint32_t keymod, char *buf, int32_t len) {
 	struct mkgui_spinbox_data *sd = find_spinbox_data(win, win->focus_id);
 	if(!sd) {
 		return 0;
@@ -246,9 +275,9 @@ static uint32_t handle_spinbox_key(struct mkgui_window *win, struct mkgui_event 
 	}
 
 	default: {
-		if(text_len > 0) {
-			for(uint32_t i = 0; i < (uint32_t)text_len; ++i) {
-				char c = text[i];
+		if(len > 0) {
+			for(uint32_t i = 0; i < (uint32_t)len; ++i) {
+				char c = buf[i];
 				uint32_t is_digit = (c >= '0' && c <= '9');
 				uint32_t is_minus = (c == '-' && sd->min_val < 0);
 				if(!is_digit && !is_minus) {

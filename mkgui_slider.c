@@ -186,7 +186,7 @@ static void render_slider(struct mkgui_window *win, uint32_t idx) {
 }
 
 // [=]===^=[ handle_slider_key ]=================================[=]
-static uint32_t handle_slider_key(struct mkgui_window *win, struct mkgui_event *ev, uint32_t ks) {
+static uint32_t handle_slider_key(struct mkgui_window *win, struct mkgui_event *ev, uint32_t ks, uint32_t keymod, char *buf, int32_t len) {
 	struct mkgui_slider_data *sd = find_slider_data(win, win->focus_id);
 	if(!sd) {
 		return 0;
@@ -227,6 +227,71 @@ static uint32_t handle_slider_key(struct mkgui_window *win, struct mkgui_event *
 	ev->type = MKGUI_EVENT_SLIDER_CHANGED;
 	ev->id = win->focus_id;
 	ev->value = sd->value;
+	return 1;
+}
+
+// [=]===^=[ handle_slider_release ]=============================[=]
+// End of a slider drag: emit SLIDER_END carrying the settled value.
+static uint32_t handle_slider_release(struct mkgui_window *win, struct mkgui_event *ev, uint32_t id) {
+	struct mkgui_slider_data *sd = find_slider_data(win, id);
+	ev->type = MKGUI_EVENT_SLIDER_END;
+	ev->id = id;
+	ev->value = sd ? sd->value : 0;
+	return 1;
+}
+
+// [=]===^=[ handle_slider_click ]===============================[=]
+// Press on a slider: clicking the thumb starts a drag from the current value;
+// clicking the track jumps the value to the click position. Either way emit
+// SLIDER_START and arm the drag via drag_slider_offset. idx == hit result.
+static uint32_t handle_slider_click(struct mkgui_window *win, struct mkgui_event *ev, uint32_t idx) {
+	struct mkgui_widget *hw = &win->widgets[idx];
+	struct mkgui_slider_data *sd = find_slider_data(win, hw->id);
+	if(!sd) {
+		return 0;
+	}
+	int32_t range = sd->max_val - sd->min_val;
+	int32_t thumb_sz = sc(win, 10);
+	int32_t new_val;
+	win->drag_slider_offset = 0;
+	if(hw->flags & MKGUI_VERTICAL) {
+		int32_t ry = win->rects[idx].y;
+		int32_t rh = win->rects[idx].h;
+		int32_t track = rh - thumb_sz;
+		int32_t thumb_y = ry + rh - thumb_sz - (range > 0 ? (int32_t)((int64_t)(sd->value - sd->min_val) * track / range) : 0);
+		if(win->mouse_y >= thumb_y && win->mouse_y < thumb_y + thumb_sz) {
+			win->drag_slider_offset = win->mouse_y - (thumb_y + thumb_sz / 2);
+			new_val = sd->value;
+		} else {
+			int32_t pos = win->mouse_y - ry - thumb_sz / 2;
+			new_val = sd->max_val - (track > 0 ? (int32_t)((int64_t)pos * range / track) : 0);
+		}
+	} else {
+		int32_t rx = win->rects[idx].x;
+		int32_t rw = win->rects[idx].w;
+		int32_t track = rw - thumb_sz;
+		int32_t thumb_x = rx + (range > 0 ? (int32_t)((int64_t)(sd->value - sd->min_val) * track / range) : 0);
+		if(win->mouse_x >= thumb_x && win->mouse_x < thumb_x + thumb_sz) {
+			win->drag_slider_offset = win->mouse_x - (thumb_x + thumb_sz / 2);
+			new_val = sd->value;
+		} else {
+			int32_t pos = win->mouse_x - rx - thumb_sz / 2;
+			new_val = sd->min_val + (track > 0 ? (int32_t)((int64_t)pos * range / track) : 0);
+		}
+	}
+
+	if(new_val < sd->min_val) {
+		new_val = sd->min_val;
+	}
+
+	if(new_val > sd->max_val) {
+		new_val = sd->max_val;
+	}
+	sd->value = new_val;
+	ev->type = MKGUI_EVENT_SLIDER_START;
+	ev->id = hw->id;
+	ev->value = new_val;
+	dirty_widget(win, idx);
 	return 1;
 }
 

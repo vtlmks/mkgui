@@ -243,7 +243,7 @@ static void test_ctx_destroy_auto_destroys_windows(void) {
 	// Intentionally skip window_destroy calls -- auto-destroy is the
 	// contract. After ctx_destroy, no windows should be tracked anywhere.
 	mkgui_ctx_destroy(ctx);
-	CHECK(g_ctx == NULL, "g_ctx should be NULL after ctx_destroy");
+	CHECK(app_ctx == NULL, "app_ctx should be NULL after ctx_destroy");
 }
 
 // [=]===^=[ test_host_loop_two_windows ]==========================[=]

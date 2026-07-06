@@ -507,8 +507,91 @@ static void gridview_scroll_to_y(struct mkgui_window *win, uint32_t id, int32_t 
 	dirty_all(win);
 }
 
+// [=]===^=[ handle_gridview_click ]=============================[=]
+// Press on a gridview: scrollbar thumb arms drag, trough pages; a column
+// divider double-click autosizes else arms resize; a data cell selects and,
+// for check-type columns, toggles the bit (GRID_CHECK) otherwise emits
+// GRID_CLICK. Returns 1 only when it emits an event. idx == hit result.
+static uint32_t handle_gridview_click(struct mkgui_window *win, struct mkgui_event *ev, uint32_t idx) {
+	struct mkgui_widget *hw = &win->widgets[idx];
+	uint32_t gv_sb_hit = gridview_scrollbar_hit(win, idx, win->mouse_x, win->mouse_y);
+	if(gv_sb_hit == 1) {
+		win->drag_scrollbar_id = hw->id;
+		win->drag_scrollbar_offset = gridview_thumb_offset(win, idx, win->mouse_y);
+
+	} else if(gv_sb_hit == 2 || gv_sb_hit == 3) {
+		struct mkgui_gridview_data *gv = find_gridv_data(win, hw->id);
+		if(gv) {
+			int32_t ghh = gv->header_height > 0 ? gv->header_height : win->row_height;
+			int32_t gcontent_h = win->rects[idx].h - ghh - 2;
+			gv->scroll_y += (gv_sb_hit == 2 ? -1 : 1) * gcontent_h;
+			gridview_clamp_scroll(win, gv, gcontent_h);
+			dirty_widget(win, idx);
+		}
+
+	} else {
+		int32_t gv_div = gridview_divider_hit(win, idx, win->mouse_x, win->mouse_y);
+		if(gv_div >= 0) {
+			struct mkgui_gridview_data *gv = find_gridv_data(win, hw->id);
+			if(gv) {
+				uint32_t now_ms = (uint32_t)(mkgui_now_ns() / 1000000ull);
+				if(win->divider_dblclick_id == hw->id && win->divider_dblclick_col == gv_div && (now_ms - win->divider_dblclick_time) < 400) {
+					gridview_autosize_col(win, gv, (uint32_t)gv_div);
+					win->divider_dblclick_id = 0;
+
+				} else {
+					win->divider_dblclick_id = hw->id;
+					win->divider_dblclick_col = gv_div;
+					win->divider_dblclick_time = now_ms;
+					win->drag_col_resize_id = hw->id;
+					win->drag_col_resize_col = gv_div;
+					win->drag_col_resize_start_x = win->mouse_x;
+					win->drag_col_resize_start_w = gv->columns[gv_div].width;
+				}
+			}
+
+		} else {
+			struct mkgui_gridview_data *gv = find_gridv_data(win, hw->id);
+			if(gv) {
+				int32_t ghh = gv->header_height > 0 ? gv->header_height : win->row_height;
+				int32_t gcontent_y = win->rects[idx].y + ghh + 1;
+				int32_t grow = (win->mouse_y - gcontent_y + gv->scroll_y) / win->row_height;
+				int32_t gcol = gridview_col_at_x(gv, win->mouse_x, win->rects[idx].x + 1);
+				if(grow >= 0 && grow < (int32_t)gv->row_count) {
+					gv->selected_row = grow;
+					gv->selected_col = gcol;
+					gv->drag_source = grow;
+					gv->drag_target = -1;
+					gv->drag_start_y = win->mouse_y;
+					gv->drag_active = 0;
+					if(gcol >= 0 && gcol < (int32_t)gv->col_count) {
+						uint32_t ct = gv->columns[gcol].col_type;
+						if(ct == MKGUI_GRID_CHECK || ct == MKGUI_GRID_CHECK_TEXT) {
+							uint32_t cur = gridview_get_bit(gv, (uint32_t)grow, (uint32_t)gcol);
+							gridview_set_bit(gv, (uint32_t)grow, (uint32_t)gcol, !cur);
+							ev->type = MKGUI_EVENT_GRID_CHECK;
+							ev->id = hw->id;
+							ev->value = grow;
+							ev->col = gcol;
+							dirty_widget(win, idx);
+							return 1;
+						}
+					}
+					ev->type = MKGUI_EVENT_GRID_CLICK;
+					ev->id = hw->id;
+					ev->value = grow;
+					ev->col = gcol;
+					dirty_widget(win, idx);
+					return 1;
+				}
+			}
+		}
+	}
+	return 0;
+}
+
 // [=]===^=[ handle_gridview_key ]================================[=]
-static uint32_t handle_gridview_key(struct mkgui_window *win, struct mkgui_event *ev, uint32_t ks) {
+static uint32_t handle_gridview_key(struct mkgui_window *win, struct mkgui_event *ev, uint32_t ks, uint32_t keymod, char *buf, int32_t len) {
 	struct mkgui_gridview_data *gv = find_gridv_data(win, win->focus_id);
 	if(!gv || gv->row_count == 0) {
 		return 0;

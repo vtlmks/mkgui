@@ -925,8 +925,152 @@ static void listview_scroll_to_x(struct mkgui_window *win, uint32_t widget_id, i
 	dirty_all(win);
 }
 
+// [=]===^=[ handle_listview_click ]=============================[=]
+// Press on a listview. In priority order: horizontal then vertical scrollbar
+// (thumb arms drag, trough pages), a column divider (double-click autosizes,
+// else arms column-resize), a column header (arms reorder-drag), then a data
+// row (multi-select honoring Ctrl/Shift via win->press_mod, double-click, slow
+// re-click of an editable selected row begins inline rename, else select +
+// arm row drag). Returns 1 when a row was hit so the caller ends the press via
+// `return ev->type != NONE`; the rename path leaves ev NONE and thus stops
+// draining without emitting, matching pre-extraction behavior. All scrollbar and
+// column paths return 0 to keep draining. idx == hit result.
+static uint32_t handle_listview_click(struct mkgui_window *win, struct mkgui_event *ev, uint32_t idx) {
+	struct mkgui_widget *hw = &win->widgets[idx];
+	uint32_t hsb_hit = listview_hscrollbar_hit(win, idx, win->mouse_x, win->mouse_y);
+	if(hsb_hit == 1) {
+		win->drag_scrollbar_id = hw->id;
+		win->drag_scrollbar_offset = listview_hthumb_offset(win, idx, win->mouse_x);
+		win->drag_scrollbar_horiz = 1;
+
+	} else if(hsb_hit == 2 || hsb_hit == 3) {
+		struct mkgui_listview_data *hlv = find_listv_data(win, hw->id);
+		if(hlv) {
+			int32_t cw = win->rects[idx].w - 2 - win->scrollbar_w;
+			hlv->scroll_x += (hsb_hit == 2 ? -1 : 1) * (cw / 2);
+			listview_clamp_scroll_x(hlv, cw);
+			dirty_widget(win, idx);
+		}
+
+	} else {
+		uint32_t sb_hit = listview_scrollbar_hit(win, idx, win->mouse_x, win->mouse_y);
+		if(sb_hit == 1) {
+			win->drag_scrollbar_id = hw->id;
+			win->drag_scrollbar_offset = listview_thumb_offset(win, idx, win->mouse_y);
+			win->drag_scrollbar_horiz = 0;
+
+		} else if(sb_hit == 2 || sb_hit == 3) {
+			listview_page_scroll(win, idx, sb_hit == 2 ? -1 : 1);
+
+		} else {
+			int32_t div = listview_divider_hit(win, idx, win->mouse_x, win->mouse_y);
+			if(div >= 0) {
+				struct mkgui_listview_data *lv = find_listv_data(win, hw->id);
+				if(lv) {
+					uint32_t logical = lv->col_order[div];
+					uint32_t now_ms = (uint32_t)(mkgui_now_ns() / 1000000ull);
+					if(win->divider_dblclick_id == hw->id && win->divider_dblclick_col == (int32_t)logical && (now_ms - win->divider_dblclick_time) < 400) {
+						listview_autosize_col(win, lv, logical);
+						win->divider_dblclick_id = 0;
+
+					} else {
+						win->divider_dblclick_id = hw->id;
+						win->divider_dblclick_col = (int32_t)logical;
+						win->divider_dblclick_time = now_ms;
+						win->drag_col_resize_id = hw->id;
+						win->drag_col_resize_col = (int32_t)logical;
+						win->drag_col_resize_start_x = win->mouse_x;
+						win->drag_col_resize_start_w = lv->columns[logical].width;
+					}
+				}
+
+			} else {
+				int32_t dcol = listview_header_hit(win, idx, win->mouse_x, win->mouse_y);
+				if(dcol >= 0) {
+					win->drag_col_id = hw->id;
+					win->drag_col_src = dcol;
+					win->drag_col_start_x = win->mouse_x;
+
+				} else {
+					int32_t row = listview_row_hit(win, idx, win->mouse_x, win->mouse_y);
+					if(row >= 0) {
+						struct mkgui_listview_data *lv = find_listv_data(win, hw->id);
+						if(lv) {
+							uint32_t now = (uint32_t)(mkgui_now_ns() / 1000000ull);
+							uint32_t elapsed = now - win->dblclick_time;
+							uint32_t is_dblclick = (win->dblclick_id == hw->id && win->dblclick_row == row && elapsed < 400);
+							uint32_t slow_click = (win->dblclick_id == hw->id && win->dblclick_row == row && elapsed >= 400 && elapsed < 1500);
+							uint32_t was_selected = (lv->selected_row == row);
+							win->dblclick_id = hw->id;
+							win->dblclick_row = row;
+							win->dblclick_time = now;
+							if(hw->style & MKGUI_LISTVIEW_MULTI_SELECT) {
+								uint32_t mod_ctrl = (win->press_mod & MKGUI_MOD_CONTROL) != 0;
+								uint32_t mod_shift = (win->press_mod & MKGUI_MOD_SHIFT) != 0;
+								if(mod_ctrl) {
+									lv_multi_sel_toggle(lv, row);
+									lv->selected_row = row;
+								} else if(mod_shift) {
+									int32_t anchor = lv->selected_row;
+									if(anchor < 0) {
+										anchor = row;
+									}
+									int32_t lo = anchor < row ? anchor : row;
+									int32_t hi2 = anchor < row ? row : anchor;
+									lv->multi_sel_count = 0;
+									for(int32_t r = lo; r <= hi2 && lv->multi_sel_count < MKGUI_MAX_MULTI_SEL; ++r) {
+										lv->multi_sel[lv->multi_sel_count++] = r;
+									}
+									lv->selected_row = row;
+								} else {
+									lv->multi_sel[0] = row;
+									lv->multi_sel_count = 1;
+									lv->selected_row = row;
+								}
+							} else {
+								lv->selected_row = row;
+							}
+							int32_t col = listview_col_hit(win, idx, win->mouse_x);
+							if(is_dblclick) {
+								ev->type = MKGUI_EVENT_LISTVIEW_DBLCLICK;
+								ev->id = hw->id;
+								ev->value = row;
+								ev->col = col;
+								win->dblclick_id = 0;
+								dirty_widget(win, idx);
+								return 1;
+							}
+
+							if(was_selected && slow_click && (hw->style & MKGUI_LISTVIEW_EDITABLE)) {
+								char cell_buf[MKGUI_MAX_TEXT] = {0};
+								if(lv->row_cb) {
+									lv->row_cb((uint32_t)row, 0, cell_buf, MKGUI_MAX_TEXT, lv->userdata);
+								}
+								celledit_begin(win, hw->id, row, 0, cell_buf);
+								dirty_widget(win, idx);
+								return 1;
+							}
+							lv->drag_source = row;
+							lv->drag_target = -1;
+							lv->drag_start_y = win->mouse_y;
+							lv->drag_active = 0;
+							ev->type = MKGUI_EVENT_LISTVIEW_SELECT;
+							ev->id = hw->id;
+							ev->value = row;
+							ev->col = col;
+							dirty_widget(win, idx);
+							return 1;
+						}
+					}
+				}
+			}
+		}
+	}
+	return 0;
+}
+
 // [=]===^=[ handle_listview_key ]===============================[=]
-static uint32_t handle_listview_key(struct mkgui_window *win, struct mkgui_event *ev, uint32_t ks) {
+static uint32_t handle_listview_key(struct mkgui_window *win, struct mkgui_event *ev, uint32_t ks, uint32_t keymod, char *buf, int32_t len) {
 	struct mkgui_listview_data *lv = find_listv_data(win, win->focus_id);
 	if(!lv || lv->row_count == 0) {
 		return 0;

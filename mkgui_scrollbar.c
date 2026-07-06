@@ -253,3 +253,21 @@ static void scrollbar_scroll(struct mkgui_window *win, uint32_t id, int32_t dire
 	}
 	dirty_all(win);
 }
+
+// [=]===^=[ handle_scrollbar_click ]============================[=]
+// Press on a scrollbar: a hit on the thumb arms thumb-drag (returns 0); a hit
+// in the trough pages toward the click and emits SCROLL. idx == hit result.
+static uint32_t handle_scrollbar_click(struct mkgui_window *win, struct mkgui_event *ev, uint32_t idx) {
+	struct mkgui_widget *hw = &win->widgets[idx];
+	if(scrollbar_hit_thumb(win, idx, win->mouse_x, win->mouse_y)) {
+		win->drag_scrollbar_id = hw->id;
+		win->drag_scrollbar_offset = scrollbar_thumb_drag_offset(win, idx, win->mouse_x, win->mouse_y);
+		return 0;
+	}
+	scrollbar_scroll(win, hw->id, win->mouse_y > win->rects[idx].y + win->rects[idx].h / 2 ? 1 : -1);
+	ev->type = MKGUI_EVENT_SCROLL;
+	ev->id = hw->id;
+	struct mkgui_scrollbar_data *sbd = find_scrollbar_data(win, hw->id);
+	ev->value = sbd ? sbd->value : 0;
+	return 1;
+}

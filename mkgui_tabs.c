@@ -130,7 +130,7 @@ static void render_tabs(struct mkgui_window *win, uint32_t idx) {
 }
 
 // [=]===^=[ handle_tabs_key ]======================================[=]
-static uint32_t handle_tabs_key(struct mkgui_window *win, struct mkgui_event *ev, uint32_t ks) {
+static uint32_t handle_tabs_key(struct mkgui_window *win, struct mkgui_event *ev, uint32_t ks, uint32_t keymod, char *buf, int32_t len) {
 	struct mkgui_widget *w = find_widget(win, win->focus_id);
 	if(!w) {
 		return 0;
@@ -197,6 +197,33 @@ static uint32_t handle_tabs_key(struct mkgui_window *win, struct mkgui_event *ev
 		ev->id = w->id;
 		ev->value = (int32_t)tab->id;
 		return 1;
+	}
+	return 0;
+}
+
+// [=]===^=[ handle_tabs_click ]=================================[=]
+// Press on a tab strip: a hit on a tab's close affordance emits TAB_CLOSE; a
+// hit on an inactive tab activates it and emits TAB_CHANGED. idx == hit result.
+static uint32_t handle_tabs_click(struct mkgui_window *win, struct mkgui_event *ev, uint32_t idx) {
+	struct mkgui_widget *hw = &win->widgets[idx];
+	uint32_t close_id = tab_close_hit_test(win, idx, win->mouse_x, win->mouse_y);
+	if(close_id) {
+		ev->type = MKGUI_EVENT_TAB_CLOSE;
+		ev->id = hw->id;
+		ev->value = (int32_t)close_id;
+		return 1;
+	}
+	uint32_t tab_id = tab_hit_test(win, idx, win->mouse_x, win->mouse_y);
+	if(tab_id) {
+		struct mkgui_tabs_data *td = find_tabs_data(win, hw->id);
+		if(td && td->active_tab != tab_id) {
+			td->active_tab = tab_id;
+			dirty_all(win);
+			ev->type = MKGUI_EVENT_TAB_CHANGED;
+			ev->id = hw->id;
+			ev->value = (int32_t)tab_id;
+			return 1;
+		}
 	}
 	return 0;
 }

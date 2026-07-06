@@ -130,3 +130,14 @@ MKGUI_API const char *mkgui_label_get(struct mkgui_window *win, uint32_t id) {
 	struct mkgui_widget *w = find_widget(win, id);
 	return w ? w->label : "";
 }
+
+// [=]===^=[ handle_label_click ]================================[=]
+// Only link-styled labels are clickable; plain labels ignore the release.
+static uint32_t handle_label_click(struct mkgui_window *win, struct mkgui_event *ev, struct mkgui_widget *w) {
+	if(!(w->style & MKGUI_LABEL_LINK)) {
+		return 0;
+	}
+	ev->type = MKGUI_EVENT_CLICK;
+	ev->id = w->id;
+	return 1;
+}

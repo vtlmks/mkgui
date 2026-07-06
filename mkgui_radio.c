@@ -181,7 +181,7 @@ static uint32_t handle_radio_click(struct mkgui_window *win, struct mkgui_event 
 }
 
 // [=]===^=[ handle_radio_key ]===================================[=]
-static uint32_t handle_radio_key(struct mkgui_window *win, struct mkgui_event *ev, uint32_t ks) {
+static uint32_t handle_radio_key(struct mkgui_window *win, struct mkgui_event *ev, uint32_t ks, uint32_t keymod, char *buf, int32_t len) {
 	if(ks == MKGUI_KEY_SPACE || ks == MKGUI_KEY_RETURN) {
 		struct mkgui_widget *w = find_widget(win, win->focus_id);
 		if(w) {

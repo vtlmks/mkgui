@@ -156,7 +156,7 @@ static void dropdown_open_popup(struct mkgui_window *win, uint32_t widget_id) {
 }
 
 // [=]===^=[ handle_dropdown_key ]===============================[=]
-static uint32_t handle_dropdown_key(struct mkgui_window *win, struct mkgui_event *ev, uint32_t ks) {
+static uint32_t handle_dropdown_key(struct mkgui_window *win, struct mkgui_event *ev, uint32_t ks, uint32_t keymod, char *buf, int32_t len) {
 	struct mkgui_dropdown_data *dd;
 
 	switch(ks) {

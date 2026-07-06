@@ -362,8 +362,57 @@ static void render_richlist(struct mkgui_window *win, uint32_t idx) {
 	}
 }
 
+// [=]===^=[ handle_richlist_click ]==============================[=]
+// Press on a richlist: a scrollbar-thumb hit arms scroll-drag; a trough hit
+// pages; a row hit selects (or emits DBLCLICK on a quick second click). Returns
+// 1 only when it emits a select/dblclick event. idx == hit result.
+static uint32_t handle_richlist_click(struct mkgui_window *win, struct mkgui_event *ev, uint32_t idx) {
+	struct mkgui_widget *hw = &win->widgets[idx];
+	uint32_t rl_sb_hit = richlist_scrollbar_hit(win, idx, win->mouse_x, win->mouse_y);
+	if(rl_sb_hit == 1) {
+		win->drag_scrollbar_id = hw->id;
+		win->drag_scrollbar_offset = richlist_thumb_offset(win, idx, win->mouse_y);
+
+	} else if(rl_sb_hit == 2 || rl_sb_hit == 3) {
+		struct mkgui_richlist_data *rl = find_richlist_data(win, hw->id);
+		if(rl) {
+			int32_t content_h = win->rects[idx].h - 2;
+			rl->scroll_y += (rl_sb_hit == 2 ? -1 : 1) * content_h;
+			richlist_clamp_scroll(rl, content_h);
+			dirty_widget(win, idx);
+		}
+
+	} else {
+		struct mkgui_richlist_data *rl = find_richlist_data(win, hw->id);
+		if(rl) {
+			int32_t row = richlist_row_hit(win, idx, win->mouse_y);
+			if(row >= 0) {
+				uint32_t now = (uint32_t)(mkgui_now_ns() / 1000000ull);
+				uint32_t is_dblclick = (win->dblclick_id == hw->id && win->dblclick_row == row && (now - win->dblclick_time) < 400);
+				win->dblclick_id = hw->id;
+				win->dblclick_row = row;
+				win->dblclick_time = now;
+				rl->selected_row = row;
+				dirty_widget(win, idx);
+				if(is_dblclick) {
+					win->dblclick_id = 0;
+					ev->type = MKGUI_EVENT_RICHLIST_DBLCLICK;
+					ev->id = hw->id;
+					ev->value = row;
+					return 1;
+				}
+				ev->type = MKGUI_EVENT_RICHLIST_SELECT;
+				ev->id = hw->id;
+				ev->value = row;
+				return 1;
+			}
+		}
+	}
+	return 0;
+}
+
 // [=]===^=[ handle_richlist_key ]=================================[=]
-static uint32_t handle_richlist_key(struct mkgui_window *win, struct mkgui_event *ev, uint32_t ks) {
+static uint32_t handle_richlist_key(struct mkgui_window *win, struct mkgui_event *ev, uint32_t ks, uint32_t keymod, char *buf, int32_t len) {
 	struct mkgui_richlist_data *rl = find_richlist_data(win, win->focus_id);
 	if(!rl || rl->row_count == 0) {
 		return 0;

@@ -40,9 +40,15 @@ palette, code generation, rendering, or event handling.
    Add `#include "mkgui_yourwidget.c"` in the widget include block in mkgui.c
    (between the other `mkgui_*.c` includes).
 
-3. **Wire up the render dispatch**
-   Add a case to the `render_widget()` switch in mkgui.c that calls
-   `render_yourwidget(ctx, idx)`.
+3. **Register per-type traits and rendering**
+   mkgui.c drives per-type behaviour from descriptor tables indexed by the type
+   enum, not parallel switches. Add a row for your type to each that applies:
+   - `widget_desc[]` (near `is_focusable`) -- set `.focusable` if the widget
+     takes keyboard focus, and `.fixed_h` if it holds its natural height in a
+     vbox rather than flexing to share leftover space.
+   - `render_desc[]` (before `render_widget`) -- set `.render` to
+     `render_yourwidget` (or a shared renderer). Set `.cell_overlay = 1` only if
+     the widget hosts an inline cell editor drawn on top.
 
 4. **Natural size**
    If the widget has a text-derived or font-derived natural height, add a case
@@ -57,10 +63,22 @@ palette, code generation, rendering, or event handling.
    allocations.
 
 6. **Event dispatch**
-   Wire up mouse press/release/motion, keyboard input, focus, and hover to
-   produce the widget's events. Most widgets hook into the existing dispatch
-   functions in mkgui.c; complex widgets can forward to helpers in their own
-   `.c` file.
+   Put each handler in its widget's own `.c` file and register it in the
+   descriptor tables (all defined just before `mkgui_window_poll`), as
+   applicable:
+   - `press_desc[]` -- button-press handler `handle_yourwidget_click(win, ev,
+     idx)`. Set `.discrete = 1` if it returns nonzero only when it also set an
+     event, or `0` if it may consume the press without emitting one.
+   - `key_desc[]` -- keyboard handler for the focused widget, with the shared
+     signature `handle_yourwidget_key(win, ev, ks, keymod, buf, len)` (ignore
+     the trailing text-entry arguments if the widget only cares about `ks`).
+   - `release_desc[]` -- if the widget finishes a drag on button-release.
+   - `click_desc[]` -- if the widget's click fires when the release lands on the
+     same widget that received the press.
+   Widgets with special press behaviour (opening popups, focus juggling, the
+   combobox/dropdown reopen guard) are handled explicitly in the press section
+   of `mkgui_window_poll` rather than through `press_desc[]`. Motion/drag is a
+   shared cross-widget state machine and also lives in `mkgui_window_poll`.
 
 7. **Dirty tracking**
    Widget setters that mutate visible state should call `dirty_widget_id(ctx,

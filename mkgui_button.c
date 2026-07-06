@@ -68,7 +68,7 @@ MKGUI_API const char *mkgui_button_get_text(struct mkgui_window *win, uint32_t i
 }
 
 // [=]===^=[ handle_button_key ]=================================[=]
-static uint32_t handle_button_key(struct mkgui_window *win, struct mkgui_event *ev, uint32_t ks) {
+static uint32_t handle_button_key(struct mkgui_window *win, struct mkgui_event *ev, uint32_t ks, uint32_t keymod, char *buf, int32_t len) {
 	if(ks == MKGUI_KEY_RETURN || ks == MKGUI_KEY_SPACE) {
 		ev->type = MKGUI_EVENT_CLICK;
 		ev->id = win->focus_id;
@@ -76,4 +76,12 @@ static uint32_t handle_button_key(struct mkgui_window *win, struct mkgui_event *
 		return 1;
 	}
 	return 0;
+}
+
+// [=]===^=[ handle_button_click ]===============================[=]
+// Fired from the release path when press and release land on the same button.
+static uint32_t handle_button_click(struct mkgui_window *win, struct mkgui_event *ev, struct mkgui_widget *w) {
+	ev->type = MKGUI_EVENT_CLICK;
+	ev->id = w->id;
+	return 1;
 }

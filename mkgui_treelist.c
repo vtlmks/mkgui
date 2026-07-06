@@ -978,8 +978,143 @@ static void treelist_autosize_col(struct mkgui_window *win, struct mkgui_treelis
 	dirty_all(win);
 }
 
+// [=]===^=[ handle_treelist_click ]=============================[=]
+// Press on a treelist (columned tree). In priority order: horizontal then
+// vertical scrollbar (thumb arms drag, trough pages), a column divider
+// (double-click autosizes else arms resize), a column header (arms reorder),
+// then a visible row: a twisty hit toggles expand/collapse (EXPAND/COLLAPSE),
+// otherwise select honoring Ctrl/Shift multi-select via win->press_mod
+// (double-click emits DBLCLICK). Returns 1 only when it emits an event; all
+// scrollbar/column paths return 0 to keep draining. idx == hit result.
+static uint32_t handle_treelist_click(struct mkgui_window *win, struct mkgui_event *ev, uint32_t idx) {
+	struct mkgui_widget *hw = &win->widgets[idx];
+	uint32_t hsb_hit = treelist_hscrollbar_hit(win, idx, win->mouse_x, win->mouse_y);
+	if(hsb_hit == 1) {
+		win->drag_scrollbar_id = hw->id;
+		win->drag_scrollbar_offset = treelist_hthumb_offset(win, idx, win->mouse_x);
+		win->drag_scrollbar_horiz = 1;
+
+	} else if(hsb_hit == 2 || hsb_hit == 3) {
+		struct mkgui_treelist_data *htl = find_treelist_data(win, hw->id);
+		if(htl) {
+			int32_t cw = win->rects[idx].w - 2 - win->scrollbar_w;
+			htl->scroll_x += (hsb_hit == 2 ? -1 : 1) * (cw / 2);
+			treelist_clamp_scroll_x(htl, cw);
+			dirty_widget(win, idx);
+		}
+
+	} else {
+		uint32_t sb_hit = treelist_scrollbar_hit(win, idx, win->mouse_x, win->mouse_y);
+		if(sb_hit == 1) {
+			win->drag_scrollbar_id = hw->id;
+			win->drag_scrollbar_offset = treelist_thumb_offset(win, idx, win->mouse_y);
+			win->drag_scrollbar_horiz = 0;
+
+		} else if(sb_hit == 2 || sb_hit == 3) {
+			treelist_page_scroll(win, idx, sb_hit == 2 ? -1 : 1);
+
+		} else {
+			int32_t div = treelist_divider_hit(win, idx, win->mouse_x, win->mouse_y);
+			if(div >= 0) {
+				struct mkgui_treelist_data *tl = find_treelist_data(win, hw->id);
+				if(tl) {
+					uint32_t logical = tl->col_order[div];
+					uint32_t now_ms = (uint32_t)(mkgui_now_ns() / 1000000ull);
+					if(win->divider_dblclick_id == hw->id && win->divider_dblclick_col == (int32_t)logical && (now_ms - win->divider_dblclick_time) < 400) {
+						treelist_autosize_col(win, tl, logical);
+						win->divider_dblclick_id = 0;
+
+					} else {
+						win->divider_dblclick_id = hw->id;
+						win->divider_dblclick_col = (int32_t)logical;
+						win->divider_dblclick_time = now_ms;
+						win->drag_col_resize_id = hw->id;
+						win->drag_col_resize_col = (int32_t)logical;
+						win->drag_col_resize_start_x = win->mouse_x;
+						win->drag_col_resize_start_w = tl->columns[logical].width;
+					}
+				}
+
+			} else {
+				int32_t dcol = treelist_header_hit(win, idx, win->mouse_x, win->mouse_y);
+				if(dcol >= 0) {
+					win->drag_col_id = hw->id;
+					win->drag_col_src = dcol;
+					win->drag_col_start_x = win->mouse_x;
+
+				} else {
+					int32_t vis_row = treelist_row_hit(win, idx, win->mouse_x, win->mouse_y);
+					struct mkgui_treelist_data *tl = find_treelist_data(win, hw->id);
+					if(tl && vis_row >= 0 && (uint32_t)vis_row < tl->visible_count) {
+						uint32_t node = tl->visible[vis_row];
+						if(treelist_twisty_hit(win, idx, win->mouse_x, node) && tl->nodes[node].has_children) {
+							tl->nodes[node].expanded = !tl->nodes[node].expanded;
+							tl->dirty_visible = 1;
+							dirty_all(win);
+							ev->type = tl->nodes[node].expanded ? MKGUI_EVENT_TREELIST_EXPAND : MKGUI_EVENT_TREELIST_COLLAPSE;
+							ev->id = hw->id;
+							ev->value = (int32_t)node + 1;
+							return 1;
+						}
+
+						int32_t handle = (int32_t)node + 1;
+						uint32_t now = (uint32_t)(mkgui_now_ns() / 1000000ull);
+						uint32_t elapsed = now - win->dblclick_time;
+						uint32_t is_dblclick = (win->dblclick_id == hw->id && win->dblclick_row == handle && elapsed < 400);
+						win->dblclick_id = hw->id;
+						win->dblclick_row = handle;
+						win->dblclick_time = now;
+						if(hw->style & MKGUI_TREELIST_MULTI_SELECT) {
+							uint32_t mod_ctrl = (win->press_mod & MKGUI_MOD_CONTROL) != 0;
+							uint32_t mod_shift = (win->press_mod & MKGUI_MOD_SHIFT) != 0;
+							if(mod_ctrl) {
+								tl_multi_sel_toggle(tl, handle);
+								tl->selected = handle;
+							} else if(mod_shift) {
+								int32_t anchor_row = treelist_visible_row_of(tl, tl->selected);
+								if(anchor_row < 0) {
+									anchor_row = vis_row;
+								}
+								int32_t lo = anchor_row < vis_row ? anchor_row : vis_row;
+								int32_t rhi = anchor_row < vis_row ? vis_row : anchor_row;
+								tl->multi_sel_count = 0;
+								for(int32_t r = lo; r <= rhi && tl->multi_sel_count < MKGUI_MAX_MULTI_SEL; ++r) {
+									tl_multi_sel_toggle(tl, (int32_t)tl->visible[r] + 1);
+								}
+								tl->selected = handle;
+							} else {
+								tl->multi_sel[0] = handle;
+								tl->multi_sel_count = 1;
+								tl->selected = handle;
+							}
+						} else {
+							tl->selected = handle;
+						}
+						int32_t col = treelist_col_hit(win, idx, win->mouse_x);
+						dirty_widget(win, idx);
+						if(is_dblclick) {
+							ev->type = MKGUI_EVENT_TREELIST_DBLCLICK;
+							ev->id = hw->id;
+							ev->value = handle;
+							ev->col = col;
+							win->dblclick_id = 0;
+							return 1;
+						}
+						ev->type = MKGUI_EVENT_TREELIST_SELECT;
+						ev->id = hw->id;
+						ev->value = handle;
+						ev->col = col;
+						return 1;
+					}
+				}
+			}
+		}
+	}
+	return 0;
+}
+
 // [=]===^=[ handle_treelist_key ]================================[=]
-static uint32_t handle_treelist_key(struct mkgui_window *win, struct mkgui_event *ev, uint32_t ks) {
+static uint32_t handle_treelist_key(struct mkgui_window *win, struct mkgui_event *ev, uint32_t ks, uint32_t keymod, char *buf, int32_t len) {
 	struct mkgui_treelist_data *tl = find_treelist_data(win, win->focus_id);
 	if(!tl) {
 		return 0;
