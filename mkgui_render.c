@@ -43,15 +43,10 @@ static void fill_pixels_avx2(uint32_t *dst, uint32_t count, uint32_t color) {
 	}
 }
 
-// [=]===^=[ blend_glyph_row_sse2 ]=================================[=]
-static void blend_glyph_row_sse2(uint32_t *rowp, uint8_t *bmp, int32_t col0, int32_t col1, int32_t gx, uint32_t rb_src, uint32_t g_src) {
-	// color is pre-split into red|blue and green channels so we can use
-	// 16-bit multiplies to blend two channels per 32-bit lane simultaneously
-	int32_t col = col0;
+// [=]===^=[ blend_glyph_sse2 ]=====================================[=]
+static void blend_glyph_sse2(uint32_t *buf, int32_t bw, uint8_t *bmp, int32_t glyph_width, int32_t row0, int32_t row1, int32_t col0, int32_t col1, int32_t gx, int32_t gy, uint32_t rb_src, uint32_t g_src) {
 	__m128i src_rb = _mm_set1_epi32((int32_t)rb_src);
 	__m128i src_g8 = _mm_set1_epi32((int32_t)(g_src >> 8));
-	// 0x80 bias per channel implements the "divide by 255" approximation:
-	// (x + 0x80 + (x >> 8)) >> 8 is equivalent to x/255 with correct rounding
 	__m128i round_rb = _mm_set1_epi32(0x00800080);
 	__m128i round_g = _mm_set1_epi32(0x00000080);
 	__m128i mask_rb = _mm_set1_epi32(0x00ff00ff);
@@ -59,50 +54,54 @@ static void blend_glyph_row_sse2(uint32_t *rowp, uint8_t *bmp, int32_t col0, int
 	__m128i mask_a = _mm_set1_epi32((int32_t)0xff000000u);
 	__m128i val_255 = _mm_set1_epi32(255);
 	__m128i zero = _mm_setzero_si128();
-	for(; col + 4 <= col1; col += 4) {
-		__m128i alphas = _mm_cvtsi32_si128(*(int32_t *)&bmp[col]);
-		alphas = _mm_unpacklo_epi8(alphas, zero);
-		alphas = _mm_unpacklo_epi16(alphas, zero);
-		__m128i any = _mm_cmpeq_epi32(alphas, zero);
-		if(_mm_movemask_epi8(any) == 0xffff) {
-			continue;
+	for(int32_t row = row0; row < row1; ++row) {
+		uint32_t *rowp = &buf[(gy + row) * bw];
+		uint8_t *row_bmp = &bmp[row * glyph_width];
+		int32_t col = col0;
+		for(; col + 4 <= col1; col += 4) {
+			__m128i alphas = _mm_cvtsi32_si128(*(int32_t *)&row_bmp[col]);
+			alphas = _mm_unpacklo_epi8(alphas, zero);
+			alphas = _mm_unpacklo_epi16(alphas, zero);
+			__m128i any = _mm_cmpeq_epi32(alphas, zero);
+			if(_mm_movemask_epi8(any) == 0xffff) {
+				continue;
+			}
+			int32_t px = gx + col;
+			__m128i dst = _mm_loadu_si128((__m128i *)&rowp[px]);
+			__m128i ia = _mm_sub_epi32(val_255, alphas);
+			__m128i a16 = _mm_or_si128(alphas, _mm_slli_epi32(alphas, 16));
+			__m128i ia16 = _mm_or_si128(ia, _mm_slli_epi32(ia, 16));
+			__m128i dst_rb = _mm_and_si128(dst, mask_rb);
+			__m128i dst_g8 = _mm_and_si128(_mm_srli_epi32(dst, 8), mask_byte);
+			__m128i rb = _mm_add_epi32(_mm_add_epi32(_mm_mullo_epi16(src_rb, a16), _mm_mullo_epi16(dst_rb, ia16)), round_rb);
+			rb = _mm_and_si128(_mm_srli_epi32(_mm_add_epi32(rb, _mm_and_si128(_mm_srli_epi32(rb, 8), mask_rb)), 8), mask_rb);
+			__m128i gv = _mm_add_epi32(_mm_add_epi32(_mm_mullo_epi16(src_g8, alphas), _mm_mullo_epi16(dst_g8, ia)), round_g);
+			gv = _mm_slli_epi32(_mm_and_si128(_mm_srli_epi32(_mm_add_epi32(gv, _mm_and_si128(_mm_srli_epi32(gv, 8), mask_byte)), 8), mask_byte), 8);
+			__m128i result = _mm_or_si128(_mm_or_si128(rb, gv), mask_a);
+			__m128i skip = _mm_cmpeq_epi32(alphas, zero);
+			result = _mm_or_si128(_mm_andnot_si128(skip, result), _mm_and_si128(skip, dst));
+			_mm_storeu_si128((__m128i *)&rowp[px], result);
 		}
-		int32_t px = gx + col;
-		__m128i dst = _mm_loadu_si128((__m128i *)&rowp[px]);
-		__m128i ia = _mm_sub_epi32(val_255, alphas);
-		__m128i a16 = _mm_or_si128(alphas, _mm_slli_epi32(alphas, 16));
-		__m128i ia16 = _mm_or_si128(ia, _mm_slli_epi32(ia, 16));
-		__m128i dst_rb = _mm_and_si128(dst, mask_rb);
-		__m128i dst_g8 = _mm_and_si128(_mm_srli_epi32(dst, 8), mask_byte);
-		__m128i rb = _mm_add_epi32(_mm_add_epi32(_mm_mullo_epi16(src_rb, a16), _mm_mullo_epi16(dst_rb, ia16)), round_rb);
-		rb = _mm_and_si128(_mm_srli_epi32(_mm_add_epi32(rb, _mm_and_si128(_mm_srli_epi32(rb, 8), mask_rb)), 8), mask_rb);
-		__m128i gv = _mm_add_epi32(_mm_add_epi32(_mm_mullo_epi16(src_g8, alphas), _mm_mullo_epi16(dst_g8, ia)), round_g);
-		gv = _mm_slli_epi32(_mm_and_si128(_mm_srli_epi32(_mm_add_epi32(gv, _mm_and_si128(_mm_srli_epi32(gv, 8), mask_byte)), 8), mask_byte), 8);
-		__m128i result = _mm_or_si128(_mm_or_si128(rb, gv), mask_a);
-		__m128i skip = _mm_cmpeq_epi32(alphas, zero);
-		result = _mm_or_si128(_mm_andnot_si128(skip, result), _mm_and_si128(skip, dst));
-		_mm_storeu_si128((__m128i *)&rowp[px], result);
-	}
-	for(; col < col1; ++col) {
-		uint32_t a = bmp[col];
-		if(a == 0) {
-			continue;
+		for(; col < col1; ++col) {
+			uint32_t a = row_bmp[col];
+			if(a == 0) {
+				continue;
+			}
+			int32_t px = gx + col;
+			uint32_t ia = 255 - a;
+			uint32_t d = rowp[px];
+			uint32_t rb = (rb_src * a + (d & 0x00ff00ff) * ia + 0x00800080);
+			rb = ((rb + ((rb >> 8) & 0x00ff00ff)) >> 8) & 0x00ff00ff;
+			uint32_t gv = (g_src * a + (d & 0x0000ff00) * ia + 0x00008000);
+			gv = ((gv + ((gv >> 8) & 0x0000ff00)) >> 8) & 0x0000ff00;
+			rowp[px] = 0xff000000 | rb | gv;
 		}
-		int32_t px = gx + col;
-		uint32_t ia = 255 - a;
-		uint32_t d = rowp[px];
-		uint32_t rb = (rb_src * a + (d & 0x00ff00ff) * ia + 0x00800080);
-		rb = ((rb + ((rb >> 8) & 0x00ff00ff)) >> 8) & 0x00ff00ff;
-		uint32_t gv = (g_src * a + (d & 0x0000ff00) * ia + 0x00008000);
-		gv = ((gv + ((gv >> 8) & 0x0000ff00)) >> 8) & 0x0000ff00;
-		rowp[px] = 0xff000000 | rb | gv;
 	}
 }
 
-// [=]===^=[ blend_glyph_row_avx2 ]=================================[=]
+// [=]===^=[ blend_glyph_avx2 ]=====================================[=]
 __attribute__((target("avx2")))
-static void blend_glyph_row_avx2(uint32_t *rowp, uint8_t *bmp, int32_t col0, int32_t col1, int32_t gx, uint32_t rb_src, uint32_t g_src) {
-	int32_t col = col0;
+static void blend_glyph_avx2(uint32_t *buf, int32_t bw, uint8_t *bmp, int32_t glyph_width, int32_t row0, int32_t row1, int32_t col0, int32_t col1, int32_t gx, int32_t gy, uint32_t rb_src, uint32_t g_src) {
 	__m256i src_rb = _mm256_set1_epi32((int32_t)rb_src);
 	__m256i src_g8 = _mm256_set1_epi32((int32_t)(g_src >> 8));
 	__m256i round_rb = _mm256_set1_epi32(0x00800080);
@@ -112,31 +111,6 @@ static void blend_glyph_row_avx2(uint32_t *rowp, uint8_t *bmp, int32_t col0, int
 	__m256i mask_a = _mm256_set1_epi32((int32_t)0xff000000u);
 	__m256i val_255 = _mm256_set1_epi32(255);
 	__m256i zero = _mm256_setzero_si256();
-	for(; col + 8 <= col1; col += 8) {
-		__m128i alpha8 = _mm_loadl_epi64((__m128i *)&bmp[col]);
-		__m128i alpha16 = _mm_unpacklo_epi8(alpha8, _mm_setzero_si128());
-		__m256i alphas = _mm256_cvtepu16_epi32(alpha16);
-		__m256i any = _mm256_cmpeq_epi32(alphas, zero);
-		if(_mm256_movemask_epi8(any) == -1) {
-			continue;
-		}
-		int32_t px = gx + col;
-		__m256i dst = _mm256_loadu_si256((__m256i *)&rowp[px]);
-		__m256i ia = _mm256_sub_epi32(val_255, alphas);
-		__m256i a16 = _mm256_or_si256(alphas, _mm256_slli_epi32(alphas, 16));
-		__m256i ia16 = _mm256_or_si256(ia, _mm256_slli_epi32(ia, 16));
-		__m256i dst_rb = _mm256_and_si256(dst, mask_rb);
-		__m256i dst_g8 = _mm256_and_si256(_mm256_srli_epi32(dst, 8), mask_byte);
-		__m256i rb = _mm256_add_epi32(_mm256_add_epi32(_mm256_mullo_epi16(src_rb, a16), _mm256_mullo_epi16(dst_rb, ia16)), round_rb);
-		rb = _mm256_and_si256(_mm256_srli_epi32(_mm256_add_epi32(rb, _mm256_and_si256(_mm256_srli_epi32(rb, 8), mask_rb)), 8), mask_rb);
-		__m256i gv = _mm256_add_epi32(_mm256_add_epi32(_mm256_mullo_epi16(src_g8, alphas), _mm256_mullo_epi16(dst_g8, ia)), round_g);
-		gv = _mm256_slli_epi32(_mm256_and_si256(_mm256_srli_epi32(_mm256_add_epi32(gv, _mm256_and_si256(_mm256_srli_epi32(gv, 8), mask_byte)), 8), mask_byte), 8);
-		__m256i result = _mm256_or_si256(_mm256_or_si256(rb, gv), mask_a);
-		__m256i skip = _mm256_cmpeq_epi32(alphas, zero);
-		result = _mm256_or_si256(_mm256_andnot_si256(skip, result), _mm256_and_si256(skip, dst));
-		_mm256_storeu_si256((__m256i *)&rowp[px], result);
-	}
-	// SSE2 tail for remaining 4+ pixels
 	__m128i src_rb4 = _mm_set1_epi32((int32_t)rb_src);
 	__m128i src_g84 = _mm_set1_epi32((int32_t)(g_src >> 8));
 	__m128i round_rb4 = _mm_set1_epi32(0x00800080);
@@ -146,44 +120,74 @@ static void blend_glyph_row_avx2(uint32_t *rowp, uint8_t *bmp, int32_t col0, int
 	__m128i mask_a4 = _mm_set1_epi32((int32_t)0xff000000u);
 	__m128i val_2554 = _mm_set1_epi32(255);
 	__m128i zero4 = _mm_setzero_si128();
-	for(; col + 4 <= col1; col += 4) {
-		int32_t bmp4; memcpy(&bmp4, &bmp[col], 4);
-		__m128i alphas4 = _mm_cvtsi32_si128(bmp4);
-		alphas4 = _mm_unpacklo_epi8(alphas4, zero4);
-		alphas4 = _mm_unpacklo_epi16(alphas4, zero4);
-		__m128i any4 = _mm_cmpeq_epi32(alphas4, zero4);
-		if(_mm_movemask_epi8(any4) == 0xffff) {
-			continue;
+	for(int32_t row = row0; row < row1; ++row) {
+		uint32_t *rowp = &buf[(gy + row) * bw];
+		uint8_t *row_bmp = &bmp[row * glyph_width];
+		int32_t col = col0;
+		for(; col + 8 <= col1; col += 8) {
+			__m128i alpha8 = _mm_loadl_epi64((__m128i *)&row_bmp[col]);
+			__m128i alpha16 = _mm_unpacklo_epi8(alpha8, _mm_setzero_si128());
+			__m256i alphas = _mm256_cvtepu16_epi32(alpha16);
+			__m256i any = _mm256_cmpeq_epi32(alphas, zero);
+			if(_mm256_movemask_epi8(any) == -1) {
+				continue;
+			}
+			int32_t px = gx + col;
+			__m256i dst = _mm256_loadu_si256((__m256i *)&rowp[px]);
+			__m256i ia = _mm256_sub_epi32(val_255, alphas);
+			__m256i a16 = _mm256_or_si256(alphas, _mm256_slli_epi32(alphas, 16));
+			__m256i ia16 = _mm256_or_si256(ia, _mm256_slli_epi32(ia, 16));
+			__m256i dst_rb = _mm256_and_si256(dst, mask_rb);
+			__m256i dst_g8 = _mm256_and_si256(_mm256_srli_epi32(dst, 8), mask_byte);
+			__m256i rb = _mm256_add_epi32(_mm256_add_epi32(_mm256_mullo_epi16(src_rb, a16), _mm256_mullo_epi16(dst_rb, ia16)), round_rb);
+			rb = _mm256_and_si256(_mm256_srli_epi32(_mm256_add_epi32(rb, _mm256_and_si256(_mm256_srli_epi32(rb, 8), mask_rb)), 8), mask_rb);
+			__m256i gv = _mm256_add_epi32(_mm256_add_epi32(_mm256_mullo_epi16(src_g8, alphas), _mm256_mullo_epi16(dst_g8, ia)), round_g);
+			gv = _mm256_slli_epi32(_mm256_and_si256(_mm256_srli_epi32(_mm256_add_epi32(gv, _mm256_and_si256(_mm256_srli_epi32(gv, 8), mask_byte)), 8), mask_byte), 8);
+			__m256i result = _mm256_or_si256(_mm256_or_si256(rb, gv), mask_a);
+			__m256i skip = _mm256_cmpeq_epi32(alphas, zero);
+			result = _mm256_or_si256(_mm256_andnot_si256(skip, result), _mm256_and_si256(skip, dst));
+			_mm256_storeu_si256((__m256i *)&rowp[px], result);
 		}
-		int32_t px = gx + col;
-		__m128i dst4 = _mm_loadu_si128((__m128i *)&rowp[px]);
-		__m128i ia4 = _mm_sub_epi32(val_2554, alphas4);
-		__m128i a164 = _mm_or_si128(alphas4, _mm_slli_epi32(alphas4, 16));
-		__m128i ia164 = _mm_or_si128(ia4, _mm_slli_epi32(ia4, 16));
-		__m128i dst_rb4 = _mm_and_si128(dst4, mask_rb4);
-		__m128i dst_g84 = _mm_and_si128(_mm_srli_epi32(dst4, 8), mask_byte4);
-		__m128i rb4 = _mm_add_epi32(_mm_add_epi32(_mm_mullo_epi16(src_rb4, a164), _mm_mullo_epi16(dst_rb4, ia164)), round_rb4);
-		rb4 = _mm_and_si128(_mm_srli_epi32(_mm_add_epi32(rb4, _mm_and_si128(_mm_srli_epi32(rb4, 8), mask_rb4)), 8), mask_rb4);
-		__m128i gv4 = _mm_add_epi32(_mm_add_epi32(_mm_mullo_epi16(src_g84, alphas4), _mm_mullo_epi16(dst_g84, ia4)), round_g4);
-		gv4 = _mm_slli_epi32(_mm_and_si128(_mm_srli_epi32(_mm_add_epi32(gv4, _mm_and_si128(_mm_srli_epi32(gv4, 8), mask_byte4)), 8), mask_byte4), 8);
-		__m128i result4 = _mm_or_si128(_mm_or_si128(rb4, gv4), mask_a4);
-		__m128i skip4 = _mm_cmpeq_epi32(alphas4, zero4);
-		result4 = _mm_or_si128(_mm_andnot_si128(skip4, result4), _mm_and_si128(skip4, dst4));
-		_mm_storeu_si128((__m128i *)&rowp[px], result4);
-	}
-	for(; col < col1; ++col) {
-		uint32_t a = bmp[col];
-		if(a == 0) {
-			continue;
+		for(; col + 4 <= col1; col += 4) {
+			int32_t bmp4;
+			memcpy(&bmp4, &row_bmp[col], 4);
+			__m128i alphas4 = _mm_cvtsi32_si128(bmp4);
+			alphas4 = _mm_unpacklo_epi8(alphas4, zero4);
+			alphas4 = _mm_unpacklo_epi16(alphas4, zero4);
+			__m128i any4 = _mm_cmpeq_epi32(alphas4, zero4);
+			if(_mm_movemask_epi8(any4) == 0xffff) {
+				continue;
+			}
+			int32_t px = gx + col;
+			__m128i dst4 = _mm_loadu_si128((__m128i *)&rowp[px]);
+			__m128i ia4 = _mm_sub_epi32(val_2554, alphas4);
+			__m128i a164 = _mm_or_si128(alphas4, _mm_slli_epi32(alphas4, 16));
+			__m128i ia164 = _mm_or_si128(ia4, _mm_slli_epi32(ia4, 16));
+			__m128i dst_rb4 = _mm_and_si128(dst4, mask_rb4);
+			__m128i dst_g84 = _mm_and_si128(_mm_srli_epi32(dst4, 8), mask_byte4);
+			__m128i rb4 = _mm_add_epi32(_mm_add_epi32(_mm_mullo_epi16(src_rb4, a164), _mm_mullo_epi16(dst_rb4, ia164)), round_rb4);
+			rb4 = _mm_and_si128(_mm_srli_epi32(_mm_add_epi32(rb4, _mm_and_si128(_mm_srli_epi32(rb4, 8), mask_rb4)), 8), mask_rb4);
+			__m128i gv4 = _mm_add_epi32(_mm_add_epi32(_mm_mullo_epi16(src_g84, alphas4), _mm_mullo_epi16(dst_g84, ia4)), round_g4);
+			gv4 = _mm_slli_epi32(_mm_and_si128(_mm_srli_epi32(_mm_add_epi32(gv4, _mm_and_si128(_mm_srli_epi32(gv4, 8), mask_byte4)), 8), mask_byte4), 8);
+			__m128i result4 = _mm_or_si128(_mm_or_si128(rb4, gv4), mask_a4);
+			__m128i skip4 = _mm_cmpeq_epi32(alphas4, zero4);
+			result4 = _mm_or_si128(_mm_andnot_si128(skip4, result4), _mm_and_si128(skip4, dst4));
+			_mm_storeu_si128((__m128i *)&rowp[px], result4);
 		}
-		int32_t px = gx + col;
-		uint32_t ia = 255 - a;
-		uint32_t d = rowp[px];
-		uint32_t rb = (rb_src * a + (d & 0x00ff00ff) * ia + 0x00800080);
-		rb = ((rb + ((rb >> 8) & 0x00ff00ff)) >> 8) & 0x00ff00ff;
-		uint32_t gv = (g_src * a + (d & 0x0000ff00) * ia + 0x00008000);
-		gv = ((gv + ((gv >> 8) & 0x0000ff00)) >> 8) & 0x0000ff00;
-		rowp[px] = 0xff000000 | rb | gv;
+		for(; col < col1; ++col) {
+			uint32_t a = row_bmp[col];
+			if(a == 0) {
+				continue;
+			}
+			int32_t px = gx + col;
+			uint32_t ia = 255 - a;
+			uint32_t d = rowp[px];
+			uint32_t rb = (rb_src * a + (d & 0x00ff00ff) * ia + 0x00800080);
+			rb = ((rb + ((rb >> 8) & 0x00ff00ff)) >> 8) & 0x00ff00ff;
+			uint32_t gv = (g_src * a + (d & 0x0000ff00) * ia + 0x00008000);
+			gv = ((gv + ((gv >> 8) & 0x0000ff00)) >> 8) & 0x0000ff00;
+			rowp[px] = 0xff000000 | rb | gv;
+		}
 	}
 }
 
@@ -345,14 +349,14 @@ static void blend_icon_row_avx2(uint32_t *rowp, uint32_t *src, int32_t col0, int
 }
 
 typedef void (*fn_fill_pixels)(uint32_t *, uint32_t, uint32_t);
-typedef void (*fn_blend_glyph_row)(uint32_t *, uint8_t *, int32_t, int32_t, int32_t, uint32_t, uint32_t);
+typedef void (*fn_blend_glyph)(uint32_t *, int32_t, uint8_t *, int32_t, int32_t, int32_t, int32_t, int32_t, int32_t, int32_t, uint32_t, uint32_t);
 typedef void (*fn_blend_icon_row)(uint32_t *, uint32_t *, int32_t, int32_t, int32_t);
 
 static void fill_pixels_resolve(uint32_t *dst, uint32_t count, uint32_t color);
 
 // Dispatch pointers
 static fn_fill_pixels fill_pixels = fill_pixels_resolve;
-static fn_blend_glyph_row blend_glyph_row = blend_glyph_row_sse2;
+static fn_blend_glyph blend_glyph = blend_glyph_sse2;
 static fn_blend_icon_row blend_icon_row = blend_icon_row_sse2;
 
 // [=]===^=[ fill_pixels_resolve ]===================================[=]
@@ -360,7 +364,7 @@ static void fill_pixels_resolve(uint32_t *dst, uint32_t count, uint32_t color) {
 	detect_cpu();
 	if(cpu_has_avx2) {
 		fill_pixels = fill_pixels_avx2;
-		blend_glyph_row = blend_glyph_row_avx2;
+		blend_glyph = blend_glyph_avx2;
 		blend_icon_row = blend_icon_row_avx2;
 	} else {
 		fill_pixels = fill_pixels_sse2;
@@ -432,7 +436,11 @@ static void draw_rect_fill(uint32_t *buf, int32_t bw, int32_t bh, int32_t x, int
 		y1 = render_clip_y2;
 	}
 	int32_t span = x1 - x0;
-	if(span <= 0) {
+	if(span <= 0 || y0 >= y1) {
+		return;
+	}
+	if(x0 == 0 && x1 == bw) {
+		fill_pixels(&buf[y0 * bw], (uint32_t)(y1 - y0) * (uint32_t)bw, color);
 		return;
 	}
 	for(int32_t row = y0; row < y1; ++row) {
@@ -442,27 +450,10 @@ static void draw_rect_fill(uint32_t *buf, int32_t bw, int32_t bh, int32_t x, int
 
 #define MKGUI_MAX_CORNER_RADIUS 48
 
-// [=]===^=[ rounded_rect_insets ]=================================[=]
-static void rounded_rect_insets(int32_t radius, int32_t *out) {
-	for(uint32_t row = 0; row < (uint32_t)radius; ++row) {
-		int32_t dy = 2 * (radius - (int32_t)row) - 1;
-		int32_t r2x4 = 4 * radius * radius;
-		int32_t inset = 0;
-		for(uint32_t col = 0; col < (uint32_t)radius; ++col) {
-			int32_t dx = 2 * (radius - (int32_t)col) - 1;
-			if(dx * dx + dy * dy > r2x4) {
-				inset = (int32_t)(col + 1);
-			}
-		}
-		out[row] = inset;
-	}
-}
+static uint8_t rounded_coverage[MKGUI_MAX_CORNER_RADIUS + 1][MKGUI_MAX_CORNER_RADIUS][MKGUI_MAX_CORNER_RADIUS];
+static uint8_t rounded_inset[MKGUI_MAX_CORNER_RADIUS + 1][MKGUI_MAX_CORNER_RADIUS];
 
 // [=]===^=[ corner_coverage ]=====================================[=]
-// computes antialiased coverage for a pixel in a rounded corner by testing
-// a 4x4 subpixel grid against the circle equation (dx^2 + dy^2 <= r^2).
-// coordinates are scaled 8x for integer subpixel precision; the SIMD path
-// evaluates all 4 x-samples per row in one compare via madd + popcount
 static uint32_t corner_coverage(int32_t col, int32_t crow, int32_t radius) {
 	int32_t r8 = 8 * radius;
 	int32_t r8sq = r8 * r8;
@@ -501,6 +492,25 @@ static uint32_t corner_coverage(int32_t col, int32_t crow, int32_t radius) {
 	return count;
 }
 
+// [=]===^=[ rounded_rect_init ]===================================[=]
+static void rounded_rect_init(void) {
+	for(int32_t radius = 1; radius <= MKGUI_MAX_CORNER_RADIUS; ++radius) {
+		for(int32_t row = 0; row < radius; ++row) {
+			int32_t dy = 2 * (radius - row) - 1;
+			int32_t r2x4 = 4 * radius * radius;
+			uint8_t inset = 0;
+			for(int32_t col = 0; col < radius; ++col) {
+				rounded_coverage[radius][row][col] = (uint8_t)corner_coverage(col, row, radius);
+				int32_t dx = 2 * (radius - col) - 1;
+				if(dx * dx + dy * dy > r2x4) {
+					inset = (uint8_t)(col + 1);
+				}
+			}
+			rounded_inset[radius][row] = inset;
+		}
+	}
+}
+
 // [=]===^=[ fill_span_clipped ]===================================[=]
 static void fill_span_clipped(uint32_t *buf, int32_t bw, int32_t py, int32_t left, int32_t right, uint32_t color) {
 	if(left < 0) {
@@ -528,6 +538,9 @@ static void fill_span_clipped(uint32_t *buf, int32_t bw, int32_t py, int32_t lef
 static void draw_rounded_rect_fill(uint32_t *buf, int32_t bw, int32_t bh, int32_t x, int32_t y, int32_t w, int32_t h, uint32_t color, int32_t radius) {
 	if(w <= 0 || h <= 0) {
 		return;
+	}
+	if(radius < 0) {
+		radius = 0;
 	}
 
 	if(radius > w / 2) {
@@ -558,7 +571,7 @@ static void draw_rounded_rect_fill(uint32_t *buf, int32_t bw, int32_t bh, int32_
 		if(crow >= 0 && radius > 0) {
 			uint32_t *rowp = &buf[py * bw];
 			for(uint32_t col = 0; col < (uint32_t)radius; ++col) {
-				uint32_t cov = corner_coverage((int32_t)col, crow, radius);
+				uint32_t cov = rounded_coverage[radius][crow][col];
 				if(cov == 0) {
 					continue;
 				}
@@ -591,12 +604,100 @@ static void draw_rounded_rect_fill(uint32_t *buf, int32_t bw, int32_t bh, int32_
 }
 
 // [=]===^=[ draw_rounded_rect ]===================================[=]
-// 1px border via overdraw: fill with border color, then an inset rect with fill color; handles rounded corners naturally.
 static void draw_rounded_rect(uint32_t *buf, int32_t bw, int32_t bh, int32_t x, int32_t y, int32_t w, int32_t h, uint32_t fill, uint32_t border, int32_t radius) {
-	draw_rounded_rect_fill(buf, bw, bh, x, y, w, h, border, radius);
-	if(w > 2 && h > 2) {
-		int32_t inner_r = radius > 1 ? radius - 1 : 0;
-		draw_rounded_rect_fill(buf, bw, bh, x + 1, y + 1, w - 2, h - 2, fill, inner_r);
+	if(w <= 0 || h <= 0) {
+		return;
+	}
+	int32_t outer_r = radius;
+	if(outer_r < 0) {
+		outer_r = 0;
+	}
+
+	if(outer_r > w / 2) {
+		outer_r = w / 2;
+	}
+
+	if(outer_r > h / 2) {
+		outer_r = h / 2;
+	}
+
+	if(outer_r > MKGUI_MAX_CORNER_RADIUS) {
+		outer_r = MKGUI_MAX_CORNER_RADIUS;
+	}
+	int32_t inner_w = w - 2;
+	int32_t inner_h = h - 2;
+	int32_t inner_r = radius > 1 ? radius - 1 : 0;
+	if(inner_r > inner_w / 2) {
+		inner_r = inner_w / 2;
+	}
+
+	if(inner_r > inner_h / 2) {
+		inner_r = inner_h / 2;
+	}
+
+	if(inner_r > MKGUI_MAX_CORNER_RADIUS) {
+		inner_r = MKGUI_MAX_CORNER_RADIUS;
+	}
+	int32_t edge = outer_r;
+	if(inner_w > 0 && inner_h > 0 && inner_r + 1 > edge) {
+		edge = inner_r + 1;
+	}
+	for(int32_t row = 0; row < h; ++row) {
+		int32_t py = y + row;
+		if(py < 0 || py >= bh || py < render_clip_y1 || py >= render_clip_y2) {
+			continue;
+		}
+		int32_t outer_crow = -1;
+		if(row < outer_r) {
+			outer_crow = row;
+		} else if(row >= h - outer_r) {
+			outer_crow = h - 1 - row;
+		}
+		uint32_t inner_row = row > 0 && row < h - 1 && inner_w > 0 && inner_h > 0;
+		int32_t inner_crow = -1;
+		if(inner_row) {
+			int32_t ir = row - 1;
+			if(ir < inner_r) {
+				inner_crow = ir;
+			} else if(ir >= inner_h - inner_r) {
+				inner_crow = inner_h - 1 - ir;
+			}
+		}
+		uint32_t *rowp = &buf[py * bw];
+		for(int32_t col = 0; col < edge; ++col) {
+			uint32_t outer_cov = outer_crow >= 0 && col < outer_r ? rounded_coverage[outer_r][outer_crow][col] : 16;
+			uint32_t inner_cov = 0;
+			if(inner_row && col > 0) {
+				int32_t inner_col = col - 1;
+				inner_cov = inner_crow >= 0 && inner_col < inner_r ? rounded_coverage[inner_r][inner_crow][inner_col] : 16;
+			}
+			int32_t pl = x + col;
+			int32_t pr = x + w - 1 - col;
+			if(pl >= 0 && pl < bw && pl >= render_clip_x1 && pl < render_clip_x2) {
+				uint32_t pixel = rowp[pl];
+				if(outer_cov > 0) {
+					pixel = blend_pixel(pixel, border, (uint8_t)(outer_cov * 255 / 16));
+				}
+
+				if(inner_cov > 0) {
+					pixel = blend_pixel(pixel, fill, (uint8_t)(inner_cov * 255 / 16));
+				}
+				rowp[pl] = pixel;
+			}
+
+			if(pr >= 0 && pr < bw && pr != pl && pr >= render_clip_x1 && pr < render_clip_x2) {
+				uint32_t pixel = rowp[pr];
+				if(outer_cov > 0) {
+					pixel = blend_pixel(pixel, border, (uint8_t)(outer_cov * 255 / 16));
+				}
+
+				if(inner_cov > 0) {
+					pixel = blend_pixel(pixel, fill, (uint8_t)(inner_cov * 255 / 16));
+				}
+				rowp[pr] = pixel;
+			}
+		}
+		fill_span_clipped(buf, bw, py, x + edge, x + w - edge, inner_row ? fill : border);
 	}
 }
 
@@ -856,12 +957,10 @@ static void draw_patch(struct mkgui_window *win, uint32_t style, int32_t x, int3
 
 	if(w > 2 && h > 2) {
 		int32_t inner_r = r > 1 ? r - 1 : 0;
-		int32_t insets[MKGUI_MAX_CORNER_RADIUS];
-		int32_t hl_inset = 0;
-		if(inner_r > 0) {
-			rounded_rect_insets(inner_r, insets);
-			hl_inset = insets[0];
+		if(inner_r > MKGUI_MAX_CORNER_RADIUS) {
+			inner_r = MKGUI_MAX_CORNER_RADIUS;
 		}
+		int32_t hl_inset = inner_r > 0 ? rounded_inset[inner_r][0] : 0;
 		int32_t hl_y = y + 1;
 		if(hl_y >= 0 && hl_y < win->win_h && hl_y >= render_clip_y1 && hl_y < render_clip_y2) {
 			uint32_t hl;
@@ -950,10 +1049,7 @@ static void draw_text_sw(struct mkgui_window *win, uint32_t *buf, int32_t bw, in
 
 		uint32_t rb_src = color & 0x00ff00ff;
 		uint32_t g_src = color & 0x0000ff00;
-		for(int32_t row = row0; row < row1; ++row) {
-			int32_t py = gy + row;
-			blend_glyph_row(&buf[py * bw], &glyph_atlas[g->atlas_offset + (uint32_t)row * (uint32_t)g->width], col0, col1, gx, rb_src, g_src);
-		}
+		blend_glyph(buf, bw, &glyph_atlas[g->atlas_offset], g->width, row0, row1, col0, col1, gx, gy, rb_src, g_src);
 
 		cx += g->advance;
 	}
@@ -976,6 +1072,7 @@ static uint32_t text_cmd_count;
 
 // [=]===^=[ text_cmd_init ]======================================[=]
 static uint32_t text_cmd_init(void) {
+	rounded_rect_init();
 	if(!vm_arena_create(&text_cmd_arena, (size_t)MKGUI_VM_MAX_TEXT_CMDS * sizeof(struct mkgui_text_cmd))) {
 		return 0;
 	}

@@ -2236,6 +2236,7 @@ static void lc_layout_node(struct mkgui_window *win, struct layout_ctx *lc, uint
 							minh = natural_height(win, jw->type);
 						}
 					}
+					lc->rects[j].h = minh;
 					min_total += minh;
 					weight_total += ew;
 				}
@@ -2275,31 +2276,14 @@ static void lc_layout_node(struct mkgui_window *win, struct layout_ctx *lc, uint
 					ch = lc->rects[j].h;
 				} else {
 					uint32_t wt = jw->weight > 0 ? jw->weight : 1;
-					int32_t base_h = lw_sw(win, jw->h);
-					if(base_h == 0) {
-						uint32_t ct = jw->type;
-						if(ct == MKGUI_VBOX || ct == MKGUI_HBOX || ct == MKGUI_FORM || ct == MKGUI_GROUP || ct == MKGUI_PANEL) {
-							base_h = lc_measure_container(win, lc, j, 1);
-						}
-
-						if(base_h == 0) {
-							base_h = natural_height(win, jw->type);
-						}
-					}
+					int32_t base_h = lc->rects[j].h;
 					// 64-bit intermediate prevents overflow when remaining * weight exceeds 2^31
 					ch = base_h + (weight_total > 0 ? (int32_t)((int64_t)remaining * (int32_t)wt / (int32_t)weight_total) : 0);
 				}
 				// floor flexible children at content size so they never collapse
 				// below usable dimensions; fixed children keep their declared size
 				if(!child_fixed) {
-					uint32_t ct = jw->type;
-					int32_t min_ch;
-					if(ct == MKGUI_VBOX || ct == MKGUI_HBOX || ct == MKGUI_FORM || ct == MKGUI_GROUP || ct == MKGUI_PANEL) {
-						min_ch = lc_measure_container(win, lc, j, 1);
-					} else {
-						min_ch = natural_height(win, ct);
-					}
-
+					int32_t min_ch = lc->rects[j].h;
 					if(min_ch < 1) {
 						min_ch = 1;
 					}
@@ -2366,6 +2350,7 @@ static void lc_layout_node(struct mkgui_window *win, struct layout_ctx *lc, uint
 							minw = natural_width(win, jw);
 						}
 					}
+					lc->rects[j].w = minw;
 					min_total += minw;
 					weight_total += ew;
 				}
@@ -2398,29 +2383,12 @@ static void lc_layout_node(struct mkgui_window *win, struct layout_ctx *lc, uint
 					cw = lc->rects[j].w;
 				} else {
 					uint32_t wt = jw->weight > 0 ? jw->weight : 1;
-					int32_t base_w = lw_sw(win, jw->w);
-					if(base_w == 0) {
-						uint32_t ct = jw->type;
-						if(ct == MKGUI_VBOX || ct == MKGUI_HBOX || ct == MKGUI_FORM || ct == MKGUI_GROUP || ct == MKGUI_PANEL) {
-							base_w = lc_measure_container(win, lc, j, 0);
-						}
-
-						if(base_w == 0) {
-							base_w = natural_width(win, jw);
-						}
-					}
+					int32_t base_w = lc->rects[j].w;
 					cw = base_w + (weight_total > 0 ? (int32_t)((int64_t)remaining * (int32_t)wt / (int32_t)weight_total) : 0);
 				}
 
 				if(!(jw->flags & MKGUI_FIXED)) {
-					uint32_t ct = jw->type;
-					int32_t min_cw;
-					if(ct == MKGUI_VBOX || ct == MKGUI_HBOX || ct == MKGUI_FORM || ct == MKGUI_GROUP || ct == MKGUI_PANEL) {
-						min_cw = lc_measure_container(win, lc, j, 0);
-					} else {
-						min_cw = natural_width(win, jw);
-					}
-
+					int32_t min_cw = lc->rects[j].w;
 					if(min_cw < 1) {
 						min_cw = 1;
 					}
@@ -3413,14 +3381,11 @@ static void render_widgets(struct mkgui_window *win) {
 			render_clip_y2 = dy + dh;
 			draw_rect_fill(win->pixels, win->win_w, win->win_h, dx, dy, dw, dh, win->theme.bg);
 			for(uint32_t i = 0; i < win->widget_count; ++i) {
-				if(!widget_visible(win, i)) {
-					continue;
-				}
 				int32_t wx = win->rects[i].x;
 				int32_t wy = win->rects[i].y;
 				int32_t wr = wx + win->rects[i].w;
 				int32_t wb = wy + win->rects[i].h;
-				if(wx < dx + dw && wr > dx && wy < dy + dh && wb > dy) {
+				if(wx < dx + dw && wr > dx && wy < dy + dh && wb > dy && widget_visible(win, i)) {
 					set_parent_clip(win, i);
 					render_widget(win, i);
 				}
