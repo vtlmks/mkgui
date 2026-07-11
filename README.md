@@ -156,6 +156,26 @@ The icons list is produced by the editor; dynamically-loaded icons can be added 
 ./build.sh debug    # -g -O0
 ```
 
+## Benchmarking
+
+`out/linux/mkguibench` measures layout, full rendering, dirty rendering, completed presentation, and complete frames independently:
+
+```bash
+out/linux/mkguibench layout mixed 2048 1920 1080 10000
+out/linux/mkguibench render buttons 256 1920 1080 1000
+out/linux/mkguibench dirty mixed 256 1920 1080 10000
+out/linux/mkguibench present fill 0 1920 1080 1000
+out/linux/mkguibench frame mixed 256 1920 1080 1000
+```
+
+The output is one machine-readable row containing total time, time per iteration, time per widget or pixel, a minimum effective framebuffer bandwidth, and a framebuffer checksum. Use a real X server for presentation measurements. Xvfb is suitable for correctness and repeatability checks but does not represent display-server or hardware presentation cost.
+
+For hardware counters, run a sufficiently long case pinned to one CPU:
+
+```bash
+taskset -c 2 perf stat -r 5 -e cycles,instructions,branches,branch-misses,cache-references,cache-misses out/linux/mkguibench render mixed 256 1920 1080 5000
+```
+
 ## Building on Windows
 
 mkgui targets C99 and builds with either **MinGW GCC** or **clang-cl** (LLVM's MSVC-compatible driver). Plain MSVC `cl.exe` is not tested but the source should be compatible; please report issues.
@@ -217,6 +237,7 @@ clang-cl /O2 /I mkwin -fuse-ld=lld-link \
 - [Visual editor guide](documentation/editor.md)
 - [Adding new widgets](documentation/adding_widgets.md)
 - [Layout engine reference](documentation/layout.md)
+- [Benchmark harness and current baseline](documentation/benchmark.md)
 
 ## Limitations
 

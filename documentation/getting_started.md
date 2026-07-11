@@ -43,6 +43,7 @@ Default (`core`) target produces:
 | `out/linux/demo`, `out/windows/demo.exe` | Demo application |
 | `out/linux/extract_icons` | Icon extraction tool |
 | `out/linux/test_layout`, `test_widgets`, `test_events`, `test_events_ext`, `test_smoke`, `test_window_visibility`, `test_dynamic` | Unit tests |
+| `out/linux/mkguibench`, `out/windows/mkguibench.exe` | Layout, rendering, dirty-region, presentation, and complete-frame benchmark harness |
 
 Both static libraries share the canonical name `libmkgui.a`; the platform is encoded in the parent directory. Consumers link with `-Lpath/to/mkgui/out/linux -lmkgui` (or `out/windows`).
 

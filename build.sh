@@ -182,6 +182,10 @@ if [ "$TARGET" != "editor" ]; then
 		$CC $CFLAGS tests/test_clipboard.c -o out/linux/test_clipboard $LINUX_LIBS $LDFLAGS
 	) &
 
+	(
+		$CC $CFLAGS benchmark.c -o out/linux/mkguibench $LINUX_LIBS $LDFLAGS
+	) &
+
 	# extract_icons is independent (doesn't use mkgui)
 	(
 		$CC -std=gnu99 -O2 -Wall -Wextra -Wno-stringop-truncation -Wno-format-truncation tools/extract_icons.c -o out/linux/extract_icons
@@ -192,6 +196,10 @@ if [ "$TARGET" != "editor" ]; then
 	if [ "$WIN_ENABLED" -eq 1 ]; then
 		(
 			$WINCC $CFLAGS $LIB_DEFINES tests/test_platform_win32.c -o out/windows/test_platform_win32.exe $WINDOWS_LIBS $WINDOWS_PTHREAD -mconsole $LDFLAGS
+		) &
+
+		(
+			$WINCC $CFLAGS benchmark.c -o out/windows/mkguibench.exe $WINDOWS_LIBS $WINDOWS_PTHREAD -mconsole $LDFLAGS
 		) &
 	fi
 fi
