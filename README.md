@@ -126,8 +126,8 @@ int main(void) {
 mkgui uses SVG icons via PlutoSVG, following the Freedesktop icon naming standard. Icons are loaded at runtime from a flat directory:
 
 ```c
-mkgui_icon_load_svg_dir(ctx, "icons");           // load all SVGs from icons/
-mkgui_icon_load_svg(ctx, "my-icon", "path.svg"); // load a single icon
+mkgui_icon_load_svg_dir(win, "icons");           // load all SVGs from icons/
+mkgui_icon_load_svg(win, "my-icon", "path.svg"); // load a single icon
 ```
 
 Monochrome icons using `currentColor` automatically follow the theme text color and update on theme switch.

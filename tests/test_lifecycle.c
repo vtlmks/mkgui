@@ -35,6 +35,11 @@ static void test_ctx_lifecycle_basic(void) {
 	CHECK(ctx->should_quit == 0, "fresh ctx has should_quit set");
 	CHECK(ctx->primary == NULL, "fresh ctx has primary set");
 	CHECK(ctx->scale > 0.99f && ctx->scale < 1.01f, "fresh ctx scale = %f, expected 1.0", (double)ctx->scale);
+	struct mkgui_ctx *second = mkgui_ctx_create();
+	CHECK(second == NULL, "second ctx_create should return NULL");
+	struct mkgui_widget invalid[] = { MKGUI_W(MKGUI_WIDGET_COUNT, 1, "Invalid", "", 0, 100, 100, 0, 0, 0) };
+	struct mkgui_window *invalid_win = mkgui_window_create(ctx, NULL, invalid, 1, NULL, 0, 0);
+	CHECK(invalid_win == NULL, "invalid widget type should reject window creation");
 	mkgui_ctx_destroy(ctx);
 
 	// null-safe

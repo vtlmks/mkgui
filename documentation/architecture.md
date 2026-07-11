@@ -13,13 +13,14 @@ For shared library use, define `MKGUI_LIBRARY` to make `MKGUI_API` expand to not
 ```
 mkgui.c
   mkgui.h                  Public API (types, enums, function prototypes)
-  platform_win32_types.h    Platform struct definitions (Win32)
-  platform_linux_types.h    Platform struct definitions (X11/FreeType/Fontconfig)
+  mkwin/mkwin.h            Windowing API
+  mkwin_types_win32.h      Platform struct definitions (Win32)
+  mkwin_types_linux.h      Platform struct definitions (X11/FreeType/Fontconfig)
   plutovg/plutosvg          Embedded SVG rasterizer (PlutoVG + PlutoSVG, MIT)
   mkgui_render.c            Drawing primitives, text command queue
   mkgui_drop.c              OS file drag-and-drop
-  platform_win32.c          Window, events, fonts, framebuffer (Win32)
-  platform_linux.c          Window, events, fonts, framebuffer (X11)
+  mkwin_win32.c            Window, events, fonts, framebuffer (Win32)
+  mkwin_linux.c            Window, events, fonts, framebuffer (X11)
   mkgui_icon.c              Icon loading (SVG via PlutoSVG), hashing, rendering
   mkgui_textedit.c          Shared text-edit primitives used by input/combobox/pathbar/cell edit
   mkgui_undo.c              Undo/redo ring buffers
@@ -50,10 +51,10 @@ Dependencies:
 | `mkgui.h` | Public API. All types, enums, and function prototypes. Single source of truth for consumers. |
 | `mkgui.c` | Core: context lifecycle, widget management, layout engine, event dispatch, main loop. Includes every other `.c` file. |
 | `mkgui_render.c` | Drawing primitives (`draw_rect_fill`, `draw_rounded_rect`, `draw_text_sw`), text command queue, icon drawing. |
-| `platform_linux.c` | X11 backend: window creation, XShm framebuffer, event translation, FreeType + Fontconfig font loading, timerfd, XDnd. |
-| `platform_linux_types.h` | Platform struct definitions for Linux (Display, Window, XShmSegmentInfo, FT_Face, FcConfig). |
-| `platform_win32.c` | Win32 backend: window creation, DIB section framebuffer, message loop, GDI font loading, waitable timers, WM_DROPFILES. |
-| `platform_win32_types.h` | Platform struct definitions for Windows (HWND, HDC, HBITMAP, HFONT). |
+| `mkwin/mkwin_linux.c` | X11 backend: window creation, XShm framebuffer, event translation, FreeType + Fontconfig font loading, timerfd, XDnd. |
+| `mkwin/mkwin_types_linux.h` | Platform struct definitions for Linux. |
+| `mkwin/mkwin_win32.c` | Win32 backend: window creation, DIB section framebuffer, message loop, GDI font loading, waitable timers, WM_DROPFILES. |
+| `mkwin/mkwin_types_win32.h` | Platform struct definitions for Windows. |
 | `mkgui_icon.c` | Icon hash table, SVG source cache, PlutoSVG rasterization, system icon theme fallback, icon drawing with clipping. |
 | `mkgui_textedit.c` | Shared text-edit primitives (cursor movement, selection, insert/delete, render) used by input/combobox/pathbar/cell edit. |
 | `mkgui_celledit.c` | Inline cell edit overlay used by listview, treeview, gridview, and itemview. F2 / slow-double-click rename. |
@@ -74,25 +75,20 @@ Dependencies:
 
 ## Core data structures
 
-### struct mkgui_ctx (the context)
+### struct mkgui_ctx
 
-Everything lives here. One context per window. Key members:
+One context exists per process. It owns application defaults, the quit flag, the primary window, and a registry of up to `MKGUI_MAX_WINDOWS` windows.
 
 | Member | Purpose |
 |--------|---------|
-| `plat` | Platform-specific data (X11 Display/Window or HWND/HDC) |
-| `pixels`, `win_w`, `win_h` | Framebuffer: 32-bit ARGB pixel array, window dimensions |
-| `widgets`, `widget_count`, `widget_cap` | Flat array of widget definitions |
-| `rects` | Parallel array of computed layout rectangles (output of layout pass) |
-| `tooltip_texts` | Parallel array of tooltip strings (one per widget slot) |
-| Aux arrays (`inputs`, `textareas`, `listvs`, ...) | Per-type auxiliary data with separate count/cap |
-| `popups[8]` | Active popup windows (dropdowns, context menus, tooltips, file dialogs) |
-| `glyphs[224]` | Cached font glyphs (Latin-1: codepoints 32-255) |
-| `theme` | Current color theme |
-| `hover_id`, `press_id`, `focus_id` | Interaction state |
-| `dirty_rects[32]`, `dirty_count`, `dirty_full` | Dirty region tracking |
-| `timers[MKGUI_MAX_TIMERS]` | Active timers, 8 slots (timerfd on Linux, WaitableTimer on Windows) |
-| `parent` | Pointer to parent context (for child windows) |
+| `windows`, `window_count` | Window registry |
+| `primary` | First live window and main-loop anchor |
+| `should_quit` | Application-wide quit flag |
+| `app_class`, `theme`, `scale` | Defaults inherited by new windows |
+
+### struct mkgui_window
+
+Each window owns its platform handle, framebuffer, widget tree, per-type auxiliary arrays, layout rectangles, event state, timers, accelerators, popups, dirty rectangles, and rendering metrics. Its `ctx` member points back to the process context and `parent` identifies an optional transient parent window.
 
 ### struct mkgui_widget
 
@@ -339,9 +335,9 @@ Icons are SVG-based. Source SVG bytes are cached per name and rasterized on dema
 
 Loading paths:
 
-1. `mkgui_icon_load_svg(ctx, name, path)` -- single SVG file registered under `name`.
-2. `mkgui_icon_load_svg_dir(ctx, dir)` -- batch load every `.svg` in a flat directory (filename minus extension = icon name).
-3. `mkgui_icon_load_app_icons(ctx, app_name)` -- resolve the directory via XDG/FHS paths, then batch load.
+1. `mkgui_icon_load_svg(win, name, path)` loads one SVG file under `name`.
+2. `mkgui_icon_load_svg_dir(win, dir)` loads every `.svg` in a flat directory.
+3. `mkgui_icon_load_app_icons(win, app_name)` resolves the application icon directory and loads it.
 4. Lazy system theme fallback (Linux): if an icon is referenced but not found in the loaded set, `icon_resolve()` walks the detected system theme chain (Papirus -> breeze -> hicolor, etc.) and loads the first match. Results are cached; a negative cache prevents repeated filesystem lookups for names that don't exist in any theme.
 
 Icons are automatically re-rasterized on scale change (`mkgui_ctx_set_scale`) and theme change (`mkgui_ctx_set_theme`) because `currentColor` in the SVG follows `theme.text`. The SVG source cache makes this cheap. Drawing is done by `draw_icon()` / `draw_icon_popup()` with per-pixel alpha blending and clip rect support.
@@ -363,23 +359,23 @@ Each popup has its own pixel buffer and is rendered/blitted independently. Max 8
 
 ## Multi-window support
 
-A single `mkgui_ctx` owns any number of `mkgui_window`s. Each window has its own X11/Win32 window, framebuffer, and widget tree; all windows on the ctx share the display connection, font data, icon cache, and theme. Create additional windows with `mkgui_window_create(ctx, parent_win, ...)`; passing a non-NULL `parent` marks the new window as transient of that parent (window manager handles stacking/modality). Every window is destroyed with `mkgui_window_destroy()` regardless of whether it was top-level or transient.
+A single `mkgui_ctx` owns up to `MKGUI_MAX_WINDOWS` windows. Each window has its own X11/Win32 window, framebuffer, and widget tree; all windows on the ctx share the display connection, font data, and icon cache. Create additional windows with `mkgui_window_create(ctx, parent_win, ...)`; passing a non-NULL `parent` marks the new window as transient of that parent. Every window is destroyed with `mkgui_window_destroy()` regardless of whether it was top-level or transient.
 
 Each window can register an event callback via `mkgui_window_set_callback()`. A global window registry maps platform window handles to their owning `mkgui_window`, so `mkgui_ctx_run()` routes events to the correct window without manual pumping. For events that arrive while another window's modal loop is running, the event is pushed onto the target window's deferred event queue and delivered on its next iteration.
 
 ## Widget lifecycle
 
 1. **Define**: create a `struct mkgui_widget` with type, id, parent_id, size, flags.
-2. **Add**: `mkgui_widget_add(ctx, widget, after_id)` inserts into the flat array. If the widget type has aux data, `init_widget_aux()` allocates and initializes it.
-3. **Layout**: next `mkgui_flush()` recomputes `ctx->rects[]` for all widgets.
+2. **Add**: `mkgui_widget_add(win, widget, after_id)` inserts into the flat array. If the widget type has aux data, `init_widget_aux()` allocates and initializes it.
+3. **Layout**: next `mkgui_flush()` recomputes `win->rects[]` for all widgets.
 4. **Render**: type-specific renderer draws the widget into the framebuffer.
 5. **Interact**: platform events are dispatched; widget-specific handlers update state and emit `mkgui_event`s.
-6. **Remove**: `mkgui_widget_remove(ctx, id)` removes the widget and all descendants, frees aux data, compacts the arrays.
+6. **Remove**: `mkgui_widget_remove(win, id)` removes the widget and all descendants, frees aux data, compacts the arrays.
 
 ## Performance notes
 
 - **SSE2**: `draw_rect_fill` uses SSE2 128-bit stores for fast rectangle clearing.
-- **Glyph cache**: all 224 Latin-1 glyphs (codepoints 32-255) are pre-rasterized at startup. No FreeType calls during rendering. Text input accepts UTF-8; codepoints within Latin-1 range are rendered from cache, others are skipped.
+- **Glyph cache**: all 224 Latin-1 glyphs (codepoints 32-255) are pre-rasterized at startup. No FreeType calls occur during rendering. Text storage and editing are byte-oriented Latin-1, not UTF-8 decoded.
 - **Virtual callbacks**: listview, gridview, and richlist fetch row data on demand via callbacks, supporting millions of rows without pre-allocating data.
 - **Deferred text rendering**: text commands are batched and flushed once per frame (or per popup), not per-widget.
 - **vm_arena**: layout and text command arrays never realloc during rendering. Pointer stability guaranteed.
@@ -388,13 +384,14 @@ Each window can register an event callback via `mkgui_window_set_callback()`. A 
 
 | Resource | Maximum | Defined by |
 |----------|---------|------------|
-| Widgets (layout) | 65,536 | `MKGUI_VM_MAX_WIDGETS` |
+| Windows per context | 16 | `MKGUI_MAX_WINDOWS` |
+| Widgets per window | 1,048,576 | `MKGUI_VM_MAX_WIDGETS` |
 | Text commands/frame | 32,768 | `MKGUI_VM_MAX_TEXT_CMDS` |
 | Icons | 2,048 (default) | `MKGUI_MAX_ICONS` (overridable at compile time; editor uses 32,768) |
 | Popups | 8 | `MKGUI_MAX_POPUPS` |
-| Timers per context | 8 | `MKGUI_MAX_TIMERS` |
-| Accelerators per context | 64 | `MKGUI_MAX_ACCELS` |
-| Dirty rects | 32 | Fixed array on ctx |
+| Timers per window | 8 | `MKGUI_MAX_TIMERS` |
+| Accelerators per window | 64 | `MKGUI_MAX_ACCELS` |
+| Dirty rects per window | 32 | Fixed array on window |
 | Widget label length | 256 chars | `MKGUI_MAX_TEXT` |
 | Icon name length | 64 chars | `MKGUI_ICON_NAME_LEN` |
 | Context menu items | 64 | `MKGUI_MAX_CTXMENU` |

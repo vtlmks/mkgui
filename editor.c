@@ -432,8 +432,9 @@ struct ed_widget {
 // ---------------------------------------------------------------------------
 
 struct ed_snapshot {
-	struct ed_widget widgets[ED_MAX_WIDGETS];
+	struct ed_widget *widgets;
 	uint32_t widget_count;
+	uint32_t widget_cap;
 };
 
 // ---------------------------------------------------------------------------
@@ -1433,7 +1434,18 @@ static void ed_remove_widget_data(uint32_t widget_id) {
 // [=]===^=[ ed_push_undo ]=======================================[=]
 static void ed_push_undo(void) {
 	struct ed_snapshot *snap = &ed.undo[ed.undo_pos % ED_MAX_UNDO];
-	memcpy(snap->widgets, ed.widgets, sizeof(struct ed_widget) * ed.widget_count);
+	if(ed.widget_count > snap->widget_cap) {
+		struct ed_widget *widgets = (struct ed_widget *)malloc((size_t)ed.widget_count * sizeof(struct ed_widget));
+		if(!widgets) {
+			return;
+		}
+		free(snap->widgets);
+		snap->widgets = widgets;
+		snap->widget_cap = ed.widget_count;
+	}
+	if(ed.widget_count > 0) {
+		memcpy(snap->widgets, ed.widgets, sizeof(struct ed_widget) * ed.widget_count);
+	}
 	snap->widget_count = ed.widget_count;
 	++ed.undo_pos;
 	ed.undo_count = ed.undo_pos;
@@ -5900,6 +5912,9 @@ int main(void) {
 		mkgui_ctx_wait(ctx);
 	}
 
+	for(uint32_t i = 0; i < ED_MAX_UNDO; ++i) {
+		free(ed.undo[i].widgets);
+	}
 	mkgui_window_destroy(win);
 	mkgui_ctx_destroy(ctx);
 	return 0;

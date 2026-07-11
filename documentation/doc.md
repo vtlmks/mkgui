@@ -461,7 +461,7 @@ struct mkgui_ctx *mkgui_ctx_create(void);
 void mkgui_ctx_destroy(struct mkgui_ctx *ctx);
 void mkgui_ctx_set_app_class(struct mkgui_ctx *ctx, const char *app_class);
 
-// Window lifecycle (any number of windows per ctx)
+// Window lifecycle (up to MKGUI_MAX_WINDOWS windows per ctx)
 struct mkgui_window *mkgui_window_create(struct mkgui_ctx *ctx, struct mkgui_window *parent,
                                          const struct mkgui_widget *widgets, uint32_t count,
                                          const char *title, int32_t w, int32_t h);
@@ -771,24 +771,24 @@ Returns 1 on success, 0 on allocation failure. The widget's aux data (slider sta
 ```c
 // add a slider as the first child of a vbox
 struct mkgui_widget slider = MKGUI_W(MKGUI_SLIDER, 500, "Volume", "", VBOX_ID, 0, 0, 0, 0, 0);
-mkgui_widget_add(ctx, slider, VBOX_ID);
+mkgui_widget_add(win, slider, VBOX_ID);
 
 // add a button after an existing sibling
 struct mkgui_widget btn = MKGUI_W(MKGUI_BUTTON, 501, "Mute", "", VBOX_ID, 80, 0, MKGUI_FIXED, 0, 0);
-mkgui_widget_add(ctx, btn, 500);  // after the slider
+mkgui_widget_add(win, btn, 500);  // after the slider
 
 // remove the slider and anything nested inside it
-mkgui_widget_remove(ctx, 500);
+mkgui_widget_remove(win, 500);
 ```
 
 ### Performance timing
 
-After each frame, the context contains timing data:
+After each frame, the window contains timing data. These fields are internal and directly visible to unity-build consumers:
 
 ```c
-ctx->perf_layout_us   // layout calculation time in microseconds
-ctx->perf_render_us   // widget rendering time in microseconds
-ctx->perf_blit_us     // framebuffer blit time in microseconds
+win->perf_layout_us   // layout calculation time in microseconds
+win->perf_render_us   // widget rendering time in microseconds
+win->perf_blit_us     // framebuffer blit time in microseconds
 ```
 
 ### Utilities
@@ -1874,7 +1874,7 @@ const char *mkgui_icon_get_dir(struct mkgui_window *win);
 
 ```c
 mkgui_ctx_set_app_class(ctx, "myapp");
-mkgui_icon_load_app_icons(ctx, "myapp");
+mkgui_icon_load_app_icons(win, "myapp");
 // Loads /usr/share/myapp/icons/document-save.svg as "document-save"
 ```
 

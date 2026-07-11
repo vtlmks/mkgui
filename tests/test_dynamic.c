@@ -298,6 +298,10 @@ int32_t main(void) {
 	test_insert_stress(win);
 	test_aux_data(win);
 	test_remove_window_blocked(win);
+	struct mkgui_widget invalid = { .type = MKGUI_WIDGET_COUNT, .id = 32000, .parent_id = 1 };
+	uint32_t count_before_invalid = win->widget_count;
+	CHECK(mkgui_widget_add(win, invalid, 0) == 0, "invalid widget type should be rejected");
+	CHECK(win->widget_count == count_before_invalid, "invalid widget type changed widget count");
 
 	verify_integrity(win, "final");
 

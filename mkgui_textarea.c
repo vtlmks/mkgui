@@ -45,16 +45,24 @@ static uint32_t textarea_line_count(struct mkgui_textarea_data *ta) {
 }
 
 // [=]===^=[ textarea_ensure_cap ]================================[=]
-static void textarea_ensure_cap(struct mkgui_textarea_data *ta, uint32_t needed) {
+static uint32_t textarea_ensure_cap(struct mkgui_textarea_data *ta, size_t needed) {
 	if(needed <= ta->text_cap) {
-		return;
+		return 1;
 	}
-	uint32_t new_cap = ta->text_cap * 2;
+	size_t new_cap = (size_t)ta->text_cap * 2;
 	if(new_cap < needed) {
 		new_cap = needed;
 	}
-	ta->text = (char *)realloc(ta->text, new_cap);
-	ta->text_cap = new_cap;
+	if(new_cap > UINT32_MAX) {
+		return 0;
+	}
+	char *text = (char *)realloc(ta->text, new_cap);
+	if(!text) {
+		return 0;
+	}
+	ta->text = text;
+	ta->text_cap = (uint32_t)new_cap;
+	return 1;
 }
 
 // [=]===^=[ textarea_has_selection ]==============================[=]
@@ -89,16 +97,6 @@ static void textarea_delete_selection(struct mkgui_textarea_data *ta) {
 	ta->cursor = lo;
 	ta->sel_start = lo;
 	ta->sel_end = lo;
-}
-
-// [=]===^=[ textarea_insert_char ]===============================[=]
-static void textarea_insert_char(struct mkgui_textarea_data *ta, char ch) {
-	textarea_ensure_cap(ta, ta->text_len + 2);
-	memmove(&ta->text[ta->cursor + 1], &ta->text[ta->cursor], ta->text_len - ta->cursor);
-	ta->text[ta->cursor] = ch;
-	++ta->cursor;
-	++ta->text_len;
-	ta->text[ta->text_len] = '\0';
 }
 
 // [=]===^=[ textarea_pos_to_line ]================================[=]
@@ -446,11 +444,18 @@ static uint32_t handle_textarea_key(struct mkgui_window *win, struct mkgui_event
 			if(readonly) {
 				return 0;
 			}
+			if(!textarea_ensure_cap(ta, (size_t)ta->text_len + 2)) {
+				return 0;
+			}
 			textarea_undo_push_force(ta);
 			if(textarea_has_selection(ta)) {
 				textarea_delete_selection(ta);
 			}
-			textarea_insert_char(ta, '\n');
+			memmove(&ta->text[ta->cursor + 1], &ta->text[ta->cursor], ta->text_len - ta->cursor);
+			ta->text[ta->cursor] = '\n';
+			++ta->cursor;
+			++ta->text_len;
+			ta->text[ta->text_len] = '\0';
 			textarea_clear_selection(ta);
 			dirty_widget_id(win, win->focus_id);
 			textarea_scroll_to_cursor(win, win->focus_id);
@@ -629,12 +634,14 @@ static uint32_t handle_textarea_key(struct mkgui_window *win, struct mkgui_event
 				if(readonly) {
 					return 0;
 				}
+				uint32_t slen = (uint32_t)len;
+				if(!textarea_ensure_cap(ta, (size_t)ta->text_len + slen + 1)) {
+					return 0;
+				}
 				textarea_undo_push(ta);
 				if(textarea_has_selection(ta)) {
 					textarea_delete_selection(ta);
 				}
-				uint32_t slen = (uint32_t)len;
-				textarea_ensure_cap(ta, ta->text_len + slen + 1);
 				memmove(&ta->text[ta->cursor + slen], &ta->text[ta->cursor], ta->text_len - ta->cursor);
 				memcpy(&ta->text[ta->cursor], buf, slen);
 				ta->text_len += slen;
@@ -661,8 +668,14 @@ MKGUI_API void mkgui_textarea_set(struct mkgui_window *win, uint32_t id, const c
 	if(!ta) {
 		return;
 	}
-	uint32_t slen = (uint32_t)strlen(text);
-	textarea_ensure_cap(ta, slen + 1);
+	size_t text_len = strlen(text);
+	if(text_len > UINT32_MAX) {
+		return;
+	}
+	uint32_t slen = (uint32_t)text_len;
+	if(!textarea_ensure_cap(ta, (size_t)slen + 1)) {
+		return;
+	}
 	memcpy(ta->text, text, slen);
 	ta->text[slen] = '\0';
 	ta->text_len = slen;
@@ -777,11 +790,17 @@ MKGUI_API void mkgui_textarea_insert(struct mkgui_window *win, uint32_t id, cons
 		return;
 	}
 
+	size_t text_len = strlen(text);
+	if(text_len > UINT32_MAX) {
+		return;
+	}
+	uint32_t slen = (uint32_t)text_len;
+	if(!textarea_ensure_cap(ta, (size_t)ta->text_len + slen + 1)) {
+		return;
+	}
 	if(textarea_has_selection(ta)) {
 		textarea_delete_selection(ta);
 	}
-	uint32_t slen = (uint32_t)strlen(text);
-	textarea_ensure_cap(ta, ta->text_len + slen + 1);
 	memmove(&ta->text[ta->cursor + slen], &ta->text[ta->cursor], ta->text_len - ta->cursor);
 	memcpy(&ta->text[ta->cursor], text, slen);
 	ta->text_len += slen;
@@ -801,8 +820,14 @@ MKGUI_API void mkgui_textarea_append(struct mkgui_window *win, uint32_t id, cons
 	if(!ta) {
 		return;
 	}
-	uint32_t slen = (uint32_t)strlen(text);
-	textarea_ensure_cap(ta, ta->text_len + slen + 1);
+	size_t text_len = strlen(text);
+	if(text_len > UINT32_MAX) {
+		return;
+	}
+	uint32_t slen = (uint32_t)text_len;
+	if(!textarea_ensure_cap(ta, (size_t)ta->text_len + slen + 1)) {
+		return;
+	}
 	memcpy(&ta->text[ta->text_len], text, slen);
 	ta->text_len += slen;
 	ta->text[ta->text_len] = '\0';

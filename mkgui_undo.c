@@ -68,21 +68,22 @@ static uint32_t input_redo(struct mkgui_input_data *inp) {
 }
 
 // [=]===^=[ textarea_undo_push ]=================================[=]
-static void textarea_undo_push(struct mkgui_textarea_data *ta) {
+static uint32_t textarea_undo_push(struct mkgui_textarea_data *ta) {
 	uint32_t now = (uint32_t)(mkgui_now_ns() / 1000000ull);
 	if(ta->undo_count > 0 && (now - ta->undo_last_ms) < MKGUI_UNDO_COALESCE_MS) {
-		return;
+		return 1;
 	}
 	ta->undo_last_ms = now;
 
 	uint32_t slot = ta->undo_pos % MKGUI_UNDO_MAX;
 	struct mkgui_textarea_snap *s = &ta->undo[slot];
-	free(s->text);
-	s->text = (char *)malloc(ta->text_len + 1);
-	if(!s->text) {
-		return;
+	char *text = (char *)malloc(ta->text_len + 1);
+	if(!text) {
+		return 0;
 	}
-	memcpy(s->text, ta->text, ta->text_len + 1);
+	memcpy(text, ta->text, ta->text_len + 1);
+	free(s->text);
+	s->text = text;
 	s->text_len = ta->text_len;
 	s->cursor = ta->cursor;
 	s->sel_start = ta->sel_start;
@@ -90,12 +91,13 @@ static void textarea_undo_push(struct mkgui_textarea_data *ta) {
 	++ta->undo_pos;
 	ta->undo_count = ta->undo_pos;
 	ta->undo_saved = ta->undo_pos;
+	return 1;
 }
 
 // [=]===^=[ textarea_undo_push_force ]============================[=]
-static void textarea_undo_push_force(struct mkgui_textarea_data *ta) {
+static uint32_t textarea_undo_push_force(struct mkgui_textarea_data *ta) {
 	ta->undo_last_ms = 0;
-	textarea_undo_push(ta);
+	return textarea_undo_push(ta);
 }
 
 // [=]===^=[ textarea_undo ]======================================[=]
@@ -105,7 +107,9 @@ static uint32_t textarea_undo(struct mkgui_textarea_data *ta) {
 	}
 
 	if(ta->undo_pos == ta->undo_saved) {
-		textarea_undo_push_force(ta);
+		if(!textarea_undo_push_force(ta)) {
+			return 0;
+		}
 		--ta->undo_pos;
 	}
 
@@ -116,8 +120,13 @@ static uint32_t textarea_undo(struct mkgui_textarea_data *ta) {
 	uint32_t slot = ta->undo_pos % MKGUI_UNDO_MAX;
 	struct mkgui_textarea_snap *s = &ta->undo[slot];
 	if(s->text_len + 1 > ta->text_cap) {
+		char *text = (char *)realloc(ta->text, s->text_len + 1);
+		if(!text) {
+			++ta->undo_pos;
+			return 0;
+		}
+		ta->text = text;
 		ta->text_cap = s->text_len + 1;
-		ta->text = (char *)realloc(ta->text, ta->text_cap);
 	}
 	memcpy(ta->text, s->text, s->text_len + 1);
 	ta->text_len = s->text_len;
@@ -136,8 +145,13 @@ static uint32_t textarea_redo(struct mkgui_textarea_data *ta) {
 	uint32_t slot = ta->undo_pos % MKGUI_UNDO_MAX;
 	struct mkgui_textarea_snap *s = &ta->undo[slot];
 	if(s->text_len + 1 > ta->text_cap) {
+		char *text = (char *)realloc(ta->text, s->text_len + 1);
+		if(!text) {
+			--ta->undo_pos;
+			return 0;
+		}
+		ta->text = text;
 		ta->text_cap = s->text_len + 1;
-		ta->text = (char *)realloc(ta->text, ta->text_cap);
 	}
 	memcpy(ta->text, s->text, s->text_len + 1);
 	ta->text_len = s->text_len;

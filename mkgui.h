@@ -163,6 +163,7 @@ enum {
 	MKGUI_DIVIDER,
 	MKGUI_LOGVIEW,
 	MKGUI_TREELIST,
+	MKGUI_WIDGET_COUNT,
 };
 
 // ---------------------------------------------------------------------------
