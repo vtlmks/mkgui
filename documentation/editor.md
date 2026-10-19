@@ -7,7 +7,7 @@ can be saved/loaded and a complete compilable C source file via code generation.
 
 1. Launch the editor binary
 2. Click a widget in the **palette** (right panel) to enter placement mode
-3. Click on the canvas to place the widget -- repeat to place more of the same
+3. Click on the canvas to place the widget; hold **Ctrl** to keep adding into the selected container
 4. Press **Escape** to exit placement mode
 5. Select placed widgets to edit properties in the right panel
 6. **File > Generate Code** to export a compilable C file
@@ -33,6 +33,15 @@ Click a widget or container in the palette to enter **placement mode**. The
 status bar shows "Place: WidgetType". Each click on the canvas places an
 instance. You can place as many as you want without re-selecting the palette
 entry. Press **Escape** to return to normal selection mode.
+
+To add five buttons to an existing HBox:
+
+1. Select the HBox on the canvas or in the tree.
+2. Click **Button** in the palette.
+3. Hold **Ctrl** and click the canvas five times. Each click adds a button to that HBox, which remains selected.
+4. Press **Escape** when finished.
+
+Repeated placement also works without Ctrl; Ctrl keeps the selected container as the parent instead of choosing a container under each click.
 
 ### Smart parenting
 
@@ -190,6 +199,7 @@ the checkboxes. Enabled events generate `case` stubs in the output code.
 | Ctrl+Z           | Undo |
 | Ctrl+Shift+Z     | Redo |
 | Ctrl+Y           | Redo (alternate) |
+| Ctrl+click canvas | Place another palette widget into the selected container; keep that container selected |
 | Delete           | Delete selected widget |
 | Escape           | Cancel placement / dismiss help popup |
 | F1               | Show help for hovered palette widget |
