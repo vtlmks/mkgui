@@ -179,6 +179,10 @@ if [ "$TARGET" != "editor" ]; then
 
 	# Remaining tests are unity builds; they use mkgui internals on purpose.
 	(
+		$CC $CFLAGS tests/test_filedialog.c -o out/linux/test_filedialog $LINUX_LIBS $LDFLAGS
+	) &
+
+	(
 		$CC $CFLAGS tests/test_layout.c -o out/linux/test_layout $LINUX_LIBS $LDFLAGS
 	) &
 
@@ -247,6 +251,7 @@ if [ "$TARGET" != "editor" ]; then
 	# Run with: wine out/windows/test_platform_win32.exe
 	if [ "$WIN_ENABLED" -eq 1 ]; then
 		(
+			$WINCC $CFLAGS tests/test_filedialog.c -o out/windows/test_filedialog.exe $WINDOWS_LIBS $WINDOWS_PTHREAD -mconsole $LDFLAGS
 			$WINCC $CFLAGS -DMKGUI_TEST_MINIMAL tests/test_features.c -o out/windows/test_features_minimal.exe $WINDOWS_LIBS $WINDOWS_PTHREAD -mconsole $LDFLAGS
 			$WINCC $CFLAGS tests/test_icon_storage.c -o out/windows/test_icon_storage.exe $WINDOWS_LIBS $WINDOWS_PTHREAD -mconsole $LDFLAGS
 		) &

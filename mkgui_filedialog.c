@@ -873,98 +873,141 @@ static struct fd_entry *fd_filtered_entry(uint32_t row) {
 // Results
 // ---------------------------------------------------------------------------
 
-// [=]===^=[ fd_build_results ]===================================[=]
+// [=]===^=[ fd_result_path ]===================================================================[=]
+static uint32_t fd_result_path(uint32_t index, char *name) {
+	uint32_t absolute = name[0] == '/';
+
+#ifdef _WIN32
+	absolute = absolute || name[0] == '\\' || (name[0] && name[1] == ':');
+#endif
+
+	int32_t length;
+
+	if(absolute) {
+		length = snprintf(fd_results[index], sizeof(fd_results[index]), "%s", name);
+
+	} else {
+		length = snprintf(fd_results[index], sizeof(fd_results[index]), "%s%s%s", fd->path, strcmp(fd->path, "/") == 0 ? "" : "/", name);
+
+	}
+
+	return length >= 0 && (size_t)length < sizeof(fd_results[index]);
+
+}
+
+// [=]===^=[ fd_build_results ]=================================================================[=]
 static void fd_build_results(struct mkgui_window *dlg) {
+	struct mkgui_listview_data *lv = find_listv_data(dlg, FD_ID_FILES);
 	fd_result_count = 0;
 
 	if(fd->mode == 2) {
-		struct mkgui_listview_data *lv = find_listv_data(dlg, FD_ID_FILES);
-		struct fd_entry *e = lv ? fd_filtered_entry((uint32_t)lv->selected_row) : NULL;
-		if(e && e->is_dir && strcmp(e->name, "..") != 0) {
-			if(strcmp(fd->path, "/") == 0) {
-				snprintf(fd_results[0], sizeof(fd_results[0]), "/%s", e->name);
-			} else {
-				snprintf(fd_results[0], sizeof(fd_results[0]), "%s/%s", fd->path, e->name);
-			}
-		} else {
-			// nothing (or "..") highlighted: pick the folder we are in
-			snprintf(fd_results[0], sizeof(fd_results[0]), "%s", fd->path);
-		}
-		fd_result_count = 1;
-		return;
-	}
+		struct fd_entry *entry = lv ? fd_filtered_entry((uint32_t)lv->selected_row) : NULL;
 
-	if(fd->mode == 1) {
-		const char *name = mkgui_input_get(dlg, FD_ID_NAME_INPUT);
-		if(name && name[0] != '\0') {
-			char fname[260];
-			snprintf(fname, sizeof(fname), "%s", name);
-			fd_append_filter_ext(fname, sizeof(fname));
-			if(strcmp(fd->path, "/") == 0) {
-				snprintf(fd_results[0], sizeof(fd_results[0]), "/%s", fname);
-			} else {
-				snprintf(fd_results[0], sizeof(fd_results[0]), "%s/%s", fd->path, fname);
+		if(entry && entry->is_dir && strcmp(entry->name, "..") != 0) {
+			fd_result_count = fd_result_path(0, entry->name);
+
+		} else {
+			int32_t length = snprintf(fd_results[0], sizeof(fd_results[0]), "%s", fd->path);
+			fd_result_count = length >= 0 && (size_t)length < sizeof(fd_results[0]);
+
+		}
+
+	} else if(fd->mode == 0 && lv && lv->multi_sel_count > 0) {
+		for(uint32_t i = 0; i < lv->multi_sel_count && fd_result_count < FD_MAX_RESULTS; ++i) {
+			struct fd_entry *entry = fd_filtered_entry((uint32_t)lv->multi_sel[i]);
+
+			if(entry && !entry->is_dir) {
+				if(!fd_result_path(fd_result_count, entry->name)) {
+					fd_result_count = 0;
+					return;
+
+				}
+
+				++fd_result_count;
+
 			}
-			fd_result_count = 1;
 		}
 
 	} else {
-		struct mkgui_listview_data *lv = find_listv_data(dlg, FD_ID_FILES);
-		if(!lv) {
-			return;
-		}
+		char name[MKGUI_MAX_TEXT];
+		snprintf(name, sizeof(name), "%s", mkgui_input_get(dlg, FD_ID_NAME_INPUT));
 
-		if(lv->multi_sel_count > 0) {
-			for(uint32_t i = 0; i < lv->multi_sel_count && fd_result_count < FD_MAX_RESULTS; ++i) {
-				int32_t row = lv->multi_sel[i];
-				struct fd_entry *e = fd_filtered_entry((uint32_t)row);
-				if(e && !e->is_dir) {
-					if(strcmp(fd->path, "/") == 0) {
-						snprintf(fd_results[fd_result_count], sizeof(fd_results[0]), "/%s", e->name);
-					} else {
-						snprintf(fd_results[fd_result_count], sizeof(fd_results[0]), "%s/%s", fd->path, e->name);
-					}
-					++fd_result_count;
-				}
-			}
+		if(name[0]) {
+			fd_result_count = fd_result_path(0, name);
 
-		} else {
-			struct fd_entry *e = fd_filtered_entry((uint32_t)lv->selected_row);
-			if(e && !e->is_dir) {
-				if(strcmp(fd->path, "/") == 0) {
-					snprintf(fd_results[0], sizeof(fd_results[0]), "/%s", e->name);
-				} else {
-					snprintf(fd_results[0], sizeof(fd_results[0]), "%s/%s", fd->path, e->name);
-				}
-				fd_result_count = 1;
+		} else if(lv) {
+			struct fd_entry *entry = fd_filtered_entry((uint32_t)lv->selected_row);
+
+			if(entry && !entry->is_dir) {
+				fd_result_count = fd_result_path(0, entry->name);
+
 			}
 		}
 	}
 }
 
-// [=]===^=[ fd_confirm ]=========================================[=]
+// [=]===^=[ fd_confirm ]=======================================================================[=]
 static uint32_t fd_confirm(struct mkgui_window *dlg) {
 	fd_build_results(dlg);
+
 	if(fd_result_count == 0) {
 		return 0;
+
 	}
 
-	if(fd->mode == 1 && fd_path_exists(fd_results[0])) {
-		char *fname = strrchr(fd_results[0], '/');
-		if(!fname) {
-			fname = fd_results[0];
-		} else {
-			++fname;
+	if(fd->mode != 2) {
+		for(uint32_t i = 0; i < fd_result_count; ++i) {
+			struct mkgui_path_info info;
+			uint32_t exists = mkgui_path_stat(fd_results[i], &info) != 0;
+
+			if(exists && info.is_dir) {
+				if(fd_result_count == 1) {
+					fd_navigate(dlg, fd_results[i]);
+					mkgui_input_set(dlg, FD_ID_NAME_INPUT, "");
+
+				}
+
+				return 0;
+
+			}
+
+			if(fd->mode == 0 && !exists) {
+				mkgui_dialog_message(dlg, "Open File", "The specified file does not exist.", MKGUI_DLG_ICON_ERROR, MKGUI_DLG_BUTTONS_OK);
+				return 0;
+
+			}
 		}
-		char msg[FD_PATH_SIZE + 320];
-		snprintf(msg, sizeof(msg), "Overwrite existing file %s?", fname);
-		if(!mkgui_dialog_confirm(dlg, "Confirm Save", msg)) {
-			return 0;
+	}
+
+	if(fd->mode == 1) {
+		char *name = strrchr(fd_results[0], '/');
+
+#ifdef _WIN32
+		char *backslash = strrchr(fd_results[0], '\\');
+
+		if(backslash && (!name || backslash > name)) {
+			name = backslash;
+
+		}
+#endif
+
+		name = name ? name + 1 : fd_results[0];
+		fd_append_filter_ext(name, (uint32_t)(sizeof(fd_results[0]) - (size_t)(name - fd_results[0])));
+
+		if(fd_path_exists(fd_results[0])) {
+			char message[FD_PATH_SIZE + 320];
+			snprintf(message, sizeof(message), "Overwrite existing file %s?", name);
+
+			if(!mkgui_dialog_confirm(dlg, "Confirm Save", message)) {
+				return 0;
+
+			}
 		}
 	}
 
 	fd->confirmed = 1;
 	return 1;
+
 }
 
 // ---------------------------------------------------------------------------
@@ -1444,6 +1487,19 @@ static uint32_t fd_run_dialog(struct mkgui_window *win, uint32_t mode, const str
 								fd_apply_filter(dlg);
 								dirty_all(dlg);
 							}
+						}
+					}
+				} break;
+
+				case MKGUI_EVENT_INPUT_CHANGED: {
+					if(ev.id == FD_ID_NAME_INPUT) {
+						struct mkgui_listview_data *lv = find_listv_data(dlg, FD_ID_FILES);
+
+						if(lv) {
+							lv->selected_row = -1;
+							lv->multi_sel_count = 0;
+							dirty_all(dlg);
+
 						}
 					}
 				} break;
