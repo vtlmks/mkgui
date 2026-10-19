@@ -5,7 +5,7 @@ v0.3.0-beta is a breaking release. Two changes drive the breakage:
 1. **`mkgui_ctx` is split into `mkgui_ctx` (application-level state) and `mkgui_window` (per-window state).** The previous "ctx" was structurally a window pretending to be a context.
 2. **Public-API naming is now consistent: `mkgui_<subsystem>_<verb>`.** Subject first, verb second. This makes tab-completion useful (`mkgui_dialog_<TAB>` narrows to dialogs, `mkgui_window_<TAB>` to window operations, etc.) instead of dumping ~170 names.
 
-Migration for a typical 100-line app: 10-15 minutes of mechanical search-and-replace plus one structural change to `main()`.
+Migration requires renaming calls and callbacks and changing context/window creation in `main()`.
 
 ## Mental model
 
@@ -193,7 +193,7 @@ Symmetric: `mkgui_ctx_set_quit(ctx, 0)` clears the app-wide quit flag if you cha
 ### Host-owned main loop
 Replaces the implicit `mkgui_ctx_run` with explicit pump-and-wait. For game-style loops or apps that need custom pacing:
 ```c
-uint64_t next_tick = mkgui_now_ns() + 16000000ull;   // 60 Hz host work
+uint64_t next_tick = mkgui_now_ns() + 16666667ull;   // approximately 60 Hz host work
 while(!mkgui_ctx_should_quit(ctx)) {
    struct mkgui_event ev;
    while(mkgui_window_poll(win, &ev)) {
@@ -204,7 +204,7 @@ while(!mkgui_ctx_should_quit(ctx)) {
    uint64_t now = mkgui_now_ns();
    if(now >= next_tick) {
       run_one_frame();
-      next_tick += 16000000ull;
+      next_tick += 16666667ull;
    }
 
    mkgui_ctx_wait_until(ctx, next_tick);
@@ -218,7 +218,7 @@ The host pattern coexists with the library's own animation pacing: any animated 
 
 ## Migration sed script
 
-The bulk of the rename is mechanical. This will get your code 95% of the way there:
+The bulk of the rename is mechanical. This handles the listed renames; review the remaining structural changes below:
 
 ```bash
 sed -i \
@@ -254,7 +254,7 @@ sed -i \
   *.c *.h
 ```
 
-The remaining 5%:
+Remaining structural changes:
 - `main()` needs the explicit `mkgui_ctx_create` + `mkgui_window_create` pair (replaces single `mkgui_create`), and the matching `mkgui_window_destroy` + `mkgui_ctx_destroy` at the end.
 - `mkgui_create_child(parent, widgets, count, title, w, h)` becomes `mkgui_window_create(mkgui_window_get_ctx(parent), parent, widgets, count, title, w, h)`.
 - Callback functions that called `mkgui_quit(ctx)` (where `ctx` was the window passed in): change to `mkgui_ctx_quit(mkgui_window_get_ctx(win))`.

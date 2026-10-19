@@ -41,8 +41,11 @@ static uint32_t tests_failed;
 // Event injection helpers
 // ---------------------------------------------------------------------------
 
+// [=]===^=[ flush_x_events ]====================================[=]
 static void flush_x_events(struct mkgui_window *win) {
+	mkwin_sync(win->mkwin);
 	XSync(win->mkwin->dpy, True);
+
 }
 
 static void run_layout(struct mkgui_window *win) {
@@ -789,14 +792,45 @@ static void test_input_undo(void) {
 	TEST_END();
 }
 
+// [=]===^=[ test_canvas_queued_click ]===========================[=]
+static void test_canvas_queued_click(void) {
+	TEST_BEGIN("canvas: queued press and release retain the press event");
+	struct mkgui_widget widgets[] = {MKGUI_W(MKGUI_WINDOW, 1, "Canvas event", "", 0, 320, 200, 0, 0, 0), MKGUI_W(MKGUI_CANVAS, 2, "", "", 1, 0, 0, 0, 0, 0)};
+	struct mkgui_ctx *ctx = mkgui_ctx_create();
+	CHECK(ctx != NULL, "create context failed");
+
+	if(ctx) {
+		struct mkgui_window *win = mkgui_window_create(ctx, NULL, widgets, 2, NULL, 0, 0);
+		CHECK(win != NULL, "create window failed");
+
+		if(win) {
+			run_layout(win);
+			inject_click(win, 2);
+			struct mkgui_event event = poll_first_widget_event(win);
+			CHECK(event.type == MKGUI_EVENT_CANVAS_PRESS && event.id == 2 && event.keysym == 1, "queued canvas click lost its press event");
+			CHECK(event.value == win->win_w / 2 && event.col == win->win_h / 2, "canvas press coordinates changed");
+			mkgui_window_destroy(win);
+
+		}
+
+		mkgui_ctx_destroy(ctx);
+
+	}
+
+	TEST_END();
+
+}
+
 // ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
 
+// [=]===^=[ main ]==============================================[=]
 int main(void) {
 	printf("mkgui event test harness\n");
 	printf("========================\n\n");
 
+	test_canvas_queued_click();
 	test_button_click();
 	test_checkbox_click_event();
 	test_radio_click_event();
@@ -822,4 +856,5 @@ int main(void) {
 	printf("\n========================\n");
 	printf("%u tests: %u passed, %u failed\n", tests_run, tests_passed, tests_failed);
 	return tests_failed ? 1 : 0;
+
 }

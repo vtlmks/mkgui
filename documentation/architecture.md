@@ -4,15 +4,34 @@ Internal reference for the structure, subsystems, and data flow of mkgui.
 
 ## Build model
 
-Unity build. A single `.c` file (your application) includes `mkgui.c`, which in turn `#include`s every other `.c` file. All functions are `static` (or `MKGUI_API static`). There is no linker step between mkgui and the application -- everything compiles as one translation unit.
+The toolkit is compiled as one translation unit, `mkgui.c`, which includes the
+widget implementations and platform backend. `build.sh` builds Linux shared and
+static libraries and, when MinGW is available, the Windows DLL and static archive.
+The demo and editor link the shared library.
 
-For shared library use, define `MKGUI_LIBRARY` to make `MKGUI_API` expand to nothing (external linkage).
+`MKGUI_LIBRARY` enables exported public definitions. Windows uses explicit
+`dllexport`/`dllimport`; ELF uses default visibility for the public API and hidden
+visibility for everything else. `MKGUI_STATIC` selects ordinary external linkage
+for static archive consumers. Including `mkgui.c` directly still gives a unity
+build with static functions.
+
+`mkgui_internal.h` contains private types shared with the editor. The editor
+obtains drawing/layout functions and shared renderer state through
+`mkgui_editor_api_v2()`, a private bridge with its own revision. Changes to the
+internal layouts or bridge table require a new private bridge revision and a
+matching editor rebuild. Applications use only the opaque public types in
+`mkgui.h`. Private headers are not installed.
+
+`mkgui.version` controls the complete Linux filename and SONAME. Version 1.0.0 installs as `libmkgui.so.1.0.0`, with a release-specific development symlink `libmkgui1.0.0.so`, archive `libmkgui1.0.0.a`, headers in `include/mkgui1.0.0`, and pkg-config package `mkgui1.0.0`. Every full release can coexist with the others.
+Windows uses `mkgui.dll` and a `libmkgui.dll.a` import library. The independently
+versioned icon library remains a dependency of the toolkit.
 
 ### Include order inside mkgui.c
 
 ```
 mkgui.c
   mkgui.h                  Public API (types, enums, function prototypes)
+  mkgui_internal.h         Private toolkit/editor types
   mkwin/mkwin.h            Windowing API
   mkwin_types_win32.h      Platform struct definitions (Win32)
   mkwin_types_linux.h      Platform struct definitions (X11/FreeType/Fontconfig)
@@ -31,7 +50,7 @@ mkgui.c
   mkgui_tooltip.c
   mkgui_dialogs.c           Message box, confirm, input dialogs
   mkgui_filedialog.c        Open/save file dialog
-  mkgui_iconbrowser.c       Freedesktop icon theme browser
+  mkgui_iconbrowser.c       Shared Fluent icon browser
   mkgui_colorpicker.c       Color picker dialog
 ```
 
@@ -42,7 +61,32 @@ Linux (X11, GCC) and Windows (Win32, MinGW cross-compile). Both are first-class.
 Dependencies:
 - Linux: FreeType2, Fontconfig, Xlib + XShm.
 - Windows: GDI (font rendering, framebuffer blit).
-- OpenGL is optional and only required when an application actually instantiates a `MKGUI_GLVIEW` widget. `libmkgui.a`, the editor, and all other widgets build and run without it.
+- OpenGL is optional and only required when an application actually instantiates a `MKGUI_GLVIEW` widget. `libmkgui.so.1.0.0`, the editor, and all other widgets build and run without it.
+
+SVG icons use PlutoSVG to parse the document and PlutoVG to rasterize paths, strokes, gradients, and transparency before atlas insertion. The unity build defines `PLUTOVG_NO_FONT` and `PLUTOVG_NO_IMAGE_IO`: PlutoVG's font implementation, stb_truetype, stb_image, and stb_image_write are excluded from compilation. Widget text uses the platform font backend. The font option is a local addition to the vendored PlutoVG canvas, internal structures, and declarations.
+
+### Widget exclusions
+
+`mkgui_features.h` maps optional `MKGUI_NO_<WIDGET>` definitions to internal
+`MKGUI_HAS_<WIDGET>` constants. No exclusions means all widget types are
+enabled. The window type always remains available, and enum values and public
+structures do not change between configurations.
+
+`MKGUI_HAS_ALL` clears all known widget and dialog exclusions at the start of
+feature resolution. No special handling is required in widget implementations.
+
+Dispatch entries, layout branches, auxiliary initialization, event paths, and
+teardown are specialized by those constants. Disabled auxiliary arrays acquire
+no arenas. Both initial window creation and dynamic insertion reject excluded
+widget types. Built-in dialogs are compiled only when their widget dependencies
+are available and their own exclusion is absent: `MKGUI_NO_DIALOGS`,
+`MKGUI_NO_FILEDIALOG`, `MKGUI_NO_COLORPICKER`, and `MKGUI_NO_ICONBROWSER`.
+
+The editor exports project-wide exclusions and closes dependencies for selected
+dialogs, tab/menu children, toolbar buttons, and explicit dynamic widget types.
+Compile the toolkit with the generated header as well as the consuming source
+when using a static library. Function sections and linker garbage collection
+remain useful with `-O2` or other application optimization settings.
 
 ## File map
 
@@ -55,23 +99,25 @@ Dependencies:
 | `mkwin/mkwin_types_linux.h` | Platform struct definitions for Linux. |
 | `mkwin/mkwin_win32.c` | Win32 backend: window creation, DIB section framebuffer, message loop, GDI font loading, waitable timers, WM_DROPFILES. |
 | `mkwin/mkwin_types_win32.h` | Platform struct definitions for Windows. |
-| `mkgui_icon.c` | Icon hash table, SVG source cache, PlutoSVG rasterization, system icon theme fallback, icon drawing with clipping. |
+| `mkgui_icon.c` | Icon hash table, SVG source cache, PlutoSVG rasterization, shared catalogue lookup, icon drawing with clipping. |
 | `mkgui_textedit.c` | Shared text-edit primitives (cursor movement, selection, insert/delete, render) used by input/combobox/pathbar/cell edit. |
 | `mkgui_celledit.c` | Inline cell edit overlay used by listview, treeview, gridview, and itemview. F2 / slow-double-click rename. |
 | `mkgui_drop.c` | OS file drag-and-drop (XDnd on Linux, WM_DROPFILES on Windows). |
-| `mkgui_*.c` (~50 files) | One file per widget type, plus a handful of subsystems (accel, ctxmenu, fs, menu, notify, etc.). Each contains rendering, event handling, and public API for that unit. |
+| `mkgui_*.c` (~50 files) | One file per widget type, add a handful of subsystems (accel, ctxmenu, fs, navigation, notify, etc.). Each contains rendering, event handling, and public API for that unit. |
 | `mkgui_dialogs.c` | Built-in message box, confirm, and input dialogs. |
 | `mkgui_filedialog.c` | Built-in file open/save dialog. |
-| `mkgui_iconbrowser.c` | Built-in Freedesktop icon theme browser. |
+| `mkgui_iconbrowser.c` | Built-in Shared Fluent icon browser. |
 | `mkgui_colorpicker.c` | Built-in color picker dialog (SV square, wheel, RGB sliders). |
 | `plutovg/`, `plutosvg/` | Embedded PlutoVG path renderer and PlutoSVG parser (MIT). Compiled into the unity build. |
 | `incbin.h` | Helper macro for embedding binary data. |
-| `editor.c` | Visual widget designer. Includes `mkgui.c`. |
-| `demo.c` | Comprehensive demo application. Includes `mkgui.c`. |
+| `editor.c` | Visual widget designer. Links the shared toolkit through its public API and private editor bridge. |
+| `mkgui_internal.h`, `mkgui_editor.h`, `mkgui_editor_api.c` | Private toolkit/editor types and bridge. |
+| `demo.c` | Comprehensive demo application. Includes `mkgui.h` and links the shared library. |
 | `tests/test_layout.c` | Layout geometry unit tests. |
 | `tests/test_widgets.c` | Widget behavior unit tests. |
 | `tests/test_events.c` | Event dispatch tests. |
-| `tools/extract_icons.c` | Offline tool: reads the editor-generated icon list and copies/resolves SVGs from a Freedesktop theme directory. |
+| `mkguiicons.c`, `mkguiicons_data.S` | Shared SVG catalogue and stable enumeration/lookup ABI. |
+| `tools/generate_icon_library.py` | Generates catalogue tables, SVG blob, and public name macros from the vendored snapshot. |
 
 ## Core data structures
 
@@ -135,54 +181,61 @@ struct vm_arena {
 | Linux | `mmap(PROT_NONE, MAP_PRIVATE \| MAP_ANONYMOUS)` | `mprotect(PROT_READ \| PROT_WRITE)` | `munmap` |
 | Windows | `VirtualAlloc(MEM_RESERVE, PAGE_NOACCESS)` | `VirtualAlloc(MEM_COMMIT, PAGE_READWRITE)` | `VirtualFree(MEM_RELEASE)` |
 
-The base pointer never changes. Pages are committed on demand as the arrays grow. Uncommitted pages cost only virtual address space (not RAM).
+Window and layout arrays keep a fixed reservation, so their base pointers never change. Pages are committed on demand as the arrays grow. Uncommitted pages cost only virtual address space. Icon metadata, lookup slots, custom SVG records, and the glyph atlas use growing reservations through `vm_arena_grow()`. When a reservation fills, a larger mapping replaces it; icon indices remain stable. The private editor bridge follows the current metadata base.
 
 ### What uses vm_arena
 
 | Arena | What it holds | Max entries | Virtual reservation |
 |-------|---------------|-------------|---------------------|
 | `text_cmd_arena` | Text render commands (per-frame) | 32,768 | ~9 MB |
-| `layout_parent_arena` | Widget parent index | 65,536 | ~256 KB |
-| `layout_child_arena` | First-child index | 65,536 | ~256 KB |
-| `layout_sibling_arena` | Next-sibling index | 65,536 | ~256 KB |
-| `layout_hash_arena` | Widget ID hash table | 131,072 | ~1 MB |
+| `icon_arena` | Cached icon metadata | Grows to the signed index limit | Grows from 64 KiB |
+| `icon_hash_arena` | Icon lookup slots | Grows with cached icons | Grows from 64 KiB |
+| `svg_source_arena` | Custom SVG source records | Grows with loaded sources | Grows from 64 KiB |
+| `glyph_arena` | Packed glyph coverage | 32-bit atlas offsets | Grows from 64 KiB |
+| `layout_parent_arena` | Widget parent index | 1,048,576 | 4 MiB |
+| `layout_child_arena` | First-child index | 1,048,576 | 4 MiB |
+| `layout_sibling_arena` | Next-sibling index | 1,048,576 | 4 MiB |
+| `layout_hash_arena` | Widget ID hash table | 2,097,152 | 16 MiB |
 
-These are static globals (shared across all windows). Initialized on first `mkgui_window_create()`, destroyed when the last window on the ctx is destroyed.
+The arena descriptors are process-private globals used by all windows. Icon arenas also initialize when icons are added before the first window. Last-window teardown releases them; context destruction also releases any preloaded icons when no window was opened.
 
 The limits are `#define`s at the top of the arena section in mkgui.c:
 
 ```c
 #define MKGUI_VM_MAX_TEXT_CMDS   32768
-#define MKGUI_VM_MAX_WIDGETS     65536
+#define MKGUI_VM_MAX_WIDGETS     (1u << 20)
 #define MKGUI_VM_MAX_HASH_SLOTS  (MKGUI_VM_MAX_WIDGETS * 2)
 ```
 
+Glyphs are copied directly from the platform rasterizer into a replacement packed atlas. There is no fixed per-glyph staging slot. A successful build replaces the previous atlas; allocation failure preserves it. Last-window teardown releases the font atlas and all icon arenas.
+
 ### What still uses malloc/realloc
 
-- **Widget arrays** (`ctx->widgets`, `ctx->rects`, `ctx->tooltip_texts`): grow via `mkgui_grow_widgets()` (+256 entries). Cold path, only during `mkgui_widget_add`.
-- **Aux data arrays**: grow via `MKGUI_AUX_GROW` (+16 entries). Cold path.
+- **Widget arrays** (`win->widgets`, `win->rects`, `win->tooltip_texts`) use reserved arenas and commit pages during growth.
+- **Aux data arrays** also use reserved arenas and grow through `MKGUI_AUX_GROW`.
 - **Textarea text buffers**: per-instance, exponential doubling. Appropriate for small per-widget buffers.
 - **Treeview node arrays**: per-instance, exponential doubling.
 - **Image/icon pixel buffers**: one-time allocation.
 
 ### Framebuffer
 
-The main framebuffer (`ctx->pixels`) is a 32-bit ARGB pixel array, `win_w * win_h * 4` bytes. Allocated via XShm shared memory on Linux (for zero-copy blit to X11) or a DIB section on Windows. Reallocated on window resize.
+The active framebuffer (`win->pixels`) is a 32-bit ARGB pixel array, `win_w * win_h * 4` bytes. Linux alternates two XShm images, with completion events protecting each image from premature reuse. Windows uses a DIB section. Shared segments retain their capacity across resizes and grow when needed. Buffer acquisition refreshes `win->pixels` before drawing.
 
-Each popup has its own pixel buffer, separately allocated.
+Each popup has its own pixel buffer, separately allocated. Linux popup presentation waits for its XShm completion before returning, so the next popup redraw can safely reuse that buffer.
+
+Each window retains the previous frame's damage. When an acquired buffer is two frames old, rendering covers both the current and previous damage; an undefined buffer receives a full redraw. Only the current damage is submitted to X11. Repair damage is kept out of subsequent history, preventing it from accumulating across frames.
 
 ## Rendering pipeline
 
 Every frame follows the same sequence inside `mkgui_flush()`:
 
-```
-1. layout_widgets(ctx)     -- recompute positions into ctx->rects[]
-2. render_widgets(ctx)     -- draw all visible widgets into ctx->pixels
-3. flush_text(ctx)         -- batch-render queued text commands
-4. render_tooltip(ctx)     -- draw tooltip overlay
-5. flush_text(ctx)         -- render tooltip text
-6. platform_blit(ctx)      -- copy ctx->pixels to the screen
-7. render/blit each popup  -- popups have independent pixel buffers
+```text
+1. layout_widgets(win) and glview_sync_all(win)
+2. mkgui_frame_begin(win): acquire a writable buffer and repair its damage history
+3. render_widgets(win) and flush_text(win)
+4. render callback, notifications, and tooltip, flushing queued text as needed
+5. mkgui_frame_present(win): submit the current damage
+6. render/present each popup
 ```
 
 ### Layout phase
@@ -215,9 +268,9 @@ struct layout_ctx {
 
 The key field is `widget_stride`. At runtime this is `sizeof(struct mkgui_widget)`. In the editor it is `sizeof(struct ed_widget)` (which extends `mkgui_widget` with editor-specific fields). `lw_get(lc, idx)` uses stride-based pointer arithmetic to index into the widget array, so the layout code handles both struct sizes transparently.
 
-**Runtime path:** `layout_build_index()`, `measure_container()`, and `layout_node()` are thin wrappers that construct a `layout_ctx` from `ctx->widgets` and the global vm_arena arrays, then call the `lc_*` functions.
+**Runtime path:** `layout_build_index()` and `layout_node()` are thin wrappers that construct a `layout_ctx` from `ctx->widgets` and the global vm_arena arrays, then call the `lc_*` functions. `lc_window_min_size()` shares the content minimum calculation between the runtime and editor.
 
-**Editor path:** `ed_layout_build_index()` and `ed_layout_preview()` construct a `layout_ctx` from the editor's own `ed.widgets[]` and static arrays (`ed_layout_parent[]`, `ed_layout_first_child[]`, etc.), then call the same `lc_build_index()` and `lc_layout_node()`. The editor's layout arrays are fixed-size (`ED_MAX_WIDGETS = 512`) since the editor doesn't need to handle thousands of widgets.
+**Editor path:** `ed_fit_canvas_to_content()` and `ed_render_canvas()` prepare runtime widget descriptions and use the editor's static layout arrays with the same `lc_window_min_size()` and `lc_layout_node()` functions. The editor arrays have a fixed capacity of `ED_MAX_WIDGETS = 4096`.
 
 ### Render phase
 
@@ -262,7 +315,7 @@ Each platform translates native events into a uniform `struct mkgui_plat_event`:
 
 ### Dispatch (internal mkgui_window_poll)
 
-Internally the dispatch loop is still named `mkgui_window_poll()` / `mkgui_ctx_wait()` / `mkgui_flush()`, but these are `static` helpers used only by `mkgui_ctx_run()` and by nested dialog event loops (`mkgui_dialogs.c`, `mkgui_filedialog.c`, `mkgui_iconbrowser.c`, `mkgui_colorpicker.c`). They are not part of the public API -- applications talk to mkgui exclusively through `mkgui_ctx_run()` plus per-context callbacks registered with `mkgui_window_set_callback()`.
+`mkgui_ctx_run()` provides the standard event loop. Hosts can also use the public `mkgui_window_poll()`, `mkgui_ctx_wait_until()`, and `mkgui_ctx_wait()` functions. Frame rendering through `mkgui_flush()` remains internal. Built-in dialogs use the same event and rendering paths.
 
 `mkgui_window_poll()` does the following on each call:
 
@@ -331,18 +384,22 @@ Both platforms implement the same set of `platform_*()` functions. The correct i
 
 ## Icon system
 
-Icons are SVG-based. Source SVG bytes are cached per name and rasterized on demand via PlutoSVG/PlutoVG into ARGB bitmaps stored in a flat linear pixel buffer (one contiguous block per icon, row-major, no stride padding). Names are hashed (FNV-1a) into a hash table for O(1) lookup.
+`libmkguiicons.so.1` / `mkguiicons.dll` provides immutable SVG data and catalogue
+metadata through a small C ABI. Names are binary-searched; a preferred source
+size selects the nearest available vector design. Generated tables and an
+assembly `incbin` keep SVG bytes out of the C compilation unit. The library does
+not render and has no dependency on mkgui or PlutoSVG. Monochrome fills are
+normalized to `currentColor` in the generated data; vendored sources stay intact.
 
-Loading paths:
+mkgui resolves names lazily and rasterizes SVGs at the exact requested pixel size
+using PlutoSVG/PlutoVG. A hash of name and pixel size finds cached images in the
+ARGB atlas. Scale and theme changes re-render these vectors. Explicit custom SVG
+and raster registration remain available. Missing names use the placeholder.
 
-1. `mkgui_icon_load_svg(win, name, path)` loads one SVG file under `name`.
-2. `mkgui_icon_load_svg_dir(win, dir)` loads every `.svg` in a flat directory.
-3. `mkgui_icon_load_app_icons(win, app_name)` resolves the application icon directory and loads it.
-4. Lazy system theme fallback (Linux): if an icon is referenced but not found in the loaded set, `icon_resolve()` walks the detected system theme chain (Papirus -> breeze -> hicolor, etc.) and loads the first match. Results are cached; a negative cache prevents repeated filesystem lookups for names that don't exist in any theme.
-
-Icons are automatically re-rasterized on scale change (`mkgui_ctx_set_scale`) and theme change (`mkgui_ctx_set_theme`) because `currentColor` in the SVG follows `theme.text`. The SVG source cache makes this cheap. Drawing is done by `draw_icon()` / `draw_icon_popup()` with per-pixel alpha blending and clip rect support.
-
-The base table is sized by `MKGUI_MAX_ICONS` (default 2048; can be overridden at compile time, the editor defines it as 32768 to support browsing entire system themes).
+The editor's browser enumerates the provider and renders visible thumbnails into
+its own cache. Filtering supports names, upstream keywords, styles, and groups
+formed from the first name component. Browser thumbnails do not consume the
+runtime icon table. See [icons.md](icons.md) for the provider ABI.
 
 ## Popup system
 
@@ -387,14 +444,14 @@ Each window can register an event callback via `mkgui_window_set_callback()`. A 
 | Windows per context | 16 | `MKGUI_MAX_WINDOWS` |
 | Widgets per window | 1,048,576 | `MKGUI_VM_MAX_WIDGETS` |
 | Text commands/frame | 32,768 | `MKGUI_VM_MAX_TEXT_CMDS` |
-| Icons | 2,048 (default) | `MKGUI_MAX_ICONS` (overridable at compile time; editor uses 32,768) |
+| Icons | Grows on demand | Stable signed indices |
 | Popups | 8 | `MKGUI_MAX_POPUPS` |
 | Timers per window | 8 | `MKGUI_MAX_TIMERS` |
 | Accelerators per window | 64 | `MKGUI_MAX_ACCELS` |
 | Dirty rects per window | 32 | Fixed array on window |
 | Widget label length | 256 chars | `MKGUI_MAX_TEXT` |
 | Icon name length | 64 chars | `MKGUI_ICON_NAME_LEN` |
-| Context menu items | 64 | `MKGUI_MAX_CTXMENU` |
+| Context navigation items | 64 | `MKGUI_MAX_CTXMENU` |
 | Statusbar sections | 8 | `MKGUI_MAX_STATUSBAR_SECTIONS` |
 | Dropdown items | 64 | `MKGUI_MAX_DROPDOWN` |
 | Pathbar segments | 64 | `MKGUI_PATHBAR_MAX_SEGS` |

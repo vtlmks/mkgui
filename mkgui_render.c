@@ -945,11 +945,6 @@ static void draw_rect_dashed(uint32_t *buf, int32_t bw, int32_t bh, int32_t x, i
 	}
 }
 
-enum {
-	MKGUI_STYLE_RAISED,
-	MKGUI_STYLE_SUNKEN,
-};
-
 // [=]===^=[ draw_patch ]==========================================[=]
 static void draw_patch(struct mkgui_window *win, uint32_t style, int32_t x, int32_t y, int32_t w, int32_t h, uint32_t fill, uint32_t border) {
 	int32_t r = win->theme.corner_radius;

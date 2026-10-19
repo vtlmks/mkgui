@@ -282,21 +282,29 @@ static uint32_t celledit_compute_rect(struct mkgui_window *win) {
 
 	struct mkgui_widget *w = &win->widgets[widx];
 	switch(w->type) {
+#if MKGUI_HAS_LISTVIEW
 	case MKGUI_LISTVIEW: {
 		return celledit_compute_rect_listview(win, widx);
 	}
+#endif
 
+#if MKGUI_HAS_TREEVIEW
 	case MKGUI_TREEVIEW: {
 		return celledit_compute_rect_treeview(win, widx);
 	}
+#endif
 
+#if MKGUI_HAS_GRIDVIEW
 	case MKGUI_GRIDVIEW: {
 		return celledit_compute_rect_gridview(win, widx);
 	}
+#endif
 
+#if MKGUI_HAS_ITEMVIEW
 	case MKGUI_ITEMVIEW: {
 		return celledit_compute_rect_itemview(win, widx);
 	}
+#endif
 
 	default: {
 		return 0;
@@ -463,7 +471,7 @@ static const char *celledit_extract_text(struct mkgui_window *win, uint32_t widg
 		return raw;
 	}
 
-	if(w->type == MKGUI_LISTVIEW) {
+	if((MKGUI_HAS_LISTVIEW && w->type == MKGUI_LISTVIEW)) {
 		struct mkgui_listview_data *lv = find_listv_data(win, widget_id);
 		if(lv && col >= 0 && (uint32_t)col < lv->col_count && lv->columns[col].cell_type == MKGUI_CELL_ICON_TEXT) {
 			const char *tab = strchr(raw, '\t');
@@ -471,7 +479,7 @@ static const char *celledit_extract_text(struct mkgui_window *win, uint32_t widg
 				return tab + 1;
 			}
 		}
-	} else if(w->type == MKGUI_GRIDVIEW) {
+	} else if((MKGUI_HAS_GRIDVIEW && w->type == MKGUI_GRIDVIEW)) {
 		struct mkgui_gridview_data *gv = find_gridv_data(win, widget_id);
 		if(gv && col >= 0 && (uint32_t)col < gv->col_count && gv->columns[col].col_type == MKGUI_CELL_ICON_TEXT) {
 			const char *tab = strchr(raw, '\t');

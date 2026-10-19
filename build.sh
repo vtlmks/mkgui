@@ -25,10 +25,10 @@ COMMON_CFLAGS+="-Wsign-conversion "
 # mkwin submodule, #included into the mkgui translation unit; just the include path.
 COMMON_CFLAGS+="-Imkwin "
 
-LIB_DEFINES="-DMKGUI_LIBRARY -DMKGUI_MAX_ICONS=32768"
+LIB_DEFINES="-DMKGUI_LIBRARY"
 
 LINUX_LIBS="$(pkg-config --cflags freetype2 fontconfig) -lX11 -lXext $(pkg-config --libs freetype2 fontconfig) -lm "
-LINUX_DEMO_LIBS="-lGL "
+LINUX_DEMO_LIBS="-lGL -lX11 "
 WINDOWS_LIBS="-lgdi32 -mwindows "
 WINDOWS_DEMO_LIBS="-lopengl32 "
 # Static-link winpthread so the .exe doesn't depend on libwinpthread-1.dll.
@@ -46,7 +46,7 @@ for arg in "$@"; do
 		normal|release|debug|size|asan)
 			MODE="$arg"
 			;;
-		core|editor|all)
+		core|editor|icons|library|all)
 			TARGET="$arg"
 			;;
 		clean)
@@ -57,7 +57,7 @@ for arg in "$@"; do
 			echo "Unknown argument: $arg"
 			echo "Usage: $0 [mode] [target]"
 			echo "  modes:   normal (default) | release | debug | size | asan | clean"
-			echo "  targets: all (default)    | core (skip editor) | editor (editor only)"
+			echo "  targets: all (default)    | core (skip editor) | editor (editor only) | icons | library"
 			exit 1
 			;;
 	esac
@@ -94,58 +94,90 @@ if [ -z "$SKIP_WINDOWS" ] && command -v $WINCC &>/dev/null; then
 	WIN_ENABLED=1
 fi
 
-# -----------------------------------------------------------------------------
-# Phase 1: the two static libmkgui.a (out/linux/, out/windows/). Every consumer
-# links one of these; the editor is a unity build and skips this phase.
-# -----------------------------------------------------------------------------
+ICON_RELEASE=$(cat mkguiicons.version)
+python3 tools/generate_icon_library.py
 
-if [ "$TARGET" != "editor" ]; then
-	(
-		echo "[lib] out/linux/libmkgui.a"
-		$CC $CFLAGS $LIB_DEFINES -c mkgui.c -o out/linux/mkgui.o $LINUX_LIBS
-		ar rcs out/linux/libmkgui.a out/linux/mkgui.o
-		rm -f out/linux/mkgui.o
-	) &
+echo "[icons] out/linux/libmkguiicons.so.$ICON_RELEASE"
+$CC -std=c99 -O2 -Wall -Wextra -fPIC -fvisibility=hidden -DMKGUIICONS_BUILD -shared mkguiicons.c mkguiicons_data.S -Wl,-soname,libmkguiicons.so.1 -o out/linux/libmkguiicons.so.$ICON_RELEASE
+ln -sf libmkguiicons.so.$ICON_RELEASE out/linux/libmkguiicons.so.1
+ln -sf libmkguiicons.so.1 out/linux/libmkguiicons.so
 
-	if [ "$WIN_ENABLED" -eq 1 ]; then
-		(
-			echo "[lib] out/windows/libmkgui.a"
-			$WINCC $CFLAGS $LIB_DEFINES -c mkgui.c -o out/windows/mkgui.o $WINDOWS_LIBS
-			$WINAR rcs out/windows/libmkgui.a out/windows/mkgui.o
-			rm -f out/windows/mkgui.o
-		) &
-	fi
-
-	# Block phase 2 until both libraries exist; consumers link against them.
-	LIB_FAIL=0
-	for job in $(jobs -p); do
-		if ! wait "$job"; then
-			LIB_FAIL=1
-		fi
-	done
-	if [ "$LIB_FAIL" -ne 0 ]; then
-		exit 1
-	fi
+if [ "$WIN_ENABLED" -eq 1 ]; then
+	echo "[icons] out/windows/mkguiicons.dll"
+	$WINCC -std=c99 -O2 -Wall -Wextra -DMKGUIICONS_BUILD -shared mkguiicons.c mkguiicons_data.S -Wl,--out-implib,out/windows/libmkguiicons.dll.a -static-libgcc -o out/windows/mkguiicons.dll
 fi
 
-# -----------------------------------------------------------------------------
-# Phase 2: consumers (parallel). Demo and tests are tiny; editor is the only
-# heavy compile left and only builds when explicitly asked for.
-# -----------------------------------------------------------------------------
+if [ "$TARGET" = "icons" ]; then
+	exit 0
+fi
+
+LINUX_LIBS+=" -Lout/linux -lmkguiicons -Wl,-rpath,\$ORIGIN "
+WINDOWS_LIBS+=" -Lout/windows -lmkguiicons "
+
+RELEASE=$(cat mkgui.version)
+
+(
+	echo "[lib] out/linux/libmkgui.so.$RELEASE and libmkgui.a"
+	$CC $CFLAGS $LIB_DEFINES -fPIC -fvisibility=hidden -c mkgui.c -o out/linux/mkgui.o $LINUX_LIBS
+	$CC $CFLAGS -shared out/linux/mkgui.o -Wl,-soname,libmkgui.so.$RELEASE -Wl,-z,defs -o out/linux/libmkgui.so.$RELEASE $LINUX_LIBS $LDFLAGS
+	ln -sf libmkgui.so.$RELEASE out/linux/libmkgui.so
+	ar rcs out/linux/libmkgui.a out/linux/mkgui.o
+	rm -f out/linux/mkgui.o
+) &
+
+if [ "$WIN_ENABLED" -eq 1 ]; then
+	(
+		echo "[lib] out/windows/mkgui.dll and libmkgui.a"
+		$WINCC $CFLAGS $LIB_DEFINES -fvisibility=hidden -shared mkgui.c -Wl,--out-implib,out/windows/libmkgui.dll.a -static-libgcc -o out/windows/mkgui.dll $WINDOWS_LIBS $WINDOWS_PTHREAD $LDFLAGS
+		$WINCC $CFLAGS $LIB_DEFINES -DMKGUI_STATIC -c mkgui.c -o out/windows/mkgui.o $WINDOWS_LIBS
+		$WINAR rcs out/windows/libmkgui.a out/windows/mkgui.o
+		rm -f out/windows/mkgui.o
+	) &
+fi
+
+LIB_FAIL=0
+for job in $(jobs -p); do
+	if ! wait "$job"; then
+		LIB_FAIL=1
+	fi
+done
+if [ "$LIB_FAIL" -ne 0 ]; then
+	exit 1
+fi
+if [ "$TARGET" = "library" ]; then
+	exit 0
+fi
+
+LINUX_SHARED="-Lout/linux -l:libmkgui.so.$RELEASE -Wl,-rpath,\$ORIGIN"
+WINDOWS_SHARED="-Lout/windows -lmkgui"
+
+# Applications use shared libraries; internal tests and the benchmark use unity builds.
 
 if [ "$TARGET" != "editor" ]; then
-	# Demo: small app, links libmkgui.a
+	# Demo: public header and shared library.
 	(
-		$CC $CFLAGS demo.c out/linux/libmkgui.a -o out/linux/demo $LINUX_LIBS $LINUX_DEMO_LIBS $LDFLAGS
+		$CC $CFLAGS demo.c -o out/linux/demo $LINUX_SHARED $LINUX_DEMO_LIBS $LDFLAGS
 	) &
 
 	if [ "$WIN_ENABLED" -eq 1 ]; then
 		(
-			$WINCC $CFLAGS demo.c out/windows/libmkgui.a -o out/windows/demo.exe $WINDOWS_LIBS $WINDOWS_DEMO_LIBS $WINDOWS_PTHREAD $LDFLAGS
+			$WINCC $CFLAGS demo.c -o out/windows/demo.exe $WINDOWS_SHARED -mwindows $WINDOWS_DEMO_LIBS $WINDOWS_PTHREAD $LDFLAGS
 		) &
 	fi
 
-	# Tests are unity builds; they use mkgui internals on purpose.
+	(
+		$CC $CFLAGS -I. tests/test_shared.c -o out/linux/test_shared $LINUX_SHARED $LDFLAGS
+		$CC $CFLAGS tests/test_editor_shared.c -o out/linux/test_editor_shared $LINUX_SHARED $LDFLAGS
+	) &
+
+	if [ "$WIN_ENABLED" -eq 1 ]; then
+		(
+			$WINCC $CFLAGS -I. tests/test_shared.c -o out/windows/test_shared.exe $WINDOWS_SHARED -mconsole $LDFLAGS
+			$WINCC $CFLAGS tests/test_editor_shared.c -o out/windows/test_editor_shared.exe $WINDOWS_SHARED -mconsole $LDFLAGS
+		) &
+	fi
+
+	# Remaining tests are unity builds; they use mkgui internals on purpose.
 	(
 		$CC $CFLAGS tests/test_layout.c -o out/linux/test_layout $LINUX_LIBS $LDFLAGS
 	) &
@@ -183,19 +215,44 @@ if [ "$TARGET" != "editor" ]; then
 	) &
 
 	(
+		$CC $CFLAGS tests/test_buffering.c -o out/linux/test_buffering $LINUX_LIBS $LDFLAGS
+	) &
+
+	(
+		$CC $CFLAGS tests/test_features.c -o out/linux/test_features $LINUX_LIBS $LDFLAGS
+	) &
+
+	(
+		$CC $CFLAGS -DMKGUI_TEST_MINIMAL tests/test_features.c -o out/linux/test_features_minimal $LINUX_LIBS $LDFLAGS
+	) &
+
+	(
+		$CC $CFLAGS -DMKGUI_TEST_MINIMAL -DMKGUI_HAS_ALL tests/test_features.c -o out/linux/test_features_all $LINUX_LIBS $LDFLAGS
+	) &
+
+	(
+		$CC $CFLAGS tests/test_editor_features.c -o out/linux/test_editor_features $LINUX_LIBS $LDFLAGS
+	) &
+
+	(
 		$CC $CFLAGS benchmark.c -o out/linux/mkguibench $LINUX_LIBS $LDFLAGS
 	) &
 
-	# extract_icons is independent (doesn't use mkgui)
 	(
-		$CC -std=gnu99 -O2 -Wall -Wextra -Wno-stringop-truncation -Wno-format-truncation tools/extract_icons.c -o out/linux/extract_icons
+		$CC $CFLAGS tests/test_icon_library.c -o out/linux/test_icon_library $LINUX_LIBS $LDFLAGS
+		$CC $CFLAGS tests/test_icon_storage.c -o out/linux/test_icon_storage $LINUX_LIBS $LDFLAGS
 	) &
 
 	# Win32 platform-layer test; covers the divergent Win32 windowing surface.
 	# Run with: wine out/windows/test_platform_win32.exe
 	if [ "$WIN_ENABLED" -eq 1 ]; then
 		(
-			$WINCC $CFLAGS $LIB_DEFINES tests/test_platform_win32.c -o out/windows/test_platform_win32.exe $WINDOWS_LIBS $WINDOWS_PTHREAD -mconsole $LDFLAGS
+			$WINCC $CFLAGS -DMKGUI_TEST_MINIMAL tests/test_features.c -o out/windows/test_features_minimal.exe $WINDOWS_LIBS $WINDOWS_PTHREAD -mconsole $LDFLAGS
+			$WINCC $CFLAGS tests/test_icon_storage.c -o out/windows/test_icon_storage.exe $WINDOWS_LIBS $WINDOWS_PTHREAD -mconsole $LDFLAGS
+		) &
+
+		(
+			$WINCC $CFLAGS tests/test_platform_win32.c -o out/windows/test_platform_win32.exe $WINDOWS_LIBS $WINDOWS_PTHREAD -mconsole $LDFLAGS
 		) &
 
 		(
@@ -205,14 +262,14 @@ if [ "$TARGET" != "editor" ]; then
 fi
 
 if [ "$TARGET" = "editor" ] || [ "$TARGET" = "all" ]; then
-	# Editor: unity build (shares mkgui's rendering/layout internals)
+	# Editor: private bridge into the shared rendering/layout implementation.
 	(
-		$CC $CFLAGS editor.c -o out/linux/editor $LINUX_LIBS $LDFLAGS
+		$CC $CFLAGS editor.c -o out/linux/editor $LINUX_SHARED $LDFLAGS
 	) &
 
 	if [ "$WIN_ENABLED" -eq 1 ]; then
 		(
-			$WINCC $CFLAGS editor.c -o out/windows/editor.exe $WINDOWS_LIBS $WINDOWS_PTHREAD $LDFLAGS
+			$WINCC $CFLAGS editor.c -o out/windows/editor.exe $WINDOWS_SHARED -mwindows $WINDOWS_PTHREAD $LDFLAGS
 		) &
 	fi
 fi

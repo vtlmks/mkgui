@@ -1,16 +1,17 @@
 # mkgui
 
-Minimal GUI toolkit for Linux (X11) and Windows (Win32) with software rendering. Single-file unity build, no third-party dependencies beyond FreeType2, Fontconfig, and Xlib (Linux) or GDI (Windows). PlutoSVG/PlutoVG are embedded in the source tree, not external dependencies.
+Minimal GUI toolkit for Linux (X11) and Windows (Win32) with software rendering. Shared library with optional static and unity builds. Uses FreeType2, Fontconfig, and Xlib (Linux) or GDI (Windows), plus the shared mkguiicons catalogue. PlutoSVG/PlutoVG are embedded in the source tree, not external dependencies.
 
 ## Building
 
-mkgui uses a unity build. You compile a single `.c` file that `#include`s `mkgui.c`:
+Applications include `mkgui.h` and link the shared library:
 
 ```bash
-gcc -std=c99 -O2 -Wall -Wextra myapp.c -o myapp \
-    $(pkg-config --cflags freetype2 fontconfig) -lX11 -lXext \
-    $(pkg-config --libs freetype2 fontconfig) -lm
+gcc -std=c99 -O2 -Wall -Wextra myapp.c -o myapp $(pkg-config --cflags --libs mkgui1.0.0)
 ```
+
+See [getting started](getting_started.md) for installation, Windows, static,
+and unity build commands.
 
 Or use the included `build.sh`:
 
@@ -23,7 +24,7 @@ Or use the included `build.sh`:
 ./build.sh clean    # remove out/
 ```
 
-`build.sh` produces `out/demo`, `out/editor`, `out/libmkgui.a`, `out/extract_icons`, and the test binaries. It also cross-compiles `out/demo.exe` and `out/editor.exe` if `x86_64-w64-mingw32-gcc` is available.
+`build.sh` produces `out/linux/demo`, `out/linux/editor`, `out/linux/libmkgui.so.1.0.0`, `out/linux/libmkgui.a`, `out/linux/libmkguiicons.so.1`, and the test binaries. It also cross-compiles `out/windows/demo.exe`, `out/windows/editor.exe`, `out/windows/mkgui.dll`, and `out/windows/mkguiicons.dll` if `x86_64-w64-mingw32-gcc` is available.
 
 ### Linux dependencies
 
@@ -45,7 +46,7 @@ OpenGL (`-lGL` / `-lopengl32`) is only required if your application instantiates
 ## Quick start
 
 ```c
-#include "mkgui.c"
+#include "mkgui.h"
 
 enum { ID_WIN = 0, ID_BTN = 1, ID_LBL = 2 };
 
@@ -88,9 +89,9 @@ int main(void) {
 
 ## Architecture
 
-Your application is a single `.c` file that includes `mkgui.c`. All functions are `static` (unity build). You define widgets as a flat array of `struct mkgui_widget`, create an application context, a window on that context, provide an event callback, and call `mkgui_ctx_run`.
+Your application includes `mkgui.h` and links the shared library. A unity build can include `mkgui.c` instead. You define widgets as a flat array of `struct mkgui_widget`, create an application context, a window on that context, provide an event callback, and call `mkgui_ctx_run`.
 
-Widget hierarchy is expressed via `parent_id`. Every widget has a unique integer `id`. The first widget must be `MKGUI_WINDOW` with `parent_id = 0`.
+Widget hierarchy is expressed via `parent_id`. Every widget has a unique nonzero integer `id`; zero means no parent or no widget. The first widget must be `MKGUI_WINDOW` with `parent_id = 0`.
 
 Multiple windows on the same ctx are supported by passing a non-NULL `parent` to `mkgui_window_create()`. See [Multi-window](#multi-window) below.
 
@@ -104,7 +105,6 @@ A small number of functions take explicit output parameters that the caller allo
 |----------|-----------------|-------------|
 | `mkgui_dialog_input` | `char *out, uint32_t out_size` | User-entered text |
 | `mkgui_dialog_color` | `uint32_t *out_color` | Chosen color |
-| `mkgui_icon_browser_theme` | `char *out, uint32_t out_size` | Selected icon name |
 | `mkgui_listview_get_multi_sel` | `int32_t **out` | Selection index array (library-owned) |
 | `mkgui_treelist_get_multi_sel` | `int32_t **out` | Selected node-handle array (library-owned) |
 | `mkgui_pathbar_get_segment_path` | `char *out, uint32_t out_size` | Composed path string |
@@ -125,7 +125,7 @@ struct mkgui_widget {
     int32_t  margin_l, margin_r, margin_t, margin_b; // layout margins
     int32_t  label_tw;    // cached label text width; leave 0 (mkgui re-measures on first render)
     char     label[256];  // display text
-    char     icon[64];    // Freedesktop icon name (e.g. "folder-open")
+    char     icon[64];    // catalogue icon name (e.g. "folder-open")
 };
 ```
 
@@ -148,6 +148,7 @@ There are no `x, y` fields. All positioning is handled by the container-based la
 | `MKGUI_LABEL` | Static text. |
 | `MKGUI_INPUT` | Single-line text input. Emits `MKGUI_EVENT_INPUT_CHANGED`, `MKGUI_EVENT_INPUT_SUBMIT` on Enter. |
 | `MKGUI_TEXTAREA` | Multi-line text editor. Emits `MKGUI_EVENT_TEXTAREA_CHANGED`, `MKGUI_EVENT_TEXTAREA_CURSOR` on cursor movement. |
+| `MKGUI_LOGVIEW` | Append-only ANSI-colour log with bounded storage, wrapping, and text selection. Requires `mkgui_logview_setup()` before appending. |
 | `MKGUI_CHECKBOX` | Toggle checkbox. Emits `MKGUI_EVENT_CHECKBOX_CHANGED`. |
 | `MKGUI_RADIO` | Radio button (mutually exclusive within parent). Emits `MKGUI_EVENT_RADIO_CHANGED`. |
 | `MKGUI_DROPDOWN` | Drop-down selector. Emits `MKGUI_EVENT_DROPDOWN_CHANGED`. |
@@ -168,14 +169,14 @@ There are no `x, y` fields. All positioning is handled by the container-based la
 | `MKGUI_MENUITEM` | Menu entry. Parent is `MKGUI_MENU` or another `MKGUI_MENUITEM` (submenu). Leaf items emit `MKGUI_EVENT_MENU`. |
 | `MKGUI_TOOLBAR` | Toolbar bar. Children are `MKGUI_BUTTON`. Supports display modes: icons+text (default), icons only, text only. Height adapts to content. |
 | `MKGUI_STATUSBAR` | Status bar with sections. |
-| `MKGUI_HSPLIT` | Horizontal splitter. Children use `MKGUI_REGION_TOP`/`MKGUI_REGION_BOTTOM`. Neither side can be smaller than `MKGUI_SPLIT_MIN_PX` (50px). |
-| `MKGUI_VSPLIT` | Vertical splitter. Children use `MKGUI_REGION_LEFT`/`MKGUI_REGION_RIGHT`. Same minimum size enforcement. |
+| `MKGUI_HSPLIT` | Horizontal splitter. Children use `MKGUI_REGION_TOP`/`MKGUI_REGION_BOTTOM`. Mouse dragging keeps each side at least the scaled `MKGUI_SPLIT_MIN_PX` (50px); programmatic ratios are clamped only to 0 through 1. |
+| `MKGUI_VSPLIT` | Vertical splitter. Children use `MKGUI_REGION_LEFT`/`MKGUI_REGION_RIGHT`. The same distinction between mouse-drag minimums and programmatic ratios applies. |
 | `MKGUI_GROUP` | Group box container. Draws a thin rounded border with a label in the top edge. Children are inset inside the frame. |
 | `MKGUI_PANEL` | Plain container that behaves as a VBOX. No border by default. Use `MKGUI_PANEL_BORDER` for a border, `MKGUI_PANEL_SUNKEN` for a recessed look. Children are stacked vertically like VBOX. |
 | `MKGUI_SCROLLBAR` | Standalone scrollbar. Horizontal by default, `MKGUI_VERTICAL` for vertical. Emits `MKGUI_EVENT_SCROLL`. |
 | `MKGUI_IMAGE` | Displays ARGB pixel data. Centered by default, `MKGUI_IMAGE_STRETCH` to fill. `MKGUI_IMAGE_BORDER` for a border. |
 | `MKGUI_GLVIEW` | OpenGL viewport. Creates a native child window for GL rendering. The user creates their own GL context. Automatically triggers 60fps redraws when visible. |
-| `MKGUI_CANVAS` | Custom drawing area. Calls a user callback with clipping set to the widget rect. Supports `MKGUI_CANVAS_BORDER`. |
+| `MKGUI_CANVAS` | Custom drawing area. The callback receives the framebuffer and widget rectangle; clip direct writes to that area. Supports `MKGUI_CANVAS_BORDER`. |
 | `MKGUI_TOGGLE` | On/off toggle switch. Emits `MKGUI_EVENT_TOGGLE_CHANGED`. |
 | `MKGUI_COMBOBOX` | Editable dropdown with filtering. Emits `MKGUI_EVENT_COMBOBOX_CHANGED`, `MKGUI_EVENT_COMBOBOX_SUBMIT`. |
 | `MKGUI_DATEPICKER` | Date picker with calendar popup. Emits `MKGUI_EVENT_DATEPICKER_CHANGED`. |
@@ -247,7 +248,7 @@ MKGUI_W(MKGUI_INPUT, ID_I1,   "",       "", ID_FORM, 0, 0, 0, 0, 0),
 | `MKGUI_ALIGN_START` | `1 << 12` | Align to start (left in VBOX, top in HBOX) |
 | `MKGUI_ALIGN_CENTER` | `2 << 12` | Center in cross-axis |
 | `MKGUI_ALIGN_END` | `3 << 12` | Align to end (right in VBOX, bottom in HBOX) |
-| `MKGUI_FIXED` | `1 << 14` | Fixed size; removed from flex distribution. With `w`/`h` > 0: use that exact size. With `w`/`h` = 0: use natural size. Weight is ignored. |
+| `MKGUI_FIXED` | `1 << 14` | Remove from box flex distribution. The main-axis size uses its explicit hint, or a measured/natural fallback. Weight is ignored; cross-axis sizing still follows the parent layout rules. |
 | `MKGUI_VERTICAL` | `1 << 15` | Vertical orientation for scrollbar, slider, meter, divider |
 
 Cross-axis alignment flags are used on children of HBOX/VBOX to control alignment perpendicular to the layout direction. Default is stretch (fill container).
@@ -332,7 +333,7 @@ Each widget type has its own private flag namespace inside the `style` field, st
 |------|-------------|
 | `MKGUI_SLIDER_MIXER` | Tapered volume style with optional meter overlay |
 | `MKGUI_METER_TEXT` | Display centered percentage |
-| `MKGUI_PROGRESS_SHIMMER` | Animated shimmer sweep (default on) |
+| `MKGUI_PROGRESS_SHIMMER` | Enable an animated shimmer sweep; off when style is zero |
 
 **Toolbar (display mode):**
 
@@ -348,7 +349,7 @@ The toolbar mode is selected by masking `MKGUI_TOOLBAR_MODE_MASK`. Change at run
 
 | Flag | Description |
 |------|-------------|
-| `MKGUI_TAB_CLOSABLE` | Show close button (emits `MKGUI_EVENT_TAB_CLOSE`) |
+| `MKGUI_TAB_CLOSABLE` | Show dismiss button (emits `MKGUI_EVENT_TAB_CLOSE`) |
 
 **Listview / Treeview / TreeList / Gridview / Itemview:**
 
@@ -384,7 +385,7 @@ struct mkgui_event {
 
 | Event | Trigger | value | col |
 |-------|---------|-------|-----|
-| `MKGUI_EVENT_CLOSE` | Window close | -- | -- |
+| `MKGUI_EVENT_CLOSE` | Window dismiss | -- | -- |
 | `MKGUI_EVENT_RESIZE` | Window resized | -- | -- |
 | `MKGUI_EVENT_CLICK` | Button pressed | -- | -- |
 | `MKGUI_EVENT_MENU` | Menu item selected | -- | -- |
@@ -405,13 +406,13 @@ struct mkgui_event {
 | `MKGUI_EVENT_TREEVIEW_EXPAND` | Tree node expanded | node id | -- |
 | `MKGUI_EVENT_TREEVIEW_COLLAPSE` | Tree node collapsed | node id | -- |
 | `MKGUI_EVENT_SPLIT_MOVED` | Splitter dragged | -- | -- |
-| `MKGUI_EVENT_KEY` | Key pressed | keysym, keymod | -- |
+| `MKGUI_EVENT_KEY` | Key pressed; read `keysym` and `keymod` fields | -- | -- |
 | `MKGUI_EVENT_ITEMVIEW_SELECT` | Item selected | item index | -- |
 | `MKGUI_EVENT_ITEMVIEW_DBLCLICK` | Item double-clicked | item index | -- |
 | `MKGUI_EVENT_SCROLL` | Scrollbar value changed, or wheel over canvas | scrollbar position, or wheel delta in pixels for canvas | 0 = vertical wheel, 1 = horizontal wheel (canvas only) |
 | `MKGUI_EVENT_CONTEXT` | Right-click on widget | row/node/item (-1 if empty) for views, mouse x otherwise | column for views, mouse y otherwise |
 | `MKGUI_EVENT_CONTEXT_HEADER` | Right-click on column header | mouse x | column index |
-| `MKGUI_EVENT_CONTEXT_MENU` | Context menu item selected | item id | checked state (0/1) |
+| `MKGUI_EVENT_CONTEXT_MENU` | Context navigation item selected | item id | checked state (0/1) |
 | `MKGUI_EVENT_GRIDVIEW_SELECT` | Grid row selection changed via keyboard navigation (up/down/page/home/end); mouse cell clicks and left/right column moves emit `GRID_CLICK` | row | column |
 | `MKGUI_EVENT_GRIDVIEW_REORDER` | Row drag-and-drop reorder | source row | target row |
 | `MKGUI_EVENT_RICHLIST_SELECT` | Rich list row selected | row | -- |
@@ -435,8 +436,8 @@ struct mkgui_event {
 | `MKGUI_EVENT_TREELIST_COLLAPSE` | TreeList node collapsed | node handle | -- |
 | `MKGUI_EVENT_TREELIST_SORT` | TreeList column header clicked | sort direction | column index |
 | `MKGUI_EVENT_TREELIST_COL_REORDER` | TreeList column dragged to new position | -- | -- |
-| `MKGUI_EVENT_TAB_CLOSE` | Tab close button clicked | tab id | -- |
-| `MKGUI_EVENT_TIMER` | Timer fired (when cb is NULL) | timer id | -- |
+| `MKGUI_EVENT_TAB_CLOSE` | Tab dismiss button clicked | tab id | -- |
+| `MKGUI_EVENT_TIMER` | Timer fired with NULL callback; `id` is the timer ID | -- | -- |
 | `MKGUI_EVENT_ACCEL` | Keyboard accelerator matched (non-menu target) | -- | -- |
 | `MKGUI_EVENT_FILE_DROP` | Files dropped on window from OS | file count | -- |
 | `MKGUI_EVENT_CANVAS_PRESS` | Mouse button down on canvas | mouse x | mouse y |
@@ -522,7 +523,7 @@ void mkgui_window_remove_timer(struct mkgui_window *win, uint32_t timer_id);
 
 `mkgui_window_set_instance` sets the per-window instance name in `WM_CLASS`. Useful when one application spawns several windows that window managers should treat as distinct (e.g. "editor", "preview", "icon-browser"). The default instance is the class name. Has no effect on Windows.
 
-`mkgui_icon_load_app_icons` takes its own `app_name` argument for the icon directory lookup. It is independent from the WM class, but in practice most applications pass the same string to both calls.
+The shared icon catalogue is independent of the application WM class.
 
 `mkgui_ctx_run` runs the event loop. It drains pending events for the ctx's primary window (the first one created), delivers each to `cb`, then pumps events for any other windows through their per-window callbacks set via `mkgui_window_set_callback`. It returns when **either** `mkgui_ctx_quit` is called (which sets the ctx-wide quit flag) **or** the primary window's `should_close` is set **or** no registered window is currently visible.
 
@@ -610,7 +611,7 @@ Windows are mapped immediately at create time by default. Two flags on the `MKGU
 | Flag                          | Effect                                                                   |
 |-------------------------------|--------------------------------------------------------------------------|
 | `MKGUI_WINDOW_HIDDEN`         | Suppress the initial map. The context exists, but no window is shown.    |
-| `MKGUI_WINDOW_HIDE_ON_CLOSE`  | When the WM close button is clicked, hide the window instead of quitting. |
+| `MKGUI_WINDOW_HIDE_ON_CLOSE`  | When the WM dismiss button is clicked, hide the window instead of quitting. |
 | `MKGUI_WINDOW_UNDECORATED`    | Remove all window manager decorations (title bar, borders). Uses `_MOTIF_WM_HINTS` on X11, `WS_POPUP` on Windows. |
 | `MKGUI_WINDOW_CANVAS`         | Entire window is a user-drawn canvas. Suppresses all mkgui chrome; the canvas callback receives the full window surface. Requires one `MKGUI_CANVAS` widget as a child. |
 
@@ -716,20 +717,9 @@ struct mkgui_icon_size {
 void mkgui_window_set_icon(struct mkgui_window *win, const struct mkgui_icon_size *sizes, uint32_t count);
 ```
 
-Sets the application icon displayed in the window title bar, taskbar, and task switcher. Call after `mkgui_window_create`, before or after `mkgui_ctx_run`. For windows created with `MKGUI_WINDOW_HIDDEN`, call this before `mkgui_window_show` so the icon is in place when the window first maps. Pass one or more ARGB32 pixel buffers at different resolutions so the window manager can pick the best match for each context.
+Sets the application icon displayed in the window title bar, taskbar, and task switcher. Call after `mkgui_window_create`. For windows created with `MKGUI_WINDOW_HIDDEN`, call this before `mkgui_window_show` so the icon is in place when the window first maps. Pass one or more ARGB32 pixel buffers at different resolutions so the window manager can pick the best match for each context.
 
-**Recommended sizes:**
-
-| Size | Used for |
-|---|---|
-| 16x16 | Window title bar, system tray (Win32 `ICON_SMALL`) |
-| 24x24 | Title bar on HiDPI / some Linux WMs |
-| 32x32 | Taskbar, alt-tab (Win32 `ICON_BIG` at 100% scale) |
-| 48x48 | Taskbar at 150% scale, KDE/GNOME app grid |
-| 64x64 | Alt-tab on HiDPI, large taskbar icons |
-| 256x256 | Windows Explorer details view, GNOME Activities |
-
-For best cross-platform results, provide at least **16x16, 32x32, and 48x48**. Adding 64x64 and 256x256 covers HiDPI and high-res contexts.
+Provide the resolutions available in the application. The native backend selects window icons from those buffers; this API does not change the icon embedded in an executable file.
 
 On X11, all sizes are packed into the `_NET_WM_ICON` property and the window manager selects the closest match. On Win32, the two closest matches to `SM_CXSMICON` and `SM_CXICON` are used for `ICON_SMALL` and `ICON_BIG`.
 
@@ -754,7 +744,7 @@ uint32_t mkgui_widget_add(struct mkgui_window *win, struct mkgui_widget w, uint3
 uint32_t mkgui_widget_remove(struct mkgui_window *win, uint32_t id);
 ```
 
-`mkgui_widget_add` inserts a widget into the context at runtime. The widget's `parent_id` determines which container it belongs to. The `after_id` parameter controls where it appears among its siblings:
+`mkgui_widget_add` inserts a widget into the window at runtime. The widget's `parent_id` determines which container it belongs to. The `after_id` parameter controls where it appears among its siblings:
 
 | `after_id` | Behavior |
 |------------|----------|
@@ -762,7 +752,7 @@ uint32_t mkgui_widget_remove(struct mkgui_window *win, uint32_t id);
 | parent's ID | Insert as the first child of that container |
 | sibling's ID | Insert immediately after that sibling |
 
-Returns 1 on success, 0 on allocation failure. The widget's aux data (slider state, input buffer, etc.) is automatically initialized. All arrays grow dynamically as needed.
+Returns 1 on success, 0 if the widget type is disabled/unknown or the widget array cannot grow. Auxiliary state is initialized for the new widget. Growth is bounded by the implementation's arena reservations.
 
 `mkgui_widget_remove` removes a widget and all its descendants. It cleans up aux data (frees textarea buffers, treeview nodes, image pixels, GL views), clears any references in focus/hover/drag state, and destroys open popups for the removed widgets. Returns 1 on success, 0 if the widget was not found. Removing a MKGUI_WINDOW widget is not allowed.
 
@@ -786,6 +776,7 @@ mkgui_widget_remove(win, 500);
 After each frame, the window contains timing data. These fields are internal and directly visible to unity-build consumers:
 
 ```c
+win->perf_acquire_us  // buffer acquisition and damage history time in microseconds
 win->perf_layout_us   // layout calculation time in microseconds
 win->perf_render_us   // widget rendering time in microseconds
 win->perf_blit_us     // framebuffer blit time in microseconds
@@ -832,11 +823,11 @@ double mkgui_get_anim_time(struct mkgui_window *win);
 - `set_visible` / `get_visible` -- toggle `MKGUI_HIDDEN` flag. Hiding clears focus.
 - `set_focus` -- programmatic focus. Only works on focusable, enabled widgets.
 - `get_geometry` -- returns the widget's computed layout rect (after layout). Any pointer may be NULL.
-- `get_min_size` -- returns the minimum window size needed to display all content without scrolling. Useful after dynamically adding widgets.
+- `get_min_size` -- returns the layout engine's calculated content minimum, including padding and any scrollable-container minimums, without the platform's minimum-window floor. Useful after dynamically adding widgets.
 - `set_flags` / `get_flags` -- raw flag access. Use for toggling multiple flags at once.
 - `is_shown` -- returns 1 if the widget is currently rendered: not flagged `MKGUI_HIDDEN`, no ancestor is hidden, and if nested inside a `MKGUI_TABS`, its tab is active. Accounts for collapsed groups. Returns 0 for unknown ids. Requires at least one layout pass.
 - `get_window_size` -- returns the current window dimensions. Either out pointer may be NULL.
-- `get_anim_time` -- monotonic time in seconds since `mkgui_window_create`, used internally by animated widgets (spinner, progress shimmer). Useful for driving custom animations from your render callback.
+- `get_anim_time` -- monotonic time in seconds since `mkgui_window_create`, used internally by animated widgets (spinner, progress shimmer). Useful for driving custom drawing during an application-owned render loop or canvas callback.
 
 ### Button
 
@@ -845,7 +836,7 @@ void mkgui_button_set_text(struct mkgui_window *win, uint32_t id, const char *te
 const char *mkgui_button_get_text(struct mkgui_window *win, uint32_t id);
 ```
 
-**Toggle button**: Set `MKGUI_BUTTON_CHECKED` on a button to render it sunken (pressed state). Toggle the flag in your click handler to create an on/off button:
+`MKGUI_BUTTON_CHECKED` gives a button a sunken appearance when supplied in its initial style. Buttons do not toggle automatically. For an icon button, keep the state in the application and change its icon in the click handler:
 
 ```c
 // Icon-only buttons center the icon automatically when label is empty
@@ -992,7 +983,7 @@ void mkgui_slider_set_meter(struct mkgui_window *win, uint32_t id, float pre, fl
 
 The slider renders a horizontal track with a draggable thumb. Set `MKGUI_VERTICAL` for vertical orientation. It does not display any text -- add your own label and/or value display if needed (e.g. using a FORM row or an HBOX with a label widget).
 
-`slider_set` changes the value without a full re-setup. `slider_set_range` changes min/max at runtime (clamps value). `slider_get_range` reads the current min/max. Any pointer may be NULL.
+`slider_set` changes the value without a full re-setup. `slider_set_range` changes min/max at runtime (clamps value). `slider_get_range` reads the current min/max. Either output pointer may be NULL.
 
 Set `MKGUI_SLIDER_MIXER` for a tapered volume-style slider (like the Windows volume mixer). The track becomes a triangle shape, narrow at the quiet end and wide at the loud end. Use `mkgui_slider_set_meter()` to overlay RMS/peak meter fill colors on the mixer track.
 
@@ -1024,7 +1015,7 @@ void mkgui_progress_get_range(struct mkgui_window *win, uint32_t id, int32_t *ma
 void mkgui_progress_set_color(struct mkgui_window *win, uint32_t id, uint32_t color);
 ```
 
-Renders a filled bar with an animated diagonal shimmer sweep while in progress. The fill color defaults to `theme.accent`. Use `progress_set_color` to override the bar color per-widget; pass `0` to revert to the theme default. The percentage text is centered on the bar. `progress_set_range` changes max at runtime (clamps value).
+Renders a filled bar. Set `MKGUI_PROGRESS_SHIMMER` to animate a diagonal sweep while the value is between zero and the maximum. The fill color defaults to `theme.accent`. Use `progress_set_color` to override the bar color per-widget; pass `0` to revert to the theme default. The percentage text is centered on the bar. `progress_set_range` changes max at runtime (clamps value).
 
 ### Meter
 
@@ -1039,7 +1030,7 @@ void mkgui_meter_set_zones(struct mkgui_window *win, uint32_t id, int32_t t1, in
 
 Level meter with colored zones showing capacity/usage. The background displays three color zones at fixed thresholds, and a thinner bar on top fills from the start to the current value. The thin bar takes the color of whichever zone the current value falls in. Set `MKGUI_VERTICAL` for a vertical meter (zones bottom-to-top). Set `MKGUI_METER_TEXT` to display a centered percentage.
 
-`meter_setup` initializes with default zone thresholds at 75% and 90% of max, with green/yellow/red colors. `meter_set_zones` overrides thresholds (`t1`, `t2` as absolute values, not percentages) and colors (`c1`, `c2`, `c3` as ARGB). `meter_set_range` changes max at runtime (clamps value).
+`meter_setup` initializes with default zone thresholds at 75% and 90% of max, with green/yellow/red colors. `meter_set_zones` overrides thresholds (`t1`, `t2` as percentages from 0 through 100) and colors (`c1`, `c2`, `c3` as ARGB). `meter_set_range` changes max at runtime (clamps value).
 
 ### Spinner
 
@@ -1098,7 +1089,7 @@ Cell type can be set in the column struct at setup time, or changed later via `m
 |------|-------------|-----------------|
 | `MKGUI_CELL_TEXT` | Left-aligned text (default) | Any string |
 | `MKGUI_CELL_PROGRESS` | Simple filled progress bar with percentage text | `"value/max"` (e.g. `"75/100"`) or just `"75"` (max defaults to 100) |
-| `MKGUI_CELL_ICON_TEXT` | Icon followed by text | `"icon-name\tLabel"` (tab-separated; icon name is a Freedesktop icon name) |
+| `MKGUI_CELL_ICON_TEXT` | Icon followed by text | `"icon-name\tLabel"` (tab-separated; icon name is a catalogue icon name) |
 | `MKGUI_CELL_SIZE` | Right-aligned formatted file size | Byte count as string (e.g. `"1048576"` renders as `"1.0 MB"`) |
 | `MKGUI_CELL_DATE` | Formatted date/time | Unix timestamp as string (e.g. `"1741900800"` renders as `"2025-03-14 00:00"`) |
 | `MKGUI_CELL_CHECKBOX` | Centered checkbox | `"1"` for checked, `"0"` for unchecked |
@@ -1231,7 +1222,7 @@ uint32_t mkgui_itemview_get_view(struct mkgui_window *win, uint32_t id);
 The itemview does not own data. It uses callbacks to request labels, icons, and thumbnails on demand:
 
 - **`label_cb(item, buf, buf_size, userdata)`** -- fill `buf` with the display name for `item`. Required.
-- **`icon_cb(item, buf, buf_size, userdata)`** -- fill `buf` with the Freedesktop icon name for `item` (e.g. `"folder"`, `"text-x-generic"`). Used by icon, compact, and detail modes. Optional (no icon drawn if NULL).
+- **`icon_cb(item, buf, buf_size, userdata)`** -- fill `buf` with the catalogue icon name for `item` (e.g. `"folder"`, `"document-text"`). Used by icon, compact, and detail modes. Optional (no icon drawn if NULL).
 - **`thumbnail_cb(item, pixels, w, h, userdata)`** -- fill the `pixels` buffer (w*h uint32_t ARGB) with a thumbnail image. Used only in thumbnail mode. Optional; set via `mkgui_itemview_set_thumbnail`. The `thumb_size` parameter controls the thumbnail resolution (default 96px).
 
 #### Setup example
@@ -1242,7 +1233,7 @@ void my_label(uint32_t item, char *buf, uint32_t buf_size, void *ud) {
 }
 
 void my_icon(uint32_t item, char *buf, uint32_t buf_size, void *ud) {
-    snprintf(buf, buf_size, "text-x-generic");
+    snprintf(buf, buf_size, "document-text");
 }
 
 mkgui_itemview_setup(ctx, ID_ITEMVIEW, 200, MKGUI_VIEW_ICON, my_label, my_icon, NULL);
@@ -1354,7 +1345,7 @@ uint32_t mkgui_logview_is_at_end(struct mkgui_window *win, uint32_t id);
 uint32_t mkgui_logview_get_selection_text(struct mkgui_window *win, uint32_t id, char *out, uint32_t out_size);
 ```
 
-`mkgui_logview_setup` is required before any append; it sizes the backing storage and is the only place that allocates. There is no default capacity -- the caller picks `max_lines` (oldest evicts when the ring fills) and `arena_bytes` (oldest lines also evict when their bytes get overwritten). Calling setup again reconfigures and clears the widget. Typical sizes: 10000 lines with a 256 KB text arena for verbose program output; smaller for embedded uses.
+`mkgui_logview_setup` is required before any append and allocates the bounded retained-line, text, and style-run storage. Pending text/style buffers grow during appends, and visual-line scratch storage grows during wrapping. There is no default capacity -- the caller picks `max_lines` (oldest evicts when the ring fills) and `arena_bytes` (oldest lines also evict when their bytes get overwritten). Calling setup again reconfigures and clears the widget. Typical sizes: 10000 lines with a 256 KB text arena for verbose program output; smaller for embedded uses.
 
 `append` / `append_n` stream raw text through an inline ANSI parser:
 
@@ -1389,7 +1380,7 @@ mkgui_statusbar_setup(ctx, ID_SB, 3, widths);
 
 ### Canvas
 
-Custom drawing widget with automatic clipping.
+Custom drawing widget. The callback receives the full framebuffer and must clip its direct pixel writes.
 
 ```c
 typedef void (*mkgui_canvas_cb)(struct mkgui_window *win, uint32_t id, uint32_t *pixels,
@@ -1427,7 +1418,7 @@ In canvas-only windows (`MKGUI_WINDOW_CANVAS`), these events are always delivere
 Combine `MKGUI_WINDOW_UNDECORATED` and `MKGUI_WINDOW_CANVAS` to create a window where the entire surface is user-drawn with no WM decorations or mkgui chrome. This is the pattern for skinned applications (e.g. media players, visualizers):
 
 ```c
-enum { ID_WIN, ID_CANVAS };
+enum { ID_WIN = 1, ID_CANVAS };
 
 struct mkgui_widget widgets[] = {
     MKGUI_W(MKGUI_WINDOW, ID_WIN, "Player", "", 0, 275, 116, 0,
@@ -1473,7 +1464,7 @@ Menus are built from a `MKGUI_MENU` (the bar) containing `MKGUI_MENUITEM` entrie
 MKGUI_W(MKGUI_MENU,     ID_MENU,  "",     "",             ID_WINDOW, 0, 0, 0, 0, 0),
 MKGUI_W(MKGUI_MENUITEM, ID_FILE,  "File", "",             ID_MENU,   0, 0, 0, 0, 0),
 MKGUI_W(MKGUI_MENUITEM, ID_OPEN,  "Open", "folder-open",  ID_FILE,   0, 0, 0, 0, 0),
-MKGUI_W(MKGUI_MENUITEM, ID_SAVE,  "Save", "content-save", ID_FILE,   0, 0, 0, 0, 0),
+MKGUI_W(MKGUI_MENUITEM, ID_SAVE,  "Save", "save", ID_FILE,   0, 0, 0, 0, 0),
 MKGUI_W(MKGUI_MENUITEM, ID_SEP1,  "",     "",             ID_FILE,   0, 0, 0, MKGUI_MENUITEM_SEPARATOR, 0),
 MKGUI_W(MKGUI_MENUITEM, ID_EXIT,  "Exit", "",             ID_FILE,   0, 0, 0, 0, 0),
 ```
@@ -1496,9 +1487,9 @@ Toolbar children are `MKGUI_BUTTON` widgets:
 
 ```c
 MKGUI_W(MKGUI_TOOLBAR, ID_TB,      "",     "",             ID_WINDOW, 0, 0, 0, 0, 0),
-MKGUI_W(MKGUI_BUTTON,  ID_TB_NEW,  "New",  "file-plus",    ID_TB,     0, 0, 0, 0, 0),
+MKGUI_W(MKGUI_BUTTON,  ID_TB_NEW,  "New",  "document-add",    ID_TB,     0, 0, 0, 0, 0),
 MKGUI_W(MKGUI_BUTTON,  ID_TB_OPEN, "Open", "folder-open",  ID_TB,     0, 0, 0, 0, 0),
-MKGUI_W(MKGUI_BUTTON,  ID_TB_SAVE, "Save", "content-save", ID_TB,     0, 0, 0, 0, 0),
+MKGUI_W(MKGUI_BUTTON,  ID_TB_SAVE, "Save", "save", ID_TB,     0, 0, 0, 0, 0),
 ```
 
 Toolbar buttons render flat (Breeze style) -- no border when idle, highlighted on hover, pressed on click. They emit `MKGUI_EVENT_CLICK`.
@@ -1544,7 +1535,7 @@ const char *mkgui_ipinput_get(struct mkgui_window *win, uint32_t id);
 uint32_t mkgui_ipinput_get_u32(struct mkgui_window *win, uint32_t id);
 ```
 
-Four-field IPv4 address input (like Windows IP input). Each octet is a separate editable field with 0--255 validation. Tab/dot moves to the next field. `ipinput_get` returns a dotted-decimal string. `ipinput_get_u32` returns the address as a 32-bit integer (network byte order). Emits `MKGUI_EVENT_IPINPUT_CHANGED`.
+Four-field IPv4 address input (like Windows IP input). Each octet is a separate editable field with 0--255 validation. Tab/dot moves to the next field. `ipinput_get` returns a dotted-decimal string. `ipinput_get_u32` packs the first octet into the high eight bits, for example `192.168.1.2` becomes `0xc0a80102`. This describes the numeric value, not its native memory byte order. Emits `MKGUI_EVENT_IPINPUT_CHANGED`.
 
 ### Pathbar
 
@@ -1590,16 +1581,17 @@ void mkgui_split_set_ratio(struct mkgui_window *win, uint32_t id, float ratio);
 A container that draws a thin rounded border with a title label breaking the top edge. Children are automatically inset inside the frame (top padding accounts for the label height, sides and bottom have a small margin).
 
 ```c
-MKGUI_W(MKGUI_GROUP,    ID_GRP, "Settings",     "", ID_TAB1, 0, 0, MKGUI_FIXED, 0, 0),
-MKGUI_W(MKGUI_INPUT,    ID_INP, "",             "", ID_GRP,  0, 0, MKGUI_FIXED, 0, 0),
-MKGUI_W(MKGUI_CHECKBOX, ID_CHK, "Enable",       "", ID_GRP,  0, 0, 0, 0, 0),
+MKGUI_W(MKGUI_GROUP,    ID_GRP, "Settings", "", ID_TAB1, 0, 0, MKGUI_FIXED, 0, 0),
+MKGUI_W(MKGUI_VBOX,     ID_BOX, "",         "", ID_GRP,  0, 0, 0, 0, 0),
+MKGUI_W(MKGUI_INPUT,    ID_INP, "",         "", ID_BOX,  0, 0, MKGUI_FIXED, 0, 0),
+MKGUI_W(MKGUI_CHECKBOX, ID_CHK, "Enable",   "", ID_BOX,  0, 0, 0, 0, 0),
 ```
 
-Children are laid out inside the group's content area (inside the border), stacking vertically like VBOX. The group is not focusable and does not intercept mouse events -- clicks pass through to children.
+The group insets its children inside the border. It does not stack direct children; the VBox in this example arranges the controls. The group is not keyboard-focusable. A collapsible group handles header clicks; other clicks can reach its children.
 
 ### Collapsible group
 
-Set `MKGUI_GROUP_COLLAPSIBLE` to allow a group to be collapsed/expanded by clicking the header. A collapsible group is always content-sized (it does not stretch to fill available space). Add `MKGUI_GROUP_COLLAPSED` to start collapsed. When collapsed, children are hidden and the group shrinks to header height. Generates `MKGUI_EVENT_CLICK` with `value=1` when collapsed, `value=0` when expanded. Groups without `MKGUI_GROUP_COLLAPSIBLE` ignore header clicks and have no arrow indicator.
+Set `MKGUI_GROUP_COLLAPSIBLE` to allow a group to be collapsed/expanded by clicking the header. In a VBox, a collapsible group keeps its measured content height instead of receiving vertical flex space. Add `MKGUI_GROUP_COLLAPSED` to start collapsed. When collapsed, children are hidden and the group shrinks to header height. Generates `MKGUI_EVENT_CLICK` with `value=1` when collapsed, `value=0` when expanded. Groups without `MKGUI_GROUP_COLLAPSIBLE` ignore header clicks and have no arrow indicator.
 
 ```c
 MKGUI_W(MKGUI_GROUP, ID_GRP, "Advanced", "", ID_PARENT, 0, 0, 0, MKGUI_GROUP_COLLAPSIBLE, 1)
@@ -1726,13 +1718,13 @@ No manual offsets are needed on chrome widgets. Simply parent them to the window
 
 ## Auto-layout containers
 
-Three container types provide automatic child positioning. The container controls all placement.
+VBox, HBox, and Form provide the box/form layouts below; Panel shares VBox placement. The container controls child placement.
 
 ### Container padding
 
 Layout containers (VBOX, HBOX, FORM) automatically apply 6px internal padding following these rules:
-- **Top-level containers** (parent is a window, tab, panel, etc.): 6px padding on all sides
-- **Nested containers** (parent is another VBOX/HBOX/FORM/GROUP/TABS): no padding (parent's gap provides spacing)
+- **Top-level containers** (parent is a WINDOW or TAB): scaled 6px padding on all sides
+- **Nested containers** (parent is VBOX/HBOX/FORM/GROUP/TABS/PANEL): no extra padding unless bordered
 - **Containers with a border flag** (`MKGUI_PANEL_BORDER`, `MKGUI_VBOX_BORDER`, `MKGUI_HBOX_BORDER`, `MKGUI_FORM_BORDER`): always have padding regardless of nesting (the border creates a visual boundary)
 - Use `MKGUI_NO_PAD` to explicitly suppress padding on any container
 
@@ -1740,9 +1732,9 @@ Layout containers (VBOX, HBOX, FORM) automatically apply 6px internal padding fo
 
 Children in HBOX/VBOX use a weight-based distribution system. The `weight` field controls how space is allocated:
 
-- **`MKGUI_FIXED`** flag -- Removed from flex distribution. With `w`/`h` > 0: use that exact pixel size. With `w`/`h` = 0: use natural size (font-derived for leaf widgets, content-measured for containers). Weight is ignored.
-- **`weight = 0`** (default) -- Flexible with effective weight 1. Zero-initialized widgets are flexible by default.
-- **`weight > 0`** -- Flexible with explicit weight. Remaining space is distributed proportionally. A weight-2 child gets twice the extra space of a weight-1 child.
+- **`MKGUI_FIXED`** flag -- Removed from flex distribution. On the parent box's main axis, use the positive size hint or measured/natural fallback. Weight is ignored. Cross-axis placement follows the VBox/HBox rules below.
+- **`weight = 0`** (default) -- Effective weight 1 for flexible children. In a VBox, single-line controls hold their natural height instead; collapsible groups are also content-sized.
+- **`weight > 0`** -- Explicit flex weight, unless `MKGUI_FIXED` or a collapsible group keeps the child content-sized. A weight-2 flexible child gets twice the extra space of a weight-1 child.
 
 For flexible children, `w`/`h` is the minimum size in the layout direction. The child gets at least that much, plus its proportional share of remaining space. When `h` is 0, the natural height (derived from font height) is used as the minimum.
 
@@ -1750,18 +1742,18 @@ Use `mkgui_set_weight(ctx, id, weight)` to change weight at runtime.
 
 ### VBox
 
-Stacks children vertically with 6px gap. By default children stretch to the full container width (override with `MKGUI_ALIGN_START/CENTER/END`). Content clips when it exceeds the container bounds. Set `MKGUI_SCROLL` to enable automatic scrollbars instead.
+Stacks children vertically with a scaled 6px gap. Children fill the container width unless a positive width hint and `MKGUI_ALIGN_START/CENTER/END` select a narrower aligned rectangle. Content clips when it exceeds the container bounds. Set `MKGUI_SCROLL` to enable automatic scrollbars instead.
 
 ```c
 MKGUI_W(MKGUI_VBOX,   ID_VBOX,  "", "", ID_TAB1, 0, 0, 0, 0, 0),
 MKGUI_W(MKGUI_BUTTON, ID_BTN1,  "Fixed (28px)", "", ID_VBOX, 0, 28, MKGUI_FIXED, 0, 0),
 MKGUI_W(MKGUI_INPUT,  ID_INP1,  "",             "", ID_VBOX, 0, 0, MKGUI_FIXED, 0, 0),
-MKGUI_W(MKGUI_BUTTON, ID_BTN2,  "Flex (fills)", "", ID_VBOX, 0, 0, 0, 0, 0),
+MKGUI_W(MKGUI_BUTTON, ID_BTN2,  "Flex (fills)", "", ID_VBOX, 0, 0, 0, 0, 1),
 ```
 
 ### HBox
 
-Stacks children horizontally with 6px gap. By default children stretch to the full container height (override with `MKGUI_ALIGN_START/CENTER/END`). Content clips when it exceeds the container bounds. Set `MKGUI_SCROLL` to enable automatic scrollbars instead.
+Stacks children horizontally with a scaled 6px gap. Children normally fill the container height. A positive height hint can select a smaller height, and `MKGUI_ALIGN_START/CENTER/END` controls its position. Fixed single-line controls with zero height use their natural height; see [layout rules](layout.md#6-hbox-rules). Content clips when it exceeds the container bounds. Set `MKGUI_SCROLL` to enable automatic scrollbars instead.
 
 ```c
 MKGUI_W(MKGUI_HBOX,   ID_HBOX, "", "", ID_TAB1, 0, 0, 0, 0, 0),
@@ -1832,104 +1824,30 @@ MKGUI_BOX_PAD           6    // internal padding in layout containers
 
 ## Icons
 
-mkgui uses SVG icons rendered via PlutoSVG/PlutoVG (embedded, MIT licensed). Icons follow Freedesktop standard naming (e.g. `"document-save"`, `"folder"`, `"dialog-warning"`).
+The shared Fluent catalogue supplies the same icon names on Linux and Windows.
+SVGs are rasterized directly into mkgui's atlas at the current pixel size using
+PlutoSVG/PlutoVG. Monochrome icons follow the theme text colour.
 
 ```c
+#include "mkguiicons_names.h"
 void mkgui_set_icon(struct mkgui_window *win, uint32_t widget_id, const char *icon_name);
 void mkgui_set_treenode_icon(struct mkgui_window *win, uint32_t widget_id, uint32_t node_id, const char *icon_name);
-```
-
-### Loading SVG icons
-
-```c
 int32_t mkgui_icon_load_svg(struct mkgui_window *win, const char *name, const char *path);
-uint32_t mkgui_icon_load_svg_dir(struct mkgui_window *win, const char *dir_path);
-uint32_t mkgui_icon_load_app_icons(struct mkgui_window *win, const char *app_name);
-const char *mkgui_icon_get_dir(struct mkgui_window *win);
-```
-
-`mkgui_icon_load_svg` loads a single SVG file and registers it under `name`. `mkgui_icon_load_svg_dir` batch-loads all `.svg` files from a flat directory (filename minus `.svg` extension becomes the icon name). All icons (including toolbar icons) are loaded at the same size.
-
-`mkgui_icon_load_app_icons` resolves the icon directory automatically using standard platform paths, then loads all SVGs from it.
-
-**Linux search order:**
-
-1. `$<APPNAME>_ICON_DIR` environment variable (override for development/packaging)
-2. `../share/<app_name>/icons/` relative to the executable (covers FHS installs)
-3. `$XDG_DATA_HOME/<app_name>/icons/` (default: `~/.local/share/`)
-4. Each `$XDG_DATA_DIRS` entry + `/<app_name>/icons/` (default: `/usr/share:/usr/local/share`)
-5. `./icons/` (development fallback)
-
-**Windows search order:**
-
-1. `%<APPNAME>_ICON_DIR%` environment variable
-2. `<exe_dir>\icons\` (portable install / dev build)
-3. `%LOCALAPPDATA%\<app_name>\icons\` (per-user install)
-4. `%APPDATA%\<app_name>\icons\` (roaming per-user install)
-5. `%ProgramFiles%\<app_name>\icons\` (system-wide install)
-6. `%ProgramFiles(x86)%\<app_name>\icons\` (32-bit system-wide install)
-7. `.\icons\` (development fallback)
-
-`mkgui_icon_get_dir` returns the resolved icon directory path, or NULL if no icons were loaded.
-
-```c
-mkgui_ctx_set_app_class(ctx, "myapp");
-mkgui_icon_load_app_icons(win, "myapp");
-// Loads /usr/share/myapp/icons/document-save.svg as "document-save"
-```
-
-SVG sources are cached in memory. Icons are automatically re-rasterized on scale or theme changes. Icons use `currentColor` from the SVG spec, so they follow the theme text color.
-
-The `extract_icons` build tool (built to `out/extract_icons`) reads the editor-generated icon list (`myapp_icons.txt`) and an optional user-managed file (`myapp_icons_extra.txt`) for dynamically loaded icons. The output directory is cleaned and rebuilt from scratch each run. Icons with source paths are copied directly; icons without are resolved from a theme directory. The extra file is never touched by the editor.
-
-### System icon theme fallback (Linux)
-
-On Linux, if an icon name is not found in the bundled `icons/` directory, mkgui automatically searches the user's installed system icon theme. This means applications can run without a bundled icon directory on Linux and still display correct icons.
-
-The system theme is detected once at init from (in order): `$MKGUI_ICON_THEME` environment variable, `gtk-icon-theme-name` in GTK 3/4 settings, KDE `kdeglobals` `[Icons] Theme=`, or `hicolor` as final fallback. The full Freedesktop `Inherits=` chain is followed (e.g. Papirus-Dark -> Papirus -> breeze-dark -> hicolor). For `-Dark`/`-Light` theme variants, the base theme is automatically inserted into the chain.
-
-Icons are loaded lazily on first use and cached. A negative cache prevents repeated filesystem lookups for names that don't exist in any theme. Bundled icons always take priority over the system theme.
-
-On Windows, there is no system theme support. The bundled `icons/` directory is required.
-
-### Missing icons
-
-If a widget references an icon name that isn't loaded and it cannot be resolved from the system theme, a built-in placeholder (magenta diamond) is shown instead. This makes unresolved icons immediately visible during development.
-
-### Multiple sizes
-
-Icons are keyed on `(name, size)` internally. The same SVG can be rasterised and cached at several sizes simultaneously -- for example, a toolbar button at `ctx->icon_size` (18 px by default), the about dialog at `ctx->dialog_icon_size` (32 px), and an itemview icon-mode cell at 48 px all live in separate atlas entries.
-
-```c
-int32_t mkgui_icon_at_size(struct mkgui_window *win, const char *name, int32_t size);
-```
-
-Use this when drawing at a non-default size. Returns the icon index (for `icons[idx]` / `draw_icon`), or -1 if no variant can be produced. The SVG source is cached on first lookup so repeated requests at different sizes don't touch disk more than once.
-
-On scale change (`mkgui_ctx_set_scale`), existing SVG-sourced icons are re-rasterised at proportionally new sizes automatically. Raster icons (added via `mkgui_icon_add`) keep their original pixels -- they are opaque to the size system and don't rescale.
-
-### Custom icons
-
-```c
 int32_t mkgui_icon_add(const char *name, const uint32_t *pixels, int32_t w, int32_t h);
+uint32_t mkgui_icon_browser(struct mkgui_window *win, int32_t size, char *out_name, uint32_t name_size);
 ```
 
-Register custom ARGB icons at any size. Custom icons override SVG icons with the same name. Pixels are copied internally. Returns the icon index, or -1 on failure.
+`mkgui_set_icon(win, id, MKICON_SAVE)` selects an icon by name. Custom SVG files
+can be registered under an application-defined name with `mkgui_icon_load_svg()`;
+their sources are retained for scale and theme changes. `mkgui_icon_add()` copies
+custom ARGB pixels. Unknown widget icons use the magenta placeholder.
 
-### Icon browser
+`mkgui_icon_browser()` opens the shared catalogue picker. It supports name and
+keyword search, name groups, and style selection. It returns 1 and writes the
+selected name on confirmation, or 0 on cancel. `size` is the logical preview size.
 
-```c
-uint32_t mkgui_icon_browser(struct mkgui_window *win, int32_t size,
-                            char *out_name, uint32_t name_size,
-                            char *out_path, uint32_t path_size);
-
-uint32_t mkgui_icon_browser_theme(struct mkgui_window *win, const char *theme_dir,
-                                  int32_t size, char *out, uint32_t out_size);
-```
-
-`mkgui_icon_browser` opens a modal browser showing icons from available Freedesktop icon themes. On Linux, it scans system icon directories (`/usr/share/icons/`, `$XDG_DATA_HOME/icons/`, etc.) in addition to the current working directory and one level deeper. On Windows, it scans the executable's own directory and the current working directory (both plus one level deeper) so themes extracted next to the binary are picked up regardless of how the app was launched. A theme dropdown allows switching between themes; the icon array is reset on each switch to avoid stale icons. Returns 1 and writes the selected icon name to `out_name` and the full source path of the selected SVG to `out_path` if the user picked an icon, 0 on cancel. Multiple themes can coexist, allowing users to mix icons from different icon sets.
-
-`mkgui_icon_browser_theme` is a narrower variant that browses only the icons in a single explicit theme directory. It writes the chosen icon name (no path) to `out`. Useful when an application bundles its own custom theme and wants a browser scoped to it.
+The standalone `mkguiicons.h` API exposes enumeration, size variants, metadata,
+and SVG lookup. See [icons.md](icons.md) for its contract and linking instructions.
 
 ### Font
 
@@ -1954,9 +1872,9 @@ mkgui_set_tooltip(ctx, ID_BTN_SAVE, "Save the current document");
 mkgui_set_tooltip(ctx, ID_CANVAS, "Click to draw, right-click to erase");
 ```
 
-Toolbar buttons automatically get their `label` set as tooltip text (since toolbars only show icons). For other widgets, tooltips must be set explicitly -- no tooltip is shown by default.
+Toolbar buttons copy their initial label as tooltip text, regardless of toolbar display mode. For other widgets, tooltips must be set explicitly -- no tooltip is shown by default.
 
-Maximum tooltip text length is 127 characters.
+Maximum tooltip text length is `MKGUI_MAX_TEXT - 1` bytes (127 in this release).
 
 ## Toasts and banners
 
@@ -1964,16 +1882,16 @@ Transient and persistent in-window notifications. These are purely mkgui-rendere
 
 ### Severity levels
 
-Both toasts and banners take a severity value that controls the background colour and resolves a Freedesktop icon:
+Both toasts and banners take a severity value that controls the background colour and resolves a catalogue icon:
 
 | Severity | Icon name | Typical use |
 |---|---|---|
-| `MKGUI_SEVERITY_INFO` | `dialog-information` | Neutral confirmations, informational messages |
-| `MKGUI_SEVERITY_SUCCESS` | `dialog-ok` | Successful operations ("file saved") |
-| `MKGUI_SEVERITY_WARNING` | `dialog-warning` | Cautions, soft limits, recoverable issues |
-| `MKGUI_SEVERITY_ERROR` | `error` | Failures requiring attention |
+| `MKGUI_SEVERITY_INFO` | `info` | Neutral confirmations, informational messages |
+| `MKGUI_SEVERITY_SUCCESS` | `checkmark` | Successful operations ("file saved") |
+| `MKGUI_SEVERITY_WARNING` | `warning` | Cautions, soft limits, recoverable issues |
+| `MKGUI_SEVERITY_ERROR` | `error-circle` | Failures requiring attention |
 
-If a severity icon cannot be resolved (not in bundled `icons/`, and on Linux not in the system theme either), the notification renders without an icon. No magenta placeholder is shown here.
+If a severity icon cannot be resolved, the notification renders without an icon. No magenta placeholder is shown here.
 
 ### Toast
 
@@ -2037,7 +1955,7 @@ void mkgui_context_menu_show_at(struct mkgui_window *win, int32_t x, int32_t y);
 ```
 
 - `mkgui_context_menu_clear()` -- Clear all items from the context menu
-- `mkgui_context_menu_add()` -- Add an item. `id` is returned in `MKGUI_EVENT_CONTEXT_MENU`. `icon` is a Freedesktop icon name (or NULL). `flags` can include `MKGUI_DISABLED`, `MKGUI_MENUITEM_SEPARATOR`, `MKGUI_MENUITEM_CHECK`, `MKGUI_MENUITEM_RADIO`, `MKGUI_MENUITEM_CHECKED`
+- `mkgui_context_menu_add()` -- Add an item. `id` is returned in `MKGUI_EVENT_CONTEXT_MENU`. `icon` is a catalogue icon name (or NULL). `flags` can include `MKGUI_DISABLED`, `MKGUI_MENUITEM_SEPARATOR`, `MKGUI_MENUITEM_CHECK`, `MKGUI_MENUITEM_RADIO`, `MKGUI_MENUITEM_CHECKED`
 - `mkgui_context_menu_add_separator()` -- Shorthand for adding a separator line
 - `mkgui_context_menu_show()` -- Show the menu at the last right-click position
 - `mkgui_context_menu_show_at()` -- Show the menu at a specific window position
@@ -2052,9 +1970,9 @@ Context menus are built and shown in response to `MKGUI_EVENT_CONTEXT` or `MKGUI
 case MKGUI_EVENT_CONTEXT: {
     if(ev->id == ID_LISTVIEW1) {
         mkgui_context_menu_clear(ctx);
-        mkgui_context_menu_add(ctx, 100, "Cut", "content-cut", 0);
-        mkgui_context_menu_add(ctx, 101, "Copy", "content-copy", 0);
-        mkgui_context_menu_add(ctx, 102, "Paste", "content-paste", 0);
+        mkgui_context_menu_add(ctx, 100, "Cut", "cut", 0);
+        mkgui_context_menu_add(ctx, 101, "Copy", "copy", 0);
+        mkgui_context_menu_add(ctx, 102, "Paste", "clipboard-paste", 0);
         mkgui_context_menu_add_separator(ctx);
         mkgui_context_menu_add(ctx, 103, "Delete", "delete", (ev->value < 0) ? MKGUI_DISABLED : 0);
         mkgui_context_menu_show(ctx);
@@ -2114,10 +2032,10 @@ Displays a message with a stock icon and a configurable button set. Blocks until
 | Constant | Icon |
 |----------|------|
 | `MKGUI_DLG_ICON_NONE` | No icon |
-| `MKGUI_DLG_ICON_INFO` | `dialog-information` |
-| `MKGUI_DLG_ICON_WARNING` | `dialog-warning` |
-| `MKGUI_DLG_ICON_ERROR` | `dialog-error` |
-| `MKGUI_DLG_ICON_QUESTION` | `dialog-question` |
+| `MKGUI_DLG_ICON_INFO` | `info` |
+| `MKGUI_DLG_ICON_WARNING` | `warning` |
+| `MKGUI_DLG_ICON_ERROR` | `error-circle` |
+| `MKGUI_DLG_ICON_QUESTION` | `question-circle` |
 
 **Button set constants:**
 
@@ -2267,7 +2185,7 @@ The dialog window is centered on the parent window when opened.
 The dialogs feature:
 - Toolbar with back/forward/up navigation buttons
 - Breadcrumb path bar (MKGUI_PATHBAR) showing clickable directory segments; click to navigate, click background to type a path directly
-- Left sidebar with shortcuts: Home, Desktop, Documents, Downloads, GTK bookmarks, and mounted volumes from `/media/` and `/mnt/`
+- Left sidebar with Home and existing Desktop/Documents/Downloads folders. Linux also loads GTK bookmarks and mounted volumes under `/media/` and `/mnt/`.
 - File list on the right with Name, Size, and Date Modified columns (sortable by clicking headers)
 - File type filter dropdown (when filters are provided)
 - Show hidden files checkbox
@@ -2340,7 +2258,7 @@ struct mkgui_ctx *mkgui_window_get_ctx(struct mkgui_window *win);
 
 ## Rendering
 
-All widget rendering is software-based (no GPU). The framebuffer is blitted to the X11 window via MIT-SHM (`XShmPutImage`).
+Toolkit widgets are software-rendered. Linux presents through MIT-SHM (`XShmPutImage`); Windows presents through GDI. Application rendering inside a GL view uses OpenGL.
 
 ### Rendering pipeline
 
@@ -2352,15 +2270,7 @@ Glyph and icon bitmaps are stored in linear memory for cache-friendly rendering.
 
 ### Antialiased drawing
 
-Rounded rectangles and circles use 4x4 subpixel sampling for antialiased edges. All math is integer-only (no sqrt or floating point). This is used for:
-
-- Widget borders (buttons, inputs, dropdowns, checkboxes, spinboxes, progress bars)
-- Radio button circles (outer ring and inner dot)
-- Checkbox checkmark (AA thick line segments)
-- Group box borders
-- Tooltip backgrounds
-- Scrollbar thumbs
-- Spinner arc
+Software primitives blend coverage at the edges of rounded rectangles, circles, thick lines, and spinner arcs. SVG icons use PlutoVG rasterization; text uses coverage from the platform font backend. The implementations use different coverage calculations rather than one shared supersampling rule.
 
 ### Theming
 
@@ -2378,7 +2288,7 @@ void mkgui_ctx_set_theme(struct mkgui_ctx *ctx, struct mkgui_theme theme);
 `mkgui_init()` detects dark vs light in this order:
 
 1. `MKGUI_THEME=light` or `MKGUI_THEME=dark` environment variable (explicit override)
-2. `GTK_THEME` contains `:dark` or `-dark` (GNOME/XFCE convention)
+2. A nonempty `GTK_THEME` selects dark if its value contains `dark` (case-insensitive), otherwise light
 3. Windows registry `HKCU\...\Themes\Personalize\AppsUseLightTheme` (Win32 only)
 4. Falls back to dark
 
@@ -2405,7 +2315,7 @@ Key theme colors (dark defaults shown):
 | `scrollbar_bg` | `#1d2023` | Scrollbar track |
 | `scrollbar_thumb` | `#4d4d4d` | Scrollbar thumb |
 | `scrollbar_thumb_hover` | `#5a5a5a` | Scrollbar thumb on hover/drag |
-| `highlight` | `#3daee9` | Focus border, menu hover, selection accents (KDE Highlight color) |
+| `highlight` | `#3daee9` | Focus border, navigation hover, selection accents (KDE Highlight color) |
 | `header_bg` | `#2a2e32` | Listview column header background |
 | `listview_alt` | `#2a2e32` | Alternating row background |
 | `accent` | `#2a7ab5` | Accent color (spinner arc, progress bar fill, cell progress) |
@@ -2507,7 +2417,7 @@ case MKGUI_EVENT_FILE_DROP: {
 } break;
 ```
 
-Paths are valid until the next drop event or context destruction. Uses XDnd v5 protocol on Linux and WM_DROPFILES on Windows. Maximum 256 files per drop.
+Paths are owned by the window and remain valid until the next drop or window destruction. Uses XDnd v5 protocol on Linux and WM_DROPFILES on Windows. Maximum 256 files per drop.
 
 ## DPI scaling
 

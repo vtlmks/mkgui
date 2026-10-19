@@ -1,20 +1,24 @@
 // Copyright (c) 2026, Peter Fors
 // SPDX-License-Identifier: MIT
-//
-// mkgui public API header -- single source of truth for all public types,
-// constants, enums, and function declarations.
-//
-// Unity build: mkgui.c defines MKGUI_API as static before including this.
-// Library build: mkgui.c defines MKGUI_API as empty (extern linkage).
-// Consumer: MKGUI_API defaults to empty below.
 
 #ifndef MKGUI_H
 #define MKGUI_H
 
+#include <stddef.h>
 #include <stdint.h>
 
 #ifndef MKGUI_API
+#if defined(MKGUI_STATIC)
 #define MKGUI_API
+#elif defined(_WIN32)
+#ifdef MKGUI_LIBRARY
+#define MKGUI_API __declspec(dllexport)
+#else
+#define MKGUI_API __declspec(dllimport)
+#endif
+#else
+#define MKGUI_API __attribute__((visibility("default")))
+#endif
 #endif
 
 // ---------------------------------------------------------------------------
@@ -35,9 +39,6 @@
 #define MKGUI_BOX_PAD              6
 #define MKGUI_ICON_SIZE            18
 #define MKGUI_ICON_NAME_LEN        64
-#ifndef MKGUI_MAX_ICONS
-#define MKGUI_MAX_ICONS            2048
-#endif
 // Amount that non-text widget colors (frame, fill, border, accent) are
 // blended toward the surrounding background when MKGUI_DISABLED is set.
 // 0.0 = no fade (looks identical to enabled), 1.0 = invisible.
@@ -661,8 +662,8 @@ MKGUI_API const char *mkgui_get_tooltip(struct mkgui_window *win, uint32_t id);
 // of the window. Click anywhere on a toast to dismiss it early. Toasts auto-
 // dismiss after duration_ms; a duration of 0 means persistent until clicked.
 // The severity controls the background colour and the icon name resolved
-// against the Freedesktop icon set (dialog-information, dialog-ok,
-// dialog-warning, error). If a severity icon cannot be resolved, the
+// against the shared icon catalogue (info, checkmark,
+// warning, error-circle). If a severity icon cannot be resolved, the
 // text is drawn without an icon. mkgui_toast is equivalent to mkgui_toast_ex
 // with severity INFO and a default duration.
 MKGUI_API void mkgui_toast(struct mkgui_window *win, const char *text);
@@ -683,21 +684,20 @@ MKGUI_API uint32_t mkgui_banner_active(struct mkgui_window *win);
 // Icon
 // ---------------------------------------------------------------------------
 
+// Icon storage grows on demand. Names must fit MKGUI_ICON_NAME_LEN including
+// the terminator. Both loaders return -1 on failure and preserve an existing
+// entry when replacement allocation or rasterization fails.
 MKGUI_API int32_t mkgui_icon_add(const char *name, const uint32_t *pixels, int32_t w, int32_t h);
 MKGUI_API int32_t mkgui_icon_load_svg(struct mkgui_window *win, const char *name, const char *path);
-MKGUI_API uint32_t mkgui_icon_load_svg_dir(struct mkgui_window *win, const char *dir_path);
-MKGUI_API uint32_t mkgui_icon_load_app_icons(struct mkgui_window *win, const char *app_name);
 // Return an icon index for (name, size), rasterising from the cached SVG
-// source (or lazy-loading from the system theme on Linux) if needed. Use
+// source or the shared mkguiicons catalogue if needed. Use
 // this when drawing at a size other than win->icon_size -- e.g. the
 // itemview in icon mode, file dialog thumbnails, or a custom gallery
 // widget. Returns -1 if no variant can be produced.
 MKGUI_API int32_t mkgui_icon_at_size(struct mkgui_window *win, const char *name, int32_t size);
-MKGUI_API const char *mkgui_icon_get_dir(struct mkgui_window *win);
 MKGUI_API void mkgui_set_icon(struct mkgui_window *win, uint32_t widget_id, const char *icon_name);
 MKGUI_API void mkgui_set_treenode_icon(struct mkgui_window *win, uint32_t widget_id, uint32_t node_id, const char *icon_name);
-MKGUI_API uint32_t mkgui_icon_browser_theme(struct mkgui_window *win, const char *theme_dir, int32_t size, char *out, uint32_t out_size);
-MKGUI_API uint32_t mkgui_icon_browser(struct mkgui_window *win, int32_t size, char *out_name, uint32_t name_size, char *out_path, uint32_t path_size);
+MKGUI_API uint32_t mkgui_icon_browser(struct mkgui_window *win, int32_t size, char *out_name, uint32_t name_size);
 
 // ---------------------------------------------------------------------------
 // Button

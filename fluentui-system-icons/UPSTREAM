@@ -1,0 +1,25 @@
+Project: Fluent UI System Icons
+Repository: https://github.com/microsoft/fluentui-system-icons
+Commit: a347af95478f989038cccbf085978865264c048a
+Commit date: 2026-10-09T16:27:55Z
+Commit subject: chore(release): publish 1.1.344 [skip ci]
+License: MIT; see LICENSE and NOTICE
+
+Archive: https://codeload.github.com/microsoft/fluentui-system-icons/tar.gz/a347af95478f989038cccbf085978865264c048a
+Archive SHA-256: ec28c5aa40321609dd05fac266e06f410f70b9ec37fa35f98a28cd0bd56d6dfe
+
+This is an unmodified SVG asset snapshot, stored as ordinary files.
+Retained from the archive:
+  assets/**/*.svg
+  assets/**/*.json
+  LICENSE
+  NOTICE
+  README.md
+  package.json
+
+The snapshot contains 21,788 SVG files across 2,994 icon directories,
+including available sizes, styles, and directional variants. All SVG files
+were parsed as XML after extraction; all retained JSON files were parsed.
+
+To update, download a new commit archive, replace the retained upstream files
+using the same selection, and update this provenance record.

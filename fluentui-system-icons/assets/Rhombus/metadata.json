@@ -1,0 +1,23 @@
+{
+  "name": "Rhombus",
+  "size": [
+    12,
+    16,
+    20,
+    24,
+    28,
+    32,
+    48
+  ],
+  "style": [
+    "Regular",
+    "Filled"
+  ],
+  "keyword": "fluent-icon",
+  "description": "Used to represent rhombus shaped content or shape in canvas editing scenarios.",
+  "metaphor": [
+    "slide",
+    "square",
+    "shape"
+  ]
+}

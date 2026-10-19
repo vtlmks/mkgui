@@ -20,10 +20,10 @@ struct notify_palette {
 
 // Severity palette matching the dialog accent colors; success is green, white text reads on all four.
 static struct notify_palette notify_pal[4] = {
-	{ 0x3daee9, 0xffffff, "dialog-information" },  // INFO
-	{ 0x27ae60, 0xffffff, "dialog-ok"          },  // SUCCESS
-	{ 0xf67400, 0xffffff, "dialog-warning"     },  // WARNING
-	{ 0xda4453, 0xffffff, "error"              },  // ERROR
+	{ 0x3daee9, 0xffffff, MKICON_INFO },  // INFO
+	{ 0x27ae60, 0xffffff, MKICON_CHECKMARK          },  // SUCCESS
+	{ 0xf67400, 0xffffff, MKICON_WARNING     },  // WARNING
+	{ 0xda4453, 0xffffff, MKICON_ERROR_CIRCLE              },  // ERROR
 };
 
 // [=]===^=[ notify_palette_for ]======================================[=]

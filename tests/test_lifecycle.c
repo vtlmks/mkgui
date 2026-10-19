@@ -298,6 +298,76 @@ static void test_host_loop_two_windows(void) {
 	mkgui_ctx_destroy(ctx);
 }
 
+// [=]===^=[ test_shared_icon_cache ]============================[=]
+static void test_shared_icon_cache(void) {
+	struct mkgui_widget widgets[] = {MKGUI_W(MKGUI_WINDOW, 1, "Shared icons", "", 0, 200, 150, 0, 0, 0), MKGUI_W(MKGUI_BUTTON, 2, "Save", MKICON_SAVE, 1, 0, 0, 0, 0, 0)};
+	struct mkgui_ctx *ctx = mkgui_ctx_create();
+	CHECK(ctx != NULL, "icon context creation failed");
+
+	if(ctx) {
+		struct mkgui_window *first = mkgui_window_create(ctx, NULL, widgets, 2, NULL, 0, 0);
+		CHECK(first != NULL, "first icon window creation failed");
+
+		if(first) {
+			mkgui_ctx_set_scale(ctx, 1.0f);
+			struct mkgui_window *second = mkgui_window_create(ctx, first, widgets, 2, "Shared icons second", 200, 150);
+			CHECK(second != NULL, "second icon window creation failed");
+
+			if(second) {
+				uint32_t count = icon_count;
+				float scales[] = {2.13f, 0.57f, 1.0f};
+
+				for(uint32_t i = 0; i < sizeof(scales) / sizeof(scales[0]); ++i) {
+					mkgui_ctx_set_scale(ctx, scales[i]);
+					int32_t size = (int32_t)((float)MKGUI_ICON_SIZE * scales[i] + 0.5f);
+					int32_t index = icon_find_idx_at(MKICON_SAVE, size);
+					CHECK(index >= 0 && icons[index].w == size, "shared cache rescaled more than once");
+					CHECK(icon_count == count, "scale change added duplicate entries");
+
+				}
+
+				mkgui_window_destroy(second);
+				CHECK(icon_lazy_ctx == first, "lazy icon context refers to destroyed window");
+				CHECK(icon_resolve(NULL, MKICON_SEARCH) >= 0, "lazy lookup after secondary destruction failed");
+
+			}
+
+			mkgui_window_destroy(first);
+			CHECK(icon_atlas == NULL && icon_count == 0 && icon_lazy_ctx == NULL, "last window leaked icon state");
+
+		}
+
+		mkgui_ctx_destroy(ctx);
+
+	}
+}
+
+// [=]===^=[ test_icon_browser_layout ]==========================[=]
+static void test_icon_browser_layout(void) {
+	struct mkgui_ctx *ctx = mkgui_ctx_create();
+	CHECK(ctx != NULL, "browser layout context creation failed");
+
+	if(ctx) {
+		struct mkgui_window *win = mkgui_window_create(ctx, NULL, ibt_widgets, sizeof(ibt_widgets) / sizeof(ibt_widgets[0]), NULL, 0, 0);
+		CHECK(win != NULL, "browser layout window creation failed");
+
+		if(win) {
+			mkgui_split_set_ratio(win, IB_TH_SPLIT, 0.22f);
+			layout_widgets(win);
+			int32_t grid = find_widget_idx(win, IB_TH_GRID);
+			int32_t groups = find_widget_idx(win, IB_TH_GROUPS);
+			CHECK(win->rects[grid].w > win->win_w / 2 && win->rects[grid].h > win->win_h / 2, "icon grid has no usable rectangle");
+			CHECK(win->rects[groups].w > 100 && win->rects[groups].h > win->win_h / 2, "icon groups have no usable rectangle");
+			CHECK(win->rects[groups].x + win->rects[groups].w <= win->rects[grid].x, "icon groups overlap grid");
+			mkgui_window_destroy(win);
+
+		}
+
+		mkgui_ctx_destroy(ctx);
+
+	}
+}
+
 // [=]===^=[ main ]================================================[=]
 int main(void) {
 	test_ctx_lifecycle_basic();
@@ -309,11 +379,16 @@ int main(void) {
 	test_pump_others();
 	test_ctx_destroy_auto_destroys_windows();
 	test_host_loop_two_windows();
+	test_shared_icon_cache();
+	test_icon_browser_layout();
 
 	if(fail_count == 0) {
 		fprintf(stderr, "all tests passed\n");
 		return 0;
+
 	}
+
 	fprintf(stderr, "%u test(s) failed\n", fail_count);
 	return 1;
+
 }

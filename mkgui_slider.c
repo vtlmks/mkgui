@@ -1,8 +1,6 @@
 // Copyright (c) 2026, Peter Fors
 // SPDX-License-Identifier: MIT
 
-#define MKGUI_SLIDER_WEDGE_MAX_W      10
-
 // [=]===^=[ slider_draw_wedge_v ]================================[=]
 static void slider_draw_wedge_v(uint32_t *buf, int32_t bw, int32_t bh, int32_t x, int32_t y, int32_t h, int32_t row_start, int32_t row_count, int32_t max_w, uint32_t color) {
 	if(h <= 1 || row_count <= 0 || max_w <= 0) {

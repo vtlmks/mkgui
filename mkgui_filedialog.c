@@ -142,68 +142,89 @@ static void fd_url_decode(char *dst, char *src, uint32_t dst_size) {
 // [=]===^=[ fd_icon_for_ext ]=====================================[=]
 static char *fd_icon_for_ext(char *dot) {
 	if(strcmp(dot, ".c") == 0 || strcmp(dot, ".h") == 0) {
-		return "text-x-csrc";
+		return MKICON_DOCUMENT_CODE;
+
 	}
 
 	if(strcmp(dot, ".cpp") == 0 || strcmp(dot, ".cc") == 0 || strcmp(dot, ".cxx") == 0 || strcmp(dot, ".hpp") == 0) {
-		return "text-x-c++src";
+		return MKICON_DOCUMENT_CODE;
+
 	}
 
 	if(strcmp(dot, ".sh") == 0 || strcmp(dot, ".bash") == 0 || strcmp(dot, ".zsh") == 0) {
-		return "text-x-script";
+		return MKICON_DOCUMENT_CODE;
+
 	}
 
 	if(strcmp(dot, ".py") == 0) {
-		return "text-x-python";
+		return MKICON_DOCUMENT_CODE;
+
 	}
 
 	if(strcmp(dot, ".js") == 0 || strcmp(dot, ".ts") == 0 || strcmp(dot, ".json") == 0) {
-		return "text-x-script";
+		return MKICON_DOCUMENT_CODE;
+
 	}
 
 	if(strcmp(dot, ".html") == 0 || strcmp(dot, ".htm") == 0) {
-		return "text-html";
+		return MKICON_DOCUMENT_CODE;
+
 	}
 
 	if(strcmp(dot, ".xml") == 0 || strcmp(dot, ".svg") == 0) {
-		return "text-xml";
+		return MKICON_DOCUMENT_CODE;
+
 	}
 
 	if(strcmp(dot, ".css") == 0) {
-		return "text-css";
+		return MKICON_DOCUMENT_CSS;
+
 	}
 
 	if(strcmp(dot, ".png") == 0 || strcmp(dot, ".jpg") == 0 || strcmp(dot, ".jpeg") == 0 || strcmp(dot, ".gif") == 0 || strcmp(dot, ".bmp") == 0 || strcmp(dot, ".webp") == 0 || strcmp(dot, ".ico") == 0) {
-		return "image-x-generic";
+		return MKICON_IMAGE;
+
 	}
 
 	if(strcmp(dot, ".pdf") == 0) {
-		return "application-pdf";
+		return MKICON_DOCUMENT_PDF;
+
 	}
 
 	if(strcmp(dot, ".zip") == 0 || strcmp(dot, ".tar") == 0 || strcmp(dot, ".gz") == 0 || strcmp(dot, ".bz2") == 0 || strcmp(dot, ".xz") == 0 || strcmp(dot, ".7z") == 0 || strcmp(dot, ".rar") == 0) {
-		return "package-x-generic";
+		return MKICON_ARCHIVE;
+
 	}
 
 	if(strcmp(dot, ".o") == 0 || strcmp(dot, ".so") == 0 || strcmp(dot, ".a") == 0 || strcmp(dot, ".dll") == 0) {
-		return "application-x-object";
+		return MKICON_DOCUMENT_CODE;
+
 	}
+
 	return NULL;
+
 }
 
 // [=]===^=[ fd_icon_for_name ]====================================[=]
 static char *fd_icon_for_name(char *name, uint32_t is_dir) {
 	if(is_dir) {
 		return "folder";
+
 	}
+
 	char *dot = strrchr(name, '.');
+
 	if(dot) {
 		char *specific = fd_icon_for_ext(dot);
-		if(specific && icon_find_idx_any(specific) >= 0) {
+
+		if(specific) {
 			return specific;
+
 		}
 	}
-	return "text-x-generic";
+
+	return MKICON_DOCUMENT_TEXT;
+
 }
 
 // [=]===^=[ fd_path_exists ]======================================[=]
@@ -957,13 +978,13 @@ static void fd_bookmark_row_cb(uint32_t row, uint32_t col, char *buf, uint32_t b
 	if(row < fd->bookmark_count) {
 		char *icon = "folder";
 		if(strcmp(fd->bookmarks[row].label, "Home") == 0) {
-			icon = "user-home";
+			icon = MKICON_HOME;
 		} else if(strcmp(fd->bookmarks[row].label, "Desktop") == 0) {
-			icon = "user-desktop";
+			icon = MKICON_DESKTOP;
 		} else if(strcmp(fd->bookmarks[row].label, "Downloads") == 0) {
-			icon = "folder-download";
+			icon = MKICON_FOLDER_OPEN_DOWN;
 		} else if(strcmp(fd->bookmarks[row].label, "Documents") == 0) {
-			icon = "folder-documents";
+			icon = MKICON_FOLDER_DOCUMENT;
 		} else {
 			uint32_t is_mount = 0;
 			if(strncmp(fd->bookmarks[row].path, "/media/", 7) == 0 || strncmp(fd->bookmarks[row].path, "/mnt/", 5) == 0) {
@@ -971,7 +992,7 @@ static void fd_bookmark_row_cb(uint32_t row, uint32_t col, char *buf, uint32_t b
 			}
 
 			if(is_mount) {
-				icon = "drive-harddisk";
+				icon = MKICON_HARD_DRIVE;
 			}
 		}
 		snprintf(buf, buf_size, "%s\t%s", icon, fd->bookmarks[row].label);
@@ -1143,11 +1164,11 @@ static uint32_t fd_run_dialog(struct mkgui_window *win, uint32_t mode, const str
 		MKGUI_W(MKGUI_WINDOW,   FD_ID_WINDOW,        "",              "",             0,                  FD_INIT_W, FD_INIT_H, 0, 0, 0),
 
 		MKGUI_W(MKGUI_TOOLBAR,  FD_ID_TOOLBAR,        "",              "",             FD_ID_WINDOW,       0, 0, 0, 0, 0),
-		MKGUI_W(MKGUI_BUTTON,   FD_ID_BTN_BACK,       "",              "go-previous",  FD_ID_TOOLBAR,      0, 0, 0, 0, 0),
-		MKGUI_W(MKGUI_BUTTON,   FD_ID_BTN_FWD,        "",              "go-next",      FD_ID_TOOLBAR,      0, 0, 0, 0, 0),
-		MKGUI_W(MKGUI_BUTTON,   FD_ID_BTN_UP,         "",              "go-up",        FD_ID_TOOLBAR,      0, 0, 0, 0, 0),
+		MKGUI_W(MKGUI_BUTTON,   FD_ID_BTN_BACK,       "",              MKICON_ARROW_LEFT,  FD_ID_TOOLBAR,      0, 0, 0, 0, 0),
+		MKGUI_W(MKGUI_BUTTON,   FD_ID_BTN_FWD,        "",              MKICON_ARROW_RIGHT,      FD_ID_TOOLBAR,      0, 0, 0, 0, 0),
+		MKGUI_W(MKGUI_BUTTON,   FD_ID_BTN_UP,         "",              MKICON_ARROW_UP,        FD_ID_TOOLBAR,      0, 0, 0, 0, 0),
 		MKGUI_W(MKGUI_BUTTON,   FD_ID_TB_SEP1,        "",              "",             FD_ID_TOOLBAR,      0, 0, 0, MKGUI_BUTTON_SEPARATOR, 0),
-		MKGUI_W(MKGUI_BUTTON,   FD_ID_BTN_NEWFOLDER,  "",              "folder-new",   FD_ID_TOOLBAR,      0, 0, 0, 0, 0),
+		MKGUI_W(MKGUI_BUTTON,   FD_ID_BTN_NEWFOLDER,  "",              MKICON_FOLDER_ADD,   FD_ID_TOOLBAR,      0, 0, 0, 0, 0),
 
 		MKGUI_W(MKGUI_PATHBAR,  FD_ID_PATHBAR,        "",              "",             FD_ID_WINDOW,       0, 0, 0, 0, 0),
 
@@ -1164,7 +1185,7 @@ static uint32_t fd_run_dialog(struct mkgui_window *win, uint32_t mode, const str
 
 		MKGUI_W(MKGUI_HBOX,     FD_ID_BTN_HBOX,       "",              "",             FD_ID_CONTENT_VBOX, 0, 28, MKGUI_FIXED, 0, 0),
 		MKGUI_W(MKGUI_CHECKBOX, FD_ID_CHK_HIDDEN,     "Show hidden",   "",             FD_ID_BTN_HBOX,     110, 0, MKGUI_FIXED, 0, 0),
-		MKGUI_W(MKGUI_LABEL,    FD_ID_SEARCH_LABEL,   "",              "edit-find",    FD_ID_BTN_HBOX,     200, 0, MKGUI_FIXED | MKGUI_HIDDEN, 0, 0),
+		MKGUI_W(MKGUI_LABEL,    FD_ID_SEARCH_LABEL,   "",              MKICON_SEARCH,    FD_ID_BTN_HBOX,     200, 0, MKGUI_FIXED | MKGUI_HIDDEN, 0, 0),
 		MKGUI_W(MKGUI_LABEL,    FD_ID_SPACER,         "",              "",             FD_ID_BTN_HBOX,     0, 0, 0, 0, 1),
 		MKGUI_W(MKGUI_BUTTON,   FD_ID_BTN_CONFIRM,    "",              "",             FD_ID_BTN_HBOX,     80, 0, MKGUI_FIXED, 0, 0),
 		MKGUI_W(MKGUI_BUTTON,   FD_ID_BTN_CANCEL,     "Cancel",        "",             FD_ID_BTN_HBOX,     80, 0, MKGUI_FIXED, 0, 0),

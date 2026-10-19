@@ -6,7 +6,7 @@ aimed at anyone writing a new widget or trying to predict how an existing
 widget will size itself inside a container.
 
 All layout code lives in [mkgui.c](../mkgui.c), in the functions prefixed
-`lc_`, `layout_`, `measure_container`, `natural_height`, `natural_width`.
+`lc_`, `layout_`, `natural_height`, `natural_width`.
 
 ---
 
@@ -35,8 +35,7 @@ A layout pass is driven from `layout_widgets` in [mkgui.c](../mkgui.c):
 
 1. **`layout_build_index`** -- builds `parent[]`, `first_child[]`,
    `next_sibling[]` arrays plus a hash table (`layout_id_map`) for O(1)
-   ID-to-index lookup. Iterates widgets in reverse so child lists are in
-   declaration order.
+   ID-to-index lookup. It links siblings in declaration order.
 2. For each top-level `MKGUI_WINDOW`:
     - Set its rect to `(0, 0, ctx->win_w, ctx->win_h)`.
     - Call **`layout_node`** (itself a thin wrapper over `lc_layout_node`)
@@ -50,8 +49,8 @@ separate measure pass and no fixpoint; measurement happens on demand inside
 
 ## 3. Shared layout context
 
-Both the runtime and the editor call the same layout code through a
-`struct layout_ctx`. The context abstracts:
+Both the runtime and the editor call the same internal layout code through a
+`struct layout_ctx`. Application code uses public widget definitions and geometry accessors; the `win->` fields below describe implementation code. The context abstracts:
 
 - `widgets` + `widget_stride` -- editor uses a bigger struct, `lw_get`
   multiplies by stride.
@@ -85,7 +84,7 @@ falls into a generic "fill parent minus margins, optionally fixed" path.
 
 ## 5. VBOX / PANEL rules
 
-`MKGUI_PANEL` is treated as a vertical box throughout layout.
+`MKGUI_PANEL` uses vertical box placement. Runtime scroll state is allocated for VBox/HBox; a Panel does not get that state.
 
 **Pass 1 -- classify children and sum minimums**:
 
@@ -115,7 +114,7 @@ flex behaviour, set `weight > 0` explicitly
 The per-type classification lives in `widget_vflex_default` in
 [mkgui.c](../mkgui.c). Multi-line leaves (textarea, listview, gridview,
 richlist, treeview, itemview, image, canvas, glview) and all containers
-return 1 (expand by default); single-line leaves return 0.
+return 1 (expand by default); single-line leaves return 0. This classification comes from `widget_desc[].fixed_h`, rather than a switch in `widget_vflex_default()`.
 
 **Pass 2 -- scrollbar and remainder**:
 
@@ -142,15 +141,18 @@ weight, `MKGUI_FIXED` children take their declared width, etc. Single-line
 widgets **do** expand horizontally by default because filling form-row
 width is usually what you want.
 
-Cross-axis (height) placement uses `widget_vflex_default` too:
+Cross-axis (height) placement fills the available height by default, including
+buttons, spinners, and other single-line controls:
 
 - Widgets with explicit `h` and `MKGUI_ALIGN_*` are placed at that height
   with the requested alignment (top/center/bottom).
-- Single-line leaves (anything for which `widget_vflex_default` returns 0)
-  take their natural height (or explicit `h` if set) and **center
-  vertically** by default. An OK/Cancel button row in a taller HBOX sits
-  in the middle instead of stretching to fill.
-- Multi-line leaves and containers fill the full HBOX height.
+- A child with an explicit `h` takes that height and centers vertically unless
+  alignment requests another position. Fixed single-line controls with `h=0`
+  use their natural height.
+- Containers and other vertically flexible widgets with `h=0` fill the HBOX
+  height, including when `MKGUI_FIXED` sets their width. Controls with `h=0`
+  and no `MKGUI_FIXED` also fill the height. A compact button row can give
+  the HBOX itself a fixed height.
 
 Scrolling steals from the inner **height**.
 
@@ -179,8 +181,7 @@ and a measured height of just `gtop`.
 ## 9. TABS / TAB rules
 
 The layout engine does not pick the active tab; it lays out **every** tab
-into the same rect. `MKGUI_TAB` insets by `(2, tab_height+2, 4, tab_height+4)`
-on `(x, y, w, h)` to leave room for the tab strip and a border. Which tab
+into the same rect. With `inset = sc(win, MKGUI_TAB_INSET)`, a TAB adds `(inset, tab_height+inset)` to `(x, y)` and subtracts `(2*inset, tab_height+2*inset)` from `(w, h)` for the tab strip and border. Which tab
 is drawn is decided at render time.
 
 ## 10. SPLIT rules
@@ -238,8 +239,7 @@ nesting chain:
   nesting.
 - `MKGUI_NO_PAD` on the flags field forces no padding regardless.
 
-`lc_measure_container` uses the exact same predicate so measurement and
-placement agree.
+Bordered boxes request padding even when nested. `MKGUI_NO_PAD` overrides that request. The current measurement helper suppresses nested padding under VBOX/HBOX/FORM/GROUP/TABS; placement also suppresses it under PANEL.
 
 ## 14. Measurement (`lc_measure_container`)
 
@@ -250,8 +250,7 @@ Algorithm:
 
 - GROUP: delegate to the inner container, add `gtop + gpad` (vertical) or
   `gpad*2` (horizontal).
-- FORM: height = `rows * (font_height+10) + (rows-1) * box_gap`. Width is
-  not measured here -- FORM always fills its main-axis parent.
+- FORM: returns `rows * (font_height+10) + max(rows-1, 0) * box_gap`. The current helper returns that row-stack extent for either axis; it does not compute an intrinsic label/control width.
 - VBOX/HBOX/PANEL:
     - `main = sum(child_main) + (visible-1) * box_gap`
     - `cross = max(child_cross)`
@@ -277,10 +276,10 @@ defaults do not suit your app.
 | SLIDER, SCROLLBAR                                               | `MKGUI_NAT_SLIDER_H` (24)                     |
 | PROGRESS, METER                                                 | `MKGUI_NAT_PROGRESS_H` (20)                   |
 | DIVIDER                                                         | `MKGUI_NAT_DIVIDER_H` (6)                     |
-| LISTVIEW, GRIDVIEW, RICHLIST, TREEVIEW, ITEMVIEW, TEXTAREA      | `row_height * 3`                              |
+| LISTVIEW, GRIDVIEW, RICHLIST, TREEVIEW, TREELIST, ITEMVIEW, TEXTAREA, LOGVIEW      | `row_height * 3`                              |
 | TABS                                                            | `tab_height + row_height * 2`                 |
 | HSPLIT, VSPLIT                                                  | `split_min_px*2 + split_thick`                |
-| IMAGE, CANVAS, GLVIEW                                           | `MKGUI_NAT_CANVAS_H` (24)                     |
+| IMAGE, CANVAS, GLVIEW, SPINNER                                           | `MKGUI_NAT_CANVAS_H` (24)                     |
 | VBOX, HBOX, FORM, PANEL, GROUP                                  | `row_height`                                  |
 
 | Widget            | Natural width                                                                         |
@@ -292,17 +291,17 @@ defaults do not suit your app.
 | DIVIDER           | `MKGUI_NAT_DIVIDER_W` (4)                                                             |
 | anything else     | `MKGUI_NAT_DEFAULT_W` (40)                                                            |
 
-## 16. Minimum window size (`layout_min_size`)
+## 16. Minimum window size (`lc_min_size`, `lc_window_min_size`)
 
-Recursive lower bound for the OS-level minimum window size. Scrollable
-containers bottom-out at `(100, row_height * 3)` because they scroll
-rather than forcing content to fit. Splits recursively sum the
+Recursive lower bound for the OS-level minimum window size. VBox/HBox/Panel containers marked `MKGUI_SCROLL` use a minimum of `(100, row_height * 3)` rather than their full content extent. Runtime scroll state is provided for VBox/HBox as described above. Splits recursively sum the
 appropriate axis. Leaves use their explicit size or
-`natural_{width,height}`. Containers delegate back to `measure_container`
+`natural_{width,height}`. Containers delegate back to `lc_measure_container`
 so there is exactly one source of truth.
 
-The final min is clamped at a **floor of `(200, 100)` pixels** before
-`box_pad*2` is added on each axis. This floor is not scaled.
+The OS minimum and editor canvas enforce a scaled `(200, 100)` floor before
+`box_pad*2` is added on each axis. `mkgui_get_min_size()` returns the content
+minimum including padding, without the OS floor. The editor uses the same
+calculation to grow the designed window when its contents no longer fit.
 
 ## 17. Global values (metric constants)
 
@@ -338,11 +337,7 @@ Checklist for a new widget:
    child of a VBOX/HBOX/FORM without an explicit `h`).
 2. Add a case to `natural_width` if the widget has an intrinsic width
    different from the `MKGUI_NAT_DEFAULT_W` fallback.
-3. Classify the widget in `widget_vflex_default`: return 0 if it is a
-   single-line control that should hold its natural height in a VBOX,
-   return 1 if it should expand to fill leftover space. The default for
-   anything not listed is 1, so you only need to add a case for
-   single-line leaves.
+3. Set `.fixed_h = 1` in `widget_desc[]` for a single-line control that should hold its natural height in a VBox. Leave it zero for default vertical flex. `widget_vflex_default()` reads that descriptor; it has no per-type switch.
 4. If the widget is a **container**, decide whether to handle it in
    `lc_layout_node` (custom rules) or let the generic fallback distribute
    full-parent rects. Also add it to the padding predicate if it should

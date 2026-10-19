@@ -10,6 +10,7 @@
 #include <stdlib.h>
 #include <time.h>
 #include "mkgui.h"
+#include "mkguiicons_names.h"
 
 #ifdef _WIN32
 #include <windows.h>
@@ -196,98 +197,143 @@ static void demo_itemview_label(uint32_t item, char *buf, uint32_t buf_size, voi
 
 // [=]===^=[ demo_itemview_icon ]==================================[=]
 static void demo_itemview_icon(uint32_t item, char *buf, uint32_t buf_size, void *userdata) {
-	(void)userdata;
 	char *name = item < DEMO_FILE_COUNT ? demo_file_names[item] : "file.dat";
 	char *dot = strrchr(name, '.');
-	char *icon = "file-document-outline";
+	char *icon = MKICON_DOCUMENT_TEXT;
+
+	(void)userdata;
+
 	if(strcmp(name, "Makefile") == 0 || strcmp(name, "Dockerfile") == 0) {
-		icon = "file-cog";
+		icon = MKICON_DOCUMENT_SETTINGS;
+
 	} else if(dot) {
 		if(strcmp(dot, ".c") == 0 || strcmp(dot, ".h") == 0) {
-			icon = "language-c";
+			icon = MKICON_DOCUMENT_CODE;
+
 		} else if(strcmp(dot, ".cpp") == 0 || strcmp(dot, ".hpp") == 0) {
-			icon = "language-cpp";
+			icon = MKICON_DOCUMENT_CODE;
+
 		} else if(strcmp(dot, ".py") == 0) {
-			icon = "language-python";
+			icon = MKICON_DOCUMENT_CODE;
+
 		} else if(strcmp(dot, ".rs") == 0) {
-			icon = "language-rust";
+			icon = MKICON_DOCUMENT_CODE;
+
 		} else if(strcmp(dot, ".go") == 0) {
-			icon = "language-go";
+			icon = MKICON_DOCUMENT_CODE;
+
 		} else if(strcmp(dot, ".java") == 0) {
-			icon = "language-java";
+			icon = MKICON_DOCUMENT_CODE;
+
 		} else if(strcmp(dot, ".js") == 0) {
-			icon = "language-javascript";
+			icon = MKICON_DOCUMENT_CODE;
+
 		} else if(strcmp(dot, ".ts") == 0) {
-			icon = "language-typescript";
+			icon = MKICON_DOCUMENT_CODE;
+
 		} else if(strcmp(dot, ".rb") == 0) {
-			icon = "language-ruby";
+			icon = MKICON_DOCUMENT_CODE;
+
 		} else if(strcmp(dot, ".lua") == 0) {
-			icon = "language-lua";
+			icon = MKICON_DOCUMENT_CODE;
+
 		} else if(strcmp(dot, ".php") == 0) {
-			icon = "language-php";
+			icon = MKICON_DOCUMENT_CODE;
+
 		} else if(strcmp(dot, ".r") == 0) {
-			icon = "language-r";
+			icon = MKICON_DOCUMENT_CODE;
+
 		} else if(strcmp(dot, ".f90") == 0) {
-			icon = "language-fortran";
+			icon = MKICON_DOCUMENT_CODE;
+
 		} else if(strcmp(dot, ".swift") == 0) {
-			icon = "language-swift";
+			icon = MKICON_DOCUMENT_CODE;
+
 		} else if(strcmp(dot, ".kt") == 0) {
-			icon = "language-kotlin";
+			icon = MKICON_DOCUMENT_CODE;
+
 		} else if(strcmp(dot, ".cs") == 0) {
-			icon = "language-csharp";
+			icon = MKICON_DOCUMENT_CODE;
+
 		} else if(strcmp(dot, ".css") == 0) {
-			icon = "language-css3";
+			icon = MKICON_DOCUMENT_CODE;
+
 		} else if(strcmp(dot, ".html") == 0 || strcmp(dot, ".htm") == 0) {
-			icon = "language-html5";
+			icon = MKICON_DOCUMENT_CODE;
+
 		} else if(strcmp(dot, ".md") == 0) {
-			icon = "language-markdown";
+			icon = MKICON_DOCUMENT_CODE;
+
 		} else if(strcmp(dot, ".json") == 0 || strcmp(dot, ".toml") == 0) {
-			icon = "code-json";
+			icon = MKICON_BRACES;
+
 		} else if(strcmp(dot, ".xml") == 0) {
-			icon = "xml";
+			icon = MKICON_DOCUMENT_CODE;
+
 		} else if(strcmp(dot, ".sh") == 0) {
-			icon = "script-text";
+			icon = MKICON_DOCUMENT_CODE;
+
 		} else if(strcmp(dot, ".sql") == 0) {
 			icon = "database";
+
 		} else if(strcmp(dot, ".pdf") == 0) {
-			icon = "file-pdf-box";
+			icon = MKICON_DOCUMENT_PDF;
+
 		} else if(strcmp(dot, ".jpg") == 0 || strcmp(dot, ".jpeg") == 0) {
-			icon = "file-jpg-box";
+			icon = MKICON_IMAGE;
+
 		} else if(strcmp(dot, ".png") == 0) {
-			icon = "file-png-box";
+			icon = MKICON_IMAGE;
+
 		} else if(strcmp(dot, ".gif") == 0) {
-			icon = "file-gif-box";
+			icon = MKICON_IMAGE;
+
 		} else if(strcmp(dot, ".svg") == 0 || strcmp(dot, ".bmp") == 0) {
-			icon = "file-image";
+			icon = MKICON_IMAGE;
+
 		} else if(strcmp(dot, ".mp4") == 0 || strcmp(dot, ".avi") == 0 || strcmp(dot, ".mkv") == 0) {
-			icon = "file-video";
+			icon = MKICON_VIDEO;
+
 		} else if(strcmp(dot, ".mp3") == 0 || strcmp(dot, ".wav") == 0 || strcmp(dot, ".ogg") == 0 || strcmp(dot, ".flac") == 0) {
-			icon = "file-music";
+			icon = MKICON_MUSIC_NOTE_2;
+
 		} else if(strcmp(dot, ".zip") == 0 || strcmp(dot, ".gz") == 0 || strcmp(dot, ".7z") == 0) {
 			icon = "folder-zip";
+
 		} else if(strcmp(dot, ".xlsx") == 0 || strcmp(dot, ".xls") == 0 || strcmp(dot, ".csv") == 0) {
-			icon = "file-excel";
+			icon = MKICON_DOCUMENT_TABLE;
+
 		} else if(strcmp(dot, ".docx") == 0 || strcmp(dot, ".doc") == 0) {
-			icon = "file-word";
+			icon = MKICON_DOCUMENT_TEXT;
+
 		} else if(strcmp(dot, ".pptx") == 0 || strcmp(dot, ".ppt") == 0) {
-			icon = "file-powerpoint";
+			icon = MKICON_SLIDE_TEXT;
+
 		} else if(strcmp(dot, ".txt") == 0 || strcmp(dot, ".log") == 0) {
-			icon = "file-document-outline";
+			icon = MKICON_DOCUMENT_TEXT;
+
 		}
 	}
 	snprintf(buf, buf_size, "%s", icon);
+
 }
 
 // [=]===^=[ demo_canvas_cb ]=====================================[=]
 static void demo_canvas_cb(struct mkgui_window *win, uint32_t id, uint32_t *pixels, int32_t x, int32_t y, int32_t w, int32_t h, void *userdata) {
 	(void)id; (void)userdata;
+
 	if(w <= 0 || h <= 0) {
 		return;
+
 	}
-	int32_t win_w, win_h;
+
+	int32_t win_w = 0;
+	int32_t win_h = 0;
+
 	mkgui_get_window_size(win, &win_w, &win_h);
 	uint32_t uw = (uint32_t)w;
 	uint32_t uh = (uint32_t)h;
+
 	for(uint32_t iy = 0; iy < uh; ++iy) {
 		for(uint32_t ix = 0; ix < uw; ++ix) {
 			uint32_t px = (uint32_t)x + ix;
@@ -296,6 +342,7 @@ static void demo_canvas_cb(struct mkgui_window *win, uint32_t id, uint32_t *pixe
 			uint32_t g = iy * 255 / (uh > 1 ? uh - 1 : 1);
 			uint32_t b = (ix + iy) * 128 / (uw + uh > 2 ? uw + uh - 2 : 1);
 			pixels[py * (uint32_t)win_w + px] = 0xff000000 | (r << 16) | (g << 8) | b;
+
 		}
 	}
 }
@@ -484,8 +531,7 @@ static void demo_event(struct mkgui_window *win, struct mkgui_event *ev, void *u
 
 			} else if(ev->id == ID_BTN_BROWSE) {
 				char icon_name[64];
-				char icon_path[1024];
-				if(mkgui_icon_browser(win, 16, icon_name, sizeof(icon_name), icon_path, sizeof(icon_path))) {
+				if(mkgui_icon_browser(win, 16, icon_name, sizeof(icon_name))) {
 					mkgui_statusbar_set(win, ID_STATUSBAR, 0, icon_name);
 				}
 
@@ -607,9 +653,9 @@ static void demo_event(struct mkgui_window *win, struct mkgui_event *ev, void *u
 		case MKGUI_EVENT_CONTEXT: {
 			if(ev->id == ID_LISTVIEW1 || ev->id == ID_GRIDVIEW1 || ev->id == ID_ITEMVIEW1 || ev->id == ID_RICHLIST1 || ev->id == ID_TREELIST1) {
 				mkgui_context_menu_clear(win);
-				mkgui_context_menu_add(win, ID_CTX_CUT, "Cut", "content-cut", 0);
-				mkgui_context_menu_add(win, ID_CTX_COPY, "Copy", "content-copy", 0);
-				mkgui_context_menu_add(win, ID_CTX_PASTE, "Paste", "content-paste", 0);
+				mkgui_context_menu_add(win, ID_CTX_CUT, "Cut", MKICON_CUT, 0);
+				mkgui_context_menu_add(win, ID_CTX_COPY, "Copy", MKICON_COPY, 0);
+				mkgui_context_menu_add(win, ID_CTX_PASTE, "Paste", MKICON_CLIPBOARD_PASTE, 0);
 				mkgui_context_menu_add_separator(win);
 				mkgui_context_menu_add(win, ID_CTX_DELETE, "Delete", "delete", (ev->value < 0) ? MKGUI_DISABLED : 0);
 				mkgui_context_menu_add(win, ID_CTX_SELECT_ALL, "Select All", "select-all", 0);
@@ -692,37 +738,37 @@ int main(void) {
 		MKGUI_W(MKGUI_MENUITEM, ID_EDIT_MENU, "Edit",              "", ID_MENU,     0, 0, 0, 0, 0),
 		MKGUI_W(MKGUI_MENUITEM, ID_VIEW_MENU, "View",              "", ID_MENU,     0, 0, 0, 0, 0),
 		MKGUI_W(MKGUI_MENUITEM, ID_HELP_MENU, "Help",              "", ID_MENU,     0, 0, 0, 0, 0),
-		MKGUI_W(MKGUI_MENUITEM, ID_FILE_NEW,  "New",               "document-new",       ID_FILE_MENU, 0, 0, 0, 0, 0),
-		MKGUI_W(MKGUI_MENUITEM, ID_OPEN,      "Open",              "document-open",      ID_FILE_MENU, 0, 0, 0, 0, 0),
+		MKGUI_W(MKGUI_MENUITEM, ID_FILE_NEW,  "New",               MKICON_DOCUMENT_ADD,       ID_FILE_MENU, 0, 0, 0, 0, 0),
+		MKGUI_W(MKGUI_MENUITEM, ID_OPEN,      "Open",              MKICON_FOLDER_OPEN,      ID_FILE_MENU, 0, 0, 0, 0, 0),
 		MKGUI_W(MKGUI_MENUITEM, ID_SAVE,      "Save",              "document-save",      ID_FILE_MENU, 0, 0, 0, 0, 0),
 		MKGUI_W(MKGUI_MENUITEM, ID_SELECT_FOLDER, "Select Folder...", "folder-open",     ID_FILE_MENU, 0, 0, 0, 0, 0),
 		MKGUI_W(MKGUI_MENUITEM, ID_FILE_SEP1, "",                  "",                   ID_FILE_MENU, 0, 0, 0, MKGUI_MENUITEM_SEPARATOR, 0),
-		MKGUI_W(MKGUI_MENUITEM, ID_EXIT,      "Exit",              "application-exit",   ID_FILE_MENU, 0, 0, 0, 0, 0),
-		MKGUI_W(MKGUI_MENUITEM, ID_EDIT_CUT,  "Cut",               "edit-cut",           ID_EDIT_MENU, 0, 0, 0, 0, 0),
-		MKGUI_W(MKGUI_MENUITEM, ID_COPY,      "Copy",              "edit-copy",          ID_EDIT_MENU, 0, 0, 0, 0, 0),
-		MKGUI_W(MKGUI_MENUITEM, ID_PASTE,     "Paste",             "edit-paste",         ID_EDIT_MENU, 0, 0, 0, 0, 0),
-		MKGUI_W(MKGUI_MENUITEM, ID_VIEW_GRID, "Show Grid",         "view-grid",          ID_VIEW_MENU, 0, 0, 0, MKGUI_MENUITEM_CHECK | MKGUI_MENUITEM_CHECKED, 0),
-		MKGUI_W(MKGUI_MENUITEM, ID_VIEW_STATUS,"Show Statusbar",   "view-fullscreen",    ID_VIEW_MENU, 0, 0, 0, MKGUI_MENUITEM_CHECK | MKGUI_MENUITEM_CHECKED, 0),
+		MKGUI_W(MKGUI_MENUITEM, ID_EXIT,      "Exit",              MKICON_SIGN_OUT,   ID_FILE_MENU, 0, 0, 0, 0, 0),
+		MKGUI_W(MKGUI_MENUITEM, ID_EDIT_CUT,  "Cut",               MKICON_CUT,           ID_EDIT_MENU, 0, 0, 0, 0, 0),
+		MKGUI_W(MKGUI_MENUITEM, ID_COPY,      "Copy",              MKICON_COPY,          ID_EDIT_MENU, 0, 0, 0, 0, 0),
+		MKGUI_W(MKGUI_MENUITEM, ID_PASTE,     "Paste",             MKICON_CLIPBOARD_PASTE,         ID_EDIT_MENU, 0, 0, 0, 0, 0),
+		MKGUI_W(MKGUI_MENUITEM, ID_VIEW_GRID, "Show Grid",         MKICON_GRID,          ID_VIEW_MENU, 0, 0, 0, MKGUI_MENUITEM_CHECK | MKGUI_MENUITEM_CHECKED, 0),
+		MKGUI_W(MKGUI_MENUITEM, ID_VIEW_STATUS,"Show Statusbar",   MKICON_FULL_SCREEN_MAXIMIZE,    ID_VIEW_MENU, 0, 0, 0, MKGUI_MENUITEM_CHECK | MKGUI_MENUITEM_CHECKED, 0),
 		MKGUI_W(MKGUI_MENUITEM, ID_VIEW_SEP1, "",                  "",                   ID_VIEW_MENU, 0, 0, 0, MKGUI_MENUITEM_SEPARATOR, 0),
 		MKGUI_W(MKGUI_MENUITEM, ID_VIEW_SMALL,"Small",             "",                   ID_VIEW_MENU, 0, 0, 0, MKGUI_MENUITEM_RADIO, 0),
 		MKGUI_W(MKGUI_MENUITEM, ID_VIEW_MEDIUM,"Medium",           "",                   ID_VIEW_MENU, 0, 0, 0, MKGUI_MENUITEM_RADIO | MKGUI_MENUITEM_CHECKED, 0),
 		MKGUI_W(MKGUI_MENUITEM, ID_VIEW_LARGE,"Large",             "",                   ID_VIEW_MENU, 0, 0, 0, MKGUI_MENUITEM_RADIO, 0),
-		MKGUI_W(MKGUI_MENUITEM, ID_HELP_ABOUT,"About",             "help-about",         ID_HELP_MENU, 0, 0, 0, 0, 0),
+		MKGUI_W(MKGUI_MENUITEM, ID_HELP_ABOUT,"About",             MKICON_INFO,         ID_HELP_MENU, 0, 0, 0, 0, 0),
 
 		/* Toolbar */
 		MKGUI_W(MKGUI_TOOLBAR,  ID_TOOLBAR,   "",                  "", ID_WINDOW,   0, 0, 0, 0, 0),
-		MKGUI_W(MKGUI_BUTTON,   ID_TB_NEW,    "New",               "edit-copy",     ID_TOOLBAR, 0, 0, 0, 0, 0),
+		MKGUI_W(MKGUI_BUTTON,   ID_TB_NEW,    "New",               MKICON_COPY,     ID_TOOLBAR, 0, 0, 0, 0, 0),
 		MKGUI_W(MKGUI_BUTTON,   ID_TB_SEP1,   "",                  "",              ID_TOOLBAR, 0, 0, 0, MKGUI_BUTTON_SEPARATOR, 0),
 		MKGUI_W(MKGUI_BUTTON,   ID_TB_OPEN,   "Open",              "folder-open",   ID_TOOLBAR, 0, 0, 0, 0, 0),
 		MKGUI_W(MKGUI_BUTTON,   ID_TB_SAVE,   "Save",              "document-save", ID_TOOLBAR, 0, 0, 0, 0, 0),
 
 		/* Tabs */
 		MKGUI_W(MKGUI_TABS,     ID_TABS,      "",                  "", ID_WINDOW,   0, 0, 0, 0, 0),
-		MKGUI_W(MKGUI_TAB,      ID_TAB_CONTROLS, "Controls",       "preferences-system", ID_TABS, 0, 0, 0, 0, 0),
+		MKGUI_W(MKGUI_TAB,      ID_TAB_CONTROLS, "Controls",       MKICON_SETTINGS, ID_TABS, 0, 0, 0, 0, 0),
 		MKGUI_W(MKGUI_TAB,      ID_TAB_TREE,     "Tree / Text",    "folder",            ID_TABS, 0, 0, 0, 0, 0),
-		MKGUI_W(MKGUI_TAB,      ID_TAB_DATA,     "Data Views",     "view-list",         ID_TABS, 0, 0, 0, 0, 0),
-		MKGUI_W(MKGUI_TAB,      ID_TAB_LAYOUT,   "Layout",         "view-grid",         ID_TABS, 0, 0, 0, 0, 0),
-		MKGUI_W(MKGUI_TAB,      ID_TAB_MEDIA,    "Media",          "image-x-generic",   ID_TABS, 0, 0, 0, 0, 0),
+		MKGUI_W(MKGUI_TAB,      ID_TAB_DATA,     "Data Views",     MKICON_TEXT_BULLET_LIST,         ID_TABS, 0, 0, 0, 0, 0),
+		MKGUI_W(MKGUI_TAB,      ID_TAB_LAYOUT,   "Layout",         MKICON_GRID,         ID_TABS, 0, 0, 0, 0, 0),
+		MKGUI_W(MKGUI_TAB,      ID_TAB_MEDIA,    "Media",          MKICON_IMAGE,   ID_TABS, 0, 0, 0, 0, 0),
 
 		/* ---- Controls tab ---- */
 		MKGUI_W(MKGUI_HBOX,     ID_CTL_HBOX,  "",                  "", ID_TAB_CONTROLS, 0, 0, 0, 0, 0),
@@ -763,9 +809,9 @@ int main(void) {
 
 		MKGUI_W(MKGUI_HBOX,     ID_BTN_HBOX,  "",                  "", ID_CTL_LVBOX, 0, 28, MKGUI_FIXED, 0, 0),
 		MKGUI_W(MKGUI_BUTTON,   ID_BUTTON1,   "Apply",             "document-save", ID_BTN_HBOX, 100, 0, MKGUI_FIXED, 0, 0),
-		MKGUI_W(MKGUI_BUTTON,   ID_BTN_BROWSE, "Browse Icons",     "edit-find", ID_BTN_HBOX, 120, 0, MKGUI_FIXED, 0, 0),
+		MKGUI_W(MKGUI_BUTTON,   ID_BTN_BROWSE, "Browse Icons",     MKICON_SEARCH, ID_BTN_HBOX, 120, 0, MKGUI_FIXED, 0, 0),
 		MKGUI_W(MKGUI_SPACER,   ID_SPACER1,   "",                  "", ID_BTN_HBOX, 0, 0, 0, 0, 1),
-		MKGUI_W(MKGUI_CHECKBOX, ID_THEME_CHECK,"Light theme",      "weather-clear", ID_BTN_HBOX, 140, 0, MKGUI_FIXED, 0, 0),
+		MKGUI_W(MKGUI_CHECKBOX, ID_THEME_CHECK,"Light theme",      MKICON_WEATHER_SUNNY, ID_BTN_HBOX, 140, 0, MKGUI_FIXED, 0, 0),
 
 		/* Controls: right column */
 		MKGUI_W(MKGUI_VBOX,     ID_CTL_RVBOX, "",                  "", ID_CTL_HBOX, 320, 0, MKGUI_FIXED, 0, 0),
@@ -782,17 +828,17 @@ int main(void) {
 		MKGUI_W(MKGUI_LABEL,    ID_LBL_AMOUNT,"Amount:",           "", ID_EXTRA_FORM, 0, 0, 0, 0, 0),
 		MKGUI_W(MKGUI_INPUT,    ID_AMOUNT_INPUT,"",                "", ID_EXTRA_FORM, 0, 0, 0, MKGUI_INPUT_NUMERIC, 0),
 		MKGUI_W(MKGUI_LABEL,    ID_LBL_COLOR, "Color:",            "", ID_EXTRA_FORM, 0, 0, 0, 0, 0),
-		MKGUI_W(MKGUI_BUTTON,   ID_BTN_COLOR, "Pick Color",  "color-management", ID_EXTRA_FORM, 0, 0, 0, 0, 0),
+		MKGUI_W(MKGUI_BUTTON,   ID_BTN_COLOR, "Pick Color",  MKICON_COLOR, ID_EXTRA_FORM, 0, 0, 0, 0, 0),
 
 		MKGUI_W(MKGUI_LABEL,    ID_LBL_NOTIFY,       "Notifications:", "",                     ID_CTL_RVBOX,        0, 0,  MKGUI_FIXED, 0, 0),
 		MKGUI_W(MKGUI_HBOX,     ID_BTN_NOTIFY_HBOX1, "",               "",                     ID_CTL_RVBOX,        0, 28, MKGUI_FIXED, 0, 0),
-		MKGUI_W(MKGUI_BUTTON,   ID_BTN_TOAST_INFO,   "Info",           "dialog-information",   ID_BTN_NOTIFY_HBOX1, 0, 0,  0, 0, 0),
-		MKGUI_W(MKGUI_BUTTON,   ID_BTN_TOAST_OK,     "Success",        "dialog-ok",            ID_BTN_NOTIFY_HBOX1, 0, 0,  0, 0, 0),
-		MKGUI_W(MKGUI_BUTTON,   ID_BTN_TOAST_WARN,   "Warning",        "dialog-warning",       ID_BTN_NOTIFY_HBOX1, 0, 0,  0, 0, 0),
-		MKGUI_W(MKGUI_BUTTON,   ID_BTN_TOAST_ERR,    "Error",          "error",                ID_BTN_NOTIFY_HBOX1, 0, 0,  0, 0, 0),
+		MKGUI_W(MKGUI_BUTTON,   ID_BTN_TOAST_INFO,   "Info",           MKICON_INFO,   ID_BTN_NOTIFY_HBOX1, 0, 0,  0, 0, 0),
+		MKGUI_W(MKGUI_BUTTON,   ID_BTN_TOAST_OK,     "Success",        MKICON_CHECKMARK,            ID_BTN_NOTIFY_HBOX1, 0, 0,  0, 0, 0),
+		MKGUI_W(MKGUI_BUTTON,   ID_BTN_TOAST_WARN,   "Warning",        MKICON_WARNING,       ID_BTN_NOTIFY_HBOX1, 0, 0,  0, 0, 0),
+		MKGUI_W(MKGUI_BUTTON,   ID_BTN_TOAST_ERR,    "Error",          MKICON_ERROR_CIRCLE,                ID_BTN_NOTIFY_HBOX1, 0, 0,  0, 0, 0),
 		MKGUI_W(MKGUI_HBOX,     ID_BTN_NOTIFY_HBOX2, "",               "",                     ID_CTL_RVBOX,        0, 28, MKGUI_FIXED, 0, 0),
-		MKGUI_W(MKGUI_BUTTON,   ID_BTN_BANNER,       "Banner on",      "dialog-warning",       ID_BTN_NOTIFY_HBOX2, 0, 0,  0, 0, 0),
-		MKGUI_W(MKGUI_BUTTON,   ID_BTN_BANNER_CLEAR, "Banner off",     "window-close",         ID_BTN_NOTIFY_HBOX2, 0, 0,  0, 0, 0),
+		MKGUI_W(MKGUI_BUTTON,   ID_BTN_BANNER,       "Banner on",      MKICON_WARNING,       ID_BTN_NOTIFY_HBOX2, 0, 0,  0, 0, 0),
+		MKGUI_W(MKGUI_BUTTON,   ID_BTN_BANNER_CLEAR, "Banner off",     MKICON_DISMISS,         ID_BTN_NOTIFY_HBOX2, 0, 0,  0, 0, 0),
 
 		MKGUI_W(MKGUI_DIVIDER,  ID_DIVIDER1,  "",                  "", ID_CTL_RVBOX, 0, 0, MKGUI_FIXED, 0, 0),
 
@@ -839,7 +885,7 @@ int main(void) {
 		/* ---- Layout tab ---- */
 		MKGUI_W(MKGUI_HBOX,     ID_LAY_HBOX,  "",                  "", ID_TAB_LAYOUT, 0, 0, 0, 0, 0),
 		MKGUI_W(MKGUI_VBOX,     ID_LAY_VBOX,  "",                  "", ID_LAY_HBOX, 200, 0, MKGUI_FIXED, MKGUI_VBOX_BORDER, 0),
-		MKGUI_W(MKGUI_BUTTON,   ID_VBOX_BTN1, "First",             "document-new",  ID_LAY_VBOX, 0, 28, MKGUI_FIXED, 0, 0),
+		MKGUI_W(MKGUI_BUTTON,   ID_VBOX_BTN1, "First",             MKICON_DOCUMENT_ADD,  ID_LAY_VBOX, 0, 28, MKGUI_FIXED, 0, 0),
 		MKGUI_W(MKGUI_BUTTON,   ID_VBOX_BTN2, "Second",            "document-save", ID_LAY_VBOX, 0, 28, MKGUI_FIXED, 0, 0),
 		MKGUI_W(MKGUI_INPUT,    ID_VBOX_INPUT,"",                  "", ID_LAY_VBOX, 0, 24, MKGUI_FIXED, 0, 0),
 		MKGUI_W(MKGUI_SPACER,   ID_VBOX_SPACER,"",                 "", ID_LAY_VBOX, 0, 0, 0, 0, 1),
@@ -887,7 +933,6 @@ int main(void) {
 		return 1;
 	}
 
-	mkgui_icon_load_svg_dir(win, "icons");
 
 	mkgui_accel_add(win, ID_FILE_NEW, MKGUI_MOD_CONTROL, 'n');
 	mkgui_accel_add(win, ID_OPEN, MKGUI_MOD_CONTROL, 'o');
@@ -991,14 +1036,14 @@ int main(void) {
 	mkgui_set_treenode_icon(win, ID_TREEVIEW1, 1, "folder");
 	mkgui_set_treenode_icon(win, ID_TREEVIEW1, 4, "folder");
 	mkgui_set_treenode_icon(win, ID_TREEVIEW1, 7, "folder");
-	mkgui_set_treenode_icon(win, ID_TREEVIEW1, 2, "language-c");
-	mkgui_set_treenode_icon(win, ID_TREEVIEW1, 3, "language-c");
-	mkgui_set_treenode_icon(win, ID_TREEVIEW1, 5, "language-c");
-	mkgui_set_treenode_icon(win, ID_TREEVIEW1, 6, "language-c");
-	mkgui_set_treenode_icon(win, ID_TREEVIEW1, 8, "language-c");
-	mkgui_set_treenode_icon(win, ID_TREEVIEW1, 9, "language-c");
-	mkgui_set_treenode_icon(win, ID_TREEVIEW1, 10, "file-cog");
-	mkgui_set_treenode_icon(win, ID_TREEVIEW1, 11, "file-document");
+	mkgui_set_treenode_icon(win, ID_TREEVIEW1, 2, MKICON_DOCUMENT_CODE);
+	mkgui_set_treenode_icon(win, ID_TREEVIEW1, 3, MKICON_DOCUMENT_CODE);
+	mkgui_set_treenode_icon(win, ID_TREEVIEW1, 5, MKICON_DOCUMENT_CODE);
+	mkgui_set_treenode_icon(win, ID_TREEVIEW1, 6, MKICON_DOCUMENT_CODE);
+	mkgui_set_treenode_icon(win, ID_TREEVIEW1, 8, MKICON_DOCUMENT_CODE);
+	mkgui_set_treenode_icon(win, ID_TREEVIEW1, 9, MKICON_DOCUMENT_CODE);
+	mkgui_set_treenode_icon(win, ID_TREEVIEW1, 10, MKICON_DOCUMENT_SETTINGS);
+	mkgui_set_treenode_icon(win, ID_TREEVIEW1, 11, MKICON_DOCUMENT);
 
 	mkgui_textarea_set(win, ID_TEXTAREA1, "Type your notes here.\nLine 2.\nLine 3.");
 

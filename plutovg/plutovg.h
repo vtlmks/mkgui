@@ -729,6 +729,7 @@ PLUTOVG_API float plutovg_path_length(const plutovg_path_t* path);
  */
 PLUTOVG_API bool plutovg_path_parse(plutovg_path_t* path, const char* data, int length);
 
+#ifndef PLUTOVG_NO_FONT
 /**
  * @brief Text encodings used for converting text data to code points.
  */
@@ -999,6 +1000,7 @@ PLUTOVG_API int plutovg_font_face_cache_load_dir(plutovg_font_face_cache_t* cach
  * @return The number of faces successfully loaded, or `-1` if font face cache loading is disabled.
  */
 PLUTOVG_API int plutovg_font_face_cache_load_sys(plutovg_font_face_cache_t* cache);
+#endif
 
 /**
  * @brief Represents a color with red, green, blue, and alpha components.
@@ -1651,6 +1653,7 @@ PLUTOVG_API void plutovg_canvas_set_paint(plutovg_canvas_t* canvas, plutovg_pain
  */
 PLUTOVG_API plutovg_paint_t* plutovg_canvas_get_paint(const plutovg_canvas_t* canvas, plutovg_color_t* color);
 
+#ifndef PLUTOVG_NO_FONT
 /**
  * @brief Assigns a font-face cache to the canvas for font management.
  *
@@ -1752,6 +1755,7 @@ PLUTOVG_API void plutovg_canvas_set_font_size(plutovg_canvas_t* canvas, float si
  * @return The current font size, in pixels. This value represents the height of the rendered text.
  */
 PLUTOVG_API float plutovg_canvas_get_font_size(const plutovg_canvas_t* canvas);
+#endif
 
 /**
  * @brief Sets the fill rule.
@@ -2441,6 +2445,7 @@ PLUTOVG_API void plutovg_canvas_clip_rect(plutovg_canvas_t* canvas, float x, flo
  */
 PLUTOVG_API void plutovg_canvas_clip_path(plutovg_canvas_t* canvas, const plutovg_path_t* path);
 
+#ifndef PLUTOVG_NO_FONT
 /**
  * @brief Adds a glyph to the current path at the specified origin.
  *
@@ -2540,6 +2545,7 @@ PLUTOVG_API void plutovg_canvas_glyph_metrics(plutovg_canvas_t* canvas, plutovg_
  * @return The total advance width of the text.
  */
 PLUTOVG_API float plutovg_canvas_text_extents(plutovg_canvas_t* canvas, const void* text, int length, plutovg_text_encoding_t encoding, plutovg_rect_t* extents);
+#endif
 
 #ifdef __cplusplus
 }

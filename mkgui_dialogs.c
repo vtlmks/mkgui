@@ -60,10 +60,10 @@ static uint32_t dlg_escape_result;
 
 static struct dlg_icon_def dlg_icon_defs[] = {
 	{ NULL,                  0        },
-	{ "dialog-information",  0x3daee9 },
-	{ "dialog-warning",      0xf67400 },
-	{ "dialog-error",        0xda4453 },
-	{ "help-browser",        0x3daee9 },
+	{ MKICON_INFO,  0x3daee9 },
+	{ MKICON_WARNING,      0xf67400 },
+	{ MKICON_ERROR_CIRCLE,        0xda4453 },
+	{ MKICON_QUESTION_CIRCLE,        0x3daee9 },
 };
 
 static struct dlg_btn_def dlg_button_defs[5][3] = {
@@ -96,7 +96,9 @@ static void dlg_render(struct mkgui_window *win, void *userdata) {
 static int32_t dlg_icon_resolve(struct mkgui_window *win, uint32_t icon_type) {
 	if(icon_type == 0 || icon_type >= sizeof(dlg_icon_defs) / sizeof(dlg_icon_defs[0])) {
 		return -1;
+
 	}
+
 	char *name = dlg_icon_defs[icon_type].name;
 	uint32_t color = dlg_icon_defs[icon_type].color;
 	char cache_name[MKGUI_ICON_NAME_LEN];
@@ -105,23 +107,23 @@ static int32_t dlg_icon_resolve(struct mkgui_window *win, uint32_t icon_type) {
 	int32_t idx = icon_find_idx_at(cache_name, win->dialog_icon_size);
 	if(idx >= 0) {
 		return idx;
+
 	}
 
-	// Lazy-load the SVG source under the original name so one copy backs both variants.
-	uint32_t src_idx = svg_find_source_idx(name);
-	if(src_idx == UINT32_MAX && win->system_theme_count > 0) {
-		src_idx = icon_lazy_load_system(win, name);
-	}
-	if(src_idx == UINT32_MAX) {
-		return icon_find_idx_any(name);
+	uint32_t source = svg_find_source_idx(name);
+
+	if(source < svg_source_count) {
+		struct mkgui_svg_source *svg = &svg_sources[source];
+		idx = svg_rasterize_icon_ex(cache_name, svg->svg_data, svg->svg_len, win->dialog_icon_size, color, source);
+
+	} else {
+		idx = icon_library_rasterize(name, cache_name, win->dialog_icon_size, color);
+
 	}
 
-	struct mkgui_svg_source *src = &svg_sources[src_idx];
-	idx = svg_rasterize_icon_ex(cache_name, src->svg_data, src->svg_len, win->dialog_icon_size, color, 0, src_idx);
-	if(idx >= 0) {
-		icon_atlas_rebuild();
-	}
+
 	return idx;
+
 }
 
 // [=]===^=[ dlg_wrap_text ]==========================================[=]

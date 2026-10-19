@@ -22,40 +22,44 @@ pacman -S mingw-w64-gcc
 apt install gcc-mingw-w64-x86-64
 ```
 
-**OpenGL is optional.** The core library, editor, static library, and all widgets except `MKGUI_GLVIEW` build and run without any OpenGL dependency. Only link `-lGL` (Linux) or `-lopengl32` (Windows) if your application actually uses the GL view widget. The bundled `demo` binary uses `MKGUI_GLVIEW`, so the demo build pulls in OpenGL; the editor and `libmkgui.a` do not.
+**OpenGL is optional.** The core library, editor, static library, and all widgets except `MKGUI_GLVIEW` build and run without any OpenGL dependency. Only link `-lGL` (Linux) or `-lopengl32` (Windows) if your application actually uses the GL view widget. The bundled `demo` binary uses `MKGUI_GLVIEW`, so the demo build pulls in OpenGL; the editor and `libmkgui.so.1.0.0` do not.
 
 ## Building mkgui
 
 ```sh
 git clone <mkgui-repo-url>
 cd mkgui
-./build.sh           # default: library + demo + tests + extract_icons
-./build.sh editor    # build the visual designer instead of the core targets
+./build.sh           # default: library + icon catalogue + demo + editor + tests
+./build.sh editor    # libraries + visual designer
+./build.sh library   # shared/static toolkit libraries + icon catalogue
 ./build.sh all       # build everything, including the editor
 ```
 
-Default (`core`) target produces:
+The core targets produce:
 
 | Output | Description |
 |--------|-------------|
+| `out/linux/libmkgui.so.1.0.0` | Linux shared library, SONAME `libmkgui.so.1.0.0` |
+| `out/windows/mkgui.dll`, `libmkgui.dll.a` | Windows shared library and MinGW import library |
 | `out/linux/libmkgui.a` | Linux static library for linking |
 | `out/windows/libmkgui.a` | Windows static library (when MinGW is available) |
 | `out/linux/demo`, `out/windows/demo.exe` | Demo application |
-| `out/linux/extract_icons` | Icon extraction tool |
+| `out/linux/libmkguiicons.so.1` | Shared SVG catalogue |
+| `out/windows/mkguiicons.dll` | Windows SVG catalogue |
 | `out/linux/test_layout`, `test_widgets`, `test_events`, `test_events_ext`, `test_smoke`, `test_window_visibility`, `test_dynamic` | Unit tests |
 | `out/linux/mkguibench`, `out/windows/mkguibench.exe` | Layout, rendering, dirty-region, presentation, and complete-frame benchmark harness |
 
-Both static libraries share the canonical name `libmkgui.a`; the platform is encoded in the parent directory. Consumers link with `-Lpath/to/mkgui/out/linux -lmkgui` (or `out/windows`).
+`-Lout/linux -lmkgui` or `-Lout/windows -lmkgui` selects the shared library. Link the explicit `libmkgui.a` path to select static linkage.
 
 `./build.sh editor` adds `out/linux/editor` (and `out/windows/editor.exe` when MinGW is present). `./build.sh all` builds both core and editor.
 
 Build modes: `./build.sh release` (stripped), `./build.sh debug` (no optimization), `./build.sh size` (`-Os`, ~26% smaller than release), `./build.sh asan` (AddressSanitizer + UBSan, Linux only), `./build.sh clean`. Modes and targets can be combined: `./build.sh release editor`.
 
-The library is compiled with `-DMKGUI_LIBRARY -DMKGUI_MAX_ICONS=32768`, so `MKGUI_API` has external linkage and the icon capacity is large enough to host system icon themes without recompiling. Consumers link `libmkgui.a` and do not need to redefine these.
+The library is compiled with `-DMKGUI_LIBRARY`. Public functions are exported; toolkit internals remain hidden. Icon metadata, hash slots, and custom SVG source records grow on demand. Applications do not need library-build definitions.
 
-## Option A: Static library (recommended)
+## Option A: Shared library
 
-Link your application against `libmkgui.a` and include `mkgui.h`.
+Include `mkgui.h` and link the library from the selected release. Within a source checkout, `-Lout/linux -lmkgui` selects that checkout's library; its SONAME records the full release. The demo and editor use this model.
 
 **myapp.c:**
 ```c
@@ -74,12 +78,11 @@ int main(void) {
 		MKGUI_W(MKGUI_WINDOW, ID_WINDOW, "My App",    "", 0,         400, 300, 0, 0, 0),
 		MKGUI_W(MKGUI_VBOX,   ID_VBOX,   "",          "", ID_WINDOW, 0, 0, 0, 0, 0),
 		MKGUI_W(MKGUI_LABEL,  ID_LABEL,  "Hello",     "", ID_VBOX,   0, 0, 0, 0, 0),
-		MKGUI_W(MKGUI_BUTTON, ID_BUTTON, "Click me",  "edit-find", ID_VBOX, 120, 0, MKGUI_FIXED, 0, 0),
+		MKGUI_W(MKGUI_BUTTON, ID_BUTTON, "Click me",  "search", ID_VBOX, 120, 0, MKGUI_FIXED, 0, 0),
 	};
 	struct mkgui_ctx *ctx = mkgui_ctx_create();
 	mkgui_ctx_set_app_class(ctx, "myapp");
 	struct mkgui_window *win = mkgui_window_create(ctx, NULL, widgets, 4, NULL, 0, 0);
-	mkgui_icon_load_app_icons(win, "myapp");
 	mkgui_ctx_run(ctx, on_event, NULL);
 	mkgui_window_destroy(win);
 	mkgui_ctx_destroy(ctx);
@@ -89,13 +92,96 @@ int main(void) {
 
 **Compile:**
 ```sh
-gcc -std=c99 -O2 myapp.c -I/path/to/mkgui -L/path/to/mkgui -lmkgui \
-    $(pkg-config --cflags --libs freetype2 fontconfig) -lX11 -lXext -lm -o myapp
+gcc -std=c99 -O2 myapp.c -I. -Lout/linux -lmkgui \
+    '-Wl,-rpath,$ORIGIN' -o out/linux/myapp
 ```
 
-## Option B: Unity build
+## Installing on Linux
 
-Include `mkgui.c` directly in your source file. No separate compilation or linking needed -- everything compiles as one translation unit. All mkgui sources (PlutoSVG/PlutoVG, platform backend, every `mkgui_*.c` widget file) are pulled in transitively through `mkgui.c`.
+`./install_icons.sh` installs the icon catalogue; `./install.sh` installs mkgui's
+shared library, static archive, public headers, and release-specific pkg-config metadata (`mkgui1.0.0.pc` for this release).
+Both scripts support `PREFIX` (default `/usr`) and `DESTDIR` for packaging.
+The caller needs write access to the destination. Run these commands with that access for a systemwide installation:
+
+```sh
+./install_icons.sh
+./install.sh
+ldconfig
+```
+
+For release 1.0.0, the toolkit installs:
+
+| File | Purpose |
+|---|---|
+| `/usr/lib/libmkgui.so.1.0.0` | Runtime library; SONAME is this complete filename |
+| `/usr/lib/libmkgui1.0.0.so` | Development symlink to that runtime library |
+| `/usr/lib/libmkgui1.0.0.a` | Static archive |
+| `/usr/include/mkgui1.0.0/mkgui.h` | Public API header |
+| `/usr/include/mkgui1.0.0/mkgui_glview.h` | Native OpenGL accessors |
+| `/usr/lib/pkgconfig/mkgui1.0.0.pc` | Matching compiler and linker flags |
+
+There is no systemwide unversioned toolkit header, `libmkgui.so`, or `mkgui.pc` to be overwritten by another release. Select the full release explicitly:
+
+```sh
+gcc myapp.c $(pkg-config --cflags --libs mkgui1.0.0) -o myapp
+```
+
+This selects the release-specific include directory and `-lmkgui1.0.0`. The linker records the library's SONAME, `libmkgui.so.1.0.0`. Releases 1.0.1, 1.1.0, or 2.0.0 install under their own full names and leave this application using 1.0.0.
+
+The icon installer supplies its independently versioned library, headers, metadata, and notices. Both installers default to `/usr`; neither script changes privileges itself.
+
+For package staging:
+
+```sh
+DESTDIR="$package_root" ./install_icons.sh
+DESTDIR="$package_root" ./install.sh
+```
+
+`DESTDIR` changes the staging destination while keeping `/usr` as the installed prefix. Run `ldconfig` on the target system after installation, rather than against the staging directory.
+
+For a writable local prefix:
+
+```sh
+PREFIX="$HOME/.local" ./install_icons.sh
+PREFIX="$HOME/.local" ./install.sh
+```
+
+Then compile against the installation:
+
+```sh
+export PKG_CONFIG_PATH="$HOME/.local/lib/pkgconfig"
+gcc myapp.c $(pkg-config --cflags --libs mkgui1.0.0) -Wl,-rpath,"$HOME/.local/lib" -o myapp
+```
+
+The explicit runtime path above lets the loader find the local prefix's libraries.
+For deployment beside an executable, keep `libmkgui.so.1.0.0` and `libmkguiicons.so.1` beside it and build the executable with `'-Wl,-rpath,$ORIGIN'`. Retain the versioned icon library file when its SONAME path is a symlink. Neither the static archives nor import libraries are runtime files.
+
+Linux uses the full release in the toolkit SONAME: `libmkgui.so.1.0.0`. Choose a tag and keep using its matching headers and library; other tags may change the API or ABI. Different full releases can be installed together, including releases with the same major number. Windows uses `mkgui.dll`, shipped with `mkguiicons.dll` beside
+the executable. Its MinGW import library is `libmkgui.dll.a`.
+
+## Option B: Static library
+
+Include `mkgui.h`, define `MKGUI_STATIC`, and link the explicit archive:
+
+```sh
+gcc -std=c99 -O2 -DMKGUI_STATIC -I. myapp.c out/linux/libmkgui.a \
+    $(pkg-config --cflags --libs freetype2 fontconfig) -lX11 -lXext -lm \
+    -Lout/linux -lmkguiicons '-Wl,-rpath,$ORIGIN' -o out/linux/myapp
+
+x86_64-w64-mingw32-gcc -std=c99 -O2 -DMKGUI_STATIC -I. myapp.c \
+    out/windows/libmkgui.a -Lout/windows -lmkguiicons -lgdi32 -mwindows \
+    -Wl,-Bstatic -lwinpthread -Wl,-Bdynamic -o out/windows/myapp.exe
+```
+
+For an installed release, use its matching header directory and static archive, followed by the platform and icon dependencies:
+
+```sh
+gcc -std=c99 -O2 -DMKGUI_STATIC myapp.c $(pkg-config --cflags mkgui1.0.0) "$(pkg-config --variable=libdir mkgui1.0.0)/libmkgui1.0.0.a" $(pkg-config --libs freetype2 fontconfig mkguiicons) -lX11 -lXext -lm -o myapp
+```
+
+## Option C: Unity build
+
+Include `mkgui.c` directly in your source file. The toolkit compiles as one translation unit; link the shared icon catalogue separately. All mkgui sources (PlutoSVG/PlutoVG, platform backend, every `mkgui_*.c` widget file) are pulled in transitively through `mkgui.c`.
 
 **myapp.c:**
 ```c
@@ -106,111 +192,28 @@ Include `mkgui.c` directly in your source file. No separate compilation or linki
 
 **Compile:**
 ```sh
-gcc -std=c99 -O2 myapp.c $(pkg-config --cflags --libs freetype2 fontconfig) -lX11 -lXext -lm -o myapp
+gcc -std=c99 -O2 -Imkwin myapp.c $(pkg-config --cflags --libs freetype2 fontconfig) -lX11 -lXext -lm $(pkg-config --cflags --libs mkguiicons) -o myapp
 ```
 
 Add `-lGL` only if your application uses `MKGUI_GLVIEW`. On Windows, the equivalent is `-lopengl32`.
 
 ## Icons
 
-mkgui uses SVG icons from Freedesktop-compatible icon themes (Papirus, Breeze, Adwaita, etc.).
+Both platforms use the shared Fluent catalogue. Build it with `./build.sh icons`.
+On Linux, `./install_icons.sh` installs into `/usr` by default; run `ldconfig`
+after a systemwide installation. Packagers can use `PREFIX=/usr DESTDIR=...`.
+On Windows, ship `out/windows/mkguiicons.dll` beside your executable and link
+against `out/windows/libmkguiicons.dll.a` using `-Lout/windows -lmkguiicons`.
 
-### Platform behaviour at a glance
+Include `mkguiicons_names.h` to use names such as `MKICON_SAVE`, `MKICON_SEARCH`,
+and `MKICON_FOLDER_OPEN` in widget initializers or `mkgui_set_icon()`. String names
+such as `"save"` work too. The editor's icon picker searches the same catalogue;
+its projects and generated source contain names, requiring no separate icon files
+or export lists. Monochrome icons follow the theme. Every scale is rasterized
+directly from SVG at the required pixel size.
 
-The icon workflow differs significantly between platforms and this catches people out, so read this section before anything else:
-
-- **Linux** has a system icon theme. If `mkgui_icon_load_app_icons()` finds no bundled `icons/` directory, mkgui automatically falls back to the user's active theme (Papirus, Breeze, Adwaita, ...) detected from GTK/KDE settings. Shipping a bundled `icons/` is still recommended for reproducible visuals, but the application will work without it, and the editor's icon browser automatically scans `/usr/share/icons/`, `$XDG_DATA_HOME/icons/`, etc.
-- **Windows** has no system icon theme. Both the editor and the applications you build with it require icon SVGs on disk -- but mkgui will use any Freedesktop theme dropped alongside the executable as a runtime fallback:
-	- For the **editor's icon browser** to show anything, unpack a Freedesktop icon theme next to the editor binary (e.g. `./Papirus/` containing the theme's `index.theme`). Without at least one such directory the browser will be empty.
-	- For an **end-user application**, the bundled `icons/` directory is the recommended path (reproducible visuals, single artefact). If no `icons/` is present, mkgui scans the working directory for sibling theme directories (`./Papirus/`, `./breeze/`, ...) and lazy-loads icons from the first match. Only when nothing is found does the magenta-diamond placeholder appear.
-
-If you develop the UI on Linux and ship to Windows, the extraction step (below) is still required to produce the `icons/` directory for the Windows build.
-
-### Setting up icons
-
-1. **Unpack an icon theme** next to the editor binary. Download a Freedesktop icon theme (e.g. Papirus) and extract it so the directory sits alongside the editor (e.g. `./Papirus/`). The editor detects any directory containing an `index.theme` file. You can have multiple themes side by side.
-
-2. **Design your UI** in the editor. When browsing icons, a dropdown lets you pick which theme to select from. You can mix icons from different themes. The editor tracks which icons are used and their source paths.
-
-3. **Extract icons** using the generated icon list:
-```sh
-# Copy icons listed by the editor, resolve mkgui required icons from Papirus
-# Last argument is the preferred SVG source size (16px) for theme lookup
-extract_icons myapp_icons.txt icons/ ./Papirus 16
-```
-The tool reads `myapp_icons.txt` (editor-managed) and also `myapp_icons_extra.txt` if it exists (user-managed, for icons loaded dynamically in code). The output directory is cleaned and rebuilt from scratch each run.
-
-Icons with source paths are copied directly. Icons without a source path (including mkgui's required internal icons) are resolved from the theme directory.
-
-4. **Add dynamic icons** (optional). If your code loads icons at runtime that aren't in the editor's UI, list them in `myapp_icons_extra.txt`:
-```
-# Extra icons loaded dynamically in code
-audio-volume-high
-media-playback-start
-media-playback-pause
-```
-This file is never touched by the editor, so your additions are safe across re-exports.
-
-5. **Load icons** at startup:
-```c
-struct mkgui_ctx *ctx = mkgui_ctx_create();
-mkgui_ctx_set_app_class(ctx, "myapp");
-struct mkgui_window *win = mkgui_window_create(ctx, NULL, widgets, count, NULL, 0, 0);
-mkgui_icon_load_app_icons(win, "myapp");
-```
-
-On Linux, this searches the following paths in order:
-
-1. `$MYAPP_ICON_DIR` environment variable (override for development/packaging)
-2. `../share/myapp/icons/` relative to the executable (covers FHS installs at any prefix)
-3. `$XDG_DATA_HOME/myapp/icons/` (default: `~/.local/share/myapp/icons/`)
-4. Each `$XDG_DATA_DIRS` entry + `/myapp/icons/` (default: `/usr/share/` and `/usr/local/share/`)
-5. `./icons/` (development fallback)
-
-On Windows, it checks the executable's own directory for an `icons/` subdirectory. If no `icons/` directory is found, mkgui also scans the working directory for any sibling Freedesktop icon-theme directory (one containing an `index.theme` file -- e.g. `Papirus/`, `breeze/`) one and two levels deep. Found themes are added to the lazy-load chain, so icons referenced by name resolve straight from the unpacked theme. This matches the editor's drop-in workflow: dropping `Papirus/` next to `editor.exe` makes it work for both the editor and any application using mkgui at runtime, without running `extract_icons` first.
-
-6. **Install** the `icons/` directory to `<prefix>/share/<app_name>/icons/` (e.g. `/usr/share/myapp/icons/`).
-
-### Mixing icon themes
-
-You can pick icons from different themes (e.g. Papirus for toolbar icons, Breeze for status icons). However, all icons are stored in a flat directory keyed by name. If you select the same icon name (e.g. "document-save") from two different themes, only one version is kept. The editor warns when this happens during export.
-
-### Icon names
-
-Icons use standard Freedesktop names. Common examples:
-
-| Name | Usage |
-|------|-------|
-| `document-save` | Save action |
-| `document-open` | Open file |
-| `document-new` | New document |
-| `edit-copy` | Copy |
-| `edit-paste` | Paste |
-| `edit-undo` | Undo |
-| `edit-redo` | Redo |
-| `edit-find` | Search |
-| `folder` | Directory |
-| `folder-open` | Open directory |
-| `go-previous` | Back/left |
-| `go-next` | Forward/right |
-| `dialog-warning` | Warning indicator |
-| `dialog-error` | Error indicator |
-
-Browse all available icons in the editor's icon browser, or see the [Freedesktop Icon Naming Specification](https://specifications.freedesktop.org/icon-naming-spec/latest/).
-
-### Icons on Windows
-
-Windows has no system-wide icon theme, so mkgui cannot fall back to the user's desktop like it does on Linux. Instead, it falls back to whatever Freedesktop theme directory is sitting next to the executable:
-
-- The editor's **icon browser is empty by default** on Windows. To populate it, download a Freedesktop theme (Papirus, Breeze, Adwaita, ...) and unpack the archive next to the editor binary so you have e.g. `editor.exe` and `Papirus\index.theme` side by side. Multiple themes can coexist. The browser finds them whether you launch the editor from its own directory, from a Start Menu shortcut, or from another CWD.
-- The same scan also runs at **runtime** in `mkgui_icon_load_app_icons` / `mkgui_icon_load_svg_dir`: when no bundled `icons/` directory is found, mkgui registers any sibling theme as a lazy-load source, so widget icons can resolve straight from the dropped theme without an `extract_icons` pre-step. This is intended for development and for letting users theme an unsigned-shipped application; production deployments should still ship a baked `icons/` directory for reproducibility.
-- An application built with mkgui looks for its icon directory in a fixed order: `%<APPNAME>_ICON_DIR%`, then `<exe_dir>\icons\`, then `%LOCALAPPDATA%\<appname>\icons\`, `%APPDATA%\<appname>\icons\`, `%ProgramFiles%\<appname>\icons\`, `%ProgramFiles(x86)%\<appname>\icons\`, and finally `.\icons\`. If none of these exist every widget icon becomes a magenta-diamond placeholder and a message is printed to stderr.
-
-Freedesktop icon themes often use symlinks for icon aliases (e.g., `media-floppy.svg` linking to `document-save.svg`). On Linux this works transparently. On Windows, symlinks may not be preserved when extracting the theme archive. Use an extraction tool that resolves symlinks to copies (e.g., 7-Zip or `tar --dereference`), or the aliased icons will be missing.
-
-### Theme compatibility
-
-Icons adapt to the active theme. Monochrome icons using `currentColor` (like Papirus action icons) automatically follow the active theme's `text` colour -- they're light on dark themes, dark on light themes, and update when you call `mkgui_ctx_set_theme()`.
+See [icons.md](icons.md) for the enumeration API, styles, custom icons, and the
+shared library's version contract.
 
 ## DPI scaling
 
@@ -226,7 +229,7 @@ All widgets, fonts, spacing, icons, and dialog windows scale automatically. The 
 
 ## Widget layout
 
-Widgets are defined as a flat array of `struct mkgui_widget`. Each widget has a `parent_id` that determines its position in the layout tree. Container widgets (VBOX, HBOX, FORM, GROUP, PANEL) arrange their children automatically.
+Widgets are defined as a flat array of `struct mkgui_widget`. Each widget has a `parent_id` that determines its position in the layout tree. VBox/HBox/Form arrange children, Panel shares VBox layout, and Group insets a child layout container.
 
 ```c
 struct mkgui_widget widgets[] = {
@@ -239,7 +242,7 @@ struct mkgui_widget widgets[] = {
 ```
 
 - `w=0, h=0`: widget takes its natural size from font height
-- `MKGUI_FIXED`: widget is removed from flex distribution. Uses exact `w`/`h` if set, or natural size if 0
+- `MKGUI_FIXED`: removed from box flex distribution; the main-axis size uses its positive hint or a measured/natural fallback. Cross-axis sizing follows the parent's alignment rules
 - `weight`: controls how flexible widgets share remaining space in a container
 
 See `documentation/doc.md` for the full API reference.
@@ -252,13 +255,13 @@ The visual designer lets you create widget layouts interactively:
 ./editor
 ```
 
-- Drag widgets from the palette onto the canvas
+- Click a palette entry, then click the canvas to place widgets; Escape ends placement mode
 - Set properties in the right panel
 - Click the icon field to browse available icons
 - Generate C code with File > Generate Code
 - Test your layout with the Test button
 
-The editor outputs a complete `.c` file with widget array, event handler stubs, and an `mkgui_ctx_run()` loop.
+The editor outputs a complete `.c` file with widget array, event handler stubs, and an `mkgui_ctx_run()` loop. Generated programs include `mkgui.h` and link the shared library by default. Define `MKGUI_UNITY` to compile the generated source with the toolkit included instead.
 
 ## Cross-platform
 
@@ -266,10 +269,10 @@ mkgui runs on Linux (X11) and Windows (Win32). Write once, compile for both:
 
 ```sh
 # Linux
-gcc -std=c99 -O2 myapp.c -lmkgui $(pkg-config --cflags --libs freetype2 fontconfig) -lX11 -lXext -lm
+gcc -std=c99 -O2 myapp.c $(pkg-config --cflags --libs mkgui1.0.0) -o myapp
 
 # Windows (cross-compile, no FreeType needed -- uses GDI for fonts)
-x86_64-w64-mingw32-gcc -std=c99 -O2 myapp.c -lmkgui -lgdi32 -mwindows
+x86_64-w64-mingw32-gcc -std=c99 -O2 -I. myapp.c -Lout/windows -lmkgui -mwindows -o out/windows/myapp.exe
 ```
 
 The same widget definitions, event handling, and icon names work identically on both platforms.

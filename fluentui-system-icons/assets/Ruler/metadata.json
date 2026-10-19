@@ -1,0 +1,26 @@
+{
+  "name": "Ruler",
+  "size": [
+    12,
+    16,
+    20,
+    24,
+    28,
+    32,
+    48
+  ],
+  "style": [
+    "Regular",
+    "Filled"
+  ],
+  "keyword": "fluent-icon",
+  "description": "Used to represent measurements.",
+  "metaphor": [
+    "measure",
+    "measurement",
+    "length",
+    "width",
+    "size",
+    "scale"
+  ]
+}

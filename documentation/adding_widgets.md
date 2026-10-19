@@ -130,9 +130,8 @@ generation to work correctly.
    - Otherwise add a case to `ed_draw_widget_fallback()` that draws a
      simplified preview.
 
-10. **Data panel** (`ed_draw_data_ui()`)
-    If the widget has pre-populated items (like dropdown, combobox, statusbar
-    sections), extend the data editing UI to include it.
+10. **Data panel** (`ed_sync_data()`, `ed_data_row_cb()`, and the `ED_DATA_*` event handlers)
+    If the widget has pre-populated items, extend its data storage, panel visibility, row display, and editing handlers.
 
 ## documentation/doc.md
 

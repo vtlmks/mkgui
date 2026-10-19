@@ -1,6 +1,6 @@
 # mkgui
 
-Minimal GUI toolkit for Linux (X11) and Windows (Win32). Software rendered, unity build (`#include "mkgui.c"`). Breeze-inspired styling. No third-party dependencies beyond FreeType2 and Xlib/GDI. The X11/Win32 windowing layer lives in a small sibling library, [mkwin](https://github.com/vtlmks/mkwin), pulled in as a git submodule.
+Minimal GUI toolkit for Linux (X11) and Windows (Win32). Software rendered, available as a shared library or a unity build (`#include "mkgui.c"`). Breeze-inspired styling. Uses FreeType2, Xlib/GDI, and the shared mkguiicons catalogue. The X11/Win32 windowing layer lives in a small sibling library, [mkwin](https://github.com/vtlmks/mkwin), pulled in as a git submodule.
 
 This is a personal project by a single developer. It works well for what it does, but it has not been exhaustively tested across every platform, hardware configuration, or edge case. Use it, enjoy it, file issues if something breaks -- but don't expect the test coverage of a toolkit backed by a corporation. There are no guarantees, no roadmap, and no promises.
 
@@ -8,9 +8,11 @@ This is a personal project by a single developer. It works well for what it does
 
 ## Project status
 
-mkgui is in **beta**. The author has used it to ship several working applications, so the core widget set, layout engine, and rendering pipeline are stable in practice. The public API is not frozen -- naming, flags, and signatures may still change between tags if something turns out to be a bad idea.
+**v1.0.0 is the first stable release.** The author has used mkgui to ship several working applications. The shared library starts at version 1.0.0. Choose a release tag for an application and stay on it. Other tags may change the API or ABI; updating is explicit. Each full release has its own Linux SONAME, headers, static archive, and pkg-config package, so applications using different releases can coexist, including releases with the same major number.
 
 ## Versioning
+
+Linux installs `libmkgui.so.1.0.0` with that same full SONAME. Each release installs its own headers, static archive, and pkg-config package, such as `mkgui1.0.0`; it does not replace another release, even when their major numbers match. Windows applications ship a matching `mkgui.dll` beside their executable. The icon catalogue has its own independent version.
 
 `master` is the development branch. It can change behaviour, break API, or introduce regressions between commits without notice -- that's what it's for.
 
@@ -20,12 +22,12 @@ mkgui is in **beta**. The author has used it to ship several working application
 # direct clone pinned to a tag
 git clone https://github.com/<user>/mkgui.git
 cd mkgui
-git checkout v0.5.0-beta
+git checkout v1.0.0
 git submodule update --init --recursive   # fetch the mkwin platform-layer submodule
 
 # or as a submodule of your own project
 git submodule add https://github.com/<user>/mkgui.git mkgui
-cd mkgui && git checkout v0.5.0-beta && git submodule update --init --recursive
+cd mkgui && git checkout v1.0.0 && git submodule update --init --recursive
 ```
 
 mkgui's own platform layer, `mkwin`, is itself a submodule, so the `git submodule update --init --recursive` step is required after any clone or checkout -- `mkgui.c` `#include`s the mkwin sources and will not compile without them. (Tags before `v0.5.0-beta` predate the submodule and simply skip that step.)
@@ -38,15 +40,15 @@ If you need a fix that only exists on master, open an issue so it can be cherry-
 - Auto-layout containers: VBox, HBox, Form, Group, Tabs, Splitters
 - Software rendering via XShm (Linux) and GDI (Windows) -- no GPU required
 - Built-in file dialogs, message boxes, input dialogs, color picker
-- SVG icon system via PlutoSVG (Freedesktop icon naming, theme-aware monochrome)
+- Shared Fluent SVG icon catalogue via PlutoSVG, with theme-aware monochrome
 - Toolbar display modes: icons only, text only, icons + text
 - DPI scaling with auto-detection and `MKWIN_SCALE` environment variable override
 - Keyboard accelerators with automatic menu shortcut display
 - Undo/redo in text input and textarea widgets
 - External file drag-and-drop (XDnd on Linux, WM_DROPFILES on Windows)
 - Visual editor with drag-and-drop, property editing, and C code generation
-- Unity build: `#include "mkgui.c"` and compile
-- ~260KB stripped binary, ~5MB BSS, instant startup
+- Shared library: include `mkgui.h` and link `-lmkgui`
+- Unity and static builds remain available
 
 ## Visual editor
 
@@ -60,27 +62,27 @@ See [documentation/editor.md](documentation/editor.md) for the full editor guide
 
 mkgui pulls its X11/Win32 windowing layer from the [mkwin](https://github.com/vtlmks/mkwin) git submodule, so make sure it is checked out -- `mkgui.c` `#include`s the mkwin sources and will not compile without them.
 
-1. Get the mkgui source **with its submodule**: `git clone` the repo, then `git submodule update --init --recursive` (or copy both `mkgui/` and its `mkwin/` subdirectory into your project).
-2. `#include "mkgui.c"` in your application.
-3. Compile and link, adding the mkwin submodule to the include path with `-Imkwin`:
+1. Get the mkgui source **with its submodule**: clone the repo, then run `git submodule update --init --recursive`.
+2. Run `./build.sh` to build the libraries, demo, editor, and tests.
+3. `#include "mkgui.h"` in your application and link the shared library:
    ```bash
-   # Linux
-   gcc -std=c99 -O2 -Imkwin myapp.c -o myapp \
-       $(pkg-config --cflags freetype2 fontconfig) -lX11 -lXext \
-       $(pkg-config --libs freetype2 fontconfig) -lm
+   # Linux, with the libraries beside the executable
+   gcc -std=c99 -O2 myapp.c -I. -Lout/linux -lmkgui '-Wl,-rpath,$ORIGIN' -o out/linux/myapp
 
    # Windows (MinGW)
-   x86_64-w64-mingw32-gcc -std=c99 -O2 -Imkwin myapp.c -o myapp.exe -lgdi32 -mwindows
+   x86_64-w64-mingw32-gcc -std=c99 -O2 myapp.c -I. -Lout/windows -lmkgui -mwindows -o out/windows/myapp.exe
    ```
-   `-Imkwin` points at the submodule directory; adjust the path if `mkwin/` is not a subdirectory of your build directory. No `MKWIN_*` defines are needed -- `mkgui.c` enables the mkwin font and glview modules itself.
-4. Place an `icons/` directory next to your executable with SVG icons (see Icon section below)
+4. On Linux, install with `./install_icons.sh` and `./install.sh` (`PREFIX` and `DESTDIR` are supported), or keep the libraries beside the executable. On Windows, ship `mkgui.dll` and `mkguiicons.dll` beside the executable.
+
+Installed Linux builds use `gcc myapp.c $(pkg-config --cflags --libs mkgui1.0.0) -o myapp`.
+See [getting started](documentation/getting_started.md) for static and unity builds.
 
 OpenGL is only required if the application uses the `MKGUI_GLVIEW` widget (add `-lGL` on Linux or `-lopengl32` on Windows). The core library, editor, and all other widgets have no GPU dependency.
 
 ## Quick example
 
 ```c
-#include "mkgui.c"
+#include "mkgui.h"
 
 enum { ID_WIN = 0, ID_BTN = 1, ID_LBL = 2 };
 
@@ -123,30 +125,29 @@ int main(void) {
 
 ## Icons
 
-mkgui uses SVG icons via PlutoSVG, following the Freedesktop icon naming standard. Icons are loaded at runtime from a flat directory:
+Linux and Windows use the same Fluent SVG catalogue through `libmkguiicons.so.1`
+or `mkguiicons.dll`. The library contains 21,788 SVG designs, exposed as 6,683
+names covering styles, sizes, languages, and directions. It is approximately
+28 MiB and is shared by applications. The upstream snapshot is vendored as
+ordinary files, without a submodule.
 
 ```c
-mkgui_icon_load_svg_dir(win, "icons");           // load all SVGs from icons/
-mkgui_icon_load_svg(win, "my-icon", "path.svg"); // load a single icon
+#include "mkguiicons_names.h"
+mkgui_set_icon(win, ID_SAVE, MKICON_SAVE);
 ```
 
-Monochrome icons using `currentColor` automatically follow the theme text color and update on theme switch.
+Icons are rasterized directly at the current pixel size. Monochrome icons follow
+the theme text colour. The editor browses this catalogue, with name/keyword search,
+name groups, and style selection. Projects store icon names; no icon manifest or
+per-application SVG directory is needed. Custom SVGs can still be registered with
+`mkgui_icon_load_svg()`.
 
-### Platform differences (important)
-
-- **Linux:** if no bundled `icons/` directory is found, mkgui automatically falls back to the user's installed system icon theme (Papirus, Breeze, Adwaita, ...). Applications can run without shipping any icons and still display correct visuals. The editor's icon browser also scans system theme directories.
-- **Windows:** there is no system icon theme. Both end-user applications and the editor require a bundled `icons/` directory (or an unpacked Freedesktop theme next to the binary for the editor's icon browser). Without one, widgets fall back to a magenta-diamond placeholder and the icon browser appears empty.
-
-Windows users must therefore download a Freedesktop icon theme (e.g. [Papirus](https://github.com/PapirusDevelopmentTeam/papirus-icon-theme), [Breeze](https://invent.kde.org/frameworks/breeze-icons)) and either drop it next to the editor as `./Papirus/` for browsing, or run `extract_icons` to produce an `icons/` directory to ship with the application.
-
-### Extracting icons
-
-```bash
-# extract_icons <icons_list.txt> <output_dir> [theme_dir] [size]
-./out/extract_icons myapp_icons.txt icons/ ./Papirus 16
-```
-
-The icons list is produced by the editor; dynamically-loaded icons can be added to `myapp_icons_extra.txt`. See the [getting started guide](documentation/getting_started.md#icons) for the full workflow.
+Build with `./build.sh icons`. Install on Linux with `./install_icons.sh`
+(default prefix `/usr`; supports `PREFIX` and `DESTDIR`), then refresh the
+system linker cache when installing systemwide. On Windows, put `mkguiicons.dll`
+beside the executable. Build outputs already include the library beside the
+editor and demo. See [the icon API](documentation/icons.md) for enumeration,
+naming, linking, and installation.
 
 ## Building the demo and editor
 
@@ -186,13 +187,13 @@ The easiest option is **MSYS2**, which gives you a native MinGW GCC on Windows:
 
 1. Install [MSYS2](https://www.msys2.org/)
 2. Open the **MSYS2 UCRT64** terminal
-3. Install the toolchain and FreeType:
+3. Install the toolchain:
    ```bash
-   pacman -S mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-freetype
+   pacman -S mingw-w64-ucrt-x86_64-gcc
    ```
-4. Build your application (Windows uses GDI for fonts, so no fontconfig is needed):
+4. Build your application, then ship `mkgui.dll` and `mkguiicons.dll` beside it:
    ```bash
-   gcc -std=c99 -O2 -Imkwin myapp.c -o myapp.exe -lgdi32 -mwindows
+   gcc -std=c99 -O2 myapp.c -I. -Lout/windows -lmkgui -mwindows -o out/windows/myapp.exe
    ```
    Add `-lopengl32` only if the application uses `MKGUI_GLVIEW`. Building `demo.c` requires `-lopengl32` since the demo showcases the GL view widget.
 
@@ -200,14 +201,14 @@ Cross-compiling from Linux also works. The included `build.sh` automatically bui
 
 ### clang-cl (MSVC toolchain)
 
-mkgui also compiles cleanly with `clang-cl` against the MSVC runtime. On Windows, install the **Build Tools for Visual Studio** (or the full IDE) and the **Windows SDK**, then from a Developer Command Prompt:
+For a unity build with `clang-cl`, include `mkgui.c` in the application and supply an MSVC-compatible import library for `mkguiicons.dll`. On Windows, install the **Build Tools for Visual Studio** (or the full IDE) and the **Windows SDK**, then from a Developer Command Prompt:
 
 ```cmd
 clang-cl /O2 /I mkwin ^
-  -DMKGUI_MAX_ICONS=32768 -D_CRT_SECURE_NO_WARNINGS ^
+  -D_CRT_SECURE_NO_WARNINGS ^
   myapp.c ^
   /link /subsystem:windows /entry:mainCRTStartup ^
-  gdi32.lib user32.lib kernel32.lib shell32.lib advapi32.lib
+  gdi32.lib user32.lib kernel32.lib shell32.lib advapi32.lib mkguiicons.lib
 ```
 
 Add `opengl32.lib` if the application uses `MKGUI_GLVIEW`. `/entry:mainCRTStartup` keeps `int main(void)` as the entry point under `/subsystem:windows` (equivalent to MinGW's `-mwindows`).
@@ -220,7 +221,7 @@ clang-cl /O2 /I mkwin -fuse-ld=lld-link \
   /imsvc <winsdk>/Include/ucrt \
   /imsvc <winsdk>/Include/um \
   /imsvc <winsdk>/Include/shared \
-  -DMKGUI_LIBRARY -DMKGUI_MAX_ICONS=32768 \
+  -DMKGUI_LIBRARY -DMKGUI_STATIC \
   -D_CRT_SECURE_NO_WARNINGS \
   mkgui.c demo.c \
   /Fedemo.exe \
@@ -228,7 +229,7 @@ clang-cl /O2 /I mkwin -fuse-ld=lld-link \
   /libpath:<msvc-crt>/lib/x86_64 \
   /libpath:<winsdk>/Lib/ucrt/x86_64 \
   /libpath:<winsdk>/Lib/um/x86_64 \
-  gdi32.lib user32.lib kernel32.lib opengl32.lib shell32.lib advapi32.lib
+  gdi32.lib user32.lib kernel32.lib opengl32.lib shell32.lib advapi32.lib mkguiicons.lib
 ```
 
 ## Documentation

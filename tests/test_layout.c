@@ -7,6 +7,11 @@
 
 #include "../mkgui.c"
 
+struct layout_stride_widget {
+	struct mkgui_widget widget;
+	uint32_t extra;
+};
+
 static uint32_t tests_run;
 static uint32_t tests_passed;
 static uint32_t tests_failed;
@@ -1026,6 +1031,124 @@ static void test_generic_fixed_zero_size(void) {
 	TEST_END();
 }
 
+// [=]===^=[ test_hbox_fixed_width_container ]====================[=]
+static void test_hbox_fixed_width_container(uint32_t type) {
+	TEST_BEGIN("hbox: fixed-width zero-height container fills the column height");
+	struct mkgui_widget widgets[] = {
+		MKGUI_W(MKGUI_WINDOW, 1, "Fixed column", "", 0, 1000, 700, 0, MKGUI_WINDOW_HIDDEN, 0),
+		MKGUI_W(MKGUI_HBOX, 2, "", "", 1, 0, 0, 0, 0, 0),
+		MKGUI_W(MKGUI_VBOX, 3, "", "", 2, 0, 0, 0, 0, 1),
+		MKGUI_W(type, 4, "Column", "", 2, 320, 0, MKGUI_FIXED, 0, 0),
+		MKGUI_W(MKGUI_VBOX, 5, "", "", 4, 0, 0, 0, 0, 0),
+		MKGUI_W(MKGUI_LABEL, 6, "First row", "", 5, 0, 0, MKGUI_FIXED, 0, 0),
+		MKGUI_W(MKGUI_LISTVIEW, 7, "", "", 5, 0, 0, 0, 0, 1),
+	};
+	struct mkgui_ctx *ctx;
+	struct mkgui_window *win = create_and_layout(widgets, sizeof(widgets) / sizeof(widgets[0]), &ctx);
+	CHECK(win != NULL, "create failed");
+
+	if(win) {
+		float scales[] = {1.0f, 2.13f};
+
+		for(uint32_t i = 0; i < sizeof(scales) / sizeof(scales[0]); ++i) {
+			mkgui_ctx_set_scale(ctx, scales[i]);
+			layout_widgets(win);
+			struct mkgui_rect left = get_rect(win, 3);
+			struct mkgui_rect right = get_rect(win, 4);
+			struct mkgui_rect content = get_rect(win, 5);
+			struct mkgui_rect list = get_rect(win, 7);
+			CHECK(right.w == sc(win, 320), "type=%u fixed column width=%d", type, right.w);
+			CHECK(right.y == left.y && right.h == left.h, "type=%u column y=%d h=%d, expected y=%d h=%d", type, right.y, right.h, left.y, left.h);
+			CHECK(content.y >= right.y && content.y + content.h <= right.y + right.h, "type=%u content overflows column", type);
+			CHECK(list.h > win->row_height && list.y + list.h <= right.y + right.h, "type=%u list overflows column", type);
+
+		}
+
+		mkgui_window_destroy(win);
+		mkgui_ctx_destroy(ctx);
+
+	}
+
+	TEST_END();
+
+}
+
+// [=]===^=[ test_hbox_cross_axis_fill ]===========================[=]
+static void test_hbox_cross_axis_fill(uint32_t type) {
+	TEST_BEGIN("hbox: zero-height controls fill five flexible rows, including editor stride");
+	static struct mkgui_widget widgets[22];
+	static struct layout_stride_widget editor_widgets[22];
+	static struct mkgui_rect editor_rects[22];
+	static uint32_t parents[22];
+	static uint32_t first_child[22];
+	static uint32_t next_sibling[22];
+	static struct mkgui_layout_hash_entry ids[64];
+	uint32_t count = 2;
+	widgets[0] = (struct mkgui_widget)MKGUI_W(MKGUI_WINDOW, 1, "Rows", "", 0, 800, 1000, 0, MKGUI_WINDOW_HIDDEN, 0);
+	widgets[1] = (struct mkgui_widget)MKGUI_W(MKGUI_VBOX, 2, "", "", 1, 0, 0, 0, 0, 0);
+
+	for(uint32_t row = 0; row < 5; ++row) {
+		uint32_t parent = 10 + row;
+		widgets[count++] = (struct mkgui_widget)MKGUI_W(MKGUI_HBOX, parent, "", "", 2, 0, 0, 0, 0, 0);
+
+		for(uint32_t col = 0; col <= row; ++col) {
+			widgets[count] = (struct mkgui_widget)MKGUI_W(type, 100 + count, "Control", "", parent, 0, 0, 0, 0, 0);
+			++count;
+
+		}
+	}
+
+	struct mkgui_ctx *ctx;
+	struct mkgui_window *win = create_and_layout(widgets, count, &ctx);
+	CHECK(win, "create failed");
+
+	if(win) {
+		for(uint32_t i = 0; i < count; ++i) {
+			editor_widgets[i].widget = win->widgets[i];
+			editor_widgets[i].extra = 0x12345678;
+			memset(&editor_rects[i], 0, sizeof(editor_rects[i]));
+
+			if(widgets[i].type == type) {
+				struct mkgui_rect parent = get_rect(win, widgets[i].parent_id);
+				struct mkgui_rect child = win->rects[i];
+				CHECK(child.h == parent.h && child.y == parent.y, "type=%u id=%u height=%d row=%d y=%d row_y=%d", type, widgets[i].id, child.h, parent.h, child.y, parent.y);
+
+			}
+		}
+
+		struct layout_ctx lc = {
+			.widgets = (struct mkgui_widget *)editor_widgets,
+			.rects = editor_rects,
+			.first_child = first_child,
+			.next_sibling = next_sibling,
+			.parent = parents,
+			.id_map = ids,
+			.hash_mask = 63,
+			.widget_count = count,
+			.widget_stride = sizeof(editor_widgets[0]),
+		};
+		lc_build_index(&lc);
+		editor_rects[0] = win->rects[0];
+		lc_layout_node(win, &lc, 0);
+		int32_t runtime_w, runtime_h, editor_w, editor_h;
+		mkgui_get_min_size(win, &runtime_w, &runtime_h);
+		lc_window_min_size(win, &lc, 0, &editor_w, &editor_h);
+		CHECK(runtime_w == editor_w && runtime_h == editor_h, "editor/runtime minimum sizes differ for type=%u", type);
+
+		for(uint32_t i = 0; i < count; ++i) {
+			CHECK(memcmp(&editor_rects[i], &win->rects[i], sizeof(editor_rects[i])) == 0, "editor/runtime layout differs for type=%u index=%u", type, i);
+
+		}
+
+		mkgui_window_destroy(win);
+		mkgui_ctx_destroy(ctx);
+
+	}
+
+	TEST_END();
+
+}
+
 // ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
@@ -1036,6 +1159,13 @@ int main(void) {
 
 	test_vbox_basic();
 	test_hbox_basic();
+	test_hbox_fixed_width_container(MKGUI_VBOX);
+	test_hbox_fixed_width_container(MKGUI_HBOX);
+	test_hbox_fixed_width_container(MKGUI_FORM);
+	test_hbox_fixed_width_container(MKGUI_PANEL);
+	test_hbox_fixed_width_container(MKGUI_GROUP);
+	test_hbox_cross_axis_fill(MKGUI_BUTTON);
+	test_hbox_cross_axis_fill(MKGUI_SPINNER);
 	test_weights();
 	test_fixed_width();
 	test_hidden_no_space();

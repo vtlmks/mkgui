@@ -18,23 +18,27 @@ The output contains:
 | `unit` | Normalization unit: widget, pixel, or dirty pixel |
 | `ns_unit` | Mean time per normalization unit |
 | `minimum_gbps` | Four bytes per affected pixel divided by elapsed time; actual read and write traffic can be higher |
-| `layout_us`, `render_us`, `blit_submit_us` | Mean internal components for complete-frame mode |
+| `layout_us`, `render_us`, `blit_submit_us` | Mean internal components for complete-frame mode; zero in other modes |
+| `buffer_acquire_us` | Mean time acquiring a reusable framebuffer and combining its damage history, in complete-frame mode |
+| `drain_us` | Final presentation drain divided by iteration count |
 | `checksum` | Sampled framebuffer checksum |
 
 Layout, full render, and dirty render execute entirely in the client process after window initialization. Presentation and complete-frame results include the display server and must be measured on the target display path. Xvfb results for those modes are correctness references only.
 
+Linux complete frames alternate two XShm images. Layout runs before buffer acquisition; acquisition waits only for outstanding completion events for the image about to be reused. Dirty redraws repair changes missed by that image, while presentation transfers only the current frame's damage. The final drain remains inside `total_ns`, so queued work is included in the result.
+
 ## Controlled Linux run
 
-On the development machine CPU 1 is isolated from scheduler domains, managed IRQs, RCU callbacks, and normal timer ticks. Benchmarks run with:
+On the Ryzen 9 9950X3D development machine, run the workload on CPU 9 with FIFO priority 99:
 
 ```bash
-taskset -c 1 chrt -f 99 out/linux/mkguibench render mixed 256 1920 1080 5000
+taskset -c 9 chrt -f 99 out/linux/mkguibench render mixed 256 1920 1080 5000
 ```
 
 Hardware counters run under the same affinity and policy:
 
 ```bash
-taskset -c 1 chrt -f 99 perf stat -r 3 -e cycles,instructions,branches,branch-misses,l1-dcache-loads,l1-dcache-load-misses out/linux/mkguibench render mixed 256 1920 1080 5000
+taskset -c 11 chrt -f 99 perf stat -r 3 -e cycles,instructions,branches,branch-misses,l1-dcache-loads,l1-dcache-load-misses taskset -c 9 out/linux/mkguibench render mixed 256 1920 1080 5000
 ```
 
 ## Ryzen 9 7950X baseline

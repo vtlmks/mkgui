@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to mkgui. Pre-1.0 betas may break the API between releases.
+All notable changes to mkgui. Release tags are fixed snapshots; applications should stay on their selected tag because other tags may change the API or ABI.
 
 ## v0.5.0-beta
 

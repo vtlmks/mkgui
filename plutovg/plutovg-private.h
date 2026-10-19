@@ -139,14 +139,18 @@ typedef struct {
 
 typedef struct plutovg_state {
     plutovg_paint_t* paint;
+#ifndef PLUTOVG_NO_FONT
     plutovg_font_face_t* font_face;
+#endif
     plutovg_color_t color;
     plutovg_matrix_t matrix;
     plutovg_stroke_data_t stroke;
     plutovg_span_buffer_t clip_spans;
     plutovg_fill_rule_t winding;
     plutovg_operator_t op;
+#ifndef PLUTOVG_NO_FONT
     float font_size;
+#endif
     float opacity;
     bool clipping;
     struct plutovg_state* next;
@@ -158,7 +162,9 @@ struct plutovg_canvas {
     plutovg_path_t* path;
     plutovg_state_t* state;
     plutovg_state_t* freed_state;
+#ifndef PLUTOVG_NO_FONT
     plutovg_font_face_cache_t* face_cache;
+#endif
     plutovg_rect_t clip_rect;
     plutovg_span_buffer_t clip_spans;
     plutovg_span_buffer_t fill_spans;

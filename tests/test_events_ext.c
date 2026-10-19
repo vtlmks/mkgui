@@ -42,8 +42,11 @@ static uint32_t tests_failed;
 // Event injection helpers (same as test_events.c)
 // ---------------------------------------------------------------------------
 
+// [=]===^=[ flush_x_events ]====================================[=]
 static void flush_x_events(struct mkgui_window *win) {
+	mkwin_sync(win->mkwin);
 	XSync(win->mkwin->dpy, True);
+
 }
 
 static void run_layout(struct mkgui_window *win) {

@@ -19,8 +19,11 @@ Widgets are rendered using the real mkgui renderer, not wireframe mockups, so
 what you see is what the generated program will look like.
 
 - Default size: 640x480
-- Minimum size: 64x64
-- Drag any edge or corner of the canvas to resize the window
+- The designed window grows automatically when its contents need more space,
+  using the same minimum-size calculation as the running GUI.
+- Drag any edge or corner to resize; shrinking stops at that content minimum.
+- Larger chosen sizes are retained when contents are removed. Canvas dimensions
+  are included in undo and redo.
 
 Grid snapping is active by default (8px grid). All placement, movement, and
 resizing snaps to the grid.
@@ -54,7 +57,7 @@ Click a widget on the canvas to select it. The selection shows 8 resize handles
 (corners and midpoints). The treeview on the left and the property panel on the
 right update to reflect the selection.
 
-- **Click and drag** a widget to move it (grid-snapped).
+- **Click and drag** changes the widget's stored design position (grid-snapped). Runtime layout still determines container-managed rectangles; use the tree or Parent property to change the hierarchy.
 - **Drag a resize handle** to resize (minimum 4x4, grid-snapped).
 - **Click canvas background** to deselect.
 
@@ -107,8 +110,8 @@ A grid of checkboxes for widget flags:
 |----------|-------------|
 | Hidden   | Widget starts hidden |
 | Disabled | Widget starts disabled |
-| Checked  | Initial checked state (checkbox, radio, menu item) |
-| Scroll   | Enable scrolling (box, form, panel) |
+| Checked  | Initial checked state (checkbox, radio, toggle, menu item) |
+| Scroll   | Enable scrolling (VBox/HBox) |
 | Border   | Visible border (panel, image, canvas) |
 | Sunken   | Recessed appearance |
 | No Pad   | Remove padding |
@@ -125,7 +128,7 @@ A grid of checkboxes for widget flags:
 | Wrap     | Word-wrapping text (label) |
 | Show %   | Show percentage text (meter) |
 | Numeric  | Filter to digits/decimal/sign (input) |
-| Closable | Show close button on tab |
+| Closable | Show dismiss button on tab |
 | Shimmer  | Animated shimmer effect (progress) |
 | MultiSel | Enable multi-selection (listview, gridview, treeview) |
 | Stretch  | Stretch image to fill widget (image) |
@@ -159,9 +162,9 @@ Visible when a TOOLBAR widget is selected:
 - **Remove Button** -- delete the last toolbar button
 
 Select a toolbar button child to set its icon via the icon browser, label, and the
-**TbSep** flag (draws a vertical separator before this button). The icon browser
-scans for Freedesktop icon themes next to the editor and offers a dropdown to switch
-between them. Icons from different themes can be mixed. The toolbar **Mode** dropdown
+**TbSep** flag (turns that child into a non-clickable vertical separator). The icon browser
+enumerates the shared Fluent catalogue and offers search, name groups, and style
+selection. Projects store names, so the same selections resolve on both platforms. The toolbar **Mode** dropdown
 sets the display mode: Icons + Text, Icons Only, or Text Only.
 
 ### Data items / Sections
@@ -189,7 +192,7 @@ the checkboxes. Enabled events generate `case` stubs in the output code.
 | Ctrl+Shift+Z     | Redo |
 | Ctrl+Y           | Redo (alternate) |
 | Delete           | Delete selected widget |
-| Escape           | Cancel placement / close help popup |
+| Escape           | Cancel placement / dismiss help popup |
 | F1               | Show help for hovered palette widget |
 | W                | Focus width field |
 | H                | Focus height field |
@@ -200,13 +203,13 @@ the checkboxes. Enabled events generate `case` stubs in the output code.
 
 | Button | Icon            | Action |
 |--------|-----------------|--------|
-| New    | document-new    | Clear project |
-| Open   | document-open   | Load project file |
+| New    | document-add    | Clear project |
+| Open   | folder-open   | Load project file |
 | Save   | document-save   | Save project (Ctrl+S) |
 | Gen    |                 | Generate C code |
 | Test   |                 | Launch live preview window |
-| Undo   | edit-undo       | Undo |
-| Redo   | edit-redo       | Redo |
+| Undo   | arrow-undo       | Undo |
+| Redo   | arrow-redo       | Redo |
 
 ## Menus
 
@@ -240,10 +243,10 @@ All layout is container-based. Widgets must be placed inside a container (VBOX, 
 Flex layout containers. Children are arranged horizontally (HBox) or vertically
 (VBox) with 6px gaps.
 
-- Set **w=0** (HBox) or **h=0** (VBox) for a child to flex and fill space.
+- Clear **Fixed** to let a child flex. In a VBox, single-line controls also need positive **Weight** to stretch vertically; zero weight keeps their natural height. Zero W/H selects an automatic minimum rather than forcing flex.
 - **Weight** controls the proportion of flex space (default 1).
 - **Align** sets cross-axis alignment (start/center/end).
-- **Fixed** flag locks a child to its explicit size.
+- **Fixed** removes the child from flex distribution on the parent box's main axis; cross-axis placement follows alignment rules.
 
 ### Form
 
@@ -270,12 +273,43 @@ Tab container. Children must be TAB type widgets.
 
 ## Code generation
 
+### Build Features
+
+**File > Build Features...** selects extra widget types created by application
+code and built-in message/input dialogs, file dialogs, the color picker, and
+the icon browser. Widgets present anywhere in the project are always kept.
+Selected dialogs automatically keep the widget types they require. The
+choices are saved in the project file.
+
+Both export commands write a sibling configuration header such as
+`gui_app_features.h`. It contains `MKGUI_NO_*` exclusions for unused widget
+types and unselected dialogs. Full application exports include it before
+the toolkit header. These exclusions specialize unity or separately compiled
+static builds; the standard shared library always contains all widgets.
+Snippet users include the configuration before their application's
+first `mkgui.h` or `mkgui.c` include. Edit the project settings and regenerate
+when application code starts creating additional widget types.
+
+Existing C applications keep all features unless they define exclusions.
+Define `MKGUI_HAS_ALL` before including the toolkit, or compile it with
+`-DMKGUI_HAS_ALL`, to override a generated exclusion header and keep every
+widget type and built-in dialog. The feature header resolves this once; the
+implementation still uses the individual per-feature definitions.
+
+Projects saved before Build Features existed initially keep every feature
+when loaded; the Build Features dialog can reduce that set. New projects
+start with only the widget types present in the project and no extra dialogs.
+
+For a static library, compile `mkgui.c` with the same configuration as its
+consumer, for example with `-include gui_app_features.h`. A configuration in
+application code cannot specialize an already compiled library.
+
 ### Generate Code
 
 **File > Generate Code** (or the Gen toolbar button) opens a save dialog and
 writes a complete C source file containing:
 
-1. `#include "mkgui.c"` (unity build)
+1. `#include "mkgui.h"` (shared library), or `mkgui.c` when compiled with `MKGUI_UNITY`
 2. An `enum` with all widget IDs
 3. Callback stubs (listview row callbacks, itemview label/icon callbacks)
 4. A `main()` function with:
@@ -286,7 +320,7 @@ writes a complete C source file containing:
    - Event loop with `case` stubs for every enabled event
    - Automatic `MKGUI_EVENT_CLOSE` handler
 
-The generated file compiles directly with no modifications needed.
+The generated file compiles directly and links the toolkit release used to design it. Select that installed release with its pkg-config package, such as `mkgui1.0.0`, or use `-Lout/linux -lmkgui` within the matching checkout. Add `-DMKGUI_UNITY` and the platform dependencies to build it with the toolkit included instead.
 
 ### Generate Snippet
 
@@ -303,14 +337,12 @@ clicks, scrolling, etc.) before generating code.
 ## Undo / Redo
 
 The editor maintains a 64-level undo history. Snapshots are taken before any
-destructive operation: widget add/delete, move/resize, property changes,
-reparenting, tab/menu/data operations.
+widget add/delete, move/resize, property changes, reparenting, and tab/menu operations. Snapshots contain widget definitions and canvas dimensions; separate dropdown/combobox items and statusbar section data are not stored in those snapshots.
 
 ## File format
 
 Projects are saved as text `.mkgui` files containing the complete widget tree,
-properties, hierarchy, data items, and editor state. The format stores widget
-types as numeric values, making it forward-compatible with new widget types.
+properties, hierarchy, data items, and editor state. The format stores widget types as numeric values. Unknown types are rejected; use the editor from the project's selected release rather than assuming cross-release compatibility.
 
 ## Canvas rendering
 

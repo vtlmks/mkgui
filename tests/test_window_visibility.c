@@ -138,6 +138,7 @@ static void test_canvas_window_flag(void) {
 	mkgui_ctx_destroy(ctx);
 }
 
+// [=]===^=[ test_window_move_get_position ]=======================[=]
 static void test_window_move_get_position(void) {
 	struct mkgui_ctx *ctx = mkgui_ctx_create();
 	struct mkgui_window *win = mkgui_window_create(ctx, NULL, undecorated_widgets, sizeof(undecorated_widgets) / sizeof(undecorated_widgets[0]), NULL, 0, 0);
@@ -146,16 +147,20 @@ static void test_window_move_get_position(void) {
 	XSync(win->mkwin->dpy, False);
 	mkgui_window_move(win, 50, 75);
 	XSync(win->mkwin->dpy, False);
-	while(XPending(win->mkwin->dpy)) {
-		XEvent xev;
-		XNextEvent(win->mkwin->dpy, &xev);
+
+	while(mkwin_pending(win->mkwin)) {
+		struct mkwin_event event;
+		mkwin_poll(win->mkwin, &event);
+
 	}
+
 	int32_t x = -1, y = -1;
 	mkgui_window_get_position(win, &x, &y);
 	CHECK(x == 50, "window x after move");
 	CHECK(y == 75, "window y after move");
 	mkgui_window_destroy(win);
 	mkgui_ctx_destroy(ctx);
+
 }
 
 int32_t main(void) {
