@@ -69,59 +69,36 @@ The library is compiled with `-DMKGUI_LIBRARY`. Public functions are exported; t
 
 For an overview of the changes from beta releases, see the [v1.0.0 migration guide](migration_v1.0.0.md).
 
+## Checking the build
+
+Build targets compile tests without running them. Run GUI tests with a working display, from the repository root. The shared-consumer tests exercise the actual library interface; the remaining tests include internals for widget, layout, and storage checks.
+
+```sh
+out/linux/test_shared
+out/linux/test_shared_events
+out/linux/test_editor_shared
+out/linux/test_undo
+out/linux/test_filedialog
+out/linux/test_editor_features
+```
+
+`test_shared_events` drives native mouse/keyboard input and modal dismissal using only public toolkit functions plus native event injection. The editor persistence test needs a temporary directory for its project, generated source, and configuration:
+
+```sh
+test_dir=$(mktemp -d)
+out/linux/test_editor_persistence "$test_dir"
+rm -rf "$test_dir"
+```
+
+Other suites are in `tests/` and built under `out/linux/`. Windows builds include `test_shared.exe`, `test_shared_events.exe`, `test_editor_shared.exe`, `test_editor_persistence.exe`, `test_undo.exe`, `test_filedialog.exe`, `test_features_minimal.exe`, `test_icon_storage.exe`, and `test_platform_win32.exe`. Run them on Windows or use Wine, for example `wine out/windows/test_shared_events.exe`. Pass a writable Windows directory to the persistence test.
+
+`python3 tests/test_install.py` checks release coexistence without a display or system installation. It builds distinguishable fixture libraries for five full releases, installs them into one temporary prefix, compiles consumers against each package, and verifies their headers, static linkage, SONAME dependencies, and continued operation after subsequent installations. It also checks `DESTDIR` staging and rejection of libraries with an incorrect SONAME.
+
 ## Option A: Shared library
 
 Include `mkgui.h` and link the library from the selected release. Within a source checkout, `-Lout/linux -lmkgui` selects that checkout's library; its SONAME records the full release. The demo and editor use this model.
 
-**myapp.c:**
-```c
-#include "mkgui.h"
-#include "mkguiicons_names.h"
-
-enum { ID_WIN = 1, ID_BOX, ID_BTN, ID_LBL };
-
-// [=]===^=[ on_event ]========================================================================[=]
-static void on_event(struct mkgui_window *win, struct mkgui_event *ev, void *userdata) {
-	(void)userdata;
-
-	if(ev->type == MKGUI_EVENT_CLOSE) {
-		mkgui_ctx_quit(mkgui_window_get_ctx(win));
-
-	} else if(ev->type == MKGUI_EVENT_CLICK && ev->id == ID_BTN) {
-		mkgui_label_set(win, ID_LBL, "Clicked!");
-
-	}
-}
-
-// [=]===^=[ main ]============================================================================[=]
-int main(void) {
-	struct mkgui_widget widgets[] = {
-		MKGUI_W(MKGUI_WINDOW, ID_WIN, "Hello", "", 0, 400, 300, 0, 0, 0),
-		MKGUI_W(MKGUI_VBOX, ID_BOX, "", "", ID_WIN, 0, 0, 0, 0, 0),
-		MKGUI_W(MKGUI_BUTTON, ID_BTN, "Click", MKICON_CHECKMARK, ID_BOX, 120, 0, MKGUI_FIXED, 0, 0),
-		MKGUI_W(MKGUI_LABEL, ID_LBL, "Ready", "", ID_BOX, 0, 0, 0, 0, 0),
-	};
-	struct mkgui_ctx *ctx = mkgui_ctx_create();
-
-	if(ctx) {
-		struct mkgui_window *win = mkgui_window_create(ctx, NULL, widgets, sizeof(widgets) / sizeof(widgets[0]), NULL, 0, 0);
-
-		if(win) {
-			mkgui_ctx_run(ctx, on_event, NULL);
-			mkgui_window_destroy(win);
-			mkgui_ctx_destroy(ctx);
-			return 0;
-
-		}
-
-		mkgui_ctx_destroy(ctx);
-
-	}
-
-	return 1;
-
-}
-```
+Use the complete [README example](../README.md#use-in-an-application) as `myapp.c`.
 
 **Compile:**
 ```sh
@@ -246,14 +223,9 @@ This embeds the toolkit in the application; the icon catalogue remains a shared-
 
 ## Option C: Unity build
 
-Include `mkgui.c` directly in your source file. The toolkit compiles as one translation unit; link the shared icon catalogue separately. All mkgui sources (PlutoSVG/PlutoVG, platform backend, every `mkgui_*.c` widget file) are pulled in transitively through `mkgui.c`.
+Include `mkgui.c` directly in your source file. The toolkit compiles as one translation unit; link the shared icon catalogue separately. The toolkit sources, embedded SVG rasterizer, and platform backend are included transitively through `mkgui.c`. Feature exclusions can remove unused widget implementations.
 
-**myapp.c:**
-```c
-#include "mkgui.c"
-
-// ... same code as above ...
-```
+In the [README example](../README.md#use-in-an-application), replace `#include "mkgui.h"` with `#include "mkgui.c"`. Keep the application code and icon-name include.
 
 **Compile:**
 ```sh
@@ -269,8 +241,7 @@ Unity builds need the complete source checkout, including mkwin. The installed p
 Both platforms use the shared Fluent catalogue. Build it with `./build.sh icons`.
 On Linux, `./install_icons.sh` installs into `/usr` by default; run `ldconfig`
 after a systemwide installation. Packagers can use `PREFIX=/usr DESTDIR=...`.
-On Windows, ship `out/windows/mkguiicons.dll` beside your executable and link
-against `out/windows/libmkguiicons.dll.a` using `-Lout/windows -lmkguiicons`.
+On Windows, ship `out/windows/mkguiicons.dll` beside the executable together with `mkgui.dll`. An application using only toolkit functions links `-lmkgui`; direct calls to `mkguiicons_*()` also require `-lmkguiicons`.
 
 Include `mkguiicons_names.h` to use names such as `MKICON_SAVE`, `MKICON_SEARCH`,
 and `MKICON_FOLDER_OPEN` in widget initializers or `mkgui_set_icon()`. String names
@@ -292,7 +263,7 @@ mkgui_ctx_set_scale(ctx, 2.0f);  // 2x scale for HiDPI displays
 
 Or set the `MKWIN_SCALE` environment variable before launching: `MKWIN_SCALE=1.5`, `MKWIN_SCALE=150%`, or `MKWIN_SCALE=144dpi`. The env var takes precedence over auto-detection.
 
-All widgets, fonts, spacing, icons, and dialog windows scale automatically. The scale factor can be changed at runtime. Range: 0.5 to 4.0.
+Widget geometry, fonts, icons, and dialog windows follow the scale. The scale factor can be changed at runtime. Range: 0.5 to 4.0.
 
 ## Widget layout
 
@@ -301,10 +272,10 @@ Widgets are defined as a flat array of `struct mkgui_widget`. Each widget has a 
 ```c
 struct mkgui_widget widgets[] = {
 //   MKGUI_W(type, id, label, icon, parent, w, h, flags, style, weight)
-    MKGUI_W(MKGUI_WINDOW, ID_WINDOW, "Title",  "", 0,      800, 600, 0, 0, 0),
-    MKGUI_W(MKGUI_VBOX,   ID_VBOX,   "",       "", ID_WINDOW, 0, 0,   0, 0, 0),
-    MKGUI_W(MKGUI_LABEL,  ID_LABEL,  "Hello",  "", ID_VBOX,0,   0,   0, 0, 0),
-    MKGUI_W(MKGUI_BUTTON, ID_BTN,    "OK",     "", ID_VBOX,100, 0, MKGUI_FIXED, 0, 0),
+	MKGUI_W(MKGUI_WINDOW, ID_WINDOW, "Title",  "", 0,      800, 600, 0, 0, 0),
+	MKGUI_W(MKGUI_VBOX,   ID_VBOX,   "",       "", ID_WINDOW, 0, 0,   0, 0, 0),
+	MKGUI_W(MKGUI_LABEL,  ID_LABEL,  "Hello",  "", ID_VBOX,0,   0,   0, 0, 0),
+	MKGUI_W(MKGUI_BUTTON, ID_BTN,    "OK",     "", ID_VBOX,100, 0, MKGUI_FIXED, 0, 0),
 };
 ```
 
@@ -342,4 +313,4 @@ gcc -std=c99 -O2 myapp.c $(pkg-config --cflags --libs mkgui1.0.0) -o myapp
 x86_64-w64-mingw32-gcc -std=c99 -O2 -I. myapp.c -Lout/windows -lmkgui -mwindows -o out/windows/myapp.exe
 ```
 
-The same widget definitions, event handling, and icon names work identically on both platforms.
+Both platforms use the same public widget definitions, event interface, and catalogue icon names.

@@ -12,7 +12,7 @@ All layout code lives in [mkgui.c](../mkgui.c), in the functions prefixed
 
 ## 1. Model
 
-mkgui is a **pure container-based, single-pass tree layout**. There are no
+mkgui uses **container-based tree layout with recursive measurement**. There are no
 anchor flags, no absolute coordinates on widgets, no constraints. Every
 widget's rect is produced by its parent.
 
@@ -73,7 +73,7 @@ specially in `lc_layout_node`:
 | `MKGUI_VBOX`, `MKGUI_PANEL`    | Vertical flex                                  |
 | `MKGUI_HBOX`                   | Horizontal flex                                |
 | `MKGUI_FORM`                   | Two-column label/control grid                  |
-| `MKGUI_GROUP`                  | Bordered titled box, holds exactly one child container |
+| `MKGUI_GROUP`                  | Bordered titled box, insets a child layout container |
 | `MKGUI_TABS`, `MKGUI_TAB`      | Tab strip + per-tab body                       |
 | `MKGUI_HSPLIT`, `MKGUI_VSPLIT` | Two-child ratio split                          |
 | `MKGUI_TOOLBAR`                | Children laid out by `render_toolbar`, not the engine |
@@ -108,7 +108,7 @@ The single-line-leaf rule matches Qt/GTK size-policy conventions: a
 `QLineEdit` / `GtkEntry` holds its natural height and does not stretch
 unless the programmer asks for it. To opt a single-line widget back into
 flex behaviour, set `weight > 0` explicitly
-(`mkgui_set_weight(id, 1)`).
+(`mkgui_set_weight(win, id, 1)`).
 
 The per-type classification lives in `widget_vflex_default` in
 [mkgui.c](../mkgui.c). Multi-line leaves (textarea, listview, gridview,
@@ -212,8 +212,7 @@ chrome children are pulled out and placed around the edges in this order:
    `win->statusbar_height`.
 
 Whatever remains is the body region passed down to the rest of the tree.
-Widgets bigger than `chrome[16]` are silently dropped, so a window cannot
-hold more than 16 chrome widgets.
+The window chrome collection has 16 slots; additional chrome children are not assigned by this path. Use one menu, toolbar, pathbar, and statusbar per window.
 
 ## 12. Generic-container fallback
 
@@ -223,9 +222,7 @@ Any container that is not one of the kinds above:
 - If `MKGUI_FIXED`, the child's own `w`/`h` override, falling back to
   container measurement or `natural_{width,height}`.
 
-This is also the only path that honours `margin_l/r/t/b`. Children inside
-VBOX/HBOX/FORM/GROUP/TABS **do not** see their margins applied -- that is
-by design, but it surprises people.
+VBOX/HBOX/FORM placement does not apply child margins. The generic fill path, including children of WINDOW, GROUP, TABS, and TAB, applies margins; the window pathbar also uses its horizontal margins.
 
 ## 13. Padding rule
 
@@ -262,8 +259,7 @@ Algorithm:
 `natural_height` and `natural_width` are the fallback when a leaf widget
 did not declare a size. Everything here is run through `sc()` so it scales
 with DPI. The numeric values come from the `MKGUI_NAT_*` defines in
-[mkgui.h](../mkgui.h) -- override them when compiling the toolkit if the
-defaults do not suit your app.
+[mkgui.h](../mkgui.h). To change these compile-time metrics, edit their definitions and rebuild the toolkit. Definitions in an application do not change an existing shared library.
 
 | Widget                                                          | Natural height                                |
 |-----------------------------------------------------------------|-----------------------------------------------|
@@ -353,29 +349,6 @@ Checklist for a new widget:
    toolbar button slots), compute and write them yourself during render,
    following the pattern in [mkgui_toolbar.c](../mkgui_toolbar.c).
 
-## 19. Known hardcoded values in layout code
+## 19. Literal offsets
 
-Magic numbers that are **not** routed through `MKGUI_*` defines. All of
-these mix a scaled font metric with a literal pixel offset, so they
-honour font scaling but not DPI scaling. The effect is small but causes
-relative padding to drift slightly at high DPI.
-
-| Location                        | Value                    | Role                                   |
-|---------------------------------|--------------------------|----------------------------------------|
-| `lc_measure_container` (GROUP)  | `font_height + 4`        | GROUP title strip height (`gtop`)      |
-| `lc_layout_node` (GROUP)        | `font_height + 4`        | GROUP title strip height (`gtop`)      |
-| VBOX fixed-group branch         | `font_height + 4`        | Collapsed GROUP height                 |
-| FORM measure / layout           | `font_height + 10`       | FORM row height                        |
-| WINDOW chrome / min size        | `font_height + 10`       | Toolbar row height                     |
-| Toolbar with icons              | `+ 10`                   | Toolbar height padding                 |
-| FORM label column               | `+ 8`                    | Label column padding                   |
-
-These remain because `font_height` already dominates the expression; the
-literal pixel offset is small next to the scaled font metric. Splitting
-them into `MKGUI_*` defines would be a readability improvement, not a
-correctness fix.
-
-Values that used to be on this list and are now scaled via sc():
-
-- `MKGUI_TAB_INSET` (2) -- MKGUI_TAB page inset and TABS min-size border.
-- `MKGUI_WIN_MIN_W`, `MKGUI_WIN_MIN_H` (200, 100) -- window min-size floor.
+Some layout formulas combine scaled font metrics with unscaled offsets, such as `font_height + 4` for a group header and `font_height + 10` for a form row. These formulas are implementation details; applications using the shared library cannot override them with compile-time definitions in their own source.

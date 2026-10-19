@@ -15,8 +15,7 @@ can be saved/loaded and a complete compilable C source file via code generation.
 ## Canvas
 
 The central area is a live-rendered canvas showing the window being designed.
-Widgets are rendered using the real mkgui renderer, not wireframe mockups, so
-what you see is what the generated program will look like.
+Layout uses the runtime engine. Simple widgets use toolkit rendering; widgets requiring live auxiliary data use simplified previews. The Test window runs the actual widgets.
 
 - Default size: 640x480
 - The designed window grows automatically when its contents need more space,
@@ -93,7 +92,7 @@ The right panel shows editable properties for the selected widget.
 | Field  | Key | Description |
 |--------|-----|-------------|
 | W      | W   | Width hint (0 = fill/auto) |
-| H      | H   | Height hint (0 = natural height from font) |
+| H      | H   | Height hint (0 = automatic under parent layout) |
 | ML/MR  |     | Left/right margins |
 | MT/MB  |     | Top/bottom margins |
 | Weight |     | Flex weight (visible when parent is HBox/VBox) |
@@ -370,20 +369,9 @@ staging slot and calling `render_widget`. Complex widgets that need aux data
 `ed_draw_widget_fallback`. A `uint64_t ed_real_render` bitfield in editor.c
 controls which widget types use real rendering.
 
-## Adding a new widget type
+## Extending the toolkit
 
-To add a new widget type to mkgui and the editor:
-
-1. Add enum value to widget type enum in `mkgui.h`
-2. Create `mkgui_newwidget.c` with render function and API functions
-3. `#include` it in `mkgui.c`
-4. Add case to `render_widget()` in mkgui.c
-5. Add `natural_height()` case in mkgui.c if it has a natural height
-6. **Editor rendering**: add bit to `ed_real_render` if no aux data needed, or add case to `ed_draw_widget_fallback` if aux data needed
-7. Add to editor palette (`ed_widgets[]` or `ed_containers[]`)
-8. Add default size in new-widget switch in editor.c
-9. Add `ed_type_name_upper()` case for code generation
-10. Add `ed_gen_id_name()` case for default ID prefix
+See [adding widgets](adding_widgets.md) for the implementation, feature configuration, editor, and code-generation changes required for a new widget type.
 
 ## Tips
 

@@ -691,7 +691,7 @@ MKGUI_API int32_t mkgui_icon_add(const char *name, const uint32_t *pixels, int32
 MKGUI_API int32_t mkgui_icon_load_svg(struct mkgui_window *win, const char *name, const char *path);
 // Return an icon index for (name, size), rasterising from the cached SVG
 // source or the shared mkguiicons catalogue if needed. Use
-// this when drawing at a size other than win->icon_size -- e.g. the
+// this when drawing at a size other than the default widget icon size, e.g. the
 // itemview in icon mode, file dialog thumbnails, or a custom gallery
 // widget. Returns -1 if no variant can be produced.
 MKGUI_API int32_t mkgui_icon_at_size(struct mkgui_window *win, const char *name, int32_t size);

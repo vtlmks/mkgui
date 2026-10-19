@@ -1,87 +1,39 @@
 # mkgui
 
-Minimal GUI toolkit for Linux (X11) and Windows (Win32). Software rendered, available as a shared library or a unity build (`#include "mkgui.c"`). Breeze-inspired styling. Uses FreeType2, Xlib/GDI, and the shared mkguiicons catalogue. The X11/Win32 windowing layer lives in a small sibling library, [mkwin](https://github.com/vtlmks/mkwin), pulled in as a git submodule.
+mkgui is a C99 GUI toolkit for Linux (X11) and Windows (Win32), with software rendering and a visual editor.
 
-This is a personal project by a single developer. It works well for what it does, but it has not been exhaustively tested across every platform, hardware configuration, or edge case. Use it, enjoy it, file issues if something breaks -- but don't expect the test coverage of a toolkit backed by a corporation. There are no guarantees, no roadmap, and no promises.
+Applications include `mkgui.h` and link the toolkit shared library. The demo, editor, and editor-generated applications use this interface. A separate shared library supplies the same Fluent SVG icon catalogue on both platforms.
+
+| Runtime library | Linux | Windows |
+|---|---|---|
+| Toolkit | `libmkgui.so.1.0.0` | `mkgui.dll` |
+| Icon catalogue | `libmkguiicons.so.1` | `mkguiicons.dll` |
+
+The toolkit contains its platform backend and SVG rasterizer. Applications do not link a separate mkwin or PlutoSVG library. Linux uses Xlib, Xext, FreeType, and Fontconfig; Windows uses system Win32/GDI APIs. OpenGL is used only by applications that create an OpenGL view.
 
 ![Demo application](screenshots/demo.png)
 
-## Project status
+## Build and run
 
-**v1.0.0 is the first stable release.** The author has used mkgui to ship several working applications. The shared library starts at version 1.0.0. Choose a release tag for an application and stay on it. Other tags may change the API or ABI; updating is explicit. Each full release has its own Linux SONAME, headers, static archive, and pkg-config package, so applications using different releases can coexist, including releases with the same major number.
+From a source checkout:
 
-## Versioning
-
-Linux installs `libmkgui.so.1.0.0` with that same full SONAME. Each release installs its own headers, static archive, and pkg-config package, such as `mkgui1.0.0`; it does not replace another release, even when their major numbers match. Windows applications ship a matching `mkgui.dll` beside their executable. The icon catalogue has its own independent version.
-
-`master` is the development branch. It can change behaviour, break API, or introduce regressions between commits without notice -- that's what it's for.
-
-**For anything you intend to ship, pin to a release tag.** Tags are the stability anchor; master is not.
-
-```bash
-# direct clone pinned to a tag
+```sh
 git clone https://github.com/vtlmks/mkgui.git
 cd mkgui
 git checkout v1.0.0
-git submodule update --init --recursive   # fetch the mkwin platform-layer submodule
-
-# or as a submodule of your own project
-git submodule add https://github.com/vtlmks/mkgui.git mkgui
-cd mkgui && git checkout v1.0.0 && git submodule update --init --recursive
+git submodule update --init --recursive
+./build.sh
+out/linux/demo
+out/linux/editor
 ```
 
-mkgui's own platform layer, `mkwin`, is itself a submodule, so the `git submodule update --init --recursive` step is required after any clone or checkout -- `mkgui.c` `#include`s the mkwin sources and will not compile without them. (Tags before `v0.5.0-beta` predate the submodule and simply skip that step.)
+The source build needs GCC, binutils, Bash, pkg-config, Python 3, and the Linux development packages listed in [getting started](documentation/getting_started.md#prerequisites). The demo also needs OpenGL development files. If the MinGW cross-compiler is installed, `build.sh` builds the Windows libraries and applications too.
 
-If you need a fix that only exists on master, open an issue so it can be cherry-picked into the next tag rather than silently depending on a moving target.
+Build outputs find their shared libraries in the output directory. No system installation is needed to try the demo or editor. `./build.sh library` builds the libraries; `./build.sh editor` builds the libraries and editor. Other targets and build modes are described in [getting started](documentation/getting_started.md#building-mkgui).
 
-See the [v1.0.0 changes](CHANGELOG.md#v100) and [migration guide](documentation/migration_v1.0.0.md) when updating from a beta release.
+`mkwin/` is a pinned source submodule. After changing the checkout, run `git submodule update --init --recursive`. The Fluent icon sources are vendored as ordinary files.
 
-## Features
-
-- 45+ widget types: buttons, inputs, checkboxes, dropdowns, sliders, spinboxes, treeviews, listviews, gridviews, tabs, menus, toolbars, statusbars, toggles, comboboxes, datepickers, and more
-- Auto-layout containers: VBox, HBox, Form, Group, Tabs, Splitters
-- Software rendering via XShm (Linux) and GDI (Windows) -- no GPU required
-- Built-in file dialogs, message boxes, input dialogs, color picker
-- Shared Fluent SVG icon catalogue via PlutoSVG, with theme-aware monochrome
-- Toolbar display modes: icons only, text only, icons + text
-- DPI scaling with auto-detection and `MKWIN_SCALE` environment variable override
-- Keyboard accelerators with automatic menu shortcut display
-- Undo/redo in text input and textarea widgets
-- External file drag-and-drop (XDnd on Linux, WM_DROPFILES on Windows)
-- Visual editor with drag-and-drop, property editing, and C code generation
-- Shared library: include `mkgui.h` and link `-lmkgui`
-- Unity and static builds remain available
-
-## Visual editor
-
-![Widget editor](screenshots/editor.png)
-
-The editor generates complete, compilable C source files. Design your UI visually, set events, and hit Generate -- the output compiles and runs immediately.
-
-See [documentation/editor.md](documentation/editor.md) for the full editor guide.
-
-## Getting started
-
-mkgui pulls its X11/Win32 windowing layer from the [mkwin](https://github.com/vtlmks/mkwin) git submodule, so make sure it is checked out -- `mkgui.c` `#include`s the mkwin sources and will not compile without them.
-
-1. Get the mkgui source **with its submodule**: clone the repo, then run `git submodule update --init --recursive`.
-2. Run `./build.sh` to build the libraries, demo, editor, and tests.
-3. `#include "mkgui.h"` in your application and link the shared library:
-   ```bash
-   # Linux, with the libraries beside the executable
-   gcc -std=c99 -O2 myapp.c -I. -Lout/linux -lmkgui '-Wl,-rpath,$ORIGIN' -o out/linux/myapp
-
-   # Windows (MinGW)
-   x86_64-w64-mingw32-gcc -std=c99 -O2 myapp.c -I. -Lout/windows -lmkgui -mwindows -o out/windows/myapp.exe
-   ```
-4. On Linux, run `./install_icons.sh`, `./install.sh`, and `ldconfig` with permission to install into `/usr` (`PREFIX` and `DESTDIR` are supported), or keep the libraries beside the executable. On Windows, ship `mkgui.dll` and `mkguiicons.dll` beside the executable.
-
-Installed Linux builds use `gcc myapp.c $(pkg-config --cflags --libs mkgui1.0.0) -o myapp`.
-Building the catalogue requires Python 3. Linux builds also require GCC, binutils, pkg-config, and the X11, Xext, FreeType2, and Fontconfig development packages. The default demo additionally needs OpenGL development files. See [getting started](documentation/getting_started.md) for dependencies, installation, static and unity builds, and Windows commands.
-
-OpenGL is only required if the application uses the `MKGUI_GLVIEW` widget (add `-lGL` on Linux or `-lopengl32` on Windows). The core library, editor, and all other widgets have no GPU dependency.
-
-## Quick example
+## Use in an application
 
 ```c
 #include "mkgui.h"
@@ -132,99 +84,61 @@ int main(void) {
 }
 ```
 
-## Icons
 
-Linux and Windows use the same Fluent SVG catalogue through `libmkguiicons.so.1`
-or `mkguiicons.dll`. The library contains 21,788 SVG designs, exposed as 6,683
-names covering styles, sizes, languages, and directions. It is approximately
-28 MiB and is shared by applications. The upstream snapshot is vendored as
-ordinary files, without a submodule.
-
-```c
-#include "mkguiicons_names.h"
-mkgui_set_icon(win, ID_SAVE, MKICON_SAVE);
-```
-
-Icons are rasterized directly at the current pixel size. Monochrome icons follow
-the theme text colour. The editor browses this catalogue, with name/keyword search,
-name groups, and style selection. Projects store icon names; no icon manifest or
-per-application SVG directory is needed. Custom SVGs can still be registered with
-`mkgui_icon_load_svg()`.
-
-Build with `./build.sh icons`. Install on Linux with `./install_icons.sh`
-(default prefix `/usr`; supports `PREFIX` and `DESTDIR`), then refresh the
-system linker cache when installing systemwide. On Windows, put `mkguiicons.dll`
-beside the executable. Build outputs already include the library beside the
-editor and demo. See [the icon API](documentation/icons.md) for enumeration,
-naming, linking, and installation.
-
-## Building the demo and editor
-
-```bash
-./build.sh          # normal (debug symbols)
-./build.sh release  # optimized, stripped
-./build.sh debug    # -g -O0
-```
-
-## Benchmarking
-
-`out/linux/mkguibench` measures layout, full rendering, dirty rendering, completed presentation, and complete frames independently:
-
-```bash
-taskset -c 9 chrt -f 99 out/linux/mkguibench layout mixed 2048 1920 1080 10000
-taskset -c 9 chrt -f 99 out/linux/mkguibench render buttons 256 1920 1080 1000
-taskset -c 9 chrt -f 99 out/linux/mkguibench dirty mixed 256 1920 1080 10000
-taskset -c 9 chrt -f 99 out/linux/mkguibench present fill 0 1920 1080 1000
-taskset -c 9 chrt -f 99 out/linux/mkguibench frame mixed 256 1920 1080 1000
-```
-
-These examples use CPU 9 and FIFO priority 99 on the development host; choose a CPU available on your machine. The output is one machine-readable row containing total time, time per iteration, time per widget or pixel, a minimum effective framebuffer bandwidth, and a framebuffer checksum. Use a real X server for presentation measurements. Xvfb is suitable for correctness and repeatability checks but does not represent display-server or hardware presentation cost.
-
-For hardware counters, run a sufficiently long case pinned to one CPU:
-
-```bash
-taskset -c 11 chrt -f 99 perf stat -r 5 -e cycles,instructions,branches,branch-misses,cache-references,cache-misses taskset -c 9 out/linux/mkguibench render mixed 256 1920 1080 5000
-```
-
-## Building on Windows
-
-The supplied `build.sh` runs on Linux and cross-compiles Windows libraries,
-demo, editor, and tests when `x86_64-w64-mingw32-gcc` is installed.
-For native builds, use the [MSYS2 / MinGW commands](documentation/getting_started.md#native-windows-builds).
-The generated import libraries target MinGW; these commands use GCC and GNU assembly.
-
-A Windows application includes `mkgui.h` and links the toolkit import library:
+Compile against the libraries in this checkout:
 
 ```sh
-gcc -std=c99 -O2 myapp.c -I. -Lout/windows -lmkgui -mwindows -o out/windows/myapp.exe
+# Linux: executable and shared libraries in out/linux
+gcc -std=c99 -O2 -Wall -Wextra myapp.c -I. -Lout/linux -lmkgui '-Wl,-rpath,$ORIGIN' -o out/linux/myapp
+
+# Windows: executable and DLLs in out/windows
+x86_64-w64-mingw32-gcc -std=c99 -O2 -Wall -Wextra myapp.c -I. -Lout/windows -lmkgui -mwindows -o out/windows/myapp.exe
 ```
 
-Put `mkgui.dll` and `mkguiicons.dll` beside the executable. Applications that
-call the icon enumeration/SVG API directly also link `-lmkguiicons`.
-Add `-lopengl32` when using `MKGUI_GLVIEW`; the bundled demo requires it.
-FreeType and Fontconfig are unnecessary on Windows, where text uses GDI.
+For systemwide Linux installation, run `./install_icons.sh`, `./install.sh`, and `ldconfig` with the required filesystem permissions. Both installers default to `/usr` and support `PREFIX` and `DESTDIR`. Installed applications compile with `gcc myapp.c $(pkg-config --cflags --libs mkgui1.0.0) -o myapp`.
+
+Windows applications ship `mkgui.dll` and `mkguiicons.dll` beside the executable. See [getting started](documentation/getting_started.md) for installation, native Windows builds, and optional static or source-inclusion builds.
+
+## Widgets and editor
+
+The toolkit provides buttons, text inputs, checkboxes, lists and trees, tables, tabs, menus, toolbars, sliders, spinboxes, images, custom canvases, and OpenGL child windows. Containers arrange widgets by parent ID, size hints, and weight. Built-in dialogs cover files, messages, text input, colours, and icon selection.
+
+Other features include runtime scaling, themes, keyboard accelerators, text undo/redo, file drag-and-drop, and multiple windows. The [API guide](documentation/doc.md) describes widget setup and events.
+
+![Widget editor](screenshots/editor.png)
+
+The editor designs layouts using the same layout engine as the toolkit. It saves `.mkgui` projects and generates C source that links the shared library, plus a sibling feature-configuration header. It can also export widget-array snippets. See the [editor guide](documentation/editor.md).
+
+## Icons
+
+Both platforms use the Fluent SVG catalogue in `mkguiicons`. Widget definitions store names such as `MKICON_SAVE` from `mkguiicons_names.h`. The editor browses the same catalogue. Applications need no desktop icon theme, exported icon list, or per-application SVG directory.
+
+SVGs are rasterized at the requested pixel dimensions, including fractional scales. Monochrome icons follow the theme text colour; colour icons retain their colours. Custom SVG files and pixel icons can also be registered. The independent [icon API](documentation/icons.md) provides name enumeration, search metadata, size variants, and SVG lookup.
+
+## Versions
+
+**1.0.0 is the first stable library release.** Choose a release tag for an application and stay on it. Other tags may change the API or ABI; updating is an explicit porting decision. Each full release has its own Linux SONAME, headers, static archive, and pkg-config package, so applications built against different releases can coexist on the same machine, including releases with the same major number. Windows applications carry their matching DLLs beside the executable.
+
+For example, `pkg-config --cflags --libs mkgui1.0.0` selects the 1.0.0 headers and library. The executable records `libmkgui.so.1.0.0` and continues loading that release when others are installed.
+
+`master` is the development branch. Use a published release tag for a fixed source snapshot, and initialize its pinned mkwin submodule. The icon catalogue has its own version and ABI; compatible catalogue updates serve multiple toolkit versions. See [the changelog](CHANGELOG.md) and [migration from beta releases](documentation/migration_v1.0.0.md).
 
 ## Documentation
 
-- [Getting started: building, installing, and linking](documentation/getting_started.md)
-- [Icon catalogue, names, and enumeration API](documentation/icons.md)
-- [Migrating to v1.0.0](documentation/migration_v1.0.0.md)
-- [Release changelog](CHANGELOG.md)
-- [API reference and widget guide](documentation/doc.md)
-- [Visual editor guide](documentation/editor.md)
-- [Adding new widgets](documentation/adding_widgets.md)
-- [Layout engine reference](documentation/layout.md)
-- [Benchmark harness and current baseline](documentation/benchmark.md)
+- [Build, install, and link](documentation/getting_started.md)
+- [API and widget guide](documentation/doc.md)
+- [Visual editor](documentation/editor.md)
+- [Icons and enumeration](documentation/icons.md)
+- [Layout rules](documentation/layout.md)
+- [Benchmark commands and timing fields](documentation/benchmark.md)
+- [Internal architecture](documentation/architecture.md)
+- [Adding widgets](documentation/adding_widgets.md)
 
-## Limitations
+## Limitations and contributions
 
-- Latin-1 (ISO 8859-1) text only -- covers Western European languages. No CJK, Arabic, or complex text shaping
-- No right-to-left (RTL) layout support
-- No accessibility API integration (tab navigation and keyboard accelerators are supported)
+Text rendering covers Latin-1 glyphs without complex shaping or right-to-left layout. There is no accessibility API integration.
 
-## Contributing
-
-Solo project with a strict C style (hard tabs, `if(` not `if (`, unity build, no `const`, no forward declarations, etc. - see the source for the full flavour). Bug reports with a minimal reproducer are very welcome; please file an issue. Pull requests are disabled by choice - any fixes will be applied in-house from a good report. Security-sensitive reports: see [SECURITY.md](SECURITY.md).
+This is a solo project. Bug reports with a reproducer are welcome through issues; fixes are applied in-house rather than through pull requests. Security reports are described in [SECURITY.md](SECURITY.md).
 
 ## License
 

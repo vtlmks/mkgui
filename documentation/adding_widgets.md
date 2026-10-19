@@ -97,7 +97,7 @@ editor's Build Features names, dependency closure, and generated exclusions.
 A new widget type changes the public interface and belongs to a new release tag. Each tag has its own headers and full-release runtime library.
 Changes to private types shared with the editor also require a new private
 bridge revision and a matching editor rebuild; see
-[architecture](architecture.md#build-model).
+[architecture](architecture.md#libraries-and-source-organization).
 
 ## editor.c - visual editor
 

@@ -2,101 +2,11 @@
 
 Minimal GUI toolkit for Linux (X11) and Windows (Win32) with software rendering. Shared library with optional static and unity builds. Uses FreeType2, Fontconfig, and Xlib (Linux) or GDI (Windows), plus the shared mkguiicons catalogue. PlutoSVG/PlutoVG are embedded in the source tree, not external dependencies.
 
-## Building
+## Using the library
 
-Applications include `mkgui.h` and link the shared library:
+Applications include `mkgui.h` and select the matching release with `pkg-config --cflags --libs mkgui1.0.0` after installation, or `-Lout/linux -lmkgui` within this checkout. The [README example](../README.md#use-in-an-application) is a complete program. [Getting started](getting_started.md) covers build prerequisites, Linux installation, Windows DLLs, and optional static/source builds. [Icons](icons.md) describes the separate shared SVG catalogue.
 
-```bash
-gcc -std=c99 -O2 -Wall -Wextra myapp.c -o myapp $(pkg-config --cflags --libs mkgui1.0.0)
-```
-
-See [getting started](getting_started.md) for installation, Windows, static,
-and unity build commands.
-
-Or use the included `build.sh`:
-
-```bash
-./build.sh          # normal (-O2, debug symbols)
-./build.sh release  # -O2 stripped
-./build.sh debug    # -g -O0
-./build.sh size     # -Os stripped
-./build.sh asan     # -O0 -fsanitize=address,undefined (Linux only)
-./build.sh clean    # remove out/
-```
-
-`build.sh` produces `out/linux/demo`, `out/linux/editor`, `out/linux/libmkgui.so.1.0.0`, `out/linux/libmkgui.a`, `out/linux/libmkguiicons.so.1`, and the test binaries. It also cross-compiles `out/windows/demo.exe`, `out/windows/editor.exe`, `out/windows/mkgui.dll`, and `out/windows/mkguiicons.dll` if `x86_64-w64-mingw32-gcc` is available.
-
-The source build needs Git, Bash, binutils, pkg-config, and Python 3. Initialize the pinned mkwin submodule with `git submodule update --init --recursive`. Python generates the icon catalogue and is not needed by applications.
-
-Both platforms require the shared icon catalogue at runtime, including static/unity toolkit builds. See [icons.md](icons.md) for its independent API and naming contract.
-
-### Linux dependencies
-
-- **FreeType2** -- glyph rasterization
-- **Fontconfig** -- font file lookup
-- **Xlib** (`-lX11`) -- windowing
-- **Xext** (`-lXext`) -- MIT-SHM framebuffer blit
-- **-lm** -- used by PlutoVG path math
-
-### Windows dependencies
-
-- **GDI** (`-lgdi32`) -- windowing, font rendering, framebuffer blit
-- `-mwindows` to mark the executable as a GUI app (no console)
-
-### OpenGL is optional
-
-OpenGL (`-lGL` / `-lopengl32`) is only required if your application instantiates a `MKGUI_GLVIEW` widget. The core library, static library, editor, and all other widgets have no GPU dependency. The bundled `demo` binary uses `MKGUI_GLVIEW`, so building `demo.c` pulls in OpenGL; `libmkgui.a`, the editor, and user applications that do not use GL views do not.
-
-## Quick start
-
-```c
-#include "mkgui.h"
-#include "mkguiicons_names.h"
-
-enum { ID_WIN = 1, ID_BOX, ID_BTN, ID_LBL };
-
-// [=]===^=[ on_event ]========================================================================[=]
-static void on_event(struct mkgui_window *win, struct mkgui_event *ev, void *userdata) {
-	(void)userdata;
-
-	if(ev->type == MKGUI_EVENT_CLOSE) {
-		mkgui_ctx_quit(mkgui_window_get_ctx(win));
-
-	} else if(ev->type == MKGUI_EVENT_CLICK && ev->id == ID_BTN) {
-		mkgui_label_set(win, ID_LBL, "Clicked!");
-
-	}
-}
-
-// [=]===^=[ main ]============================================================================[=]
-int main(void) {
-	struct mkgui_widget widgets[] = {
-		MKGUI_W(MKGUI_WINDOW, ID_WIN, "Hello", "", 0, 400, 300, 0, 0, 0),
-		MKGUI_W(MKGUI_VBOX, ID_BOX, "", "", ID_WIN, 0, 0, 0, 0, 0),
-		MKGUI_W(MKGUI_BUTTON, ID_BTN, "Click", MKICON_CHECKMARK, ID_BOX, 120, 0, MKGUI_FIXED, 0, 0),
-		MKGUI_W(MKGUI_LABEL, ID_LBL, "Ready", "", ID_BOX, 0, 0, 0, 0, 0),
-	};
-	struct mkgui_ctx *ctx = mkgui_ctx_create();
-
-	if(ctx) {
-		struct mkgui_window *win = mkgui_window_create(ctx, NULL, widgets, sizeof(widgets) / sizeof(widgets[0]), NULL, 0, 0);
-
-		if(win) {
-			mkgui_ctx_run(ctx, on_event, NULL);
-			mkgui_window_destroy(win);
-			mkgui_ctx_destroy(ctx);
-			return 0;
-
-		}
-
-		mkgui_ctx_destroy(ctx);
-
-	}
-
-	return 1;
-
-}
-```
+The declarations in [mkgui.h](../mkgui.h), [mkgui_glview.h](../mkgui_glview.h), and [mkguiicons.h](../mkguiicons.h) define the public interfaces. `struct mkgui_ctx` and `struct mkgui_window` are opaque to shared/static consumers. The examples below use `ctx` for the application context and `win` for a window. Widget-array entries and event-handler cases are fragments to insert into an application, rather than standalone programs.
 
 ## Architecture
 
@@ -104,39 +14,31 @@ Your application includes `mkgui.h` and links the shared library. A unity build 
 
 Widget hierarchy is expressed via `parent_id`. Every widget has a unique nonzero integer `id`; zero means no parent or no widget. The first widget must be `MKGUI_WINDOW` with `parent_id = 0`.
 
-Multiple windows on the same ctx are supported by passing a non-NULL `parent` to `mkgui_window_create()`. See [Multi-window](#multi-window) below.
+Create additional windows on the same context with `mkgui_window_create()`. Pass a parent window for a transient child, or NULL for an independent window. See [Multi-window](#multi-window) below.
 
 ### Parameter ownership
 
-mkgui never modifies data passed as input parameters. Strings, widget arrays, column definitions, file dialog options, dropdown items, pixel buffers, and all other input data are either copied into internal storage or read in place. Your original data is never touched.
+The toolkit copies widget definitions and ordinary setter strings. Text getters expose library-owned storage; some use shared scratch buffers that another getter call can overwrite. Copy returned text before subsequent API calls when it must remain stable. Do not retain window-owned pointers after window destruction.
 
-A small number of functions take explicit output parameters that the caller allocates and mkgui fills in:
+List/grid column definitions, dropdown/combobox items, and image pixels are also copied. Registered callbacks and their `userdata` are retained; callback code and referenced application state must remain valid while registered. Callback output buffers are writable.
 
-| Function | Output parameter | Description |
-|----------|-----------------|-------------|
-| `mkgui_dialog_input` | `char *out, uint32_t out_size` | User-entered text |
-| `mkgui_dialog_color` | `uint32_t *out_color` | Chosen color |
-| `mkgui_listview_get_multi_sel` | `int32_t **out` | Selection index array (library-owned) |
-| `mkgui_treelist_get_multi_sel` | `int32_t **out` | Selected node-handle array (library-owned) |
-| `mkgui_pathbar_get_segment_path` | `char *out, uint32_t out_size` | Composed path string |
-
-These are the only parameters mkgui writes to.
+Explicit output parameters are writable. Examples include dialog results, window dimensions/position, selected-text buffers, icon-browser names, and selection arrays returned through output pointers. Selection-array getters expose internal arrays; the caller does not free them.
 
 ## Widget definition
 
 ```c
 struct mkgui_widget {
-    uint32_t type;        // MKGUI_BUTTON, MKGUI_INPUT, etc.
-    uint32_t id;          // unique identifier
-    uint32_t parent_id;   // parent widget id
-    int32_t  w, h;        // size (0 = natural size derived from font height)
-    uint32_t flags;       // universal layout flags (MKGUI_FIXED, MKGUI_HIDDEN, etc.)
-    uint32_t style;       // per-widget-type flags (MKGUI_LABEL_TRUNCATE, MKGUI_CHECKBOX_CHECKED, etc.)
-    uint32_t weight;      // layout weight (0=default flex, >0=explicit proportional)
-    int32_t  margin_l, margin_r, margin_t, margin_b; // layout margins
-    int32_t  label_tw;    // cached label text width; leave 0 (mkgui re-measures on first render)
-    char     label[256];  // display text
-    char     icon[64];    // catalogue icon name (e.g. "folder-open")
+	uint32_t type;        // MKGUI_BUTTON, MKGUI_INPUT, etc.
+	uint32_t id;          // unique identifier
+	uint32_t parent_id;   // parent widget id
+	int32_t  w, h;        // size hint (0 = automatic under parent layout)
+	uint32_t flags;       // universal layout flags (MKGUI_FIXED, MKGUI_HIDDEN, etc.)
+	uint32_t style;       // per-widget-type flags (MKGUI_LABEL_TRUNCATE, MKGUI_CHECKBOX_CHECKED, etc.)
+	uint32_t weight;      // layout weight (0=default flex, >0=explicit proportional)
+	int32_t  margin_l, margin_r, margin_t, margin_b; // layout margins
+	int32_t  label_tw;    // cached label text width; leave 0 (mkgui re-measures on first render)
+	char     label[MKGUI_MAX_TEXT];  // display text
+	char     icon[MKGUI_ICON_NAME_LEN];    // catalogue icon name (e.g. "folder-open")
 };
 ```
 
@@ -148,7 +50,7 @@ MKGUI_W(type, id, label, icon, parent_id, w, h, flags, style, weight)
 
 The `flags` field holds universal layout and state flags: `MKGUI_FIXED`, `MKGUI_HIDDEN`, `MKGUI_DISABLED`, `MKGUI_SCROLL`, `MKGUI_NO_PAD`, `MKGUI_VERTICAL`, `MKGUI_REGION_*`, `MKGUI_ALIGN_*`. The `style` field holds per-widget-type appearance flags, named with the widget type prefix: `MKGUI_CHECKBOX_CHECKED`, `MKGUI_INPUT_PASSWORD`, `MKGUI_INPUT_READONLY`, `MKGUI_MENUITEM_SEPARATOR`, `MKGUI_MENUITEM_CHECK`, `MKGUI_MENUITEM_RADIO`, `MKGUI_PANEL_BORDER`, `MKGUI_PANEL_SUNKEN`, `MKGUI_SLIDER_MIXER`, `MKGUI_METER_TEXT`, `MKGUI_IMAGE_STRETCH`, `MKGUI_TAB_CLOSABLE`, `MKGUI_LISTVIEW_MULTI_SELECT`, `MKGUI_LABEL_TRUNCATE`, `MKGUI_TOOLBAR_ICONS_ONLY`, `MKGUI_TOOLBAR_TEXT_ONLY`, `MKGUI_LABEL_LINK`, `MKGUI_GROUP_COLLAPSIBLE`, `MKGUI_GROUP_COLLAPSED`, `MKGUI_LABEL_WRAP`, `MKGUI_INPUT_NUMERIC`.
 
-There are no `x, y` fields. All positioning is handled by the container-based layout system. The `w` and `h` fields specify size; when `h` is 0, the widget uses its natural height (derived from the font height for most widget types).
+There are no `x, y` fields. All positioning is handled by the container-based layout system. The `w` and `h` fields are size hints. Zero selects automatic sizing under the parent container: natural size and flex distribution depend on the widget, weight, flags, and layout axis. See [layout rules](layout.md).
 
 ## Widget types
 
@@ -205,24 +107,22 @@ All layout is container-based. There are no `x, y` position fields on widgets. E
 
 ### How it works
 
-- **WINDOW** acts as a VBOX for its non-chrome children. Menu, toolbar, statusbar, and pathbar are auto-positioned as window chrome (see [Window chrome auto-layout](#window-chrome-auto-layout)). All other children fill the remaining content area using VBOX stacking.
+- **WINDOW** reserves space for menu, toolbar, statusbar, and an automatic-height pathbar (see [Window chrome auto-layout](#window-chrome-auto-layout)). Ordinary children receive the remaining content rectangle. Use a single body container to arrange them; direct body siblings overlap.
 - **PANEL** behaves as a VBOX container. Children are stacked vertically.
 - **VBOX** stacks children top-to-bottom.
 - **HBOX** stacks children left-to-right.
 - **FORM** pairs children into label+control rows.
-- **GROUP** insets children inside a bordered frame, stacking like VBOX.
+- **GROUP** insets its content inside a bordered frame. Give it a child layout container to arrange multiple controls.
 - **TABS/TAB** -- each TAB acts as a container for its children.
 - **HSPLIT/VSPLIT** -- children use `MKGUI_REGION_*` flags to select their pane.
 
 ### Natural sizing
 
-When `h` is 0, widgets use a natural height derived from the font height. Most leaf widgets (buttons, labels, inputs, checkboxes, radios, dropdowns, spinboxes, etc.) have sensible natural heights. This means you rarely need to specify `h` explicitly.
-
-When `w` is 0 in a flex container, the widget stretches to fill available space along the layout axis.
+Zero width/height selects automatic sizing under the parent layout. A VBox holds single-line controls at natural height when weight is zero; positive weight opts them into vertical flex. An HBox distributes flexible widths and fills its cross-axis height unless explicit height, fixed sizing, or alignment selects a smaller height. See [layout rules](layout.md).
 
 ### Margins
 
-The `margin_l`, `margin_r`, `margin_t`, `margin_b` fields add spacing around a widget, inset from where the container would normally place it. Margins do not affect siblings -- they only shrink the widget's own allocated area.
+Margins are applied by the generic fill path, including direct content children of WINDOW, GROUP, TABS, and TAB. VBox/HBox/Form child placement does not apply them. Put spacing in the relevant container or use spacers when arranging box/form children. See [layout rules](layout.md#12-generic-container-fallback).
 
 ### Common patterns
 
@@ -268,7 +168,7 @@ Change toolbar display mode at runtime with `mkgui_toolbar_set_mode()`. The tool
 
 ### Style flags (`style` field)
 
-Each widget type has its own private flag namespace inside the `style` field, starting at bit 0. Different widget types reuse the same bit positions -- for example `MKGUI_CHECKBOX_CHECKED`, `MKGUI_BUTTON_CHECKED`, and `MKGUI_INPUT_PASSWORD` all live at bit 0, but that is harmless because the `style` field is interpreted relative to the widget's `type`. Always reference flags by name; the numeric bit layout is an internal detail and may change between releases.
+Each widget type has its own flag namespace inside the `style` field, starting at bit 0. Different widget types reuse the same bit positions -- for example `MKGUI_CHECKBOX_CHECKED`, `MKGUI_BUTTON_CHECKED`, and `MKGUI_INPUT_PASSWORD` all live at bit 0, but that is harmless because the `style` field is interpreted relative to the widget's `type`. Use the named constants. Their meanings and values belong to the selected release's public interface; other tags may change them.
 
 **Button:**
 
@@ -385,12 +285,12 @@ The toolbar mode is selected by masking `MKGUI_TOOLBAR_MODE_MASK`. Change at run
 
 ```c
 struct mkgui_event {
-    uint32_t type;    // MKGUI_EVENT_*
-    uint32_t id;      // widget that triggered the event
-    int32_t  value;   // event-specific value
-    int32_t  col;     // column (listview events)
-    uint32_t keysym;  // key code (key events)
-    uint32_t keymod;  // modifier mask (key events)
+	uint32_t type;    // MKGUI_EVENT_*
+	uint32_t id;      // widget that triggered the event
+	int32_t  value;   // event-specific value
+	int32_t  col;     // column (listview events)
+	uint32_t keysym;  // key code (key events)
+	uint32_t keymod;  // modifier mask (key events)
 };
 ```
 
@@ -423,7 +323,7 @@ struct mkgui_event {
 | `MKGUI_EVENT_SCROLL` | Scrollbar value changed, or wheel over canvas | scrollbar position, or wheel delta in pixels for canvas | 0 = vertical wheel, 1 = horizontal wheel (canvas only) |
 | `MKGUI_EVENT_CONTEXT` | Right-click on widget | row/node/item (-1 if empty) for views, mouse x otherwise | column for views, mouse y otherwise |
 | `MKGUI_EVENT_CONTEXT_HEADER` | Right-click on column header | mouse x | column index |
-| `MKGUI_EVENT_CONTEXT_MENU` | Context navigation item selected | item id | checked state (0/1) |
+| `MKGUI_EVENT_CONTEXT_MENU` | Context menu item selected (`id` is the item ID) | checked state (0/1) | -- |
 | `MKGUI_EVENT_GRIDVIEW_SELECT` | Grid row selection changed via keyboard navigation (up/down/page/home/end); mouse cell clicks and left/right column moves emit `GRID_CLICK` | row | column |
 | `MKGUI_EVENT_GRIDVIEW_REORDER` | Row drag-and-drop reorder | source row | target row |
 | `MKGUI_EVENT_RICHLIST_SELECT` | Rich list row selected | row | -- |
@@ -469,70 +369,68 @@ struct mkgui_event {
 
 ```c
 // Context lifecycle (one ctx per process)
-struct mkgui_ctx *mkgui_ctx_create(void);
-void mkgui_ctx_destroy(struct mkgui_ctx *ctx);
-void mkgui_ctx_set_app_class(struct mkgui_ctx *ctx, const char *app_class);
+MKGUI_API struct mkgui_ctx *mkgui_ctx_create(void);
+MKGUI_API void mkgui_ctx_destroy(struct mkgui_ctx *ctx);
+MKGUI_API void mkgui_ctx_set_app_class(struct mkgui_ctx *ctx, const char *app_class);
 
-// Window lifecycle (up to MKGUI_MAX_WINDOWS windows per ctx)
-struct mkgui_window *mkgui_window_create(struct mkgui_ctx *ctx, struct mkgui_window *parent,
-                                         const struct mkgui_widget *widgets, uint32_t count,
-                                         const char *title, int32_t w, int32_t h);
-void mkgui_window_destroy(struct mkgui_window *win);
-struct mkgui_ctx *mkgui_window_get_ctx(struct mkgui_window *win);
-void mkgui_window_set_callback(struct mkgui_window *win, mkgui_event_cb cb, void *userdata);
+// Window lifecycle
+MKGUI_API struct mkgui_window *mkgui_window_create(struct mkgui_ctx *ctx, struct mkgui_window *parent, const struct mkgui_widget *widgets, uint32_t count, const char *title, int32_t w, int32_t h);
+MKGUI_API void mkgui_window_destroy(struct mkgui_window *win);
+MKGUI_API struct mkgui_ctx *mkgui_window_get_ctx(struct mkgui_window *win);
+MKGUI_API void mkgui_window_set_callback(struct mkgui_window *win, mkgui_event_cb cb, void *userdata);
 
 // Main loop (ctx-scoped: covers every window on the ctx)
-void mkgui_ctx_run(struct mkgui_ctx *ctx, mkgui_event_cb cb, void *userdata);
-void mkgui_ctx_quit(struct mkgui_ctx *ctx);
-void mkgui_ctx_set_quit(struct mkgui_ctx *ctx, uint32_t value);
-uint32_t mkgui_ctx_should_quit(struct mkgui_ctx *ctx);
-void mkgui_ctx_wait(struct mkgui_ctx *ctx);
-void mkgui_ctx_wait_until(struct mkgui_ctx *ctx, uint64_t deadline_ns);
-void mkgui_ctx_pump_others(struct mkgui_ctx *ctx);
-void mkgui_ctx_reap_closed(struct mkgui_ctx *ctx);
-uint32_t mkgui_window_poll(struct mkgui_window *win, struct mkgui_event *ev);
-uint64_t mkgui_now_ns(void);
+MKGUI_API void mkgui_ctx_run(struct mkgui_ctx *ctx, mkgui_event_cb cb, void *userdata);
+MKGUI_API void mkgui_ctx_quit(struct mkgui_ctx *ctx);
+MKGUI_API void mkgui_ctx_set_quit(struct mkgui_ctx *ctx, uint32_t value);
+MKGUI_API uint32_t mkgui_ctx_should_quit(struct mkgui_ctx *ctx);
+MKGUI_API void     mkgui_ctx_wait(struct mkgui_ctx *ctx);
+MKGUI_API void     mkgui_ctx_wait_until(struct mkgui_ctx *ctx, uint64_t deadline_ns);
+MKGUI_API void mkgui_ctx_pump_others(struct mkgui_ctx *ctx);
+MKGUI_API void mkgui_ctx_reap_closed(struct mkgui_ctx *ctx);
+MKGUI_API uint32_t mkgui_window_poll(struct mkgui_window *win, struct mkgui_event *ev);
+MKGUI_API uint64_t mkgui_now_ns(void);
 
 // Per-window close flag (default: X close button auto-sets this; app can clear)
-void mkgui_window_set_close(struct mkgui_window *win, uint32_t value);
-uint32_t mkgui_window_should_close(struct mkgui_window *win);
+MKGUI_API void mkgui_window_set_close(struct mkgui_window *win, uint32_t value);
+MKGUI_API uint32_t mkgui_window_should_close(struct mkgui_window *win);
 
 // Deferred self-destroy (safe to call from a window's own callback)
-void mkgui_window_close(struct mkgui_window *win);
+MKGUI_API void mkgui_window_close(struct mkgui_window *win);
 
 // Window operations
-void mkgui_window_show(struct mkgui_window *win);
-void mkgui_window_hide(struct mkgui_window *win);
-uint32_t mkgui_window_is_visible(struct mkgui_window *win);
-void mkgui_window_move(struct mkgui_window *win, int32_t x, int32_t y);
-void mkgui_window_get_position(struct mkgui_window *win, int32_t *x, int32_t *y);
-void mkgui_window_begin_drag(struct mkgui_window *win);
-void mkgui_window_set_shape(struct mkgui_window *win, const int32_t *xy_pairs, uint32_t point_count);
-void mkgui_window_set_shape_mask(struct mkgui_window *win, const uint32_t *argb, int32_t w, int32_t h, uint32_t alpha_threshold);
-void mkgui_window_clear_shape(struct mkgui_window *win);
-void mkgui_window_resize(struct mkgui_window *win, int32_t w, int32_t h);
-void mkgui_window_invalidate(struct mkgui_window *win);
-void mkgui_window_set_title(struct mkgui_window *win, const char *title);
-void mkgui_window_set_instance(struct mkgui_window *win, const char *instance);
+MKGUI_API void mkgui_window_show(struct mkgui_window *win);
+MKGUI_API void mkgui_window_hide(struct mkgui_window *win);
+MKGUI_API uint32_t mkgui_window_is_visible(struct mkgui_window *win);
+MKGUI_API void mkgui_window_move(struct mkgui_window *win, int32_t x, int32_t y);
+MKGUI_API void mkgui_window_get_position(struct mkgui_window *win, int32_t *x, int32_t *y);
+MKGUI_API void mkgui_window_begin_drag(struct mkgui_window *win);
+MKGUI_API void mkgui_window_set_shape(struct mkgui_window *win, const int32_t *xy_pairs, uint32_t point_count);
+MKGUI_API void mkgui_window_set_shape_mask(struct mkgui_window *win, const uint32_t *argb, int32_t w, int32_t h, uint32_t alpha_threshold);
+MKGUI_API void mkgui_window_clear_shape(struct mkgui_window *win);
+MKGUI_API void mkgui_window_resize(struct mkgui_window *win, int32_t w, int32_t h);
+MKGUI_API void mkgui_window_invalidate(struct mkgui_window *win);
+MKGUI_API void mkgui_window_set_title(struct mkgui_window *win, const char *title);
+MKGUI_API void mkgui_window_set_instance(struct mkgui_window *win, const char *instance);
 
 // Per-window timers
-uint32_t mkgui_window_add_timer(struct mkgui_window *win, uint64_t interval_ns, mkgui_timer_cb cb, void *userdata);
-void mkgui_window_remove_timer(struct mkgui_window *win, uint32_t timer_id);
+MKGUI_API uint32_t mkgui_window_add_timer(struct mkgui_window *win, uint64_t interval_ns, mkgui_timer_cb cb, void *userdata);
+MKGUI_API void mkgui_window_remove_timer(struct mkgui_window *win, uint32_t timer_id);
 ```
 
-`mkgui_ctx_create` allocates the application context. Call once at startup; pair with `mkgui_ctx_destroy` at shutdown. No X display is opened until the first window is created on this ctx.
+`mkgui_ctx_create` allocates the application context. Call once at startup; pair with `mkgui_ctx_destroy` at shutdown. The native display/window resources are acquired when a window is created.
 
 `mkgui_window_create` creates a window on the ctx. Pass `parent=NULL` for top-level windows, `parent=existing_window` for transient/dialog windows (sets X11 transient-for hint / Win32 owner). `title=NULL` and `w=h=0` make the window inherit those values from the `MKGUI_WINDOW` widget in `widgets[]`.
 
 `mkgui_window_destroy` destroys a window immediately and synchronously (it frees the window, so the pointer is dangling on return). Each window created via `mkgui_window_create` must be destroyed; destroying a window does not destroy its ctx. **Never call it on a window from inside that window's own event or timer callback** -- the poll/timer loop is still iterating the window and would touch freed memory. Use `mkgui_window_close` for that.
 
-`mkgui_window_close` requests *deferred* destruction: it only flags the window, so it is safe to call from anywhere, including the window's own callback (e.g. a progress dialog that tears itself down when its worker finishes). The window is actually destroyed by `mkgui_ctx_reap_closed`, which runs at a point where nothing is polling a window. `mkgui_ctx_run` calls the reaper at the top of its loop automatically; a host-owned loop must call `mkgui_ctx_reap_closed(ctx)` itself once per iteration, outside its poll calls. Closing the primary window ends `mkgui_ctx_run` (like `should_close`); the primary is freed by `mkgui_ctx_destroy`, never reaped mid-loop.
+`mkgui_window_close` requests *deferred* destruction: it only flags the window, so it is safe to call from the window's own event or timer callback (e.g. a progress dialog that tears itself down when its worker finishes). The window is actually destroyed by `mkgui_ctx_reap_closed`, which runs at a point where nothing is polling a window. `mkgui_ctx_run` calls the reaper at the top of its loop automatically; a host-owned loop must call `mkgui_ctx_reap_closed(ctx)` itself once per iteration, outside its poll calls. Closing the primary window ends `mkgui_ctx_run` (like `should_close`); the primary is freed by `mkgui_ctx_destroy`, never reaped mid-loop.
 
 `mkgui_window_set_title` changes the window title bar text at runtime. Does not trigger a widget redraw.
 
-`mkgui_ctx_set_app_class` sets the application class name used by window managers to group windows, match `.desktop` files, and select taskbar icons. On X11 this sets the `WM_CLASS` class field and the `_NET_WM_PID`; on Windows it maps to the window class. Call before creating any window for best results. The string is copied internally and applied to every existing window on the ctx.
+`mkgui_ctx_set_app_class` sets the application class name used by window managers to group windows, match `.desktop` files, and select taskbar icons. On X11 this sets the `WM_CLASS` class field. The Win32 backend keeps its native class fixed. Call before creating any window for best results. The string is copied internally and applied to every existing window on the ctx.
 
-`mkgui_window_set_instance` sets the per-window instance name in `WM_CLASS`. Useful when one application spawns several windows that window managers should treat as distinct (e.g. "editor", "preview", "icon-browser"). The default instance is the class name. Has no effect on Windows.
+`mkgui_window_set_instance` sets the per-window instance name in `WM_CLASS`. Useful when one application spawns several windows that window managers should treat as distinct (e.g. "editor", "preview", "icon-browser"). New top-level windows use instance `main`; transient children use `dialog`. Has no effect on Windows.
 
 The shared icon catalogue is independent of the application WM class.
 
@@ -544,37 +442,14 @@ The shared icon catalogue is independent of the application WM class.
 
 `mkgui_ctx_run` handles frame pacing automatically:
 - When animated widgets are visible (spinners, progress bars, GL views), it runs at ~60fps
-- When idle, it blocks indefinitely until an event arrives (zero CPU usage)
+- When idle, it waits for native events and registered timers
 - It wakes immediately on platform events (mouse, keyboard, expose) or timer expiration
 
 On Linux, blocking uses `ppoll()` on the X11 connection fd and timer fds. On Windows, it uses `MsgWaitForMultipleObjects`.
 
 Mouse motion events are automatically compressed. When multiple consecutive motion events are queued, only the last position is delivered.
 
-**Single-window example:**
-
-```c
-static void on_event(struct mkgui_window *win, struct mkgui_event *ev, void *userdata) {
-    (void)userdata;
-    switch(ev->type) {
-        case MKGUI_EVENT_CLOSE: {
-            mkgui_ctx_quit(mkgui_window_get_ctx(win));
-        } break;
-
-        case MKGUI_EVENT_CLICK: {
-            // handle click
-        } break;
-    }
-}
-
-int main(void) {
-    struct mkgui_ctx *ctx = mkgui_ctx_create();
-    struct mkgui_window *win = mkgui_window_create(ctx, NULL, widgets, count, NULL, 0, 0);
-    mkgui_ctx_run(ctx, on_event, NULL);
-    mkgui_window_destroy(win);
-    mkgui_ctx_destroy(ctx);
-}
-```
+The [README example](../README.md#use-in-an-application) contains a complete single-window application. The following multi-window fragment assumes application-defined `plugin_widgets` and `plugin_count`.
 
 **Multi-window example (e.g. plugin config opens a non-modal secondary window):**
 
@@ -582,21 +457,24 @@ int main(void) {
 static struct mkgui_window *plugin_win;
 
 static void plugin_event(struct mkgui_window *win, struct mkgui_event *ev, void *ud) {
-    (void)ud;
-    switch(ev->type) {
-        case MKGUI_EVENT_CLOSE: {
-            mkgui_window_destroy(win);
-            plugin_win = NULL;
-        } break;
-    }
+	(void)ud;
+	switch(ev->type) {
+		case MKGUI_EVENT_CLOSE: {
+			mkgui_window_close(win);
+			plugin_win = NULL;
+		} break;
+	}
 }
 
 // Called from the main window's event callback
 void open_plugin_config(struct mkgui_window *parent_win) {
-    struct mkgui_ctx *ctx = mkgui_window_get_ctx(parent_win);
-    plugin_win = mkgui_window_create(ctx, parent_win, plugin_widgets, plugin_count, "Plugin Config", 400, 300);
-    mkgui_window_set_callback(plugin_win, plugin_event, NULL);
-    // Returns immediately; the main mkgui_ctx_run() loop pumps this window
+	struct mkgui_ctx *ctx = mkgui_window_get_ctx(parent_win);
+	plugin_win = mkgui_window_create(ctx, parent_win, plugin_widgets, plugin_count, "Plugin Config", 400, 300);
+	if(plugin_win) {
+		mkgui_window_set_callback(plugin_win, plugin_event, NULL);
+
+	}
+	// Returns immediately; the main mkgui_ctx_run() loop pumps this window
 }
 ```
 
@@ -606,12 +484,12 @@ Dialogs (`mkgui_dialog_message`, `mkgui_dialog_open`, etc.) work normally when c
 
 ```c
 case MKGUI_EVENT_CLOSE: {
-    if(!has_unsaved_changes ||
-       mkgui_dialog_confirm(win, "Discard changes?", "You have unsaved changes. Quit anyway?")) {
-        mkgui_ctx_quit(mkgui_window_get_ctx(win));
-    } else {
-        mkgui_window_set_close(win, 0);   // cancel the auto-set close flag
-    }
+	if(!has_unsaved_changes ||
+	   mkgui_dialog_confirm(win, "Discard changes?", "You have unsaved changes. Quit anyway?")) {
+		mkgui_ctx_quit(mkgui_window_get_ctx(win));
+	} else {
+		mkgui_window_set_close(win, 0);   // cancel the auto-set close flag
+	}
 } break;
 ```
 
@@ -629,17 +507,17 @@ Windows are mapped immediately at create time by default. Two flags on the `MKGU
 Three runtime calls control visibility:
 
 ```c
-void     mkgui_window_show(struct mkgui_window *win);
-void     mkgui_window_hide(struct mkgui_window *win);
-uint32_t mkgui_window_is_visible(struct mkgui_window *win);
+MKGUI_API void mkgui_window_show(struct mkgui_window *win);
+MKGUI_API void mkgui_window_hide(struct mkgui_window *win);
+MKGUI_API uint32_t mkgui_window_is_visible(struct mkgui_window *win);
 ```
 
 Three runtime calls control window position:
 
 ```c
-void mkgui_window_move(struct mkgui_window *win, int32_t x, int32_t y);
-void mkgui_window_get_position(struct mkgui_window *win, int32_t *x, int32_t *y);
-void mkgui_window_begin_drag(struct mkgui_window *win);
+MKGUI_API void mkgui_window_move(struct mkgui_window *win, int32_t x, int32_t y);
+MKGUI_API void mkgui_window_get_position(struct mkgui_window *win, int32_t *x, int32_t *y);
+MKGUI_API void mkgui_window_begin_drag(struct mkgui_window *win);
 ```
 
 `mkgui_window_move` sets the window position in screen coordinates. `mkgui_window_get_position` reads it. `mkgui_window_begin_drag` initiates a WM-managed move operation (`_NET_WM_MOVERESIZE` on X11, `WM_NCLBUTTONDOWN` on Windows); call it from a mouse press handler when the user clicks a drag region.
@@ -654,25 +532,25 @@ A hidden window is fully functional. The X display connection stays open, additi
 
 ```c
 static struct mkgui_widget config_widgets[] = {
-    { MKGUI_WINDOW, 1, 0, 480, 320, 0,
-      MKGUI_WINDOW_HIDDEN | MKGUI_WINDOW_HIDE_ON_CLOSE, 0,
-      0, 0, 0, 0, 0, "Preferences", "" },
-    /* ... config widgets ... */
+	{ MKGUI_WINDOW, 1, 0, 480, 320, 0,
+	  MKGUI_WINDOW_HIDDEN | MKGUI_WINDOW_HIDE_ON_CLOSE, 0,
+	  0, 0, 0, 0, 0, "Preferences", "" },
+	/* ... config widgets ... */
 };
 
 int main(void) {
-    struct mkgui_ctx *ctx = mkgui_ctx_create();
-    struct mkgui_window *config = mkgui_window_create(ctx, NULL, config_widgets,
-                                                       N, NULL, 0, 0);  // not mapped
-    /* ... run player main loop ... */
+	struct mkgui_ctx *ctx = mkgui_ctx_create();
+	struct mkgui_window *config = mkgui_window_create(ctx, NULL, config_widgets,
+													   N, NULL, 0, 0);  // not mapped
+	/* ... run player main loop ... */
 
-    /* User chose "File -> Open" or "Edit -> Preferences": */
-    mkgui_window_show(config);
-    mkgui_ctx_run(ctx, on_event, NULL);   /* returns when user closes (= hides) */
-    /* control resumes here, config window still alive */
+	/* User chose "File -> Open" or "Edit -> Preferences": */
+	mkgui_window_show(config);
+	mkgui_ctx_run(ctx, on_event, NULL);   /* returns when user closes (= hides) */
+	/* control resumes here, config window still alive */
 
-    mkgui_window_destroy(config);
-    mkgui_ctx_destroy(ctx);
+	mkgui_window_destroy(config);
+	mkgui_ctx_destroy(ctx);
 }
 ```
 
@@ -681,8 +559,8 @@ The config window can also be used as the parent of file dialogs while it is hid
 ```c
 char path[4096];
 struct mkgui_file_dialog_opts opts = { .start_path = "." };
-if(mkgui_dialog_open(config, &opts, path, sizeof(path))) {
-    /* user picked a file */
+if(mkgui_dialog_open(config, &opts)) {
+	snprintf(path, sizeof(path), "%s", mkgui_dialog_get_path(config, 0));
 }
 ```
 
@@ -693,11 +571,11 @@ Without `MKGUI_WINDOW_HIDE_ON_CLOSE`, behavior is unchanged: a WM close button c
 ```c
 typedef void (*mkgui_timer_cb)(struct mkgui_window *win, uint32_t timer_id, void *userdata);
 
-uint32_t mkgui_window_add_timer(struct mkgui_window *win, uint64_t interval_ns, mkgui_timer_cb cb, void *userdata);
-void mkgui_window_remove_timer(struct mkgui_window *win, uint32_t timer_id);
+MKGUI_API uint32_t mkgui_window_add_timer(struct mkgui_window *win, uint64_t interval_ns, mkgui_timer_cb cb, void *userdata);
+MKGUI_API void mkgui_window_remove_timer(struct mkgui_window *win, uint32_t timer_id);
 ```
 
-`mkgui_window_add_timer` creates a repeating timer with nanosecond-resolution interval. Returns a timer ID (0 on failure). Up to `MKGUI_MAX_TIMERS` (8) timers per context.
+`mkgui_window_add_timer` creates a repeating timer with nanosecond-resolution interval. Returns a timer ID (0 on failure). Up to `MKGUI_MAX_TIMERS` (8) timers per window.
 
 If `cb` is non-NULL, the callback fires during event processing. If `cb` is NULL, an `MKGUI_EVENT_TIMER` event is delivered to the event callback instead (with `ev->id` set to the timer ID).
 
@@ -709,11 +587,11 @@ Call `mkgui_window_remove_timer` inside the callback to make a one-shot timer.
 
 ```c
 void refresh(struct mkgui_window *win, uint32_t timer_id, void *data) {
-    update_data();
-    update_widgets(ctx);
+	update_data();
+	update_widgets(ctx);
 }
 
-mkgui_window_add_timer(ctx, 33333333, refresh, NULL);  // 33.3ms = 30Hz
+mkgui_window_add_timer(win, 33333333, refresh, NULL);  // 33.3ms = 30Hz
 ```
 
 
@@ -721,11 +599,11 @@ mkgui_window_add_timer(ctx, 33333333, refresh, NULL);  // 33.3ms = 30Hz
 
 ```c
 struct mkgui_icon_size {
-    uint32_t *pixels;
-    int32_t w, h;
+	uint32_t *pixels;
+	int32_t w, h;
 };
 
-void mkgui_window_set_icon(struct mkgui_window *win, const struct mkgui_icon_size *sizes, uint32_t count);
+MKGUI_API void mkgui_window_set_icon(struct mkgui_window *win, const struct mkgui_icon_size *sizes, uint32_t count);
 ```
 
 Sets the application icon displayed in the window title bar, taskbar, and task switcher. Call after `mkgui_window_create`. For windows created with `MKGUI_WINDOW_HIDDEN`, call this before `mkgui_window_show` so the icon is in place when the window first maps. Pass one or more ARGB32 pixel buffers at different resolutions so the window manager can pick the best match for each context.
@@ -741,18 +619,18 @@ Pixel format is ARGB32 (same as the rest of mkgui): `0xAARRGGBB`.
 ```c
 // icon_16, icon_32, icon_48 are uint32_t arrays with premade pixel data
 struct mkgui_icon_size app_icons[] = {
-    { icon_16, 16, 16 },
-    { icon_32, 32, 32 },
-    { icon_48, 48, 48 },
+	{ icon_16, 16, 16 },
+	{ icon_32, 32, 32 },
+	{ icon_48, 48, 48 },
 };
-mkgui_window_set_icon(ctx, app_icons, 3);
+mkgui_window_set_icon(win, app_icons, 3);
 ```
 
 ### Runtime widget management
 
 ```c
-uint32_t mkgui_widget_add(struct mkgui_window *win, struct mkgui_widget w, uint32_t after_id);
-uint32_t mkgui_widget_remove(struct mkgui_window *win, uint32_t id);
+MKGUI_API uint32_t mkgui_widget_add(struct mkgui_window *win, struct mkgui_widget w, uint32_t after_id);
+MKGUI_API uint32_t mkgui_widget_remove(struct mkgui_window *win, uint32_t id);
 ```
 
 `mkgui_widget_add` inserts a widget into the window at runtime. The widget's `parent_id` determines which container it belongs to. The `after_id` parameter controls where it appears among its siblings:
@@ -767,7 +645,7 @@ Returns 1 on success, 0 if the widget type is disabled/unknown or the widget arr
 
 `mkgui_widget_remove` removes a widget and all its descendants. It cleans up aux data (frees textarea buffers, treeview nodes, image pixels, GL views), clears any references in focus/hover/drag state, and destroys open popups for the removed widgets. Returns 1 on success, 0 if the widget was not found. Removing a MKGUI_WINDOW widget is not allowed.
 
-**Important:** Pointers returned by `find_widget()` or any `find_*_data()` function are invalidated after calling `mkgui_widget_add` or `mkgui_widget_remove`, because the underlying arrays may be reallocated. Always re-query after adding or removing widgets.
+Use widget IDs with the public getters and setters after insertion or removal. Private lookup helpers and auxiliary structures are not part of the application API.
 
 ```c
 // add a slider as the first child of a vbox
@@ -784,20 +662,13 @@ mkgui_widget_remove(win, 500);
 
 ### Performance timing
 
-After each frame, the window contains timing data. These fields are internal and directly visible to unity-build consumers:
-
-```c
-win->perf_acquire_us  // buffer acquisition and damage history time in microseconds
-win->perf_layout_us   // layout calculation time in microseconds
-win->perf_render_us   // widget rendering time in microseconds
-win->perf_blit_us     // framebuffer blit time in microseconds
-```
+Per-frame timing fields are private implementation state. Shared-library consumers have no public accessor for them. Use the [benchmark harness](benchmark.md) to measure layout, rendering, dirty rendering, presentation, and complete frames.
 
 ### Utilities
 
 ```c
-uint64_t mkgui_now_ns(void);
-void     mkgui_sleep_ns(uint64_t ns);
+MKGUI_API uint64_t mkgui_now_ns(void);
+MKGUI_API void mkgui_sleep_ns(uint64_t ns);
 ```
 
 `mkgui_now_ns` -- monotonic clock in nanoseconds. Same epoch the library uses internally, so deadlines passed to `mkgui_ctx_wait_until` are commensurable. Effectively never wraps (`uint64_t` ns covers ~584 years).
@@ -811,23 +682,23 @@ If you specifically need milliseconds or microseconds, convert at the call site:
 These functions work on any widget type:
 
 ```c
-void mkgui_set_enabled(struct mkgui_window *win, uint32_t id, uint32_t enabled);
-uint32_t mkgui_get_enabled(struct mkgui_window *win, uint32_t id);
-void mkgui_set_visible(struct mkgui_window *win, uint32_t id, uint32_t visible);
-uint32_t mkgui_get_visible(struct mkgui_window *win, uint32_t id);
-void mkgui_set_focus(struct mkgui_window *win, uint32_t id);
-uint32_t mkgui_has_focus(struct mkgui_window *win, uint32_t id);
-void mkgui_get_geometry(struct mkgui_window *win, uint32_t id, int32_t *x, int32_t *y, int32_t *w, int32_t *h);
-void mkgui_get_min_size(struct mkgui_window *win, int32_t *out_w, int32_t *out_h);
-void mkgui_set_flags(struct mkgui_window *win, uint32_t id, uint32_t flags);
-uint32_t mkgui_get_flags(struct mkgui_window *win, uint32_t id);
-void mkgui_set_tooltip(struct mkgui_window *win, uint32_t id, const char *text);
-const char *mkgui_get_tooltip(struct mkgui_window *win, uint32_t id);
-void mkgui_set_weight(struct mkgui_window *win, uint32_t id, uint32_t weight);
-void mkgui_set_icon(struct mkgui_window *win, uint32_t widget_id, const char *icon_name);
-uint32_t mkgui_is_shown(struct mkgui_window *win, uint32_t id);
-void mkgui_get_window_size(struct mkgui_window *win, int32_t *out_w, int32_t *out_h);
-double mkgui_get_anim_time(struct mkgui_window *win);
+MKGUI_API void mkgui_set_enabled(struct mkgui_window *win, uint32_t id, uint32_t enabled);
+MKGUI_API uint32_t mkgui_get_enabled(struct mkgui_window *win, uint32_t id);
+MKGUI_API void mkgui_set_visible(struct mkgui_window *win, uint32_t id, uint32_t visible);
+MKGUI_API uint32_t mkgui_get_visible(struct mkgui_window *win, uint32_t id);
+MKGUI_API void mkgui_set_focus(struct mkgui_window *win, uint32_t id);
+MKGUI_API uint32_t mkgui_has_focus(struct mkgui_window *win, uint32_t id);
+MKGUI_API void mkgui_get_geometry(struct mkgui_window *win, uint32_t id, int32_t *x, int32_t *y, int32_t *w, int32_t *h);
+MKGUI_API void mkgui_get_min_size(struct mkgui_window *win, int32_t *out_w, int32_t *out_h);
+MKGUI_API void mkgui_set_flags(struct mkgui_window *win, uint32_t id, uint32_t flags);
+MKGUI_API uint32_t mkgui_get_flags(struct mkgui_window *win, uint32_t id);
+MKGUI_API void mkgui_set_tooltip(struct mkgui_window *win, uint32_t id, const char *text);
+MKGUI_API const char *mkgui_get_tooltip(struct mkgui_window *win, uint32_t id);
+MKGUI_API void mkgui_set_weight(struct mkgui_window *win, uint32_t id, uint32_t weight);
+MKGUI_API void mkgui_set_icon(struct mkgui_window *win, uint32_t widget_id, const char *icon_name);
+MKGUI_API uint32_t mkgui_is_shown(struct mkgui_window *win, uint32_t id);
+MKGUI_API void mkgui_get_window_size(struct mkgui_window *win, int32_t *out_w, int32_t *out_h);
+MKGUI_API double mkgui_get_anim_time(struct mkgui_window *win);
 ```
 
 - `set_enabled` / `get_enabled` -- toggle `MKGUI_DISABLED` flag. Disabling clears focus.
@@ -843,32 +714,33 @@ double mkgui_get_anim_time(struct mkgui_window *win);
 ### Button
 
 ```c
-void mkgui_button_set_text(struct mkgui_window *win, uint32_t id, const char *text);
-const char *mkgui_button_get_text(struct mkgui_window *win, uint32_t id);
+MKGUI_API void mkgui_button_set_text(struct mkgui_window *win, uint32_t id, const char *text);
+MKGUI_API const char *mkgui_button_get_text(struct mkgui_window *win, uint32_t id);
 ```
 
 `MKGUI_BUTTON_CHECKED` gives a button a sunken appearance when supplied in its initial style. Buttons do not toggle automatically. For an icon button, keep the state in the application and change its icon in the click handler:
 
 ```c
 // Icon-only buttons center the icon automatically when label is empty
-MKGUI_W(MKGUI_BUTTON, ID_MUTE, "", "volume-high", ID_VBOX, 28, 28, MKGUI_FIXED | MKGUI_ALIGN_CENTER, 0, 0),
+MKGUI_W(MKGUI_BUTTON, ID_MUTE, "", "speaker-2", ID_VBOX, 28, 28, MKGUI_FIXED | MKGUI_ALIGN_CENTER, 0, 0),
+
+// Application-owned state:
+static uint32_t muted;
 
 // In event callback:
 case MKGUI_EVENT_CLICK: {
-    if(ev->id == ID_MUTE) {
-        uint32_t f = mkgui_get_flags(ctx, ID_MUTE);
-        f ^= MKGUI_BUTTON_CHECKED;
-        mkgui_set_flags(ctx, ID_MUTE, f);
-        mkgui_set_icon(ctx, ID_MUTE, (f & MKGUI_BUTTON_CHECKED) ? "volume-off" : "volume-high");
-    }
+	if(ev->id == ID_MUTE) {
+		muted ^= 1;
+		mkgui_set_icon(win, ID_MUTE, muted ? "speaker-off" : "speaker-2");
+	}
 } break;
 ```
 
 ### Label
 
 ```c
-void mkgui_label_set(struct mkgui_window *win, uint32_t id, const char *text);
-const char *mkgui_label_get(struct mkgui_window *win, uint32_t id);
+MKGUI_API void mkgui_label_set(struct mkgui_window *win, uint32_t id, const char *text);
+MKGUI_API const char *mkgui_label_get(struct mkgui_window *win, uint32_t id);
 ```
 
 Set `MKGUI_LABEL_TRUNCATE` to clip text that overflows the widget width, replacing the tail with "...". Without this flag, text is hard-clipped at the widget boundary. The full text is preserved in the widget -- only the rendered output is affected.
@@ -883,7 +755,7 @@ MKGUI_W(MKGUI_LABEL, ID_NAME, "Very Long Channel Name", "", ID_PARENT, 80, 0,
 Set `MKGUI_LABEL_LINK` to make a label clickable. The text renders in the selection color with an underline. Hover changes color. Generates `MKGUI_EVENT_CLICK` when clicked.
 
 ```c
-MKGUI_W(MKGUI_LABEL, ID_LINK, "Visit website", "", ID_PARENT, 0, 0, MKGUI_FIXED, MKGUI_LABEL_LINK, 0)
+MKGUI_W(MKGUI_LABEL, ID_LINK, "Visit website", "", ID_PARENT, 0, 0, MKGUI_FIXED, MKGUI_LABEL_LINK, 0),
 ```
 
 #### Wrapping label
@@ -891,22 +763,22 @@ MKGUI_W(MKGUI_LABEL, ID_LINK, "Visit website", "", ID_PARENT, 0, 0, MKGUI_FIXED,
 Set `MKGUI_LABEL_WRAP` to word-wrap text across multiple lines. The label renders from the top and wraps at word boundaries to fit the widget width. Set an explicit height or use flex fill.
 
 ```c
-MKGUI_W(MKGUI_LABEL, ID_DESC, "Long description text here...", "", ID_PARENT, 0, 80, MKGUI_FIXED, MKGUI_LABEL_WRAP, 0)
+MKGUI_W(MKGUI_LABEL, ID_DESC, "Long description text here...", "", ID_PARENT, 0, 80, MKGUI_FIXED, MKGUI_LABEL_WRAP, 0),
 ```
 
 ### Input
 
 ```c
-void mkgui_input_set(struct mkgui_window *win, uint32_t id, const char *text);
-const char *mkgui_input_get(struct mkgui_window *win, uint32_t id);
-void mkgui_input_clear(struct mkgui_window *win, uint32_t id);
-void mkgui_input_set_readonly(struct mkgui_window *win, uint32_t id, uint32_t readonly);
-uint32_t mkgui_input_get_readonly(struct mkgui_window *win, uint32_t id);
-uint32_t mkgui_input_get_cursor(struct mkgui_window *win, uint32_t id);
-void mkgui_input_set_cursor(struct mkgui_window *win, uint32_t id, uint32_t pos);
-void mkgui_input_select_all(struct mkgui_window *win, uint32_t id);
-void mkgui_input_get_selection(struct mkgui_window *win, uint32_t id, uint32_t *start, uint32_t *end);
-void mkgui_input_set_selection(struct mkgui_window *win, uint32_t id, uint32_t start, uint32_t end);
+MKGUI_API void mkgui_input_set(struct mkgui_window *win, uint32_t id, const char *text);
+MKGUI_API const char *mkgui_input_get(struct mkgui_window *win, uint32_t id);
+MKGUI_API void mkgui_input_clear(struct mkgui_window *win, uint32_t id);
+MKGUI_API void mkgui_input_set_readonly(struct mkgui_window *win, uint32_t id, uint32_t readonly);
+MKGUI_API uint32_t mkgui_input_get_readonly(struct mkgui_window *win, uint32_t id);
+MKGUI_API uint32_t mkgui_input_get_cursor(struct mkgui_window *win, uint32_t id);
+MKGUI_API void mkgui_input_set_cursor(struct mkgui_window *win, uint32_t id, uint32_t pos);
+MKGUI_API void mkgui_input_select_all(struct mkgui_window *win, uint32_t id);
+MKGUI_API void mkgui_input_get_selection(struct mkgui_window *win, uint32_t id, uint32_t *start, uint32_t *end);
+MKGUI_API void mkgui_input_set_selection(struct mkgui_window *win, uint32_t id, uint32_t start, uint32_t end);
 ```
 
 Double-click on an input widget selects all text. Single click positions the cursor. Click-drag selects a range.
@@ -920,21 +792,21 @@ Supports Ctrl+C (copy) and Ctrl+V (paste). Newlines in pasted text are replaced 
 Set `MKGUI_INPUT_NUMERIC` to filter keyboard input to digits, decimal point, sign, and scientific notation (e/E). Non-numeric characters are rejected.
 
 ```c
-MKGUI_W(MKGUI_INPUT, ID_AMOUNT, "", "", ID_FORM, 0, 0, 0, MKGUI_INPUT_NUMERIC, 0)
+MKGUI_W(MKGUI_INPUT, ID_AMOUNT, "", "", ID_FORM, 0, 0, 0, MKGUI_INPUT_NUMERIC, 0),
 ```
 
 ### Checkbox
 
 ```c
-uint32_t mkgui_checkbox_get(struct mkgui_window *win, uint32_t id);
-void mkgui_checkbox_set(struct mkgui_window *win, uint32_t id, uint32_t checked);
+MKGUI_API uint32_t mkgui_checkbox_get(struct mkgui_window *win, uint32_t id);
+MKGUI_API void mkgui_checkbox_set(struct mkgui_window *win, uint32_t id, uint32_t checked);
 ```
 
 ### Radio
 
 ```c
-uint32_t mkgui_radio_get(struct mkgui_window *win, uint32_t id);
-void mkgui_radio_set(struct mkgui_window *win, uint32_t id, uint32_t checked);
+MKGUI_API uint32_t mkgui_radio_get(struct mkgui_window *win, uint32_t id);
+MKGUI_API void mkgui_radio_set(struct mkgui_window *win, uint32_t id, uint32_t checked);
 ```
 
 Radio buttons are mutually exclusive within the same parent. Clicking one unchecks siblings. `radio_set` with `checked=1` automatically unchecks all other radios in the same parent group.
@@ -942,8 +814,8 @@ Radio buttons are mutually exclusive within the same parent. Clicking one unchec
 ### Toggle
 
 ```c
-void mkgui_toggle_set(struct mkgui_window *win, uint32_t id, uint32_t state);
-uint32_t mkgui_toggle_get(struct mkgui_window *win, uint32_t id);
+MKGUI_API void mkgui_toggle_set(struct mkgui_window *win, uint32_t id, uint32_t state);
+MKGUI_API uint32_t mkgui_toggle_get(struct mkgui_window *win, uint32_t id);
 ```
 
 On/off toggle switch. Emits `MKGUI_EVENT_TOGGLE_CHANGED`.
@@ -951,15 +823,15 @@ On/off toggle switch. Emits `MKGUI_EVENT_TOGGLE_CHANGED`.
 ### Dropdown
 
 ```c
-void mkgui_dropdown_setup(struct mkgui_window *win, uint32_t id, const char *const *items, uint32_t count);
-int32_t mkgui_dropdown_get(struct mkgui_window *win, uint32_t id);
-void mkgui_dropdown_set(struct mkgui_window *win, uint32_t id, int32_t index);
-const char *mkgui_dropdown_get_text(struct mkgui_window *win, uint32_t id);
-uint32_t mkgui_dropdown_get_count(struct mkgui_window *win, uint32_t id);
-const char *mkgui_dropdown_get_item_text(struct mkgui_window *win, uint32_t id, uint32_t index);
-void mkgui_dropdown_add(struct mkgui_window *win, uint32_t id, const char *text);
-void mkgui_dropdown_remove(struct mkgui_window *win, uint32_t id, uint32_t index);
-void mkgui_dropdown_clear(struct mkgui_window *win, uint32_t id);
+MKGUI_API void mkgui_dropdown_setup(struct mkgui_window *win, uint32_t id, const char *const *items, uint32_t count);
+MKGUI_API int32_t mkgui_dropdown_get(struct mkgui_window *win, uint32_t id);
+MKGUI_API void mkgui_dropdown_set(struct mkgui_window *win, uint32_t id, int32_t index);
+MKGUI_API const char *mkgui_dropdown_get_text(struct mkgui_window *win, uint32_t id);
+MKGUI_API uint32_t mkgui_dropdown_get_count(struct mkgui_window *win, uint32_t id);
+MKGUI_API const char *mkgui_dropdown_get_item_text(struct mkgui_window *win, uint32_t id, uint32_t index);
+MKGUI_API void mkgui_dropdown_add(struct mkgui_window *win, uint32_t id, const char *text);
+MKGUI_API void mkgui_dropdown_remove(struct mkgui_window *win, uint32_t id, uint32_t index);
+MKGUI_API void mkgui_dropdown_clear(struct mkgui_window *win, uint32_t id);
 ```
 
 `dropdown_set` selects an item by index (-1 to deselect). `dropdown_add` / `dropdown_remove` / `dropdown_clear` modify items at runtime without a full re-setup. Maximum 64 items.
@@ -967,16 +839,16 @@ void mkgui_dropdown_clear(struct mkgui_window *win, uint32_t id);
 ### ComboBox
 
 ```c
-void mkgui_combobox_setup(struct mkgui_window *win, uint32_t id, const char *const *items, uint32_t count);
-int32_t mkgui_combobox_get(struct mkgui_window *win, uint32_t id);
-const char *mkgui_combobox_get_text(struct mkgui_window *win, uint32_t id);
-void mkgui_combobox_set(struct mkgui_window *win, uint32_t id, int32_t index);
-void mkgui_combobox_set_text(struct mkgui_window *win, uint32_t id, const char *text);
-uint32_t mkgui_combobox_get_count(struct mkgui_window *win, uint32_t id);
-const char *mkgui_combobox_get_item_text(struct mkgui_window *win, uint32_t id, uint32_t index);
-void mkgui_combobox_add(struct mkgui_window *win, uint32_t id, const char *text);
-void mkgui_combobox_remove(struct mkgui_window *win, uint32_t id, uint32_t index);
-void mkgui_combobox_clear(struct mkgui_window *win, uint32_t id);
+MKGUI_API void mkgui_combobox_setup(struct mkgui_window *win, uint32_t id, const char *const *items, uint32_t count);
+MKGUI_API int32_t mkgui_combobox_get(struct mkgui_window *win, uint32_t id);
+MKGUI_API const char *mkgui_combobox_get_text(struct mkgui_window *win, uint32_t id);
+MKGUI_API void mkgui_combobox_set(struct mkgui_window *win, uint32_t id, int32_t index);
+MKGUI_API void mkgui_combobox_set_text(struct mkgui_window *win, uint32_t id, const char *text);
+MKGUI_API uint32_t mkgui_combobox_get_count(struct mkgui_window *win, uint32_t id);
+MKGUI_API const char *mkgui_combobox_get_item_text(struct mkgui_window *win, uint32_t id, uint32_t index);
+MKGUI_API void mkgui_combobox_add(struct mkgui_window *win, uint32_t id, const char *text);
+MKGUI_API void mkgui_combobox_remove(struct mkgui_window *win, uint32_t id, uint32_t index);
+MKGUI_API void mkgui_combobox_clear(struct mkgui_window *win, uint32_t id);
 ```
 
 Editable dropdown with text input and filtering. The user can type to filter the item list or enter custom text. `combobox_get` returns the selected item index (-1 if custom text). `combobox_get_text` returns the current text (whether from the list or typed). Emits `MKGUI_EVENT_COMBOBOX_CHANGED` on selection and `MKGUI_EVENT_COMBOBOX_SUBMIT` on Enter.
@@ -984,12 +856,12 @@ Editable dropdown with text input and filtering. The user can type to filter the
 ### Slider
 
 ```c
-void mkgui_slider_setup(struct mkgui_window *win, uint32_t id, int32_t min_val, int32_t max_val, int32_t value);
-int32_t mkgui_slider_get(struct mkgui_window *win, uint32_t id);
-void mkgui_slider_set(struct mkgui_window *win, uint32_t id, int32_t value);
-void mkgui_slider_get_range(struct mkgui_window *win, uint32_t id, int32_t *min_val, int32_t *max_val);
-void mkgui_slider_set_range(struct mkgui_window *win, uint32_t id, int32_t min_val, int32_t max_val);
-void mkgui_slider_set_meter(struct mkgui_window *win, uint32_t id, float pre, float post, uint32_t pre_color, uint32_t post_color);
+MKGUI_API void mkgui_slider_setup(struct mkgui_window *win, uint32_t id, int32_t min_val, int32_t max_val, int32_t value);
+MKGUI_API int32_t mkgui_slider_get(struct mkgui_window *win, uint32_t id);
+MKGUI_API void mkgui_slider_set(struct mkgui_window *win, uint32_t id, int32_t value);
+MKGUI_API void mkgui_slider_get_range(struct mkgui_window *win, uint32_t id, int32_t *min_val, int32_t *max_val);
+MKGUI_API void mkgui_slider_set_range(struct mkgui_window *win, uint32_t id, int32_t min_val, int32_t max_val);
+MKGUI_API void mkgui_slider_set_meter(struct mkgui_window *win, uint32_t id, float pre, float post, uint32_t pre_color, uint32_t post_color);
 ```
 
 The slider renders a horizontal track with a draggable thumb. Set `MKGUI_VERTICAL` for vertical orientation. It does not display any text -- add your own label and/or value display if needed (e.g. using a FORM row or an HBOX with a label widget).
@@ -1003,12 +875,12 @@ Meter values are 0.0--1.0 (clamped). The `pre` layer is drawn first, then `post`
 ### Spinbox
 
 ```c
-void mkgui_spinbox_setup(struct mkgui_window *win, uint32_t id, int32_t min_val, int32_t max_val, int32_t value, int32_t step);
-int32_t mkgui_spinbox_get(struct mkgui_window *win, uint32_t id);
-void mkgui_spinbox_set(struct mkgui_window *win, uint32_t id, int32_t value);
-void mkgui_spinbox_set_range(struct mkgui_window *win, uint32_t id, int32_t min_val, int32_t max_val);
-void mkgui_spinbox_get_range(struct mkgui_window *win, uint32_t id, int32_t *min_val, int32_t *max_val);
-void mkgui_spinbox_set_step(struct mkgui_window *win, uint32_t id, int32_t step);
+MKGUI_API void mkgui_spinbox_setup(struct mkgui_window *win, uint32_t id, int32_t min_val, int32_t max_val, int32_t value, int32_t step);
+MKGUI_API int32_t mkgui_spinbox_get(struct mkgui_window *win, uint32_t id);
+MKGUI_API void mkgui_spinbox_set(struct mkgui_window *win, uint32_t id, int32_t value);
+MKGUI_API void mkgui_spinbox_set_range(struct mkgui_window *win, uint32_t id, int32_t min_val, int32_t max_val);
+MKGUI_API void mkgui_spinbox_get_range(struct mkgui_window *win, uint32_t id, int32_t *min_val, int32_t *max_val);
+MKGUI_API void mkgui_spinbox_set_step(struct mkgui_window *win, uint32_t id, int32_t step);
 ```
 
 Click the text area to enter edit mode (cursor appears, existing value is pre-filled). Type a new value and press Enter to confirm (clears focus) or Escape to cancel. Use up/down arrow keys or the +/- buttons to step.
@@ -1018,12 +890,12 @@ Click the text area to enter edit mode (cursor appears, existing value is pre-fi
 ### Progress
 
 ```c
-void mkgui_progress_setup(struct mkgui_window *win, uint32_t id, int32_t max_val);
-void mkgui_progress_set(struct mkgui_window *win, uint32_t id, int32_t value);
-int32_t mkgui_progress_get(struct mkgui_window *win, uint32_t id);
-void mkgui_progress_set_range(struct mkgui_window *win, uint32_t id, int32_t max_val);
-void mkgui_progress_get_range(struct mkgui_window *win, uint32_t id, int32_t *max_val);
-void mkgui_progress_set_color(struct mkgui_window *win, uint32_t id, uint32_t color);
+MKGUI_API void mkgui_progress_setup(struct mkgui_window *win, uint32_t id, int32_t max_val);
+MKGUI_API void mkgui_progress_set(struct mkgui_window *win, uint32_t id, int32_t value);
+MKGUI_API int32_t mkgui_progress_get(struct mkgui_window *win, uint32_t id);
+MKGUI_API void mkgui_progress_set_range(struct mkgui_window *win, uint32_t id, int32_t max_val);
+MKGUI_API void mkgui_progress_get_range(struct mkgui_window *win, uint32_t id, int32_t *max_val);
+MKGUI_API void mkgui_progress_set_color(struct mkgui_window *win, uint32_t id, uint32_t color);
 ```
 
 Renders a filled bar. Set `MKGUI_PROGRESS_SHIMMER` to animate a diagonal sweep while the value is between zero and the maximum. The fill color defaults to `theme.accent`. Use `progress_set_color` to override the bar color per-widget; pass `0` to revert to the theme default. The percentage text is centered on the bar. `progress_set_range` changes max at runtime (clamps value).
@@ -1031,12 +903,12 @@ Renders a filled bar. Set `MKGUI_PROGRESS_SHIMMER` to animate a diagonal sweep w
 ### Meter
 
 ```c
-void mkgui_meter_setup(struct mkgui_window *win, uint32_t id, int32_t max_val);
-void mkgui_meter_set(struct mkgui_window *win, uint32_t id, int32_t value);
-int32_t mkgui_meter_get(struct mkgui_window *win, uint32_t id);
-void mkgui_meter_set_range(struct mkgui_window *win, uint32_t id, int32_t max_val);
-void mkgui_meter_get_range(struct mkgui_window *win, uint32_t id, int32_t *max_val);
-void mkgui_meter_set_zones(struct mkgui_window *win, uint32_t id, int32_t t1, int32_t t2, uint32_t c1, uint32_t c2, uint32_t c3);
+MKGUI_API void mkgui_meter_setup(struct mkgui_window *win, uint32_t id, int32_t max_val);
+MKGUI_API void mkgui_meter_set(struct mkgui_window *win, uint32_t id, int32_t value);
+MKGUI_API int32_t mkgui_meter_get(struct mkgui_window *win, uint32_t id);
+MKGUI_API void mkgui_meter_set_range(struct mkgui_window *win, uint32_t id, int32_t max_val);
+MKGUI_API void mkgui_meter_get_range(struct mkgui_window *win, uint32_t id, int32_t *max_val);
+MKGUI_API void mkgui_meter_set_zones(struct mkgui_window *win, uint32_t id, int32_t t1, int32_t t2, uint32_t c1, uint32_t c2, uint32_t c3);
 ```
 
 Level meter with colored zones showing capacity/usage. The background displays three color zones at fixed thresholds, and a thinner bar on top fills from the start to the current value. The thin bar takes the color of whichever zone the current value falls in. Set `MKGUI_VERTICAL` for a vertical meter (zones bottom-to-top). Set `MKGUI_METER_TEXT` to display a centered percentage.
@@ -1046,7 +918,7 @@ Level meter with colored zones showing capacity/usage. The background displays t
 ### Spinner
 
 ```c
-MKGUI_W(MKGUI_SPINNER, ID_SPIN, "", "", ID_PARENT, 24, 24, MKGUI_FIXED, 0, 0)
+MKGUI_W(MKGUI_SPINNER, ID_SPIN, "", "", ID_PARENT, 24, 24, MKGUI_FIXED, 0, 0),
 ```
 
 No setup or API functions needed. The spinner is a rotating arc that animates automatically. Size is determined by the widget's `w` and `h` (uses the smaller of the two as diameter). Uses `theme.accent` for the arc color. Place it anywhere a loading indicator is needed.
@@ -1058,26 +930,24 @@ The spinner only consumes CPU while visible. Widgets on inactive tabs or hidden 
 ```c
 typedef void (*mkgui_row_cb)(uint32_t row, uint32_t col, char *buf, uint32_t buf_size, void *userdata);
 
-void mkgui_listview_setup(struct mkgui_window *win, uint32_t id, uint32_t row_count,
-                          uint32_t col_count, const struct mkgui_column *columns,
-                          mkgui_row_cb cb, void *userdata);
-void mkgui_listview_set_rows(struct mkgui_window *win, uint32_t id, uint32_t row_count);
-int32_t mkgui_listview_get_selected(struct mkgui_window *win, uint32_t id);
-void mkgui_listview_set_selected(struct mkgui_window *win, uint32_t id, int32_t row);
-uint32_t mkgui_listview_get_multi_sel(struct mkgui_window *win, uint32_t id, int32_t **out);
-uint32_t mkgui_listview_is_selected(struct mkgui_window *win, uint32_t id, int32_t row);
-void mkgui_listview_clear_selection(struct mkgui_window *win, uint32_t id);
-const uint32_t *mkgui_listview_get_col_order(struct mkgui_window *win, uint32_t id);
-void mkgui_listview_set_col_order(struct mkgui_window *win, uint32_t id, const uint32_t *order, uint32_t count);
-int32_t mkgui_listview_get_col_width(struct mkgui_window *win, uint32_t id, uint32_t col);
-uint32_t mkgui_listview_get_col_count(struct mkgui_window *win, uint32_t id);
-const char *mkgui_listview_get_col_label(struct mkgui_window *win, uint32_t id, uint32_t col);
-void mkgui_listview_set_col_width(struct mkgui_window *win, uint32_t id, uint32_t col, int32_t width);
-void mkgui_listview_set_cell_type(struct mkgui_window *win, uint32_t id, uint32_t col, uint32_t cell_type);
-void mkgui_listview_visible_range(struct mkgui_window *win, uint32_t id, int32_t *first, int32_t *last);
-void mkgui_listview_scroll_to(struct mkgui_window *win, uint32_t id, int32_t row);
-void mkgui_listview_get_sort(struct mkgui_window *win, uint32_t id, int32_t *col, int32_t *dir);
-void mkgui_listview_set_sort(struct mkgui_window *win, uint32_t id, int32_t col, int32_t dir);
+MKGUI_API void mkgui_listview_setup(struct mkgui_window *win, uint32_t id, uint32_t row_count, uint32_t col_count, const struct mkgui_column *columns, mkgui_row_cb cb, void *userdata);
+MKGUI_API void mkgui_listview_set_rows(struct mkgui_window *win, uint32_t id, uint32_t row_count);
+MKGUI_API int32_t mkgui_listview_get_selected(struct mkgui_window *win, uint32_t id);
+MKGUI_API void mkgui_listview_set_selected(struct mkgui_window *win, uint32_t id, int32_t row);
+MKGUI_API uint32_t mkgui_listview_get_multi_sel(struct mkgui_window *win, uint32_t id, int32_t **out);
+MKGUI_API uint32_t mkgui_listview_is_selected(struct mkgui_window *win, uint32_t id, int32_t row);
+MKGUI_API void mkgui_listview_clear_selection(struct mkgui_window *win, uint32_t id);
+MKGUI_API const uint32_t *mkgui_listview_get_col_order(struct mkgui_window *win, uint32_t id);
+MKGUI_API void mkgui_listview_set_col_order(struct mkgui_window *win, uint32_t id, const uint32_t *order, uint32_t count);
+MKGUI_API int32_t mkgui_listview_get_col_width(struct mkgui_window *win, uint32_t id, uint32_t col);
+MKGUI_API uint32_t mkgui_listview_get_col_count(struct mkgui_window *win, uint32_t id);
+MKGUI_API const char *mkgui_listview_get_col_label(struct mkgui_window *win, uint32_t id, uint32_t col);
+MKGUI_API void mkgui_listview_set_col_width(struct mkgui_window *win, uint32_t id, uint32_t col, int32_t width);
+MKGUI_API void mkgui_listview_set_cell_type(struct mkgui_window *win, uint32_t id, uint32_t col, uint32_t cell_type);
+MKGUI_API void mkgui_listview_visible_range(struct mkgui_window *win, uint32_t id, int32_t *first, int32_t *last);
+MKGUI_API void mkgui_listview_scroll_to(struct mkgui_window *win, uint32_t id, int32_t row);
+MKGUI_API void mkgui_listview_get_sort(struct mkgui_window *win, uint32_t id, int32_t *col, int32_t *dir);
+MKGUI_API void mkgui_listview_set_sort(struct mkgui_window *win, uint32_t id, int32_t col, int32_t dir);
 ```
 
 The listview is fully virtual -- it never owns data. The row callback is invoked only for visible rows during rendering. For datasets with frequently changing data (e.g. download progress), use `mkgui_listview_visible_range` to check if the changed row is currently visible before dirtying the widget.
@@ -1086,9 +956,9 @@ The listview is fully virtual -- it never owns data. The row callback is invoked
 
 ```c
 struct mkgui_column {
-    char label[256];   // header text
-    int32_t width;     // column width in pixels
-    uint32_t cell_type; // MKGUI_CELL_* (default: MKGUI_CELL_TEXT)
+	char label[MKGUI_MAX_TEXT];   // header text
+	int32_t width;     // column width in pixels
+	uint32_t cell_type; // MKGUI_CELL_* (default: MKGUI_CELL_TEXT)
 };
 ```
 
@@ -1124,18 +994,17 @@ Multi-column grid with per-cell checkbox support. Ideal for patchbays, routing m
 ```c
 typedef void (*mkgui_grid_cell_cb)(uint32_t row, uint32_t col, char *buf, uint32_t buf_size, void *userdata);
 
-void mkgui_gridview_setup(struct mkgui_window *win, uint32_t id, uint32_t row_count, uint32_t col_count,
-    const struct mkgui_grid_column *columns, mkgui_grid_cell_cb cell_cb, void *userdata);
-void mkgui_gridview_set_rows(struct mkgui_window *win, uint32_t id, uint32_t row_count);
-int32_t mkgui_gridview_get_selected(struct mkgui_window *win, uint32_t id);
-void mkgui_gridview_set_selected(struct mkgui_window *win, uint32_t id, int32_t row);
-uint32_t mkgui_gridview_get_check(struct mkgui_window *win, uint32_t id, uint32_t row, uint32_t col);
-void mkgui_gridview_set_check(struct mkgui_window *win, uint32_t id, uint32_t row, uint32_t col, uint32_t checked);
-int32_t mkgui_gridview_get_col_width(struct mkgui_window *win, uint32_t id, uint32_t col);
-uint32_t mkgui_gridview_get_col_count(struct mkgui_window *win, uint32_t id);
-const char *mkgui_gridview_get_col_label(struct mkgui_window *win, uint32_t id, uint32_t col);
-void mkgui_gridview_set_col_width(struct mkgui_window *win, uint32_t id, uint32_t col, int32_t width);
-void mkgui_gridview_scroll_to(struct mkgui_window *win, uint32_t id, int32_t row);
+MKGUI_API void mkgui_gridview_setup(struct mkgui_window *win, uint32_t id, uint32_t row_count, uint32_t col_count, const struct mkgui_grid_column *columns, mkgui_grid_cell_cb cb, void *userdata);
+MKGUI_API void mkgui_gridview_set_rows(struct mkgui_window *win, uint32_t id, uint32_t row_count);
+MKGUI_API int32_t mkgui_gridview_get_selected(struct mkgui_window *win, uint32_t id);
+MKGUI_API void mkgui_gridview_set_selected(struct mkgui_window *win, uint32_t id, int32_t row);
+MKGUI_API uint32_t mkgui_gridview_get_check(struct mkgui_window *win, uint32_t id, uint32_t row, uint32_t col);
+MKGUI_API void mkgui_gridview_set_check(struct mkgui_window *win, uint32_t id, uint32_t row, uint32_t col, uint32_t checked);
+MKGUI_API int32_t mkgui_gridview_get_col_width(struct mkgui_window *win, uint32_t id, uint32_t col);
+MKGUI_API uint32_t mkgui_gridview_get_col_count(struct mkgui_window *win, uint32_t id);
+MKGUI_API const char *mkgui_gridview_get_col_label(struct mkgui_window *win, uint32_t id, uint32_t col);
+MKGUI_API void mkgui_gridview_set_col_width(struct mkgui_window *win, uint32_t id, uint32_t col, int32_t width);
+MKGUI_API void mkgui_gridview_scroll_to(struct mkgui_window *win, uint32_t id, int32_t row);
 ```
 
 Column types (set in `struct mkgui_grid_column`):
@@ -1169,20 +1038,20 @@ A list widget where each row displays a thumbnail, title, subtitle, and right-al
 
 ```c
 struct mkgui_richlist_row {
-    char title[MKGUI_MAX_TEXT];
-    char subtitle[MKGUI_MAX_TEXT];
-    char right_text[64];
-    uint32_t *thumbnail;      // ARGB pixels, NULL for no thumbnail
-    int32_t thumb_w, thumb_h; // source thumbnail dimensions
+	char title[MKGUI_MAX_TEXT];
+	char subtitle[MKGUI_MAX_TEXT];
+	char right_text[64];
+	uint32_t *thumbnail;      // ARGB pixels, NULL for no thumbnail
+	int32_t thumb_w, thumb_h; // source thumbnail dimensions
 };
 
 typedef void (*mkgui_richlist_cb)(uint32_t row, struct mkgui_richlist_row *out, void *userdata);
 
-void mkgui_richlist_setup(struct mkgui_window *win, uint32_t id, uint32_t row_count, int32_t row_height, mkgui_richlist_cb cb, void *userdata);
-void mkgui_richlist_set_rows(struct mkgui_window *win, uint32_t id, uint32_t row_count);
-int32_t mkgui_richlist_get_selected(struct mkgui_window *win, uint32_t id);
-void mkgui_richlist_set_selected(struct mkgui_window *win, uint32_t id, int32_t row);
-void mkgui_richlist_scroll_to(struct mkgui_window *win, uint32_t id, int32_t row);
+MKGUI_API void mkgui_richlist_setup(struct mkgui_window *win, uint32_t id, uint32_t row_count, int32_t row_height, mkgui_richlist_cb cb, void *userdata);
+MKGUI_API void mkgui_richlist_set_rows(struct mkgui_window *win, uint32_t id, uint32_t row_count);
+MKGUI_API int32_t mkgui_richlist_get_selected(struct mkgui_window *win, uint32_t id);
+MKGUI_API void mkgui_richlist_set_selected(struct mkgui_window *win, uint32_t id, int32_t row);
+MKGUI_API void mkgui_richlist_scroll_to(struct mkgui_window *win, uint32_t id, int32_t row);
 ```
 
 The callback fills a `struct mkgui_richlist_row` for each visible row. The widget renders: thumbnail on the left (scaled to fit row height minus padding), title and subtitle stacked in the center, right-aligned text on the right. Virtual scrolling -- only visible rows are queried.
@@ -1205,18 +1074,16 @@ typedef void (*mkgui_itemview_label_cb)(uint32_t item, char *buf, uint32_t buf_s
 typedef void (*mkgui_itemview_icon_cb)(uint32_t item, char *buf, uint32_t buf_size, void *userdata);
 typedef void (*mkgui_thumbnail_cb)(uint32_t item, uint32_t *pixels, int32_t w, int32_t h, void *userdata);
 
-void mkgui_itemview_setup(struct mkgui_window *win, uint32_t id, uint32_t item_count,
-                          uint32_t view_mode, mkgui_itemview_label_cb label_cb,
-                          mkgui_itemview_icon_cb icon_cb, void *userdata);
-void mkgui_itemview_set_thumbnail(struct mkgui_window *win, uint32_t id, mkgui_thumbnail_cb cb, int32_t thumb_size);
-void mkgui_itemview_set_view(struct mkgui_window *win, uint32_t id, uint32_t view_mode);
-void mkgui_itemview_set_items(struct mkgui_window *win, uint32_t id, uint32_t count);
-void mkgui_itemview_set_cell_size(struct mkgui_window *win, uint32_t id, int32_t w, int32_t h);
-int32_t mkgui_itemview_get_selected(struct mkgui_window *win, uint32_t id);
-void mkgui_itemview_set_selected(struct mkgui_window *win, uint32_t id, int32_t item);
-void mkgui_itemview_clear_selection(struct mkgui_window *win, uint32_t id);
-void mkgui_itemview_scroll_to(struct mkgui_window *win, uint32_t id, int32_t item);
-uint32_t mkgui_itemview_get_view(struct mkgui_window *win, uint32_t id);
+MKGUI_API void mkgui_itemview_setup(struct mkgui_window *win, uint32_t id, uint32_t item_count, uint32_t view_mode, mkgui_itemview_label_cb label_cb, mkgui_itemview_icon_cb icon_cb, void *userdata);
+MKGUI_API void mkgui_itemview_set_thumbnail(struct mkgui_window *win, uint32_t id, mkgui_thumbnail_cb cb, int32_t thumb_size);
+MKGUI_API void mkgui_itemview_set_view(struct mkgui_window *win, uint32_t id, uint32_t view_mode);
+MKGUI_API void mkgui_itemview_set_items(struct mkgui_window *win, uint32_t id, uint32_t count);
+MKGUI_API void mkgui_itemview_set_cell_size(struct mkgui_window *win, uint32_t id, int32_t w, int32_t h);
+MKGUI_API int32_t mkgui_itemview_get_selected(struct mkgui_window *win, uint32_t id);
+MKGUI_API void mkgui_itemview_set_selected(struct mkgui_window *win, uint32_t id, int32_t item);
+MKGUI_API void mkgui_itemview_clear_selection(struct mkgui_window *win, uint32_t id);
+MKGUI_API void mkgui_itemview_scroll_to(struct mkgui_window *win, uint32_t id, int32_t item);
+MKGUI_API uint32_t mkgui_itemview_get_view(struct mkgui_window *win, uint32_t id);
 ```
 
 #### View modes
@@ -1240,43 +1107,42 @@ The itemview does not own data. It uses callbacks to request labels, icons, and 
 
 ```c
 void my_label(uint32_t item, char *buf, uint32_t buf_size, void *ud) {
-    snprintf(buf, buf_size, "File %u.txt", item + 1);
+	snprintf(buf, buf_size, "File %u.txt", item + 1);
 }
 
 void my_icon(uint32_t item, char *buf, uint32_t buf_size, void *ud) {
-    snprintf(buf, buf_size, "document-text");
+	snprintf(buf, buf_size, "document-text");
 }
 
-mkgui_itemview_setup(ctx, ID_ITEMVIEW, 200, MKGUI_VIEW_ICON, my_label, my_icon, NULL);
+mkgui_itemview_setup(win, ID_ITEMVIEW, 200, MKGUI_VIEW_ICON, my_label, my_icon, NULL);
 ```
 
 Switch view modes at runtime:
 
 ```c
-mkgui_itemview_set_view(ctx, ID_ITEMVIEW, MKGUI_VIEW_COMPACT);
+mkgui_itemview_set_view(win, ID_ITEMVIEW, MKGUI_VIEW_COMPACT);
 ```
 
 ### Treeview
 
 ```c
-void mkgui_treeview_setup(struct mkgui_window *win, uint32_t id);
-uint32_t mkgui_treeview_add(struct mkgui_window *win, uint32_t widget_id,
-                            uint32_t node_id, uint32_t parent_node, const char *label);
-void mkgui_treeview_select(struct mkgui_window *win, uint32_t widget_id, int32_t node_id);
-int32_t mkgui_treeview_get_selected(struct mkgui_window *win, uint32_t id);
-void mkgui_treeview_remove(struct mkgui_window *win, uint32_t widget_id, uint32_t node_id);
-void mkgui_treeview_clear(struct mkgui_window *win, uint32_t widget_id);
-void mkgui_treeview_set_label(struct mkgui_window *win, uint32_t widget_id, uint32_t node_id, const char *label);
-const char *mkgui_treeview_get_label(struct mkgui_window *win, uint32_t widget_id, uint32_t node_id);
-void mkgui_treeview_expand(struct mkgui_window *win, uint32_t widget_id, uint32_t node_id);
-void mkgui_treeview_collapse(struct mkgui_window *win, uint32_t widget_id, uint32_t node_id);
-uint32_t mkgui_treeview_is_expanded(struct mkgui_window *win, uint32_t widget_id, uint32_t node_id);
-void mkgui_treeview_expand_all(struct mkgui_window *win, uint32_t widget_id);
-void mkgui_treeview_collapse_all(struct mkgui_window *win, uint32_t widget_id);
-uint32_t mkgui_treeview_get_parent(struct mkgui_window *win, uint32_t widget_id, uint32_t node_id);
-uint32_t mkgui_treeview_node_count(struct mkgui_window *win, uint32_t widget_id);
-void mkgui_treeview_scroll_to(struct mkgui_window *win, uint32_t widget_id, uint32_t node_id);
-void mkgui_set_treenode_icon(struct mkgui_window *win, uint32_t widget_id, uint32_t node_id, const char *icon_name);
+MKGUI_API void mkgui_treeview_setup(struct mkgui_window *win, uint32_t id);
+MKGUI_API uint32_t mkgui_treeview_add(struct mkgui_window *win, uint32_t widget_id, uint32_t node_id, uint32_t parent_node, const char *label);
+MKGUI_API void mkgui_treeview_select(struct mkgui_window *win, uint32_t widget_id, int32_t node_id);
+MKGUI_API int32_t mkgui_treeview_get_selected(struct mkgui_window *win, uint32_t id);
+MKGUI_API void mkgui_treeview_remove(struct mkgui_window *win, uint32_t widget_id, uint32_t node_id);
+MKGUI_API void mkgui_treeview_clear(struct mkgui_window *win, uint32_t widget_id);
+MKGUI_API void mkgui_treeview_set_label(struct mkgui_window *win, uint32_t widget_id, uint32_t node_id, const char *label);
+MKGUI_API const char *mkgui_treeview_get_label(struct mkgui_window *win, uint32_t widget_id, uint32_t node_id);
+MKGUI_API void mkgui_treeview_expand(struct mkgui_window *win, uint32_t widget_id, uint32_t node_id);
+MKGUI_API void mkgui_treeview_collapse(struct mkgui_window *win, uint32_t widget_id, uint32_t node_id);
+MKGUI_API uint32_t mkgui_treeview_is_expanded(struct mkgui_window *win, uint32_t widget_id, uint32_t node_id);
+MKGUI_API void mkgui_treeview_expand_all(struct mkgui_window *win, uint32_t widget_id);
+MKGUI_API void mkgui_treeview_collapse_all(struct mkgui_window *win, uint32_t widget_id);
+MKGUI_API uint32_t mkgui_treeview_get_parent(struct mkgui_window *win, uint32_t widget_id, uint32_t node_id);
+MKGUI_API uint32_t mkgui_treeview_node_count(struct mkgui_window *win, uint32_t widget_id);
+MKGUI_API void mkgui_treeview_scroll_to(struct mkgui_window *win, uint32_t widget_id, uint32_t node_id);
+MKGUI_API void mkgui_set_treenode_icon(struct mkgui_window *win, uint32_t widget_id, uint32_t node_id, const char *icon_name);
 ```
 
 `parent_node = 0` for root-level nodes. `treeview_remove` removes a node and all its descendants. `treeview_clear` removes all nodes. `expand` / `collapse` / `expand_all` / `collapse_all` control node visibility. `get_parent` returns the parent node ID (0 for root nodes). `scroll_to` ensures a node is visible in the scrollable area.
@@ -1286,29 +1152,27 @@ void mkgui_set_treenode_icon(struct mkgui_window *win, uint32_t widget_id, uint3
 A columned tree (tree-table): a listview whose rows also nest into an expandable hierarchy. The disclosure twisty and indentation live in column 0; every other column renders as a listview cell (same `MKGUI_CELL_*` types). Use it for anything that is "table columns + parent/child" -- file managers, property trees, parent/clone game lists.
 
 ```c
-void mkgui_treelist_setup(struct mkgui_window *win, uint32_t id, uint32_t col_count,
-                          const struct mkgui_column *columns);
-uint32_t mkgui_treelist_add(struct mkgui_window *win, uint32_t id, uint32_t parent_node,
-                            const char *const *cells, void *row_userdata);
-void mkgui_treelist_clear(struct mkgui_window *win, uint32_t id);
-void mkgui_treelist_expand(struct mkgui_window *win, uint32_t id, uint32_t node);
-void mkgui_treelist_collapse(struct mkgui_window *win, uint32_t id, uint32_t node);
-void mkgui_treelist_expand_all(struct mkgui_window *win, uint32_t id);
-void mkgui_treelist_collapse_all(struct mkgui_window *win, uint32_t id);
-uint32_t mkgui_treelist_is_expanded(struct mkgui_window *win, uint32_t id, uint32_t node);
-int32_t mkgui_treelist_get_selected(struct mkgui_window *win, uint32_t id);
-void mkgui_treelist_set_selected(struct mkgui_window *win, uint32_t id, int32_t node);
-uint32_t mkgui_treelist_is_selected(struct mkgui_window *win, uint32_t id, uint32_t node);
-void mkgui_treelist_clear_selection(struct mkgui_window *win, uint32_t id);
-uint32_t mkgui_treelist_get_multi_sel(struct mkgui_window *win, uint32_t id, int32_t **out);
-void *mkgui_treelist_get_userdata(struct mkgui_window *win, uint32_t id, uint32_t node);
-uint32_t mkgui_treelist_get_parent(struct mkgui_window *win, uint32_t id, uint32_t node);
-uint32_t mkgui_treelist_node_count(struct mkgui_window *win, uint32_t id);
-void mkgui_treelist_set_col_width(struct mkgui_window *win, uint32_t id, uint32_t col, int32_t width);
-void mkgui_treelist_set_cell_type(struct mkgui_window *win, uint32_t id, uint32_t col, uint32_t cell_type);
-void mkgui_treelist_get_sort(struct mkgui_window *win, uint32_t id, int32_t *col, int32_t *dir);
-void mkgui_treelist_set_sort(struct mkgui_window *win, uint32_t id, int32_t col, int32_t dir);
-void mkgui_treelist_scroll_to(struct mkgui_window *win, uint32_t id, uint32_t node);
+MKGUI_API void mkgui_treelist_setup(struct mkgui_window *win, uint32_t id, uint32_t col_count, const struct mkgui_column *columns);
+MKGUI_API uint32_t mkgui_treelist_add(struct mkgui_window *win, uint32_t id, uint32_t parent_node, const char *const *cells, void *row_userdata);
+MKGUI_API void mkgui_treelist_clear(struct mkgui_window *win, uint32_t id);
+MKGUI_API void mkgui_treelist_expand(struct mkgui_window *win, uint32_t id, uint32_t node);
+MKGUI_API void mkgui_treelist_collapse(struct mkgui_window *win, uint32_t id, uint32_t node);
+MKGUI_API void mkgui_treelist_expand_all(struct mkgui_window *win, uint32_t id);
+MKGUI_API void mkgui_treelist_collapse_all(struct mkgui_window *win, uint32_t id);
+MKGUI_API uint32_t mkgui_treelist_is_expanded(struct mkgui_window *win, uint32_t id, uint32_t node);
+MKGUI_API int32_t mkgui_treelist_get_selected(struct mkgui_window *win, uint32_t id);
+MKGUI_API void mkgui_treelist_set_selected(struct mkgui_window *win, uint32_t id, int32_t node);
+MKGUI_API uint32_t mkgui_treelist_is_selected(struct mkgui_window *win, uint32_t id, uint32_t node);
+MKGUI_API void mkgui_treelist_clear_selection(struct mkgui_window *win, uint32_t id);
+MKGUI_API uint32_t mkgui_treelist_get_multi_sel(struct mkgui_window *win, uint32_t id, int32_t **out);
+MKGUI_API void *mkgui_treelist_get_userdata(struct mkgui_window *win, uint32_t id, uint32_t node);
+MKGUI_API uint32_t mkgui_treelist_get_parent(struct mkgui_window *win, uint32_t id, uint32_t node);
+MKGUI_API uint32_t mkgui_treelist_node_count(struct mkgui_window *win, uint32_t id);
+MKGUI_API void mkgui_treelist_set_col_width(struct mkgui_window *win, uint32_t id, uint32_t col, int32_t width);
+MKGUI_API void mkgui_treelist_set_cell_type(struct mkgui_window *win, uint32_t id, uint32_t col, uint32_t cell_type);
+MKGUI_API void mkgui_treelist_get_sort(struct mkgui_window *win, uint32_t id, int32_t *col, int32_t *dir);
+MKGUI_API void mkgui_treelist_set_sort(struct mkgui_window *win, uint32_t id, int32_t col, int32_t dir);
+MKGUI_API void mkgui_treelist_scroll_to(struct mkgui_window *win, uint32_t id, uint32_t node);
 ```
 
 Unlike the listview (which is fully virtual via a row callback), the treelist is **retained**: it stores the node tree and each row's cell strings, because a callback cannot express hierarchy cheaply. `mkgui_treelist_add` returns a **stable node handle** (a small 1-based integer); pass `MKGUI_TREELIST_ROOT` (0) as `parent_node` for a top-level row, or a parent's handle to nest under it. Arbitrary depth is supported. `cells` is an array of `col_count` strings (NULL entries render empty). `row_userdata` maps a row back to your record without a hidden column; retrieve it with `mkgui_treelist_get_userdata`.
@@ -1324,17 +1188,17 @@ Events: `MKGUI_EVENT_TREELIST_SELECT`, `MKGUI_EVENT_TREELIST_DBLCLICK`, `MKGUI_E
 ### Textarea
 
 ```c
-void mkgui_textarea_set(struct mkgui_window *win, uint32_t id, const char *text);
-const char *mkgui_textarea_get(struct mkgui_window *win, uint32_t id);
-void mkgui_textarea_set_readonly(struct mkgui_window *win, uint32_t id, uint32_t readonly);
-uint32_t mkgui_textarea_get_readonly(struct mkgui_window *win, uint32_t id);
-void mkgui_textarea_get_cursor(struct mkgui_window *win, uint32_t id, uint32_t *line, uint32_t *col);
-void mkgui_textarea_set_cursor(struct mkgui_window *win, uint32_t id, uint32_t line, uint32_t col);
-uint32_t mkgui_textarea_get_line_count(struct mkgui_window *win, uint32_t id);
-void mkgui_textarea_get_selection(struct mkgui_window *win, uint32_t id, uint32_t *start, uint32_t *end);
-void mkgui_textarea_insert(struct mkgui_window *win, uint32_t id, const char *text);
-void mkgui_textarea_append(struct mkgui_window *win, uint32_t id, const char *text);
-void mkgui_textarea_scroll_to_end(struct mkgui_window *win, uint32_t id);
+MKGUI_API void mkgui_textarea_set(struct mkgui_window *win, uint32_t id, const char *text);
+MKGUI_API const char *mkgui_textarea_get(struct mkgui_window *win, uint32_t id);
+MKGUI_API void mkgui_textarea_set_readonly(struct mkgui_window *win, uint32_t id, uint32_t readonly);
+MKGUI_API uint32_t mkgui_textarea_get_readonly(struct mkgui_window *win, uint32_t id);
+MKGUI_API void mkgui_textarea_get_cursor(struct mkgui_window *win, uint32_t id, uint32_t *line, uint32_t *col);
+MKGUI_API void mkgui_textarea_set_cursor(struct mkgui_window *win, uint32_t id, uint32_t line, uint32_t col);
+MKGUI_API uint32_t mkgui_textarea_get_line_count(struct mkgui_window *win, uint32_t id);
+MKGUI_API void mkgui_textarea_get_selection(struct mkgui_window *win, uint32_t id, uint32_t *start, uint32_t *end);
+MKGUI_API void mkgui_textarea_insert(struct mkgui_window *win, uint32_t id, const char *text);
+MKGUI_API void mkgui_textarea_append(struct mkgui_window *win, uint32_t id, const char *text);
+MKGUI_API void mkgui_textarea_scroll_to_end(struct mkgui_window *win, uint32_t id);
 ```
 
 Supports Ctrl+C (copy) and Ctrl+V (paste). Uses the system clipboard (X11 CLIPBOARD selection / Win32 clipboard).
@@ -1346,14 +1210,14 @@ Supports Ctrl+C (copy) and Ctrl+V (paste). Uses the system clipboard (X11 CLIPBO
 Append-only scrolling log widget with ANSI color parsing, optional word wrap, and selection. Designed for streaming program/process output where the textarea widget would be the wrong tool (textarea is for small editable notes, not large or growing buffers).
 
 ```c
-void mkgui_logview_setup(struct mkgui_window *win, uint32_t id, uint32_t max_lines, uint32_t arena_bytes);
-void mkgui_logview_append(struct mkgui_window *win, uint32_t id, const char *text);
-void mkgui_logview_append_n(struct mkgui_window *win, uint32_t id, const char *text, uint32_t len);
-void mkgui_logview_clear(struct mkgui_window *win, uint32_t id);
-uint32_t mkgui_logview_get_line_count(struct mkgui_window *win, uint32_t id);
-void mkgui_logview_scroll_to_end(struct mkgui_window *win, uint32_t id);
-uint32_t mkgui_logview_is_at_end(struct mkgui_window *win, uint32_t id);
-uint32_t mkgui_logview_get_selection_text(struct mkgui_window *win, uint32_t id, char *out, uint32_t out_size);
+MKGUI_API void mkgui_logview_setup(struct mkgui_window *win, uint32_t id, uint32_t max_lines, uint32_t arena_bytes);
+MKGUI_API void mkgui_logview_append(struct mkgui_window *win, uint32_t id, const char *text);
+MKGUI_API void mkgui_logview_append_n(struct mkgui_window *win, uint32_t id, const char *text, uint32_t len);
+MKGUI_API void mkgui_logview_clear(struct mkgui_window *win, uint32_t id);
+MKGUI_API uint32_t mkgui_logview_get_line_count(struct mkgui_window *win, uint32_t id);
+MKGUI_API void mkgui_logview_scroll_to_end(struct mkgui_window *win, uint32_t id);
+MKGUI_API uint32_t mkgui_logview_is_at_end(struct mkgui_window *win, uint32_t id);
+MKGUI_API uint32_t mkgui_logview_get_selection_text(struct mkgui_window *win, uint32_t id, char *out, uint32_t out_size);
 ```
 
 `mkgui_logview_setup` is required before any append and allocates the bounded retained-line, text, and style-run storage. Pending text/style buffers grow during appends, and visual-line scratch storage grows during wrapping. There is no default capacity -- the caller picks `max_lines` (oldest evicts when the ring fills) and `arena_bytes` (oldest lines also evict when their bytes get overwritten). Calling setup again reconfigures and clears the widget. Typical sizes: 10000 lines with a 256 KB text arena for verbose program output; smaller for embedded uses.
@@ -1376,17 +1240,17 @@ Style flag `MKGUI_LOGVIEW_NOWRAP` disables word wrap; long lines clip at the rig
 ### Statusbar
 
 ```c
-void mkgui_statusbar_setup(struct mkgui_window *win, uint32_t id, uint32_t section_count, int32_t *widths);
-void mkgui_statusbar_set(struct mkgui_window *win, uint32_t id, uint32_t section, const char *text);
-const char *mkgui_statusbar_get(struct mkgui_window *win, uint32_t id, uint32_t section);
-void mkgui_statusbar_clear(struct mkgui_window *win, uint32_t id, uint32_t section);
+MKGUI_API void mkgui_statusbar_setup(struct mkgui_window *win, uint32_t id, uint32_t section_count, const int32_t *widths);
+MKGUI_API void mkgui_statusbar_set(struct mkgui_window *win, uint32_t id, uint32_t section, const char *text);
+MKGUI_API const char *mkgui_statusbar_get(struct mkgui_window *win, uint32_t id, uint32_t section);
+MKGUI_API void mkgui_statusbar_clear(struct mkgui_window *win, uint32_t id, uint32_t section);
 ```
 
 Section widths: positive = fixed pixels, negative = fill remaining space.
 
 ```c
 int32_t widths[] = { -1, 150, 100 };  // 3 sections: flexible, 150px, 100px
-mkgui_statusbar_setup(ctx, ID_SB, 3, widths);
+mkgui_statusbar_setup(win, ID_SB, 3, widths);
 ```
 
 ### Canvas
@@ -1394,28 +1258,34 @@ mkgui_statusbar_setup(ctx, ID_SB, 3, widths);
 Custom drawing widget. The callback receives the full framebuffer and must clip its direct pixel writes.
 
 ```c
-typedef void (*mkgui_canvas_cb)(struct mkgui_window *win, uint32_t id, uint32_t *pixels,
-                                 int32_t x, int32_t y, int32_t w, int32_t h, void *userdata);
+typedef void (*mkgui_canvas_cb)(struct mkgui_window *win, uint32_t id, uint32_t *pixels, int32_t x, int32_t y, int32_t w, int32_t h, void *userdata);
 
-void mkgui_canvas_set_callback(struct mkgui_window *win, uint32_t id, mkgui_canvas_cb callback, void *userdata);
+MKGUI_API void mkgui_canvas_set_callback(struct mkgui_window *win, uint32_t id, mkgui_canvas_cb callback, void *userdata);
 ```
 
 ```c
-MKGUI_W(MKGUI_CANVAS, ID_CANVAS, "", "", ID_PARENT, 0, 0, 0, MKGUI_CANVAS_BORDER, 0)
+MKGUI_W(MKGUI_CANVAS, ID_CANVAS, "", "", ID_PARENT, 0, 0, 0, MKGUI_CANVAS_BORDER, 0),
 ```
 
-The callback receives the pixel buffer and the widget's rect. All `draw_*` functions respect the clip rect, which is automatically set to the widget bounds before the callback and restored after. Use `MKGUI_CANVAS_BORDER` to draw a border before the callback runs.
+The callback receives the full window pixel buffer and the canvas rectangle. Obtain the framebuffer stride with `mkgui_get_window_size()`. Clip direct pixel writes to both the canvas rectangle and framebuffer bounds. Internal `draw_*` helpers are not exported by the shared library. `MKGUI_CANVAS_BORDER` draws the border before the callback.
 
 Mouse wheel events over a canvas emit `MKGUI_EVENT_SCROLL` with `value` set to the wheel delta in pixels (negative = up/left, positive = down/right) and `col` indicating the wheel axis (0 = vertical, 1 = horizontal). The canvas owner decides what to do with the delta - typical use is to advance an app-managed scroll offset and mark the widget dirty.
 
 ```c
-void my_draw(struct mkgui_window *win, uint32_t id, uint32_t *pixels,
-             int32_t x, int32_t y, int32_t w, int32_t h, void *userdata) {
-    draw_rect_fill(pixels, ctx->win_w, ctx->win_h, x, y, w, h, 0xFF2A2A2A);
-    // ... custom drawing ...
+// [=]===^=[ my_draw ]==========================================================================[=]
+static void my_draw(struct mkgui_window *win, uint32_t id, uint32_t *pixels, int32_t x, int32_t y, int32_t w, int32_t h, void *userdata) {
+	int32_t width, height;
+	mkgui_get_window_size(win, &width, &height);
+
+	for(int32_t row = y > 0 ? y : 0; row < y + h && row < height; ++row) {
+		for(int32_t col = x > 0 ? x : 0; col < x + w && col < width; ++col) {
+			pixels[(size_t)row * (size_t)width + (size_t)col] = 0xff2a2a2a;
+
+		}
+	}
 }
 
-mkgui_canvas_set_callback(ctx, ID_CANVAS, my_draw, NULL);
+mkgui_canvas_set_callback(win, ID_CANVAS, my_draw, NULL);
 ```
 
 #### Canvas input events
@@ -1432,9 +1302,9 @@ Combine `MKGUI_WINDOW_UNDECORATED` and `MKGUI_WINDOW_CANVAS` to create a window 
 enum { ID_WIN = 1, ID_CANVAS };
 
 struct mkgui_widget widgets[] = {
-    MKGUI_W(MKGUI_WINDOW, ID_WIN, "Player", "", 0, 275, 116, 0,
-            MKGUI_WINDOW_UNDECORATED | MKGUI_WINDOW_CANVAS, 0),
-    MKGUI_W(MKGUI_CANVAS, ID_CANVAS, "", "", ID_WIN, 0, 0, 0, 0, 1),
+	MKGUI_W(MKGUI_WINDOW, ID_WIN, "Player", "", 0, 275, 116, 0,
+			MKGUI_WINDOW_UNDECORATED | MKGUI_WINDOW_CANVAS, 0),
+	MKGUI_W(MKGUI_CANVAS, ID_CANVAS, "", "", ID_WIN, 0, 0, 0, 0, 1),
 };
 
 struct mkgui_ctx *ctx = mkgui_ctx_create();
@@ -1456,13 +1326,13 @@ Canvas-only windows can be given a non-rectangular shape via the X11 Shape exten
 ```c
 // Polygon outline
 int32_t points[] = { x0,y0, x1,y1, x2,y2, ... };
-mkgui_window_set_shape(ctx, points, point_count);
+mkgui_window_set_shape(win, points, point_count);
 
 // Mask from ARGB bitmap (pixels with alpha >= threshold are visible)
-mkgui_window_set_shape_mask(ctx, skin_pixels, skin_w, skin_h, 128);
+mkgui_window_set_shape_mask(win, skin_pixels, skin_w, skin_h, 128);
 
 // Restore rectangular shape
-mkgui_window_clear_shape(ctx);
+mkgui_window_clear_shape(win);
 ```
 
 `mkgui_window_set_shape` takes interleaved x,y pairs defining a polygon. `mkgui_window_set_shape_mask` scans an ARGB pixel buffer and builds the shape from spans where the alpha channel meets or exceeds `alpha_threshold`. Both use winding-rule fill. Call `mkgui_window_clear_shape` to remove the shape and return to a normal rectangle.
@@ -1508,13 +1378,13 @@ Toolbar buttons render flat (Breeze style) -- no border when idle, highlighted o
 ### Display modes
 
 ```c
-void mkgui_toolbar_set_mode(struct mkgui_window *win, uint32_t toolbar_id, uint32_t mode);
+MKGUI_API void mkgui_toolbar_set_mode(struct mkgui_window *win, uint32_t toolbar_id, uint32_t mode);
 ```
 
 Switch between icons+text, icons only, or text only at runtime. The toolbar height adapts automatically -- text-only toolbars are shorter, icon toolbars size to the loaded icon dimensions.
 
 ```c
-mkgui_toolbar_set_mode(ctx, ID_TB, MKGUI_TOOLBAR_ICONS_ONLY);
+mkgui_toolbar_set_mode(win, ID_TB, MKGUI_TOOLBAR_ICONS_ONLY);
 ```
 
 Or set the mode in the widget style at init time:
@@ -1526,12 +1396,12 @@ MKGUI_W(MKGUI_TOOLBAR, ID_TB, "", "", ID_WINDOW, 0, 0, 0, MKGUI_TOOLBAR_ICONS_ON
 ### DatePicker
 
 ```c
-void mkgui_datepicker_set(struct mkgui_window *win, uint32_t id, int32_t year, int32_t month, int32_t day);
-void mkgui_datepicker_get(struct mkgui_window *win, uint32_t id, int32_t *year, int32_t *month, int32_t *day);
-const char *mkgui_datepicker_get_text(struct mkgui_window *win, uint32_t id);
-void mkgui_datepicker_set_readonly(struct mkgui_window *win, uint32_t id, uint32_t readonly);
-uint32_t mkgui_datepicker_get_readonly(struct mkgui_window *win, uint32_t id);
-void mkgui_today(int32_t *year, int32_t *month, int32_t *day);
+MKGUI_API void mkgui_datepicker_set(struct mkgui_window *win, uint32_t id, int32_t year, int32_t month, int32_t day);
+MKGUI_API void mkgui_datepicker_get(struct mkgui_window *win, uint32_t id, int32_t *year, int32_t *month, int32_t *day);
+MKGUI_API const char *mkgui_datepicker_get_text(struct mkgui_window *win, uint32_t id);
+MKGUI_API void mkgui_datepicker_set_readonly(struct mkgui_window *win, uint32_t id, uint32_t readonly);
+MKGUI_API uint32_t mkgui_datepicker_get_readonly(struct mkgui_window *win, uint32_t id);
+MKGUI_API void mkgui_today(int32_t *year, int32_t *month, int32_t *day);
 ```
 
 Date picker with calendar popup. Click the dropdown arrow to open the calendar. Type directly in the text field to edit the date (YYYY-MM-DD format). Emits `MKGUI_EVENT_DATEPICKER_CHANGED`.
@@ -1541,9 +1411,9 @@ Date picker with calendar popup. Click the dropdown arrow to open the calendar. 
 ### IP Input
 
 ```c
-void mkgui_ipinput_set(struct mkgui_window *win, uint32_t id, const char *ip_string);
-const char *mkgui_ipinput_get(struct mkgui_window *win, uint32_t id);
-uint32_t mkgui_ipinput_get_u32(struct mkgui_window *win, uint32_t id);
+MKGUI_API void mkgui_ipinput_set(struct mkgui_window *win, uint32_t id, const char *ip_string);
+MKGUI_API const char *mkgui_ipinput_get(struct mkgui_window *win, uint32_t id);
+MKGUI_API uint32_t mkgui_ipinput_get_u32(struct mkgui_window *win, uint32_t id);
 ```
 
 Four-field IPv4 address input (like Windows IP input). Each octet is a separate editable field with 0--255 validation. Tab/dot moves to the next field. `ipinput_get` returns a dotted-decimal string. `ipinput_get_u32` packs the first octet into the high eight bits, for example `192.168.1.2` becomes `0xc0a80102`. This describes the numeric value, not its native memory byte order. Emits `MKGUI_EVENT_IPINPUT_CHANGED`.
@@ -1551,9 +1421,9 @@ Four-field IPv4 address input (like Windows IP input). Each octet is a separate 
 ### Pathbar
 
 ```c
-void mkgui_pathbar_set(struct mkgui_window *win, uint32_t id, const char *path);
-const char *mkgui_pathbar_get(struct mkgui_window *win, uint32_t id);
-void mkgui_pathbar_get_segment_path(struct mkgui_window *win, uint32_t id, uint32_t seg_idx, char *out, uint32_t out_size);
+MKGUI_API void mkgui_pathbar_set(struct mkgui_window *win, uint32_t id, const char *path);
+MKGUI_API const char *mkgui_pathbar_get(struct mkgui_window *win, uint32_t id);
+MKGUI_API void mkgui_pathbar_get_segment_path(struct mkgui_window *win, uint32_t id, uint32_t seg_idx, char *out, uint32_t out_size);
 ```
 
 Breadcrumb-style path bar. Click a segment to navigate to that directory (emits `MKGUI_EVENT_PATHBAR_NAV` with `ev->value` = segment index). Click the background to enter edit mode (type a path directly, Enter emits `MKGUI_EVENT_PATHBAR_SUBMIT`). `pathbar_get_segment_path` builds the full path up to and including segment `seg_idx`.
@@ -1561,11 +1431,11 @@ Breadcrumb-style path bar. Click a segment to navigate to that directory (emits 
 ### Tabs API
 
 ```c
-uint32_t mkgui_tabs_get_current(struct mkgui_window *win, uint32_t id);
-void mkgui_tabs_set_current(struct mkgui_window *win, uint32_t id, uint32_t tab_id);
-uint32_t mkgui_tabs_get_count(struct mkgui_window *win, uint32_t id);
-void mkgui_tabs_set_text(struct mkgui_window *win, uint32_t tabs_id, uint32_t tab_id, const char *text);
-const char *mkgui_tabs_get_text(struct mkgui_window *win, uint32_t tabs_id, uint32_t tab_id);
+MKGUI_API uint32_t mkgui_tabs_get_current(struct mkgui_window *win, uint32_t id);
+MKGUI_API void mkgui_tabs_set_current(struct mkgui_window *win, uint32_t id, uint32_t tab_id);
+MKGUI_API uint32_t mkgui_tabs_get_count(struct mkgui_window *win, uint32_t id);
+MKGUI_API void mkgui_tabs_set_text(struct mkgui_window *win, uint32_t tabs_id, uint32_t tab_id, const char *text);
+MKGUI_API const char *mkgui_tabs_get_text(struct mkgui_window *win, uint32_t tabs_id, uint32_t tab_id);
 ```
 
 `tabs_get_current` returns the active tab's widget ID. `tabs_set_current` switches to a tab by its widget ID. `tabs_get_count` returns the number of MKGUI_TAB children. `tabs_set_text` / `tabs_get_text` change tab labels at runtime.
@@ -1581,8 +1451,8 @@ MKGUI_W(MKGUI_LISTVIEW, ID_LIST,  "", "", ID_SPLIT, 0, 0, MKGUI_REGION_RIGHT, 0,
 The divider is draggable. Children sized automatically based on their region flag.
 
 ```c
-float mkgui_split_get_ratio(struct mkgui_window *win, uint32_t id);
-void mkgui_split_set_ratio(struct mkgui_window *win, uint32_t id, float ratio);
+MKGUI_API float mkgui_split_get_ratio(struct mkgui_window *win, uint32_t id);
+MKGUI_API void mkgui_split_set_ratio(struct mkgui_window *win, uint32_t id, float ratio);
 ```
 
 `split_get_ratio` returns the current split position as a 0.0--1.0 ratio. `split_set_ratio` sets it programmatically (clamped to 0.0--1.0).
@@ -1605,13 +1475,13 @@ The group insets its children inside the border. It does not stack direct childr
 Set `MKGUI_GROUP_COLLAPSIBLE` to allow a group to be collapsed/expanded by clicking the header. In a VBox, a collapsible group keeps its measured content height instead of receiving vertical flex space. Add `MKGUI_GROUP_COLLAPSED` to start collapsed. When collapsed, children are hidden and the group shrinks to header height. Generates `MKGUI_EVENT_CLICK` with `value=1` when collapsed, `value=0` when expanded. Groups without `MKGUI_GROUP_COLLAPSIBLE` ignore header clicks and have no arrow indicator.
 
 ```c
-MKGUI_W(MKGUI_GROUP, ID_GRP, "Advanced", "", ID_PARENT, 0, 0, 0, MKGUI_GROUP_COLLAPSIBLE, 1)
-MKGUI_W(MKGUI_GROUP, ID_GRP, "Advanced", "", ID_PARENT, 0, 0, 0, MKGUI_GROUP_COLLAPSIBLE | MKGUI_GROUP_COLLAPSED, 1)
+MKGUI_W(MKGUI_GROUP, ID_GRP, "Advanced", "", ID_PARENT, 0, 0, 0, MKGUI_GROUP_COLLAPSIBLE, 1),
+MKGUI_W(MKGUI_GROUP, ID_GRP, "Advanced", "", ID_PARENT, 0, 0, 0, MKGUI_GROUP_COLLAPSIBLE | MKGUI_GROUP_COLLAPSED, 1),
 ```
 
 ```c
-void mkgui_group_set_collapsed(struct mkgui_window *win, uint32_t id, uint32_t collapsed);
-uint32_t mkgui_group_get_collapsed(struct mkgui_window *win, uint32_t id);
+MKGUI_API void mkgui_group_set_collapsed(struct mkgui_window *win, uint32_t id, uint32_t collapsed);
+MKGUI_API uint32_t mkgui_group_get_collapsed(struct mkgui_window *win, uint32_t id);
 ```
 
 ## Panel
@@ -1634,9 +1504,9 @@ MKGUI_W(MKGUI_SCROLLBAR, ID_SB, "", "", ID_TAB1, MKGUI_SCROLLBAR_W, 200, MKGUI_V
 ```
 
 ```c
-void mkgui_scrollbar_setup(struct mkgui_window *win, uint32_t id, int32_t max_value, int32_t page_size);
-void mkgui_scrollbar_set(struct mkgui_window *win, uint32_t id, int32_t value);
-int32_t mkgui_scrollbar_get(struct mkgui_window *win, uint32_t id);
+MKGUI_API void mkgui_scrollbar_setup(struct mkgui_window *win, uint32_t id, int32_t max_value, int32_t page_size);
+MKGUI_API void mkgui_scrollbar_set(struct mkgui_window *win, uint32_t id, int32_t value);
+MKGUI_API int32_t mkgui_scrollbar_get(struct mkgui_window *win, uint32_t id);
 ```
 
 - `max_value`: total content size
@@ -1650,7 +1520,7 @@ Use `MKGUI_VERTICAL` flag for a vertical scrollbar. Emits `MKGUI_EVENT_SCROLL` o
 A visual separator line for VBOX/HBOX containers. Draws an etched line. Horizontal by default; set `MKGUI_VERTICAL` for vertical.
 
 ```c
-MKGUI_W(MKGUI_DIVIDER, ID_DIV, "", "", ID_VBOX, 0, 0, MKGUI_FIXED, 0, 0)
+MKGUI_W(MKGUI_DIVIDER, ID_DIV, "", "", ID_VBOX, 0, 0, MKGUI_FIXED, 0, 0),
 ```
 
 ## Image
@@ -1662,31 +1532,31 @@ MKGUI_W(MKGUI_IMAGE, ID_IMG, "", "", ID_TAB1, 200, 200, MKGUI_FIXED, MKGUI_IMAGE
 ```
 
 ```c
-void mkgui_image_set(struct mkgui_window *win, uint32_t id, uint32_t *pixels, int32_t w, int32_t h);
-void mkgui_image_clear(struct mkgui_window *win, uint32_t id);
+MKGUI_API void mkgui_image_set(struct mkgui_window *win, uint32_t id, const uint32_t *pixels, int32_t w, int32_t h);
+MKGUI_API void mkgui_image_clear(struct mkgui_window *win, uint32_t id);
 ```
 
 Pixels are ARGB format (alpha in bits 31-24). The widget copies the pixel data internally. Use `MKGUI_IMAGE_STRETCH` to stretch the image to fill the widget area. Use `MKGUI_IMAGE_BORDER` for a border frame.
 
 ## GL View
 
-Embeds an OpenGL viewport. mkgui creates a native child window; the user creates their own GL context and renders to it. The widget automatically triggers 60fps redraws when visible on the active tab.
+Embeds an OpenGL viewport. mkgui creates a native child window; the user creates their own GL context and renders to it. A visible OpenGL view keeps the toolkit animation loop active; application code performs the OpenGL drawing.
 
 ```c
 MKGUI_W(MKGUI_GLVIEW, ID_GL, "", "", ID_TAB1, 0, 0, 0, MKGUI_GLVIEW_BORDER, 0),
 ```
 
 ```c
-uint32_t mkgui_glview_init(struct mkgui_window *win, uint32_t id);
-void mkgui_glview_destroy(struct mkgui_window *win, uint32_t id);
-void mkgui_glview_get_size(struct mkgui_window *win, uint32_t id, int32_t *w, int32_t *h);
+MKGUI_API uint32_t mkgui_glview_init(struct mkgui_window *win, uint32_t id);
+MKGUI_API void mkgui_glview_destroy(struct mkgui_window *win, uint32_t id);
+MKGUI_API void mkgui_glview_get_size(struct mkgui_window *win, uint32_t id, int32_t *w, int32_t *h);
 
 // Linux (X11):
-Window mkgui_glview_get_x11_window(struct mkgui_window *win, uint32_t id);
-Display *mkgui_glview_get_x11_display(struct mkgui_window *win);
+MKGUI_API Window mkgui_glview_get_x11_window(struct mkgui_window *win, uint32_t id);
+MKGUI_API Display *mkgui_glview_get_x11_display(struct mkgui_window *win);
 
 // Windows:
-HWND mkgui_glview_get_hwnd(struct mkgui_window *win, uint32_t id);
+MKGUI_API HWND mkgui_glview_get_hwnd(struct mkgui_window *win, uint32_t id);
 ```
 
 ### Usage
@@ -1697,23 +1567,23 @@ HWND mkgui_glview_get_hwnd(struct mkgui_window *win, uint32_t id);
 4. In your render loop, make the context current, draw, and swap buffers
 
 ```c
-mkgui_glview_init(ctx, ID_GL);
+mkgui_glview_init(win, ID_GL);
 
 // Linux example with GLX:
-Display *dpy = mkgui_glview_get_x11_display(ctx);
-Window win = mkgui_glview_get_x11_window(ctx, ID_GL);
+Display *dpy = mkgui_glview_get_x11_display(win);
+Window drawable = mkgui_glview_get_x11_window(win, ID_GL);
 // ... create GLXContext with glXCreateContext / glXCreateNewContext ...
 
 // In render loop:
-glXMakeCurrent(dpy, win, glctx);
+glXMakeCurrent(dpy, drawable, glctx);
 int32_t w, h;
-mkgui_glview_get_size(ctx, ID_GL, &w, &h);
+mkgui_glview_get_size(win, ID_GL, &w, &h);
 glViewport(0, 0, w, h);
 // ... draw ...
-glXSwapBuffers(dpy, win);
+glXSwapBuffers(dpy, drawable);
 ```
 
-mkgui does not link against OpenGL. The user brings their own GL loader and context creation. The widget automatically repositions/resizes the child window when the layout changes (e.g. window resize, tab switch). GL animations should use `ctx->anim_time` (wall-clock seconds) for time-based motion rather than per-frame increments.
+mkgui does not link against OpenGL. The user brings their own GL loader and context creation. The widget automatically repositions/resizes the child window when the layout changes (e.g. window resize, tab switch). Use `mkgui_now_ns()` for an animation clock. Include the native platform headers before `mkgui_glview.h` to declare the handle accessors.
 
 ## Window chrome auto-layout
 
@@ -1723,7 +1593,7 @@ When a `MKGUI_WINDOW` has menu, toolbar, statusbar, or pathbar children, the lay
 - **Toolbar** -- placed below the menu, full window width
 - **Pathbar** -- placed below the toolbar, full window width
 - **Statusbar** -- placed at the very bottom, full window width
-- **All other children** -- positioned in the remaining content area between the chrome widgets, using VBOX stacking
+- **All other children** -- given the remaining content rectangle; use a body container to arrange them
 
 No manual offsets are needed on chrome widgets. Simply parent them to the window with zero size/flags. The content area is computed automatically.
 
@@ -1749,7 +1619,7 @@ Children in HBOX/VBOX use a weight-based distribution system. The `weight` field
 
 For flexible children, `w`/`h` is the minimum size in the layout direction. The child gets at least that much, plus its proportional share of remaining space. When `h` is 0, the natural height (derived from font height) is used as the minimum.
 
-Use `mkgui_set_weight(ctx, id, weight)` to change weight at runtime.
+Use `mkgui_set_weight(win, id, weight)` to change weight at runtime.
 
 ### VBox
 
@@ -1775,7 +1645,7 @@ MKGUI_W(MKGUI_PANEL,  ID_RIGHT,"", "", ID_HBOX, 150, 0, MKGUI_FIXED, MKGUI_PANEL
 
 ### Form
 
-Two-column form layout for label+control pairs. Children are paired in order: 1st is label, 2nd is control, 3rd is label, 4th is control, etc. The label column auto-sizes to the widest label. Each row is 24px tall with 6px gap.
+Two-column form layout for label+control pairs. Children are paired in order: 1st is label, 2nd is control, 3rd is label, 4th is control, etc. The label column auto-sizes to the widest label. Each row is the current font height plus 10 pixels, separated by the scaled box gap.
 
 ```c
 MKGUI_W(MKGUI_FORM,     ID_FORM,  "", "", ID_TAB1, 0, 0, 0, 0, 0),
@@ -1841,17 +1711,18 @@ PlutoSVG/PlutoVG. Monochrome icons follow the theme text colour.
 
 ```c
 #include "mkguiicons_names.h"
-void mkgui_set_icon(struct mkgui_window *win, uint32_t widget_id, const char *icon_name);
-void mkgui_set_treenode_icon(struct mkgui_window *win, uint32_t widget_id, uint32_t node_id, const char *icon_name);
-int32_t mkgui_icon_load_svg(struct mkgui_window *win, const char *name, const char *path);
-int32_t mkgui_icon_add(const char *name, const uint32_t *pixels, int32_t w, int32_t h);
-uint32_t mkgui_icon_browser(struct mkgui_window *win, int32_t size, char *out_name, uint32_t name_size);
+MKGUI_API void mkgui_set_icon(struct mkgui_window *win, uint32_t widget_id, const char *icon_name);
+MKGUI_API void mkgui_set_treenode_icon(struct mkgui_window *win, uint32_t widget_id, uint32_t node_id, const char *icon_name);
+MKGUI_API int32_t mkgui_icon_load_svg(struct mkgui_window *win, const char *name, const char *path);
+MKGUI_API int32_t mkgui_icon_add(const char *name, const uint32_t *pixels, int32_t w, int32_t h);
+MKGUI_API int32_t mkgui_icon_at_size(struct mkgui_window *win, const char *name, int32_t size);
+MKGUI_API uint32_t mkgui_icon_browser(struct mkgui_window *win, int32_t size, char *out_name, uint32_t name_size);
 ```
 
 `mkgui_set_icon(win, id, MKICON_SAVE)` selects an icon by name. Custom SVG files
 can be registered under an application-defined name with `mkgui_icon_load_svg()`;
 their sources are retained for scale and theme changes. `mkgui_icon_add()` copies
-custom ARGB pixels. Unknown widget icons use the magenta placeholder.
+custom ARGB pixels. Both registration functions return an icon index or -1 on failure. `mkgui_icon_at_size()` resolves/caches a variant at the requested pixel size and returns its index or -1. These indices are library-owned identities, not pixel-buffer pointers. Unknown widget icons use the magenta placeholder.
 
 `mkgui_icon_browser()` opens the shared catalogue picker. It supports name and
 keyword search, name groups, and style selection. It returns 1 and writes the
@@ -1862,25 +1733,25 @@ and SVG lookup. See [icons.md](icons.md) for its contract and linking instructio
 
 ### Font
 
-Override the font with the `MKWIN_FONT_FILE` environment variable:
+On Linux, Fontconfig selects the `sans-serif` font. `MKWIN_FONT_FILE` selects an explicit font file:
 
-```bash
+```sh
 MKWIN_FONT_FILE=/path/to/font.ttf ./myapp
 ```
 
-The default font search order prefers proportional sans-serif fonts: Noto Sans, IBM Plex Sans, DejaVu Sans.
+The Win32 backend requests Segoe UI through GDI. It does not use `MKWIN_FONT_FILE`.
 
 ## Tooltips
 
 ```c
-void mkgui_set_tooltip(struct mkgui_window *win, uint32_t id, const char *text);
+MKGUI_API void mkgui_set_tooltip(struct mkgui_window *win, uint32_t id, const char *text);
 ```
 
 Sets a tooltip on any widget. The tooltip appears after a short hover delay, positioned near the cursor. Pass `NULL` to clear.
 
 ```c
-mkgui_set_tooltip(ctx, ID_BTN_SAVE, "Save the current document");
-mkgui_set_tooltip(ctx, ID_CANVAS, "Click to draw, right-click to erase");
+mkgui_set_tooltip(win, ID_BTN_SAVE, "Save the current document");
+mkgui_set_tooltip(win, ID_CANVAS, "Click to draw, right-click to erase");
 ```
 
 Toolbar buttons copy their initial label as tooltip text, regardless of toolbar display mode. For other widgets, tooltips must be set explicitly -- no tooltip is shown by default.
@@ -1909,9 +1780,9 @@ If a severity icon cannot be resolved, the notification renders without an icon.
 Toasts are transient corner-overlay notifications. Multiple toasts stack vertically at the bottom-right of the window. The user can click anywhere on a toast to dismiss it early; otherwise it auto-dismisses after its duration expires.
 
 ```c
-void mkgui_toast(struct mkgui_window *win, const char *text);
-void mkgui_toast_ex(struct mkgui_window *win, uint32_t severity, const char *text, uint32_t duration_ms);
-void mkgui_toast_clear(struct mkgui_window *win);
+MKGUI_API void mkgui_toast(struct mkgui_window *win, const char *text);
+MKGUI_API void mkgui_toast_ex(struct mkgui_window *win, uint32_t severity, const char *text, uint32_t duration_ms);
+MKGUI_API void mkgui_toast_clear(struct mkgui_window *win);
 ```
 
 - `mkgui_toast()` -- shortcut for an INFO toast with the default 3000 ms duration.
@@ -1919,30 +1790,30 @@ void mkgui_toast_clear(struct mkgui_window *win);
 - `mkgui_toast_clear()` -- dismiss all currently-active toasts immediately.
 
 ```c
-mkgui_toast(ctx, "Files synced with remote");
-mkgui_toast_ex(ctx, MKGUI_SEVERITY_SUCCESS, "File saved", 3000);
-mkgui_toast_ex(ctx, MKGUI_SEVERITY_WARNING, "Disk is nearly full", 4000);
-mkgui_toast_ex(ctx, MKGUI_SEVERITY_ERROR, "Connection lost", 0);   // persistent
+mkgui_toast(win, "Files synced with remote");
+mkgui_toast_ex(win, MKGUI_SEVERITY_SUCCESS, "File saved", 3000);
+mkgui_toast_ex(win, MKGUI_SEVERITY_WARNING, "Disk is nearly full", 4000);
+mkgui_toast_ex(win, MKGUI_SEVERITY_ERROR, "Connection lost", 0);   // persistent
 ```
 
 Up to `MKGUI_MAX_TOASTS` (8) toasts are visible at once. When a new toast arrives while all slots are full, the oldest toast is evicted to make room. Text is truncated to fit the toast width (single line).
 
 ### Banner
 
-A banner is a persistent full-width stripe at the top of the window, intended for ongoing conditions rather than transient messages ("unsaved changes", "offline mode", "trial expires in 3 days"). Only one banner per context -- setting a new one replaces any existing.
+A banner is a persistent full-width stripe at the top of the window, intended for ongoing conditions rather than transient messages ("unsaved changes", "offline mode", "trial expires in 3 days"). Only one banner per window -- setting a new one replaces any existing.
 
 ```c
-void     mkgui_banner_set(struct mkgui_window *win, uint32_t severity, const char *text);
-void     mkgui_banner_clear(struct mkgui_window *win);
-uint32_t mkgui_banner_active(struct mkgui_window *win);
+MKGUI_API void mkgui_banner_set(struct mkgui_window *win, uint32_t severity, const char *text);
+MKGUI_API void mkgui_banner_clear(struct mkgui_window *win);
+MKGUI_API uint32_t mkgui_banner_active(struct mkgui_window *win);
 ```
 
 The banner has a close button on the right; clicking it calls `mkgui_banner_clear()` automatically. Your code can also clear it unconditionally, e.g. when the underlying condition no longer applies.
 
 ```c
-mkgui_banner_set(ctx, MKGUI_SEVERITY_WARNING, "You have unsaved changes");
+mkgui_banner_set(win, MKGUI_SEVERITY_WARNING, "You have unsaved changes");
 // ...later, after a save succeeds:
-mkgui_banner_clear(ctx);
+mkgui_banner_clear(win);
 ```
 
 **Important:** the banner is an overlay. It does not participate in the layout engine, so it will occlude widgets placed against the top edge of the window while shown. If you expect to show a banner, leave top padding in your root container (e.g. a `MKGUI_SPACER` of the banner's approximate height, or start with a menubar/toolbar that is less critical if covered briefly).
@@ -1958,11 +1829,11 @@ Build and show context menus in response to right-click events. Context menus ar
 ### API reference
 
 ```c
-void mkgui_context_menu_clear(struct mkgui_window *win);
-void mkgui_context_menu_add(struct mkgui_window *win, uint32_t id, const char *label, const char *icon, uint32_t flags);
-void mkgui_context_menu_add_separator(struct mkgui_window *win);
-void mkgui_context_menu_show(struct mkgui_window *win);
-void mkgui_context_menu_show_at(struct mkgui_window *win, int32_t x, int32_t y);
+MKGUI_API void mkgui_context_menu_clear(struct mkgui_window *win);
+MKGUI_API void mkgui_context_menu_add(struct mkgui_window *win, uint32_t id, const char *label, const char *icon, uint32_t flags);
+MKGUI_API void mkgui_context_menu_add_separator(struct mkgui_window *win);
+MKGUI_API void mkgui_context_menu_show(struct mkgui_window *win);
+MKGUI_API void mkgui_context_menu_show_at(struct mkgui_window *win, int32_t x, int32_t y);
 ```
 
 - `mkgui_context_menu_clear()` -- Clear all items from the context menu
@@ -1979,28 +1850,28 @@ Context menus are built and shown in response to `MKGUI_EVENT_CONTEXT` or `MKGUI
 
 ```c
 case MKGUI_EVENT_CONTEXT: {
-    if(ev->id == ID_LISTVIEW1) {
-        mkgui_context_menu_clear(ctx);
-        mkgui_context_menu_add(ctx, 100, "Cut", "cut", 0);
-        mkgui_context_menu_add(ctx, 101, "Copy", "copy", 0);
-        mkgui_context_menu_add(ctx, 102, "Paste", "clipboard-paste", 0);
-        mkgui_context_menu_add_separator(ctx);
-        mkgui_context_menu_add(ctx, 103, "Delete", "delete", (ev->value < 0) ? MKGUI_DISABLED : 0);
-        mkgui_context_menu_show(ctx);
-    }
+	if(ev->id == ID_LISTVIEW1) {
+		mkgui_context_menu_clear(win);
+		mkgui_context_menu_add(win, 100, "Cut", "cut", 0);
+		mkgui_context_menu_add(win, 101, "Copy", "copy", 0);
+		mkgui_context_menu_add(win, 102, "Paste", "clipboard-paste", 0);
+		mkgui_context_menu_add_separator(win);
+		mkgui_context_menu_add(win, 103, "Delete", "delete", (ev->value < 0) ? MKGUI_DISABLED : 0);
+		mkgui_context_menu_show(win);
+	}
 } break;
 
 case MKGUI_EVENT_CONTEXT_HEADER: {
-    // Right-click on column header -- ev->col has the column index
-    mkgui_context_menu_clear(ctx);
-    mkgui_context_menu_add(ctx, 200, "Name", NULL, MKGUI_MENUITEM_CHECK | MKGUI_MENUITEM_CHECKED);
-    mkgui_context_menu_add(ctx, 201, "Size", NULL, MKGUI_MENUITEM_CHECK | MKGUI_MENUITEM_CHECKED);
-    mkgui_context_menu_show(ctx);
+	// Right-click on column header -- ev->col has the column index
+	mkgui_context_menu_clear(win);
+	mkgui_context_menu_add(win, 200, "Name", NULL, MKGUI_MENUITEM_CHECK | MKGUI_MENUITEM_CHECKED);
+	mkgui_context_menu_add(win, 201, "Size", NULL, MKGUI_MENUITEM_CHECK | MKGUI_MENUITEM_CHECKED);
+	mkgui_context_menu_show(win);
 } break;
 
 case MKGUI_EVENT_CONTEXT_MENU: {
-    // ev->id is the item id passed to mkgui_context_menu_add()
-    printf("Selected context menu item: %u\n", ev->id);
+	// ev->id is the item id passed to mkgui_context_menu_add()
+	printf("Selected context menu item: %u\n", ev->id);
 } break;
 ```
 
@@ -2032,11 +1903,10 @@ Convenience functions for common dialog patterns. All are blocking (modal).
 ### Message box
 
 ```c
-uint32_t mkgui_dialog_message(struct mkgui_window *win, const char *title, const char *message,
-                           uint32_t icon_type, uint32_t buttons);
+MKGUI_API uint32_t mkgui_dialog_message(struct mkgui_window *win, const char *title, const char *message, uint32_t icon_type, uint32_t buttons);
 ```
 
-Displays a message with a stock icon and a configurable button set. Blocks until dismissed. Returns one of the `MKGUI_DLG_RESULT_*` constants indicating which button was pressed (or `MKGUI_DLG_RESULT_CANCEL` if the window was closed).
+Displays a message with a stock icon and a configurable button set. Blocks until dismissed. Returns the selected button's `MKGUI_DLG_RESULT_*` value. Closing the native window returns `MKGUI_DLG_RESULT_NONE`. Escape selects Cancel or No when present; otherwise it returns None.
 
 **Icon constants:**
 
@@ -2062,15 +1932,16 @@ Displays a message with a stock icon and a configurable button set. Blocks until
 
 | Constant | Meaning |
 |----------|---------|
+| `MKGUI_DLG_RESULT_NONE` | Window closed or dismissed without a matching result button |
 | `MKGUI_DLG_RESULT_OK` | OK pressed |
-| `MKGUI_DLG_RESULT_CANCEL` | Cancel pressed or window closed |
+| `MKGUI_DLG_RESULT_CANCEL` | Cancel pressed |
 | `MKGUI_DLG_RESULT_YES` | Yes pressed |
 | `MKGUI_DLG_RESULT_NO` | No pressed |
 | `MKGUI_DLG_RESULT_RETRY` | Retry pressed |
 
 ```c
-uint32_t r = mkgui_dialog_message(ctx, "Save?", "Save changes before exit?",
-                               MKGUI_DLG_ICON_QUESTION, MKGUI_DLG_BUTTONS_YES_NO_CANCEL);
+uint32_t r = mkgui_dialog_message(win, "Save?", "Save changes before exit?",
+							   MKGUI_DLG_ICON_QUESTION, MKGUI_DLG_BUTTONS_YES_NO_CANCEL);
 if(r == MKGUI_DLG_RESULT_YES)    { save_and_exit(); }
 if(r == MKGUI_DLG_RESULT_NO)     { exit_no_save(); }
 if(r == MKGUI_DLG_RESULT_CANCEL) { /* keep editing */ }
@@ -2079,39 +1950,38 @@ if(r == MKGUI_DLG_RESULT_CANCEL) { /* keep editing */ }
 ### Confirm dialog
 
 ```c
-uint32_t mkgui_dialog_confirm(struct mkgui_window *win, const char *title, const char *message);
+MKGUI_API uint32_t mkgui_dialog_confirm(struct mkgui_window *win, const char *title, const char *message);
 ```
 
-Shorthand for `mkgui_dialog_message` with `MKGUI_DLG_ICON_QUESTION` and `MKGUI_DLG_BUTTONS_OK_CANCEL`. Returns 1 if OK, 0 if cancelled.
+Shorthand for `mkgui_dialog_message` with `MKGUI_DLG_ICON_QUESTION` and `MKGUI_DLG_BUTTONS_YES_NO`. Returns 1 for Yes and 0 for No or cancellation.
 
 ### Input dialog
 
 ```c
-uint32_t mkgui_dialog_input(struct mkgui_window *win, const char *title, const char *prompt,
-                             const char *default_text, char *out, uint32_t out_size);
+MKGUI_API uint32_t mkgui_dialog_input(struct mkgui_window *win, const char *title, const char *prompt, const char *default_text, char *out, uint32_t out_size);
 ```
 
 Displays a prompt label with a text input field and OK/Cancel buttons. Returns 1 if OK (text written to `out`), 0 if cancelled. `default_text` can be NULL.
 
 ```c
 char name[256];
-if(mkgui_dialog_input(ctx, "New File", "File name:", "untitled.txt", name, sizeof(name))) {
-    printf("Created: %s\n", name);
+if(mkgui_dialog_input(win, "New File", "File name:", "untitled.txt", name, sizeof(name))) {
+	printf("Created: %s\n", name);
 }
 ```
 
 ### Color picker
 
 ```c
-uint32_t mkgui_dialog_color(struct mkgui_window *win, uint32_t initial_color, uint32_t *out_color);
+MKGUI_API uint32_t mkgui_dialog_color(struct mkgui_window *win, uint32_t initial_color, uint32_t *out_color);
 ```
 
 Opens a modal color picker dialog with three modes selectable via tabs: SV square with hue bar, color wheel, and RGB sliders. Includes hex input, R/G/B spinboxes, and a preview swatch. Returns 1 if OK (selected color written to `out_color` as 0x00RRGGBB), 0 if cancelled.
 
 ```c
 uint32_t color = 0;
-if(mkgui_dialog_color(ctx, 0x3366cc, &color)) {
-    printf("Selected: #%06x\n", color);
+if(mkgui_dialog_color(win, 0x3366cc, &color)) {
+	printf("Selected: #%06x\n", color);
 }
 ```
 
@@ -2123,16 +1993,16 @@ mkgui includes built-in open and save file dialogs. Both are blocking (modal) --
 
 ```c
 struct mkgui_file_filter {
-    const char *label;                              // "Images", "Source Files"
-    const char *pattern;                            // "*.png;*.jpg;*.jpeg", "*.c;*.h"
+	const char *label;                              // "Images", "Source Files"
+	const char *pattern;                            // "*.png;*.jpg;*.jpeg", "*.c;*.h"
 };
 
 struct mkgui_file_dialog_opts {
-    const char *start_path;                         // NULL = home directory
-    const struct mkgui_file_filter *filters;        // NULL = no filters
-    uint32_t filter_count;
-    const char *default_name;                       // save mode only, NULL = empty
-    uint32_t multi_select;                          // open mode only, 0 or 1
+	const char *start_path;                         // NULL = home directory
+	const struct mkgui_file_filter *filters;        // NULL = no filters
+	uint32_t filter_count;
+	const char *default_name;                       // save mode only, NULL = empty
+	uint32_t multi_select;                          // open mode only, 0 or 1
 };
 ```
 
@@ -2143,9 +2013,9 @@ Zero-init opts and only set the fields you need.
 ```c
 struct mkgui_file_dialog_opts opts = {0};
 opts.multi_select = 1;
-uint32_t count = mkgui_dialog_open(ctx, &opts);
+uint32_t count = mkgui_dialog_open(win, &opts);
 for(uint32_t i = 0; i < count; ++i) {
-    printf("Selected: %s\n", mkgui_dialog_get_path(ctx, i));
+	printf("Selected: %s\n", mkgui_dialog_get_path(win, i));
 }
 ```
 
@@ -2157,13 +2027,13 @@ Returns the number of selected files (0 = cancelled). Set `opts.multi_select = 1
 struct mkgui_file_dialog_opts opts = {0};
 opts.default_name = "untitled.txt";
 struct mkgui_file_filter filters[] = {
-    { "Text files", "*.txt" },
-    { "All files",  "*" },
+	{ "Text files", "*.txt" },
+	{ "All files",  "*" },
 };
 opts.filters = filters;
 opts.filter_count = 2;
-if(mkgui_dialog_save(ctx, &opts)) {
-    printf("Save to: %s\n", mkgui_dialog_get_path(ctx, 0));
+if(mkgui_dialog_save(win, &opts)) {
+	printf("Save to: %s\n", mkgui_dialog_get_path(win, 0));
 }
 ```
 
@@ -2174,8 +2044,8 @@ Returns 1 if the user confirmed, 0 if cancelled. If the user types a filename wi
 ```c
 struct mkgui_file_dialog_opts opts = {0};
 opts.start_path = "/home/user/roms";
-if(mkgui_dialog_folder(ctx, &opts)) {
-    printf("Folder: %s\n", mkgui_dialog_get_path(ctx, 0));
+if(mkgui_dialog_folder(win, &opts)) {
+	printf("Folder: %s\n", mkgui_dialog_get_path(win, 0));
 }
 ```
 
@@ -2183,8 +2053,8 @@ Returns 1 if the user confirmed, 0 if cancelled. The list shows directories only
 
 ### Dialog window
 
-Dialogs open as separate, WM-decorated X11 windows (not overlays). They are:
-- **Resizable** -- drag the window border to see more sidebar entries or file list rows (minimum size 400x300, initial 780x520)
+Dialogs open as separate native windows with window-manager decorations. They are:
+- **Resizable** -- drag the window border to see more sidebar entries or file list rows; the layout enforces its content minimum
 - **Movable** -- drag the title bar to reposition, e.g. to see the main window underneath when naming a file
 - **Modal** -- set as transient-for the main window; the main window does not accept input while the dialog is open
 - **Parent stays alive** -- the parent window continues to repaint and animate (spinners, progress bars, GL views) while the dialog is open
@@ -2204,17 +2074,17 @@ The dialogs feature:
 - Double-click directories to enter them, double-click files to select and confirm
 - Type-ahead search: typing while the file list is focused jumps to the first matching file (accumulating prefix, backspace to correct, escape to reset)
 - Keyboard: Escape to cancel, Enter to confirm, Ctrl+L to focus path bar, Backspace to go up a directory
-- Tab to cycle focus between path bar, filename input (save), filter dropdown, and file list
+- Tab to cycle focus between path bar, filename input (open/save), filter dropdown, and file list
 
-The save dialog adds a "File name:" input row and a "New Folder" button at the bottom. Clicking a file in the list fills the filename field automatically.
+Open and Save include a filename input. Typing a relative name resolves it in the current directory; explicit paths are accepted. Typing a directory navigates into it. Save applies the selected extension to names without one and confirms overwrites. Clicking a file fills the filename input. A New Folder button creates a directory through a text-input dialog.
 
 ### API reference
 
 ```c
-uint32_t mkgui_dialog_open(struct mkgui_window *win, const struct mkgui_file_dialog_opts *opts);
-uint32_t mkgui_dialog_save(struct mkgui_window *win, const struct mkgui_file_dialog_opts *opts);
-uint32_t mkgui_dialog_folder(struct mkgui_window *win, const struct mkgui_file_dialog_opts *opts);
-const char *mkgui_dialog_get_path(struct mkgui_window *win, uint32_t index);
+MKGUI_API uint32_t mkgui_dialog_open(struct mkgui_window *win, const struct mkgui_file_dialog_opts *opts);
+MKGUI_API uint32_t mkgui_dialog_save(struct mkgui_window *win, const struct mkgui_file_dialog_opts *opts);
+MKGUI_API uint32_t mkgui_dialog_folder(struct mkgui_window *win, const struct mkgui_file_dialog_opts *opts);
+MKGUI_API const char *mkgui_dialog_get_path(struct mkgui_window *win, uint32_t index);
 ```
 
 ## Multi-window
@@ -2249,22 +2119,17 @@ All windows on a ctx share its X11 Display connection (or Win32 message thread).
 // Create a window on the ctx. parent==NULL: top-level; parent!=NULL: transient
 // of that parent. title/w/h override the MKGUI_WINDOW widget; pass NULL/0 to
 // inherit from the widget.
-struct mkgui_window *mkgui_window_create(struct mkgui_ctx *ctx,
-                                          struct mkgui_window *parent,
-                                          const struct mkgui_widget *widgets,
-                                          uint32_t count,
-                                          const char *title,
-                                          int32_t w, int32_t h);
+MKGUI_API struct mkgui_window *mkgui_window_create(struct mkgui_ctx *ctx, struct mkgui_window *parent, const struct mkgui_widget *widgets, uint32_t count, const char *title, int32_t w, int32_t h);
 
 // Destroy a window
-void mkgui_window_destroy(struct mkgui_window *win);
+MKGUI_API void mkgui_window_destroy(struct mkgui_window *win);
 
 // Register a per-window event callback (used by mkgui_ctx_run for non-primary
 // windows and by mkgui_ctx_pump_others for host-owned loops).
-void mkgui_window_set_callback(struct mkgui_window *win, mkgui_event_cb cb, void *userdata);
+MKGUI_API void mkgui_window_set_callback(struct mkgui_window *win, mkgui_event_cb cb, void *userdata);
 
 // Get the owning ctx from a window (useful inside event callbacks)
-struct mkgui_ctx *mkgui_window_get_ctx(struct mkgui_window *win);
+MKGUI_API struct mkgui_ctx *mkgui_window_get_ctx(struct mkgui_window *win);
 ```
 
 ## Rendering
@@ -2291,11 +2156,11 @@ Software primitives blend coverage at the edges of rounded rectangles, circles, 
 
 ```c
 // Built-in themes
-struct mkgui_theme default_theme(void);  // dark (Breeze)
-struct mkgui_theme light_theme(void);    // light
+MKGUI_API struct mkgui_theme default_theme(void);  // dark (Breeze)
+MKGUI_API struct mkgui_theme light_theme(void);    // light
 
 // Apply a theme (re-renders icons automatically)
-void mkgui_ctx_set_theme(struct mkgui_ctx *ctx, struct mkgui_theme theme);
+MKGUI_API void mkgui_ctx_set_theme(struct mkgui_ctx *ctx, struct mkgui_theme theme);
 ```
 
 `mkgui_ctx_create()` detects dark vs light in this order:
@@ -2339,24 +2204,24 @@ Key theme colors (dark defaults shown):
 Bind keyboard shortcuts to widgets. When a shortcut matches, the bound widget receives an event -- `MKGUI_EVENT_MENU` for menu items, `MKGUI_EVENT_ACCEL` for everything else.
 
 ```c
-void mkgui_accel_add(struct mkgui_window *win, uint32_t id, uint32_t keymod, uint32_t keysym);
-void mkgui_accel_remove(struct mkgui_window *win, uint32_t id);
-void mkgui_accel_clear(struct mkgui_window *win);
+MKGUI_API void mkgui_accel_add(struct mkgui_window *win, uint32_t id, uint32_t keymod, uint32_t keysym);
+MKGUI_API void mkgui_accel_remove(struct mkgui_window *win, uint32_t id);
+MKGUI_API void mkgui_accel_clear(struct mkgui_window *win);
 ```
 
 Modifier flags: `MKGUI_MOD_CONTROL`, `MKGUI_MOD_SHIFT`, `MKGUI_MOD_ALT`. Combine with bitwise OR.
 
 ```c
-mkgui_accel_add(ctx, ID_SAVE, MKGUI_MOD_CONTROL, 's');
-mkgui_accel_add(ctx, ID_REDO, MKGUI_MOD_CONTROL | MKGUI_MOD_SHIFT, 'z');
-mkgui_accel_add(ctx, ID_HELP, MKGUI_MOD_CONTROL, MKGUI_KEY_F1);
+mkgui_accel_add(win, ID_SAVE, MKGUI_MOD_CONTROL, 's');
+mkgui_accel_add(win, ID_REDO, MKGUI_MOD_CONTROL | MKGUI_MOD_SHIFT, 'z');
+mkgui_accel_add(win, ID_HELP, MKGUI_MOD_CONTROL, MKGUI_KEY_F1);
 ```
 
 Menu items with accelerators automatically show the shortcut text right-aligned in the popup (e.g. "Ctrl+S"). No manual text formatting needed.
 
 Accelerators dispatch after context menu keys but before Tab and Ctrl+A/C/V/X. This means app shortcuts take priority over default clipboard bindings when a text widget is focused. Key matching is case-insensitive.
 
-Maximum 64 accelerators per context.
+Maximum 64 accelerators per window.
 
 ## Undo/redo
 
@@ -2383,11 +2248,10 @@ While editing, the cell shows a text input with cursor and selection. Click insi
 On commit, `MKGUI_EVENT_CELL_EDIT_COMMIT` fires with `ev->id` set to the widget, `ev->value` set to the row (or node id), and `ev->col` set to the column. Retrieve the new text with `mkgui_cell_edit_get_text` while the event is being handled. The application is responsible for applying the change to its backing data.
 
 ```c
-void mkgui_cell_edit_begin(struct mkgui_window *win, uint32_t widget_id,
-                           int32_t row, int32_t col, const char *text);
-void mkgui_cell_edit_cancel(struct mkgui_window *win);
-const char *mkgui_cell_edit_get_text(struct mkgui_window *win);
-uint32_t mkgui_cell_edit_active(struct mkgui_window *win);
+MKGUI_API void mkgui_cell_edit_begin(struct mkgui_window *win, uint32_t widget_id, int32_t row, int32_t col, const char *text);
+MKGUI_API void mkgui_cell_edit_cancel(struct mkgui_window *win);
+MKGUI_API const char *mkgui_cell_edit_get_text(struct mkgui_window *win);
+MKGUI_API uint32_t mkgui_cell_edit_active(struct mkgui_window *win);
 ```
 
 - `mkgui_cell_edit_begin` programmatically starts editing a specific cell with a pre-filled initial text. Useful for "Rename" context menu actions.
@@ -2395,38 +2259,38 @@ uint32_t mkgui_cell_edit_active(struct mkgui_window *win);
 - `mkgui_cell_edit_get_text` returns the current edit buffer (valid during `MKGUI_EVENT_CELL_EDIT_COMMIT`).
 - `mkgui_cell_edit_active` returns non-zero while an edit is in progress.
 
-Only one cell edit can be active per context at a time (similar to focus).
+Only one cell edit can be active per window at a time (similar to focus).
 
 ```c
 case MKGUI_EVENT_CELL_EDIT_COMMIT: {
-    if(ev->id == ID_FILE_LIST) {
-        const char *new_name = mkgui_cell_edit_get_text(ctx);
-        rename_file(ev->value, new_name);
-        refresh_listview();
-    }
+	if(ev->id == ID_FILE_LIST) {
+		const char *new_name = mkgui_cell_edit_get_text(win);
+		rename_file(ev->value, new_name);
+		refresh_listview();
+	}
 } break;
 ```
 
 ## File drag-and-drop
 
-Accept file drops from the OS file manager. Opt-in per context.
+Accept file drops from the OS file manager. Opt-in per window.
 
 ```c
-void mkgui_drop_enable(struct mkgui_window *win);
-uint32_t mkgui_drop_count(struct mkgui_window *win);
-const char *mkgui_drop_file(struct mkgui_window *win, uint32_t index);
+MKGUI_API void mkgui_drop_enable(struct mkgui_window *win);
+MKGUI_API uint32_t mkgui_drop_count(struct mkgui_window *win);
+MKGUI_API const char *mkgui_drop_file(struct mkgui_window *win, uint32_t index);
 ```
 
-Call `mkgui_drop_enable(ctx)` after creation. When files are dropped, `MKGUI_EVENT_FILE_DROP` fires with `ev->value` set to the file count. Retrieve paths with `mkgui_drop_file()`:
+Call `mkgui_drop_enable(win)` after creation. When files are dropped, `MKGUI_EVENT_FILE_DROP` fires with `ev->value` set to the file count. Retrieve paths with `mkgui_drop_file()`:
 
 ```c
-mkgui_drop_enable(ctx);
+mkgui_drop_enable(win);
 
 // in event handler:
 case MKGUI_EVENT_FILE_DROP: {
-    for(uint32_t i = 0; i < mkgui_drop_count(ctx); ++i) {
-        printf("Dropped: %s\n", mkgui_drop_file(ctx, i));
-    }
+	for(uint32_t i = 0; i < mkgui_drop_count(win); ++i) {
+		printf("Dropped: %s\n", mkgui_drop_file(win, i));
+	}
 } break;
 ```
 
@@ -2442,8 +2306,8 @@ mkgui auto-detects the display scale factor on startup:
 Override auto-detection with `mkgui_ctx_set_scale()` or the `MKWIN_SCALE` environment variable:
 
 ```c
-void mkgui_ctx_set_scale(struct mkgui_ctx *ctx, float scale);
-float mkgui_ctx_get_scale(struct mkgui_ctx *ctx);
+MKGUI_API void mkgui_ctx_set_scale(struct mkgui_ctx *ctx, float scale);
+MKGUI_API float mkgui_ctx_get_scale(struct mkgui_ctx *ctx);
 ```
 
 The `MKWIN_SCALE` environment variable accepts three formats:

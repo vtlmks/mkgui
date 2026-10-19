@@ -32,7 +32,7 @@ bytes and lookup tables; it does not include a renderer or compression library.
 ## Names and styles
 
 ```c
-#include "mkguiicons.h"
+#include "mkgui.h"
 #include "mkguiicons_names.h"
 
 mkgui_set_icon(win, ID_SAVE, MKICON_SAVE);
@@ -55,12 +55,26 @@ including arbitrary scales such as 2.13. It does not resize a cached bitmap.
 ## Enumeration and SVG lookup
 
 ```c
-uint32_t count = mkguiicons_count();
-for(uint32_t i = 0; i < count; ++i) {
-	const char *name = mkguiicons_name(i);
-	uint32_t length;
-	const char *svg = mkguiicons_svg(name, 24, &length);
-	/* Consume name and length bytes of SVG. */
+#include <stdio.h>
+#include "mkguiicons.h"
+
+// [=]===^=[ main ]=============================================================================[=]
+int main(void) {
+	uint32_t count = mkguiicons_count();
+
+	for(uint32_t i = 0; i < count; ++i) {
+		const char *name = mkguiicons_name(i);
+		uint32_t length;
+		const char *svg = mkguiicons_svg(name, 24, &length);
+
+		if(svg) {
+			printf("%s: %u SVG bytes\n", name, length);
+
+		}
+	}
+
+	return 0;
+
 }
 ```
 
@@ -104,8 +118,7 @@ old per-application SVG directory/export-list workflow have been removed.
 ## Runtime storage
 
 Each process owns its rasterized icon cache. Metadata, lookup slots, and custom
-SVG records grow in reserve/commit arenas as icons are added. The former 32,768
-icon and 4,096 custom SVG limits no longer apply. Indices stay stable through
+SVG records grow in reserve/commit arenas as icons are added. Indices stay stable through
 growth and replacement. Cached pixel atlases and loaded SVG text are
 released with the last window, or by context destruction if no window was opened.
 Raster icons added before the first window survive its initialization. Failed

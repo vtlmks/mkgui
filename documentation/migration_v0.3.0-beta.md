@@ -1,5 +1,7 @@
 # Migrating to v0.3.0-beta
 
+Historical guide for upgrading v0.2 applications to v0.3. For the current shared-library interface, use the [getting started guide](getting_started.md) and [v1.0 migration guide](migration_v1.0.0.md).
+
 v0.3.0-beta is a breaking release. Two changes drive the breakage:
 
 1. **`mkgui_ctx` is split into `mkgui_ctx` (application-level state) and `mkgui_window` (per-window state).** The previous "ctx" was structurally a window pretending to be a context.
