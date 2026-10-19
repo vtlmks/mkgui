@@ -228,4 +228,4 @@ Solo project with a strict C style (hard tabs, `if(` not `if (`, unity build, no
 
 ## License
 
-MIT
+MIT. See [LICENSE](LICENSE).
