@@ -607,6 +607,9 @@ MKGUI_API void mkgui_window_set_shape_mask(struct mkgui_window *win, const uint3
 MKGUI_API void mkgui_window_clear_shape(struct mkgui_window *win);
 MKGUI_API void mkgui_window_resize(struct mkgui_window *win, int32_t w, int32_t h);
 MKGUI_API void mkgui_window_invalidate(struct mkgui_window *win);
+// interval_ns must be nonzero. A NULL callback emits MKGUI_EVENT_TIMER with
+// the timer ID; a non-NULL callback runs during event processing. Returns
+// zero if the timer cannot be created.
 MKGUI_API uint32_t mkgui_window_add_timer(struct mkgui_window *win, uint64_t interval_ns, mkgui_timer_cb cb, void *userdata);
 MKGUI_API void mkgui_window_remove_timer(struct mkgui_window *win, uint32_t timer_id);
 

@@ -575,11 +575,11 @@ MKGUI_API uint32_t mkgui_window_add_timer(struct mkgui_window *win, uint64_t int
 MKGUI_API void mkgui_window_remove_timer(struct mkgui_window *win, uint32_t timer_id);
 ```
 
-`mkgui_window_add_timer` creates a repeating timer with nanosecond-resolution interval. Returns a timer ID (0 on failure). Up to `MKGUI_MAX_TIMERS` (8) timers per window.
+`mkgui_window_add_timer` creates a repeating timer with its interval expressed in nanoseconds. Zero is rejected; actual wakeup resolution follows the platform. Returns a timer ID (0 on failure). Up to `MKGUI_MAX_TIMERS` (8) timers per window.
 
 If `cb` is non-NULL, the callback fires during event processing. If `cb` is NULL, an `MKGUI_EVENT_TIMER` event is delivered to the event callback instead (with `ev->id` set to the timer ID).
 
-Timers do not drift. On Linux, `timerfd_create(CLOCK_MONOTONIC)` provides kernel-managed absolute deadlines. On Windows, `SetWaitableTimer` with absolute re-arming after each firing prevents accumulation error.
+Linux uses periodic `timerfd` timers on `CLOCK_MONOTONIC`. Windows rearms a waitable timer against its original epoch and includes the next deadline in idle waits. Timer events are returned by window polling. Callbacks run during event processing; the Win32 backend also services callback timers during native move/resize loops.
 
 Call `mkgui_window_remove_timer` inside the callback to make a one-shot timer.
 
@@ -588,7 +588,7 @@ Call `mkgui_window_remove_timer` inside the callback to make a one-shot timer.
 ```c
 void refresh(struct mkgui_window *win, uint32_t timer_id, void *data) {
 	update_data();
-	update_widgets(ctx);
+	update_widgets(win);
 }
 
 mkgui_window_add_timer(win, 33333333, refresh, NULL);  // 33.3ms = 30Hz

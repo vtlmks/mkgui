@@ -577,10 +577,17 @@ MKGUI_API uint32_t mkgui_dialog_color(struct mkgui_window *win, uint32_t initial
 	uint32_t was_press = 0;
 
 	while(running) {
-		while(mkgui_window_poll(dlg, &ev)) {
+		while(running && mkgui_window_poll(dlg, &ev)) {
 			switch(ev.type) {
 				case MKGUI_EVENT_CLOSE: {
 					running = 0;
+				} break;
+
+				case MKGUI_EVENT_KEY: {
+					if(ev.keysym == MKGUI_KEY_ESCAPE) {
+						running = 0;
+
+					}
 				} break;
 
 				case MKGUI_EVENT_CLICK: {
@@ -629,7 +636,11 @@ MKGUI_API uint32_t mkgui_dialog_color(struct mkgui_window *win, uint32_t initial
 			cp_state.drag_target = 0;
 		}
 		was_press = (dlg->press_id != 0);
-		mkgui_ctx_wait(dlg->ctx);
+
+		if(running) {
+			mkgui_ctx_wait(dlg->ctx);
+
+		}
 	}
 
 	if(result && out_color) {

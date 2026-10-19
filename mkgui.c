@@ -2343,6 +2343,15 @@ static void mkgui_font_fini(struct mkgui_window *win) {
 
 }
 
+#ifdef _WIN32
+// [=]===^=[ timer_due ]========================================================================[=]
+static uint64_t timer_due(struct mkgui_timer *timer) {
+	uint64_t ticks = timer->interval_ns / 100 + (timer->interval_ns % 100 != 0);
+	return (uint64_t)timer->epoch.QuadPart + (timer->fire_count + 1) * ticks;
+
+}
+#endif
+
 // [=]===^=[ mkgui_modal_frame ]===================================[=]
 // mkwin calls this each frame of a Win32 modal move/resize loop, while our
 // event loop is suspended: advance animation, service timers, and repaint.
@@ -2357,14 +2366,12 @@ static void mkgui_modal_frame(struct mkwin_window *mkwin_win, void *user) {
 	win->anim_time += dt;
 	for(uint32_t ti = 0; ti < win->timer_count; ++ti) {
 		struct mkgui_timer *t = &win->timers[ti];
-		if(t->active && t->handle && WaitForSingleObject(t->handle, 0) == WAIT_OBJECT_0) {
+		if(t->active && t->cb && t->handle && WaitForSingleObject(t->handle, 0) == WAIT_OBJECT_0) {
 			++t->fire_count;
 			LARGE_INTEGER next;
-			next.QuadPart = t->epoch.QuadPart + (int64_t)(t->fire_count * (t->interval_ns / 100));
+			next.QuadPart = (int64_t)timer_due(t);
 			SetWaitableTimer(t->handle, &next, 0, NULL, NULL, FALSE);
-			if(t->cb) {
-				t->cb(win, t->id, t->userdata);
-			}
+			t->cb(win, t->id, t->userdata);
 		}
 	}
 #endif
@@ -5044,7 +5051,7 @@ MKGUI_API uint32_t mkgui_window_poll(struct mkgui_window *win, struct mkgui_even
 		if(WaitForSingleObject(t->handle, 0) == WAIT_OBJECT_0) {
 			++t->fire_count;
 			LARGE_INTEGER next;
-			next.QuadPart = t->epoch.QuadPart + (int64_t)(t->fire_count * (t->interval_ns / 100));
+			next.QuadPart = (int64_t)timer_due(t);
 			SetWaitableTimer(t->handle, &next, 0, NULL, NULL, FALSE);
 			if(t->cb) {
 				t->cb(win, t->id, t->userdata);
@@ -7986,6 +7993,29 @@ MKGUI_API void mkgui_ctx_wait_until(struct mkgui_ctx *ctx, uint64_t deadline_ns)
 				}
 			}
 		}
+#ifdef _WIN32
+		FILETIME file_time;
+		ULARGE_INTEGER wall_time;
+		GetSystemTimeAsFileTime(&file_time);
+		wall_time.LowPart = file_time.dwLowDateTime;
+		wall_time.HighPart = file_time.dwHighDateTime;
+
+		for(uint32_t ti = 0; ti < c->timer_count; ++ti) {
+			struct mkgui_timer *timer = &c->timers[ti];
+
+			if(timer->active) {
+				uint64_t due = timer_due(timer);
+				uint64_t ticks = due > wall_time.QuadPart ? due - wall_time.QuadPart : 0;
+				uint64_t deadline = ticks > (UINT64_MAX - now) / 100 ? UINT64_MAX : now + ticks * 100;
+
+				if(!target || deadline < target) {
+					target = deadline;
+
+				}
+			}
+		}
+#endif
+
 		int32_t next_toast = toasts_next_expiry_ms(c);
 		if(next_toast >= 0) {
 			uint64_t tt = now + (uint64_t)(uint32_t)next_toast * 1000000ull;
@@ -8023,47 +8053,63 @@ MKGUI_API uint32_t mkgui_ctx_should_quit(struct mkgui_ctx *ctx) {
 // [=]===^=[ mkgui_window_add_timer ]=====================================[=]
 MKGUI_API uint32_t mkgui_window_add_timer(struct mkgui_window *win, uint64_t interval_ns, mkgui_timer_cb cb, void *userdata) {
 	MKGUI_CHECK_VAL(win, 0);
-	if(!cb) {
+
+	if(interval_ns == 0 || win->timer_count >= MKGUI_MAX_TIMERS) {
 		return 0;
+
 	}
 
-	if(win->timer_count >= MKGUI_MAX_TIMERS) {
-		return 0;
-	}
-	struct mkgui_timer *t = &win->timers[win->timer_count];
-	memset(t, 0, sizeof(*t));
-	t->id = ++win->timer_next_id;
-	t->interval_ns = interval_ns;
-	t->cb = cb;
-	t->userdata = userdata;
-	t->active = 1;
+	struct mkgui_timer *timer = &win->timers[win->timer_count];
+	memset(timer, 0, sizeof(*timer));
+	timer->id = ++win->timer_next_id;
+	timer->interval_ns = interval_ns;
+	timer->cb = cb;
+	timer->userdata = userdata;
+	timer->active = 1;
 #ifdef _WIN32
-	t->handle = CreateWaitableTimerW(NULL, FALSE, NULL);
-	if(!t->handle) {
-		return 0;
+	timer->handle = CreateWaitableTimerW(NULL, FALSE, NULL);
+
+	if(timer->handle) {
+		FILETIME file_time;
+		GetSystemTimeAsFileTime(&file_time);
+		timer->epoch.LowPart = file_time.dwLowDateTime;
+		timer->epoch.HighPart = (LONG)file_time.dwHighDateTime;
+		LARGE_INTEGER due;
+		due.QuadPart = -(int64_t)(interval_ns / 100 + (interval_ns % 100 != 0));
+
+		if(SetWaitableTimer(timer->handle, &due, 0, NULL, NULL, FALSE)) {
+			++win->timer_count;
+			return timer->id;
+
+		}
+
+		CloseHandle(timer->handle);
+
 	}
-	FILETIME ft;
-	GetSystemTimeAsFileTime(&ft);
-	t->epoch.LowPart = ft.dwLowDateTime;
-	t->epoch.HighPart = (LONG)ft.dwHighDateTime;
-	t->fire_count = 0;
-	LARGE_INTEGER due;
-	due.QuadPart = -(int64_t)(interval_ns / 100);
-	SetWaitableTimer(t->handle, &due, 0, NULL, NULL, FALSE);
 #else
-	t->fd = timerfd_create(CLOCK_MONOTONIC, TFD_NONBLOCK);
-	if(t->fd < 0) {
-		return 0;
+	timer->fd = timerfd_create(CLOCK_MONOTONIC, TFD_NONBLOCK);
+
+	if(timer->fd >= 0) {
+		struct itimerspec interval = {0};
+		interval.it_value.tv_sec = (time_t)(interval_ns / 1000000000);
+		interval.it_value.tv_nsec = (long)(interval_ns % 1000000000);
+		interval.it_interval = interval.it_value;
+
+		if(timerfd_settime(timer->fd, 0, &interval, NULL) == 0) {
+			mkwin_wait_fd_add(timer->fd);
+			++win->timer_count;
+			return timer->id;
+
+		}
+
+		close(timer->fd);
+
 	}
-	struct itimerspec its = {0};
-	its.it_value.tv_sec = (time_t)(interval_ns / 1000000000);
-	its.it_value.tv_nsec = (long)(interval_ns % 1000000000);
-	its.it_interval = its.it_value;
-	timerfd_settime(t->fd, 0, &its, NULL);
-	mkwin_wait_fd_add(t->fd);
 #endif
-	++win->timer_count;
-	return t->id;
+
+	memset(timer, 0, sizeof(*timer));
+	return 0;
+
 }
 
 // [=]===^=[ mkgui_window_remove_timer ]==================================[=]

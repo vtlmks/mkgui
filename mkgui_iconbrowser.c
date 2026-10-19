@@ -395,7 +395,7 @@ MKGUI_API uint32_t mkgui_icon_browser(struct mkgui_window *win, int32_t size, ch
 			struct mkgui_event event;
 
 			while(running) {
-				while(mkgui_window_poll(dialog, &event)) {
+				while(running && mkgui_window_poll(dialog, &event)) {
 					if(event.type == MKGUI_EVENT_CLOSE || (event.type == MKGUI_EVENT_KEY && event.keysym == MKGUI_KEY_ESCAPE)) {
 						running = 0;
 

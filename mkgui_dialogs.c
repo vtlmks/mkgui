@@ -235,7 +235,7 @@ static uint32_t dlg_run(struct mkgui_window *parent, struct mkgui_widget *widget
 	struct mkgui_event ev;
 	uint32_t running = 1;
 	while(running) {
-		while(mkgui_window_poll(dlg, &ev)) {
+		while(running && mkgui_window_poll(dlg, &ev)) {
 			switch(ev.type) {
 				case MKGUI_EVENT_CLOSE: {
 					running = 0;
@@ -270,7 +270,11 @@ static uint32_t dlg_run(struct mkgui_window *parent, struct mkgui_widget *widget
 				default: break;
 			}
 		}
-		mkgui_ctx_wait(parent->ctx);
+
+		if(running) {
+			mkgui_ctx_wait(parent->ctx);
+
+		}
 	}
 
 	mkgui_window_destroy(dlg);
@@ -513,7 +517,7 @@ MKGUI_API uint32_t mkgui_dialog_input(struct mkgui_window *win, const char *titl
 	struct mkgui_event ev;
 	uint32_t running = 1;
 	while(running) {
-		while(mkgui_window_poll(dlg, &ev)) {
+		while(running && mkgui_window_poll(dlg, &ev)) {
 			switch(ev.type) {
 				case MKGUI_EVENT_CLOSE: {
 					running = 0;
@@ -547,7 +551,11 @@ MKGUI_API uint32_t mkgui_dialog_input(struct mkgui_window *win, const char *titl
 				default: break;
 			}
 		}
-		mkgui_ctx_wait(win->ctx);
+
+		if(running) {
+			mkgui_ctx_wait(win->ctx);
+
+		}
 	}
 
 	if(result) {

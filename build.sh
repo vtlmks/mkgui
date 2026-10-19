@@ -167,6 +167,7 @@ if [ "$TARGET" != "editor" ]; then
 
 	(
 		$CC $CFLAGS -I. tests/test_shared.c -o out/linux/test_shared $LINUX_SHARED $LDFLAGS
+		$CC $CFLAGS tests/test_shared_events.c -o out/linux/test_shared_events $LINUX_SHARED -lX11 -pthread $LDFLAGS
 		$CC $CFLAGS tests/test_editor_shared.c -o out/linux/test_editor_shared $LINUX_SHARED $LDFLAGS
 		$CC $CFLAGS tests/test_editor_persistence.c -o out/linux/test_editor_persistence $LINUX_SHARED $LDFLAGS
 	) &
@@ -174,6 +175,7 @@ if [ "$TARGET" != "editor" ]; then
 	if [ "$WIN_ENABLED" -eq 1 ]; then
 		(
 			$WINCC $CFLAGS -I. tests/test_shared.c -o out/windows/test_shared.exe $WINDOWS_SHARED -mconsole $LDFLAGS
+			$WINCC $CFLAGS tests/test_shared_events.c -o out/windows/test_shared_events.exe $WINDOWS_SHARED -mconsole $LDFLAGS
 			$WINCC $CFLAGS tests/test_editor_shared.c -o out/windows/test_editor_shared.exe $WINDOWS_SHARED -mconsole $LDFLAGS
 			$WINCC $CFLAGS tests/test_editor_persistence.c -o out/windows/test_editor_persistence.exe $WINDOWS_SHARED -mconsole $LDFLAGS
 		) &

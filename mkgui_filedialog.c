@@ -1292,7 +1292,7 @@ static uint32_t fd_run_dialog(struct mkgui_window *win, uint32_t mode, const str
 	uint32_t running = 1;
 	struct mkgui_event ev;
 	while(running) {
-		while(mkgui_window_poll(dlg, &ev)) {
+		while(running && mkgui_window_poll(dlg, &ev)) {
 			switch(ev.type) {
 				case MKGUI_EVENT_CLOSE: {
 					running = 0;
@@ -1515,7 +1515,11 @@ static uint32_t fd_run_dialog(struct mkgui_window *win, uint32_t mode, const str
 				default: break;
 			}
 		}
-		mkgui_ctx_wait(dlg->ctx);
+
+		if(running) {
+			mkgui_ctx_wait(dlg->ctx);
+
+		}
 	}
 
 	mkgui_window_destroy(dlg);
