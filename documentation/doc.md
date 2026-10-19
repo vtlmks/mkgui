@@ -19,12 +19,16 @@ Or use the included `build.sh`:
 ./build.sh          # normal (-O2, debug symbols)
 ./build.sh release  # -O2 stripped
 ./build.sh debug    # -g -O0
-./build.sh size     # -Os stripped (~26% smaller than release, also catches more -Wformat-truncation warnings)
+./build.sh size     # -Os stripped
 ./build.sh asan     # -O0 -fsanitize=address,undefined (Linux only)
 ./build.sh clean    # remove out/
 ```
 
 `build.sh` produces `out/linux/demo`, `out/linux/editor`, `out/linux/libmkgui.so.1.0.0`, `out/linux/libmkgui.a`, `out/linux/libmkguiicons.so.1`, and the test binaries. It also cross-compiles `out/windows/demo.exe`, `out/windows/editor.exe`, `out/windows/mkgui.dll`, and `out/windows/mkguiicons.dll` if `x86_64-w64-mingw32-gcc` is available.
+
+The source build needs Git, Bash, binutils, pkg-config, and Python 3. Initialize the pinned mkwin submodule with `git submodule update --init --recursive`. Python generates the icon catalogue and is not needed by applications.
+
+Both platforms require the shared icon catalogue at runtime, including static/unity toolkit builds. See [icons.md](icons.md) for its independent API and naming contract.
 
 ### Linux dependencies
 
@@ -47,43 +51,50 @@ OpenGL (`-lGL` / `-lopengl32`) is only required if your application instantiates
 
 ```c
 #include "mkgui.h"
+#include "mkguiicons_names.h"
 
-enum { ID_WIN = 0, ID_BTN = 1, ID_LBL = 2 };
+enum { ID_WIN = 1, ID_BOX, ID_BTN, ID_LBL };
 
+// [=]===^=[ on_event ]========================================================================[=]
 static void on_event(struct mkgui_window *win, struct mkgui_event *ev, void *userdata) {
-    (void)userdata;
-    switch(ev->type) {
-        case MKGUI_EVENT_CLOSE: {
-            mkgui_ctx_quit(mkgui_window_get_ctx(win));
-        } break;
+	(void)userdata;
 
-        case MKGUI_EVENT_CLICK: {
-            if(ev->id == ID_BTN) {
-                mkgui_label_set(win, ID_LBL, "Clicked!");
-            }
-        } break;
-    }
+	if(ev->type == MKGUI_EVENT_CLOSE) {
+		mkgui_ctx_quit(mkgui_window_get_ctx(win));
+
+	} else if(ev->type == MKGUI_EVENT_CLICK && ev->id == ID_BTN) {
+		mkgui_label_set(win, ID_LBL, "Clicked!");
+
+	}
 }
 
+// [=]===^=[ main ]============================================================================[=]
 int main(void) {
-    struct mkgui_widget widgets[] = {
-        MKGUI_W(MKGUI_WINDOW, ID_WIN, "Hello",  "",  0,      400, 300, 0, 0, 0),
-        MKGUI_W(MKGUI_BUTTON, ID_BTN, "Click",  "",  ID_WIN, 100, 0, MKGUI_FIXED, 0, 0),
-        MKGUI_W(MKGUI_LABEL,  ID_LBL, "Ready",  "",  ID_WIN, 0, 0, 0, 0, 0),
-    };
+	struct mkgui_widget widgets[] = {
+		MKGUI_W(MKGUI_WINDOW, ID_WIN, "Hello", "", 0, 400, 300, 0, 0, 0),
+		MKGUI_W(MKGUI_VBOX, ID_BOX, "", "", ID_WIN, 0, 0, 0, 0, 0),
+		MKGUI_W(MKGUI_BUTTON, ID_BTN, "Click", MKICON_CHECKMARK, ID_BOX, 120, 0, MKGUI_FIXED, 0, 0),
+		MKGUI_W(MKGUI_LABEL, ID_LBL, "Ready", "", ID_BOX, 0, 0, 0, 0, 0),
+	};
+	struct mkgui_ctx *ctx = mkgui_ctx_create();
 
-    struct mkgui_ctx *ctx = mkgui_ctx_create();
-    if(!ctx) return 1;
-    struct mkgui_window *win = mkgui_window_create(ctx, NULL, widgets, 3, NULL, 0, 0);
-    if(!win) {
-        mkgui_ctx_destroy(ctx);
-        return 1;
-    }
+	if(ctx) {
+		struct mkgui_window *win = mkgui_window_create(ctx, NULL, widgets, sizeof(widgets) / sizeof(widgets[0]), NULL, 0, 0);
 
-    mkgui_ctx_run(ctx, on_event, NULL);
-    mkgui_window_destroy(win);
-    mkgui_ctx_destroy(ctx);
-    return 0;
+		if(win) {
+			mkgui_ctx_run(ctx, on_event, NULL);
+			mkgui_window_destroy(win);
+			mkgui_ctx_destroy(ctx);
+			return 0;
+
+		}
+
+		mkgui_ctx_destroy(ctx);
+
+	}
+
+	return 1;
+
 }
 ```
 
@@ -2262,11 +2273,13 @@ Toolkit widgets are software-rendered. Linux presents through MIT-SHM (`XShmPutI
 
 ### Rendering pipeline
 
-mkgui uses partial rendering via dirty rectangles. Widgets mark themselves dirty on state changes, dirty rects are merged when spatially close, and only affected regions are cleared, re-rendered, and blitted. Each dirty rect is processed individually: clip bounds are set, the background is cleared, overlapping widgets are rendered, and `platform_blit_region` blits just that region. Hot-path operations (hover, scroll, slider drag, text input, click selection) dirty only the affected widget. Full redraws (`dirty_all`) are reserved for structural changes: window resize/expose, tab switch, focus change, widget add/remove, theme change, and scale change. All rendering goes to a client-side framebuffer, then `XShmPutImage` (Linux) or `BitBlt` (Windows) blits the result to the window.
+mkgui uses partial rendering via dirty rectangles. Widgets mark themselves dirty on state changes, dirty rects are merged when spatially close, and only affected regions are cleared, re-rendered, and blitted. Each dirty rect is processed individually: clip bounds are set, the background is cleared, overlapping widgets are rendered, and mkwin presents just that region. Hot-path operations (hover, scroll, slider drag, text input, click selection) dirty only the affected widget. Full redraws (`dirty_all`) are reserved for structural changes: window resize/expose, tab switch, focus change, widget add/remove, theme change, and scale change. All rendering goes to a client-side framebuffer, then `XShmPutImage` (Linux) or `BitBlt` (Windows) blits the result to the window.
+
+Linux main windows alternate two XShm buffers. Before rendering, mkgui acquires a buffer whose previous presentation has completed and repairs damage from frames that buffer missed. Only current-frame damage is submitted to X11. Popups keep a single buffer and wait for its transfer before reuse. Windows uses a DIB section and flushes pending GDI work before acquisition.
 
 ### Glyph and icon storage
 
-Glyph and icon bitmaps are stored in linear memory for cache-friendly rendering. Each glyph or icon is a contiguous block of pixels (row-major, no stride padding), and each entry stores a byte offset into the flat buffer. This means the entire bitmap for a glyph or icon fits in a few cache lines with no gaps, which is optimal for the CPU-side alpha blending path. The buffers are rebuilt automatically on scale or theme changes.
+Glyph and icon bitmaps are stored in linear memory for cache-friendly rendering. Each glyph or icon is a contiguous block of pixels (row-major, no stride padding), and glyph entries store byte offsets into the coverage buffer, while icon entries store pixel offsets into the ARGB buffer. The blending path reads those rows sequentially. Scale changes rebuild glyph coverage and applicable rasterized icons. Theme changes refresh the themed SVG icons.
 
 ### Antialiased drawing
 
@@ -2274,7 +2287,7 @@ Software primitives blend coverage at the edges of rounded rectangles, circles, 
 
 ### Theming
 
-`mkgui_init()` auto-detects light vs dark from the environment. Apps can override at runtime with `mkgui_ctx_set_theme`:
+`mkgui_ctx_create()` auto-detects light vs dark from the environment. Apps can override at runtime with `mkgui_ctx_set_theme`:
 
 ```c
 // Built-in themes
@@ -2285,7 +2298,7 @@ struct mkgui_theme light_theme(void);    // light
 void mkgui_ctx_set_theme(struct mkgui_ctx *ctx, struct mkgui_theme theme);
 ```
 
-`mkgui_init()` detects dark vs light in this order:
+`mkgui_ctx_create()` detects dark vs light in this order:
 
 1. `MKGUI_THEME=light` or `MKGUI_THEME=dark` environment variable (explicit override)
 2. A nonempty `GTK_THEME` selects dark if its value contains `dark` (case-insensitive), otherwise light

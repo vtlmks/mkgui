@@ -206,8 +206,8 @@ the checkboxes. Enabled events generate `case` stubs in the output code.
 | New    | document-add    | Clear project |
 | Open   | folder-open   | Load project file |
 | Save   | document-save   | Save project (Ctrl+S) |
-| Gen    |                 | Generate C code |
-| Test   |                 | Launch live preview window |
+| Gen    | document-code   | Generate C code |
+| Test   | play            | Launch live preview window |
 | Undo   | arrow-undo       | Undo |
 | Redo   | arrow-redo       | Redo |
 
@@ -321,6 +321,23 @@ writes a complete C source file containing:
    - Automatic `MKGUI_EVENT_CLOSE` handler
 
 The generated file compiles directly and links the toolkit release used to design it. Select that installed release with its pkg-config package, such as `mkgui1.0.0`, or use `-Lout/linux -lmkgui` within the matching checkout. Add `-DMKGUI_UNITY` and the platform dependencies to build it with the toolkit included instead.
+
+Keep the generated `.c` and its sibling `*_features.h` together. With the
+libraries installed on Linux:
+
+```sh
+gcc -std=c99 -O2 gui_app.c $(pkg-config --cflags --libs mkgui1.0.0) -o gui_app
+```
+
+Using build outputs from the mkgui repository:
+
+```sh
+gcc -std=c99 -O2 /path/to/gui_app.c -I. -Lout/linux -lmkgui '-Wl,-rpath,$ORIGIN' -o out/linux/gui_app
+x86_64-w64-mingw32-gcc -std=c99 -O2 /path/to/gui_app.c -I. -Lout/windows -lmkgui -mwindows -o out/windows/gui_app.exe
+```
+
+Ship both `mkgui.dll` and `mkguiicons.dll` beside a Windows application.
+See [getting started](getting_started.md) for static/unity builds and Linux deployment.
 
 ### Generate Snippet
 

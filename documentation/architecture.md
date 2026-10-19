@@ -109,7 +109,6 @@ remain useful with `-O2` or other application optimization settings.
 | `mkgui_iconbrowser.c` | Built-in Shared Fluent icon browser. |
 | `mkgui_colorpicker.c` | Built-in color picker dialog (SV square, wheel, RGB sliders). |
 | `plutovg/`, `plutosvg/` | Embedded PlutoVG path renderer and PlutoSVG parser (MIT). Compiled into the unity build. |
-| `incbin.h` | Helper macro for embedding binary data. |
 | `editor.c` | Visual widget designer. Links the shared toolkit through its public API and private editor bridge. |
 | `mkgui_internal.h`, `mkgui_editor.h`, `mkgui_editor_api.c` | Private toolkit/editor types and bridge. |
 | `demo.c` | Comprehensive demo application. Includes `mkgui.h` and links the shared library. |
@@ -148,17 +147,17 @@ There are no `x, y` fields. All positioning is container-based (VBOX, HBOX, FORM
 
 ### Auxiliary data (the aux system)
 
-Many widget types need per-instance state beyond what `struct mkgui_widget` holds (cursor position, scroll offset, selected items, etc.). These are stored in separate typed arrays on the context:
+Many widget types need per-instance state beyond what `struct mkgui_widget` holds (cursor position, scroll offset, selected items, etc.). These are stored in separate typed arrays on the window:
 
 ```
-ctx->inputs[]       -- cursor, selection, scroll for MKGUI_INPUT
-ctx->textareas[]    -- text buffer, cursor, selection for MKGUI_TEXTAREA
-ctx->listvs[]       -- columns, row callback, selection for MKGUI_LISTVIEW
-ctx->treeviews[]    -- node array, expanded state for MKGUI_TREEVIEW
-...                 (22 aux types total)
+win->inputs[]       -- cursor, selection, scroll for MKGUI_INPUT
+win->textareas[]    -- text buffer, cursor, selection for MKGUI_TEXTAREA
+win->listvs[]       -- columns, row callback, selection for MKGUI_LISTVIEW
+win->treeviews[]    -- node array, expanded state for MKGUI_TREEVIEW
+...
 ```
 
-Each array grows independently via `MKGUI_AUX_GROW` (realloc +16 entries). Lookup is via `find_*_data(ctx, widget_id)` which does a linear scan of the aux array (fast because counts are small -- typically single digits).
+Each array commits additional pages through `MKGUI_AUX_GROW` in `MKGUI_GROW_AUX` increments within its reserved arena. Its base pointer stays fixed. Lookup helpers such as `find_input_data(win, widget_id)` scan the corresponding auxiliary array.
 
 Aux data is created automatically by `init_widget_aux()` when a widget is added, and freed by `mkgui_remove_aux_*()` when removed.
 
@@ -170,9 +169,9 @@ The hot-path allocations (text rendering commands and layout tree arrays) use a 
 
 ```c
 struct vm_arena {
-    uint8_t *base;       // fixed address, never moves
-    size_t reserved;     // virtual address space reserved
-    size_t committed;    // pages actually backed by physical memory
+	uint8_t *base;
+	size_t reserved;
+	size_t committed;
 };
 ```
 
@@ -197,7 +196,7 @@ Window and layout arrays keep a fixed reservation, so their base pointers never 
 | `layout_sibling_arena` | Next-sibling index | 1,048,576 | 4 MiB |
 | `layout_hash_arena` | Widget ID hash table | 2,097,152 | 16 MiB |
 
-The arena descriptors are process-private globals used by all windows. Icon arenas also initialize when icons are added before the first window. Last-window teardown releases them; context destruction also releases any preloaded icons when no window was opened.
+Window widget and auxiliary arenas belong to each window. Layout scratch, text commands, fonts, and icons use process-private globals shared by windows in that process. Loading the shared library in another process creates independent writable state; the library code and immutable catalogue can be shared. Icon arenas also initialize when icons are added before the first window. Last-window teardown releases them; context destruction also releases any preloaded icons when no window was opened.
 
 The limits are `#define`s at the top of the arena section in mkgui.c:
 
@@ -211,8 +210,6 @@ Glyphs are copied directly from the platform rasterizer into a replacement packe
 
 ### What still uses malloc/realloc
 
-- **Widget arrays** (`win->widgets`, `win->rects`, `win->tooltip_texts`) use reserved arenas and commit pages during growth.
-- **Aux data arrays** also use reserved arenas and grow through `MKGUI_AUX_GROW`.
 - **Textarea text buffers**: per-instance, exponential doubling. Appropriate for small per-widget buffers.
 - **Treeview node arrays**: per-instance, exponential doubling.
 - **Image/icon pixel buffers**: one-time allocation.
@@ -243,32 +240,32 @@ Every frame follows the same sequence inside `mkgui_flush()`:
 `layout_widgets()` rebuilds the widget tree every frame:
 
 1. **Build index** (`layout_build_index`): populate parent/child/sibling arrays and the ID hash table from the flat widget array. Uses vm_arena memory.
-2. **Measure** (`lc_measure_container`): bottom-up pass computing minimum sizes for containers (VBOX, HBOX, FORM, GROUP, TABS).
-3. **Position** (`lc_layout_node`): top-down recursive pass. Each widget's final rect is computed from its parent's rect using container-based layout (VBOX, HBOX, FORM stacking), weights, and measured sizes. Special handling for menus, toolbars, statusbars, pathbars (auto-positioned window chrome), splits (draggable ratio), and tabs (only active tab children laid out). PANEL behaves as a VBOX container. Widgets with `h=0` use a natural height derived from the font height.
-4. Results stored in `ctx->rects[]` (parallel to `ctx->widgets[]`).
+2. **Position and measure** (`lc_layout_node`, `lc_measure_container`): recursively position children, measuring their content minimums as needed during the walk. Container rules, weights, explicit sizes, and natural sizes determine the result. Menus, toolbars, statusbars, and pathbars occupy window chrome; splits use a divider ratio, and tabs lay out their active page.
+3. Store results in `win->rects[]` (parallel to `win->widgets[]`). Zero size hints follow the parent container's flex rules and the widget's natural size.
+4. **Window minimum** (`layout_compute_min_size`): update the native minimum size after structural changes, using the same calculation as the editor canvas.
 
 ### layout_ctx -- shared layout abstraction
 
-The layout engine (measure, build index, position) operates on a `struct layout_ctx` instead of reading directly from `struct mkgui_ctx`. This allows the same layout code to be used by both the runtime and the visual editor.
+The layout engine (measure, build index, position) operates on a `struct layout_ctx` instead of reading directly from `struct mkgui_window`. This allows the same layout code to be used by both the runtime and the visual editor.
 
 ```c
 struct layout_ctx {
-    struct mkgui_widget *widgets;     // widget array (may be ed_widget cast)
-    struct { int32_t x, y, w, h; } *rects;  // output rectangles
-    uint32_t *first_child;            // tree index arrays
-    uint32_t *next_sibling;
-    uint32_t *parent;
-    struct mkgui_layout_hash_entry *id_map;  // ID -> index hash table
-    uint32_t hash_mask;
-    uint32_t widget_count;
-    uint32_t has_scroll;              // enable scroll measurement
-    size_t widget_stride;             // sizeof one widget entry
+	struct mkgui_widget *widgets;
+	struct mkgui_rect *rects;
+	uint32_t *first_child;
+	uint32_t *next_sibling;
+	uint32_t *parent;
+	struct mkgui_layout_hash_entry *id_map;
+	uint32_t hash_mask;
+	uint32_t widget_count;
+	uint32_t has_scroll;
+	size_t widget_stride;
 };
 ```
 
 The key field is `widget_stride`. At runtime this is `sizeof(struct mkgui_widget)`. In the editor it is `sizeof(struct ed_widget)` (which extends `mkgui_widget` with editor-specific fields). `lw_get(lc, idx)` uses stride-based pointer arithmetic to index into the widget array, so the layout code handles both struct sizes transparently.
 
-**Runtime path:** `layout_build_index()` and `layout_node()` are thin wrappers that construct a `layout_ctx` from `ctx->widgets` and the global vm_arena arrays, then call the `lc_*` functions. `lc_window_min_size()` shares the content minimum calculation between the runtime and editor.
+**Runtime path:** `layout_build_index()` and `layout_node()` are thin wrappers that construct a `layout_ctx` from `win->widgets` and the global vm_arena arrays, then call the `lc_*` functions. `lc_window_min_size()` shares the content minimum calculation between the runtime and editor.
 
 **Editor path:** `ed_fit_canvas_to_content()` and `ed_render_canvas()` prepare runtime widget descriptions and use the editor's static layout arrays with the same `lc_window_min_size()` and `lc_layout_node()` functions. The editor arrays have a fixed capacity of `ED_MAX_WIDGETS = 4096`.
 
@@ -278,8 +275,8 @@ The key field is `widget_stride`. At runtime this is `sizeof(struct mkgui_widget
 
 1. Set clip rectangle to parent bounds via `set_parent_clip()`.
 2. Skip hidden widgets and inactive tab children.
-3. Dispatch to type-specific renderer (big switch on `w->type`).
-4. Each renderer draws into `ctx->pixels` using primitives from `mkgui_render.c`.
+3. Dispatch through the type-indexed `render_desc[]` table.
+4. Each renderer draws into `win->pixels` using primitives from `mkgui_render.c`.
 
 ### Text rendering
 
@@ -291,7 +288,7 @@ Text is not drawn immediately. Instead, `push_text_clip()` queues a text command
 
 Widgets mark regions dirty via `dirty_add()`, `dirty_widget()`, `dirty_widget_id()`, or `dirty_all()`. The dirty rect array (max 32 rects) enables partial redraws and partial blits. Adjacent dirty rects are merged when their union area is within 1.5x the sum of individual areas to avoid overdraw. If the array overflows (32+ rects), it falls back to full-screen redraw via `dirty_all()`.
 
-Each dirty rect is processed independently in `render_widgets()`: the clip region is set to the rect bounds, the rect is cleared to the background color, all widgets overlapping that rect are rendered clipped to it, and the rect is blitted to screen via `platform_blit_region()`. This per-rect approach avoids stale pixels between non-adjacent dirty rects.
+Each dirty rect is processed independently in `render_widgets()`: the clip region is set to the rect bounds, the rect is cleared to the background color, and all widgets overlapping that rect are rendered clipped to it. `mkgui_frame_present()` submits the current frame's damage through `mkwin_present_region()`. Buffer repair regions are rendered but excluded from presentation history.
 
 Most widget API setters (label, progress, meter, slider, textarea, etc.) and event dispatch hot paths (scroll, drag, selection) use `dirty_widget_id()` / `dirty_widget()` to only redraw the affected widget. Full-screen `dirty_all()` is reserved for events that affect the entire layout: window resize, expose, tab switch, focus change, widget add/remove, theme change, treeview expand/collapse.
 
@@ -351,36 +348,34 @@ while(!ctx->should_quit && !ctx->primary->should_close) {
 }
 ```
 
-`mkgui_ctx_wait()` calls `mkgui_flush()` then blocks on `platform_wait_event()` (poll/select on Linux, MsgWaitForMultipleObjects on Windows). It also drains events for secondary contexts that were registered via `mkgui_window_set_callback()`, so multi-window applications work without a manual pump.
+`mkgui_ctx_wait()` flushes windows before waiting through mkwin. Linux uses `ppoll` for display/timer readiness; Windows uses `MsgWaitForMultipleObjects`. Registered callbacks and the context loop route events to secondary windows.
 
 ## Platform abstraction
 
-Both platforms implement the same set of `platform_*()` functions. The correct implementation is selected at compile time via `#ifdef _WIN32`.
+mkwin implements the X11 and Win32 windowing backends. mkgui includes its
+source from the pinned `mkwin/` submodule, selecting a backend with `_WIN32`.
+It is compiled into the toolkit library and has no separate runtime library.
 
 | Function | Purpose |
 |----------|---------|
-| `platform_init()` | Create window, allocate framebuffer, load cursors |
-| `platform_init_child()` | Create transient child window linked to parent |
-| `platform_destroy()` | Close window, free resources |
-| `platform_fb_create()` | Allocate shared-memory framebuffer (XShm / DIB) |
-| `platform_fb_resize()` | Reallocate framebuffer on window resize |
-| `platform_fb_destroy()` | Free framebuffer |
-| `platform_blit()` | Copy full framebuffer to screen |
-| `platform_blit_region()` | Copy a sub-rectangle to screen |
-| `platform_popup_init()` | Create override-redirect popup window |
-| `platform_popup_fini()` | Destroy popup window |
-| `platform_popup_blit()` | Blit popup pixel buffer |
-| `platform_wait_event()` | Block until event available (with timeout) |
-| `platform_pending()` | Check if events are queued |
-| `platform_next_event()` | Dequeue and translate one event |
-| `platform_translate_coords()` | Local to screen coordinate conversion |
-| `platform_screen_size()` | Get desktop dimensions |
-| `platform_set_cursor()` | Switch cursor (`MKGUI_CURSOR_DEFAULT` / `_H_RESIZE` / `_V_RESIZE`) |
-| `platform_font_init()` | Load TTF font, rasterize glyphs |
-| `platform_font_fini()` | Free font resources |
-| `platform_clipboard_set()` | Set clipboard content |
-| `platform_clipboard_get_alloc()` | Get clipboard content (caller frees) |
-| `platform_glview_create/destroy/show/reposition()` | GL viewport child window management |
+| `mkwin_open()`, `mkwin_map()`, `mkwin_destroy()` | Create, show, and destroy top-level/transient windows |
+| `mkwin_begin_frame()` | Acquire a writable framebuffer and return its age |
+| `mkwin_framebuffer()` | Get the current framebuffer pointer |
+| `mkwin_present()`, `mkwin_present_region()` | Submit full or partial presentation |
+| `mkwin_sync()` | Wait for outstanding server work |
+| `mkwin_resize()`, `mkwin_set_min_size()` | Resize and publish the content minimum |
+| `mkwin_popup_open()`, `mkwin_popup_present()`, `mkwin_popup_close()` | Popup window lifecycle and presentation |
+| `mkwin_poll()`, `mkwin_pending()`, `mkwin_wait()` | Event delivery and waiting |
+| `mkwin_translate_coords()`, `mkwin_screen_size()` | Coordinate and desktop queries |
+| `mkwin_set_cursor()` | Select the platform cursor |
+| `mkwin_font_open()`, `mkwin_font_set_size()`, `mkwin_font_glyph()`, `mkwin_font_close()` | Native font loading and glyph rasterization |
+| `mkwin_clipboard_set()`, `mkwin_clipboard_get()` | Clipboard transfer |
+| `mkwin_glview_create()`, `mkwin_glview_destroy()`, `mkwin_glview_show()`, `mkwin_glview_reposition()` | Native OpenGL child windows |
+
+See [mkwin's API documentation](../mkwin/documentation/doc.md) for the complete
+platform contract. For mkwin development, use its standalone repository and then
+update mkgui's submodule pin to the adopted commit. A release's pin records the
+revision required to build that release.
 
 ## Icon system
 
@@ -432,7 +427,7 @@ Each window can register an event callback via `mkgui_window_set_callback()`. A 
 ## Performance notes
 
 - **SSE2**: `draw_rect_fill` uses SSE2 128-bit stores for fast rectangle clearing.
-- **Glyph cache**: all 224 Latin-1 glyphs (codepoints 32-255) are pre-rasterized at startup. No FreeType calls occur during rendering. Text storage and editing are byte-oriented Latin-1, not UTF-8 decoded.
+- **Glyph cache**: all 224 Latin-1 glyphs (codepoints 32-255) are pre-rasterized at startup. No FreeType calls occur during rendering. The glyph atlas covers Latin-1; input editing advances over UTF-8 sequences.
 - **Virtual callbacks**: listview, gridview, and richlist fetch row data on demand via callbacks, supporting millions of rows without pre-allocating data.
 - **Deferred text rendering**: text commands are batched and flushed once per frame (or per popup), not per-widget.
 - **vm_arena**: layout and text command arrays never realloc during rendering. Pointer stability guaranteed.

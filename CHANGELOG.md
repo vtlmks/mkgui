@@ -2,6 +2,65 @@
 
 All notable changes to mkgui. Release tags are fixed snapshots; applications should stay on their selected tag because other tags may change the API or ABI.
 
+## v1.0.0
+
+First stable release. Each full release has independent Linux runtime and development files. Applications select their exact release; different releases can coexist without replacing one another's headers or libraries. See the [migration guide](documentation/migration_v1.0.0.md)
+when updating a beta application.
+
+### Breaking
+
+- **Shared toolkit library by default.** Applications include `mkgui.h` and
+  link `-lmkgui`. Linux builds provide `libmkgui.so.1.0.0` with SONAME
+  `libmkgui.so.1.0.0`; Windows builds provide `mkgui.dll` and a MinGW import library.
+  The demo and editor use the shared library. Static archives and source-level
+  unity builds remain available.
+- **One Fluent icon catalogue on both platforms.** `libmkguiicons.so.1` /
+  `mkguiicons.dll` supplies 21,788 SVG designs exposed through 6,683 names.
+  Desktop theme scanning, application icon directories, export lists, and
+  legacy icon-name aliases are removed. Use canonical catalogue names or the
+  generated `MKICON_*` constants. The icon browser returns a name instead of
+  an SVG path. Custom SVG and raster icon registration remain available.
+- **Toolkit implementation types are private.** Shared-library consumers use
+  the public API. The bundled editor accesses rendering/layout internals through
+  a separately revisioned private bridge and must match its toolkit build.
+
+### Added
+
+- Linux installation scripts for both libraries, public headers, and pkg-config
+  metadata. Toolkit headers, archives, development symlinks, and pkg-config packages include the full release, such as `mkgui1.0.0`. The default prefix is `/usr`; `PREFIX` and `DESTDIR` are supported.
+- Public icon enumeration, keywords, name groups, source sizes, and SVG lookup.
+  The catalogue has an independent ABI and can serve multiple mkgui versions.
+  Its Fluent source snapshot is vendored as ordinary files; Python 3 generates
+  its build data.
+- Widget and dialog exclusions through `MKGUI_NO_*`, with `MKGUI_HAS_ALL` to
+  retain every feature. Editor Build Features settings generate a sibling
+  configuration header for static/unity builds.
+- Deterministic layout, full-render, dirty-render, presentation, and complete-frame
+  benchmark modes, including buffer acquisition and final drain accounting.
+
+### Changed
+
+- Cached icon metadata, lookup slots, custom SVG records, and the glyph atlas
+  grow through virtual memory arenas. The former fixed icon/source counts and
+  per-glyph staging limit are removed. Failed replacements preserve existing data.
+- PlutoVG's unused font and image-file implementations are excluded from the
+  toolkit build; text continues to use FreeType/GDI.
+- Linux presentation rotates two XShm framebuffers and waits for completion
+  before reusing each image. Dirty rendering repairs damage missed by the
+  acquired image. mkwin remains a source submodule pinned by each mkgui release.
+- Generated applications link the shared library by default. `MKGUI_UNITY`
+  selects source inclusion instead.
+
+### Fixed
+
+- HBox children retain vertical expansion for flexible widgets and containers,
+  while fixed single-line controls keep their natural height.
+- The editor canvas grows to the same content minimum as the running GUI.
+  Manual shrinking respects that minimum, and undo/redo restores canvas size.
+- Icons registered before the first window survive initialization, and cache
+  storage is released when the last window or a windowless context is destroyed.
+- Large glyphs are packed without truncation into a replacement atlas.
+
 ## v0.5.0-beta
 
 ### Breaking

@@ -29,10 +29,8 @@ palette, code generation, rendering, or event handling.
 
 1. **Create `mkgui_yourwidget.c`**
    One file per widget type. It contains:
-   - `struct mkgui_yourwidget_data` if the widget has aux state (cursor, scroll,
-     selection, callbacks, etc.).
-   - `find_yourwidget_data(ctx, widget_id)` aux lookup helper.
-   - `render_yourwidget(ctx, idx)` rendering function.
+   - `find_yourwidget_data(win, widget_id)` aux lookup helper.
+   - `render_yourwidget(win, idx)` rendering function.
    - Event/input handlers called from the main dispatch path.
    - `MKGUI_API` public setters/getters.
 
@@ -81,8 +79,25 @@ palette, code generation, rendering, or event handling.
    shared cross-widget state machine and also lives in `mkgui_window_poll`.
 
 7. **Dirty tracking**
-   Widget setters that mutate visible state should call `dirty_widget_id(ctx,
+   Widget setters that mutate visible state should call `dirty_widget_id(win,
    id)` so the widget is redrawn without a full-screen refresh.
+
+## Private state and feature configuration
+
+Put auxiliary structure definitions and window-owned array fields in
+`mkgui_internal.h`, before their implementation is included. Add the corresponding
+arena to `struct mkgui_window_arenas` and pair its initialization, growth, and
+teardown with the existing auxiliary arrays.
+
+Add `MKGUI_NO_YOURWIDGET` / `MKGUI_HAS_YOURWIDGET` resolution to
+`mkgui_features.h`, including the `MKGUI_HAS_ALL` override. Gate descriptor
+entries, layout handling, initialization, and events consistently. Update the
+editor's Build Features names, dependency closure, and generated exclusions.
+
+A new widget type changes the public interface and belongs to a new release tag. Each tag has its own headers and full-release runtime library.
+Changes to private types shared with the editor also require a new private
+bridge revision and a matching editor rebuild; see
+[architecture](architecture.md#build-model).
 
 ## editor.c - visual editor
 
@@ -150,4 +165,4 @@ After adding everything, verify:
 - Code generation produces a compilable output file that actually uses the
   widget (including any setup calls).
 - `./build.sh` completes with zero warnings.
-- `out/test_layout` and `out/test_widgets` still pass.
+- `out/linux/test_layout` and `out/linux/test_widgets` still pass.

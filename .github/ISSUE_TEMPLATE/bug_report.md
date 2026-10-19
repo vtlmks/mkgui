@@ -13,6 +13,8 @@ assignees: ''
 
 **mkgui version**
 - Commit hash or release:
+- Build model (shared library, static library, or unity):
+- Installed mkgui and mkguiicons versions, if using shared libraries:
 
 **What happened**
 A clear description of the actual behaviour.
@@ -33,4 +35,4 @@ This is required. Pick one:
 ```
 
 **Additional context**
-Stack traces, screenshots, log output, relevant environment variables (`MKWIN_SCALE`, `MKGUI_ICON_THEME`, etc.), or anything else that helps isolate the issue.
+Stack traces, screenshots, log output, relevant environment variables (`MKWIN_SCALE`, `MKWIN_FONT_FILE`, `MKGUI_THEME`, etc.), or anything else that helps isolate the issue.

@@ -20,19 +20,21 @@ Linux installs `libmkgui.so.1.0.0` with that same full SONAME. Each release inst
 
 ```bash
 # direct clone pinned to a tag
-git clone https://github.com/<user>/mkgui.git
+git clone https://github.com/vtlmks/mkgui.git
 cd mkgui
 git checkout v1.0.0
 git submodule update --init --recursive   # fetch the mkwin platform-layer submodule
 
 # or as a submodule of your own project
-git submodule add https://github.com/<user>/mkgui.git mkgui
+git submodule add https://github.com/vtlmks/mkgui.git mkgui
 cd mkgui && git checkout v1.0.0 && git submodule update --init --recursive
 ```
 
 mkgui's own platform layer, `mkwin`, is itself a submodule, so the `git submodule update --init --recursive` step is required after any clone or checkout -- `mkgui.c` `#include`s the mkwin sources and will not compile without them. (Tags before `v0.5.0-beta` predate the submodule and simply skip that step.)
 
 If you need a fix that only exists on master, open an issue so it can be cherry-picked into the next tag rather than silently depending on a moving target.
+
+See the [v1.0.0 changes](CHANGELOG.md#v100) and [migration guide](documentation/migration_v1.0.0.md) when updating from a beta release.
 
 ## Features
 
@@ -72,10 +74,10 @@ mkgui pulls its X11/Win32 windowing layer from the [mkwin](https://github.com/vt
    # Windows (MinGW)
    x86_64-w64-mingw32-gcc -std=c99 -O2 myapp.c -I. -Lout/windows -lmkgui -mwindows -o out/windows/myapp.exe
    ```
-4. On Linux, install with `./install_icons.sh` and `./install.sh` (`PREFIX` and `DESTDIR` are supported), or keep the libraries beside the executable. On Windows, ship `mkgui.dll` and `mkguiicons.dll` beside the executable.
+4. On Linux, run `./install_icons.sh`, `./install.sh`, and `ldconfig` with permission to install into `/usr` (`PREFIX` and `DESTDIR` are supported), or keep the libraries beside the executable. On Windows, ship `mkgui.dll` and `mkguiicons.dll` beside the executable.
 
 Installed Linux builds use `gcc myapp.c $(pkg-config --cflags --libs mkgui1.0.0) -o myapp`.
-See [getting started](documentation/getting_started.md) for static and unity builds.
+Building the catalogue requires Python 3. Linux builds also require GCC, binutils, pkg-config, and the X11, Xext, FreeType2, and Fontconfig development packages. The default demo additionally needs OpenGL development files. See [getting started](documentation/getting_started.md) for dependencies, installation, static and unity builds, and Windows commands.
 
 OpenGL is only required if the application uses the `MKGUI_GLVIEW` widget (add `-lGL` on Linux or `-lopengl32` on Windows). The core library, editor, and all other widgets have no GPU dependency.
 
@@ -83,43 +85,50 @@ OpenGL is only required if the application uses the `MKGUI_GLVIEW` widget (add `
 
 ```c
 #include "mkgui.h"
+#include "mkguiicons_names.h"
 
-enum { ID_WIN = 0, ID_BTN = 1, ID_LBL = 2 };
+enum { ID_WIN = 1, ID_BOX, ID_BTN, ID_LBL };
 
+// [=]===^=[ on_event ]========================================================================[=]
 static void on_event(struct mkgui_window *win, struct mkgui_event *ev, void *userdata) {
-    (void)userdata;
-    switch(ev->type) {
-        case MKGUI_EVENT_CLOSE: {
-            mkgui_ctx_quit(mkgui_window_get_ctx(win));
-        } break;
+	(void)userdata;
 
-        case MKGUI_EVENT_CLICK: {
-            if(ev->id == ID_BTN) {
-                mkgui_label_set(win, ID_LBL, "Clicked!");
-            }
-        } break;
-    }
+	if(ev->type == MKGUI_EVENT_CLOSE) {
+		mkgui_ctx_quit(mkgui_window_get_ctx(win));
+
+	} else if(ev->type == MKGUI_EVENT_CLICK && ev->id == ID_BTN) {
+		mkgui_label_set(win, ID_LBL, "Clicked!");
+
+	}
 }
 
+// [=]===^=[ main ]============================================================================[=]
 int main(void) {
-    struct mkgui_widget widgets[] = {
-        MKGUI_W(MKGUI_WINDOW, ID_WIN, "Hello", "", 0,      400, 300, 0, 0, 0),
-        MKGUI_W(MKGUI_BUTTON, ID_BTN, "Click", "", ID_WIN, 100, 0, MKGUI_FIXED, 0, 0),
-        MKGUI_W(MKGUI_LABEL,  ID_LBL, "Ready", "", ID_WIN, 0, 0, 0, 0, 0),
-    };
+	struct mkgui_widget widgets[] = {
+		MKGUI_W(MKGUI_WINDOW, ID_WIN, "Hello", "", 0, 400, 300, 0, 0, 0),
+		MKGUI_W(MKGUI_VBOX, ID_BOX, "", "", ID_WIN, 0, 0, 0, 0, 0),
+		MKGUI_W(MKGUI_BUTTON, ID_BTN, "Click", MKICON_CHECKMARK, ID_BOX, 120, 0, MKGUI_FIXED, 0, 0),
+		MKGUI_W(MKGUI_LABEL, ID_LBL, "Ready", "", ID_BOX, 0, 0, 0, 0, 0),
+	};
+	struct mkgui_ctx *ctx = mkgui_ctx_create();
 
-    struct mkgui_ctx *ctx = mkgui_ctx_create();
-    if(!ctx) return 1;
-    struct mkgui_window *win = mkgui_window_create(ctx, NULL, widgets, 3, NULL, 0, 0);
-    if(!win) {
-        mkgui_ctx_destroy(ctx);
-        return 1;
-    }
+	if(ctx) {
+		struct mkgui_window *win = mkgui_window_create(ctx, NULL, widgets, sizeof(widgets) / sizeof(widgets[0]), NULL, 0, 0);
 
-    mkgui_ctx_run(ctx, on_event, NULL);
-    mkgui_window_destroy(win);
-    mkgui_ctx_destroy(ctx);
-    return 0;
+		if(win) {
+			mkgui_ctx_run(ctx, on_event, NULL);
+			mkgui_window_destroy(win);
+			mkgui_ctx_destroy(ctx);
+			return 0;
+
+		}
+
+		mkgui_ctx_destroy(ctx);
+
+	}
+
+	return 1;
+
 }
 ```
 
@@ -162,78 +171,45 @@ naming, linking, and installation.
 `out/linux/mkguibench` measures layout, full rendering, dirty rendering, completed presentation, and complete frames independently:
 
 ```bash
-out/linux/mkguibench layout mixed 2048 1920 1080 10000
-out/linux/mkguibench render buttons 256 1920 1080 1000
-out/linux/mkguibench dirty mixed 256 1920 1080 10000
-out/linux/mkguibench present fill 0 1920 1080 1000
-out/linux/mkguibench frame mixed 256 1920 1080 1000
+taskset -c 9 chrt -f 99 out/linux/mkguibench layout mixed 2048 1920 1080 10000
+taskset -c 9 chrt -f 99 out/linux/mkguibench render buttons 256 1920 1080 1000
+taskset -c 9 chrt -f 99 out/linux/mkguibench dirty mixed 256 1920 1080 10000
+taskset -c 9 chrt -f 99 out/linux/mkguibench present fill 0 1920 1080 1000
+taskset -c 9 chrt -f 99 out/linux/mkguibench frame mixed 256 1920 1080 1000
 ```
 
-The output is one machine-readable row containing total time, time per iteration, time per widget or pixel, a minimum effective framebuffer bandwidth, and a framebuffer checksum. Use a real X server for presentation measurements. Xvfb is suitable for correctness and repeatability checks but does not represent display-server or hardware presentation cost.
+These examples use CPU 9 and FIFO priority 99 on the development host; choose a CPU available on your machine. The output is one machine-readable row containing total time, time per iteration, time per widget or pixel, a minimum effective framebuffer bandwidth, and a framebuffer checksum. Use a real X server for presentation measurements. Xvfb is suitable for correctness and repeatability checks but does not represent display-server or hardware presentation cost.
 
 For hardware counters, run a sufficiently long case pinned to one CPU:
 
 ```bash
-taskset -c 2 perf stat -r 5 -e cycles,instructions,branches,branch-misses,cache-references,cache-misses out/linux/mkguibench render mixed 256 1920 1080 5000
+taskset -c 11 chrt -f 99 perf stat -r 5 -e cycles,instructions,branches,branch-misses,cache-references,cache-misses taskset -c 9 out/linux/mkguibench render mixed 256 1920 1080 5000
 ```
 
 ## Building on Windows
 
-mkgui targets C99 and builds with either **MinGW GCC** or **clang-cl** (LLVM's MSVC-compatible driver). Plain MSVC `cl.exe` is not tested but the source should be compatible; please report issues.
+The supplied `build.sh` runs on Linux and cross-compiles Windows libraries,
+demo, editor, and tests when `x86_64-w64-mingw32-gcc` is installed.
+For native builds, use the [MSYS2 / MinGW commands](documentation/getting_started.md#native-windows-builds).
+The generated import libraries target MinGW; these commands use GCC and GNU assembly.
 
-### MSYS2 / MinGW (recommended)
+A Windows application includes `mkgui.h` and links the toolkit import library:
 
-The easiest option is **MSYS2**, which gives you a native MinGW GCC on Windows:
-
-1. Install [MSYS2](https://www.msys2.org/)
-2. Open the **MSYS2 UCRT64** terminal
-3. Install the toolchain:
-   ```bash
-   pacman -S mingw-w64-ucrt-x86_64-gcc
-   ```
-4. Build your application, then ship `mkgui.dll` and `mkguiicons.dll` beside it:
-   ```bash
-   gcc -std=c99 -O2 myapp.c -I. -Lout/windows -lmkgui -mwindows -o out/windows/myapp.exe
-   ```
-   Add `-lopengl32` only if the application uses `MKGUI_GLVIEW`. Building `demo.c` requires `-lopengl32` since the demo showcases the GL view widget.
-
-Cross-compiling from Linux also works. The included `build.sh` automatically builds Windows executables if `x86_64-w64-mingw32-gcc` is available.
-
-### clang-cl (MSVC toolchain)
-
-For a unity build with `clang-cl`, include `mkgui.c` in the application and supply an MSVC-compatible import library for `mkguiicons.dll`. On Windows, install the **Build Tools for Visual Studio** (or the full IDE) and the **Windows SDK**, then from a Developer Command Prompt:
-
-```cmd
-clang-cl /O2 /I mkwin ^
-  -D_CRT_SECURE_NO_WARNINGS ^
-  myapp.c ^
-  /link /subsystem:windows /entry:mainCRTStartup ^
-  gdi32.lib user32.lib kernel32.lib shell32.lib advapi32.lib mkguiicons.lib
+```sh
+gcc -std=c99 -O2 myapp.c -I. -Lout/windows -lmkgui -mwindows -o out/windows/myapp.exe
 ```
 
-Add `opengl32.lib` if the application uses `MKGUI_GLVIEW`. `/entry:mainCRTStartup` keeps `int main(void)` as the entry point under `/subsystem:windows` (equivalent to MinGW's `-mwindows`).
-
-Cross-compiling from Linux with `clang-cl` is also possible if you have a copy of the MSVC CRT headers/libraries and the Windows SDK. Point clang at them with `/imsvc` for each include directory and `/libpath:` for each library directory, and use `-fuse-ld=lld-link` so the LLVM linker handles the COFF output:
-
-```bash
-clang-cl /O2 /I mkwin -fuse-ld=lld-link \
-  /imsvc <msvc-crt>/include \
-  /imsvc <winsdk>/Include/ucrt \
-  /imsvc <winsdk>/Include/um \
-  /imsvc <winsdk>/Include/shared \
-  -DMKGUI_LIBRARY -DMKGUI_STATIC \
-  -D_CRT_SECURE_NO_WARNINGS \
-  mkgui.c demo.c \
-  /Fedemo.exe \
-  /link /subsystem:windows /entry:mainCRTStartup \
-  /libpath:<msvc-crt>/lib/x86_64 \
-  /libpath:<winsdk>/Lib/ucrt/x86_64 \
-  /libpath:<winsdk>/Lib/um/x86_64 \
-  gdi32.lib user32.lib kernel32.lib opengl32.lib shell32.lib advapi32.lib mkguiicons.lib
-```
+Put `mkgui.dll` and `mkguiicons.dll` beside the executable. Applications that
+call the icon enumeration/SVG API directly also link `-lmkguiicons`.
+Add `-lopengl32` when using `MKGUI_GLVIEW`; the bundled demo requires it.
+FreeType and Fontconfig are unnecessary on Windows, where text uses GDI.
 
 ## Documentation
 
+- [Getting started: building, installing, and linking](documentation/getting_started.md)
+- [Icon catalogue, names, and enumeration API](documentation/icons.md)
+- [Migrating to v1.0.0](documentation/migration_v1.0.0.md)
+- [Release changelog](CHANGELOG.md)
 - [API reference and widget guide](documentation/doc.md)
 - [Visual editor guide](documentation/editor.md)
 - [Adding new widgets](documentation/adding_widgets.md)

@@ -26,7 +26,7 @@ Widgets store only:
 - `style` -- per-widget-type style bits
 
 There are no `x`/`y` fields on widgets. Positions live in a parallel
-`ctx->rects[]` array, indexed identically to `ctx->widgets[]`, and are
+`win->rects[]` array, indexed identically to `win->widgets[]`, and are
 rewritten every layout pass.
 
 ## 2. Entry point and pass order
@@ -37,11 +37,10 @@ A layout pass is driven from `layout_widgets` in [mkgui.c](../mkgui.c):
    `next_sibling[]` arrays plus a hash table (`layout_id_map`) for O(1)
    ID-to-index lookup. It links siblings in declaration order.
 2. For each top-level `MKGUI_WINDOW`:
-    - Set its rect to `(0, 0, ctx->win_w, ctx->win_h)`.
+    - Set its rect to `(0, 0, win->win_w, win->win_h)`.
     - Call **`layout_node`** (itself a thin wrapper over `lc_layout_node`)
       which recursively positions every descendant.
-    - If `ctx->dirty_full`, call **`layout_compute_min_size`** to push a
-      minimum window size to the platform layer.
+    - If `win->dirty_full` and this is not a canvas-only window, call **`layout_compute_min_size`** to push a minimum window size to the platform layer.
 
 Everything after the index build is a single recursive walk. There is no
 separate measure pass and no fixpoint; measurement happens on demand inside
@@ -59,7 +58,7 @@ Both the runtime and the editor call the same internal layout code through a
   index.
 - `has_scroll` -- the runtime honours `MKGUI_SCROLL`; the editor ignores it.
 
-`lw_sw(ctx, v)` scales positive values through `sc()` (DPI scale) and
+`lw_sw(win, v)` scales positive values through `sc()` (DPI scale) and
 passes non-positive values through as-is so that "0 means auto" is
 preserved.
 
@@ -101,7 +100,7 @@ falls into a generic "fill parent minus margins, optionally fixed" path.
   Their height is taken from `w->h` (scaled), falling back to
   `lc_measure_container` for containers or `natural_height` for leaves,
   and added to `fixed_total`. Collapsed groups are clamped to
-  `ctx->font_height + 4` (header only).
+  `win->font_height + 4` (header only).
 - **Flexible** children: same resolution used as a **minimum** added to
   `min_total`; their `weight` (or 1) added to `weight_total`.
 
@@ -118,10 +117,10 @@ return 1 (expand by default); single-line leaves return 0. This classification c
 
 **Pass 2 -- scrollbar and remainder**:
 
-- `gap_total = (visible_count - 1) * ctx->box_gap`
+- `gap_total = (visible_count - 1) * win->box_gap`
 - `content_h = fixed_total + min_total + gap_total`
 - If the box has `MKGUI_SCROLL` and `content_h > ph`, steal
-  `ctx->scrollbar_w` from the **inner width** and clamp remaining to 0.
+  `win->scrollbar_w` from the **inner width** and clamp remaining to 0.
 - `remaining = ph - fixed_total - min_total - gap_total`
 
 **Pass 3 -- place children top-to-bottom**:
@@ -132,7 +131,7 @@ return 1 (expand by default); single-line leaves return 0. This classification c
   their content minimum so weights cannot collapse them below usable size.
 - Horizontal placement honours `MKGUI_ALIGN_{START,CENTER,END}` when a
   non-zero explicit `w` exists; otherwise the child fills the inner width.
-- Advance `cy += ch + ctx->box_gap`.
+- Advance `cy += ch + win->box_gap`.
 
 ## 6. HBOX rules
 
@@ -163,8 +162,8 @@ order.
 
 - Column 1 width = `max(label_text_width + 8)` over all even-indexed children.
 - Column 2 width = `pw - col1`.
-- Row height = `ctx->font_height + 10`.
-- Rows separated by `ctx->box_gap`.
+- Row height = `win->font_height + 10`.
+- Rows separated by `win->box_gap`.
 - A trailing odd child (no control) just sits in column 1 of its row.
 
 ## 8. GROUP rules
@@ -172,8 +171,8 @@ order.
 `MKGUI_GROUP` is a bordered titled frame that contains **one** inner
 container (VBOX/HBOX/FORM/PANEL). It reserves:
 
-- `gtop = ctx->font_height + 4` -- title strip at the top.
-- `gpad = ctx->box_pad` -- symmetric inset on left, right, bottom.
+- `gtop = win->font_height + 4` -- title strip at the top.
+- `gpad = win->box_pad` -- symmetric inset on left, right, bottom.
 
 Collapsed groups (`MKGUI_GROUP_COLLAPSED`) early-out with no child layout
 and a measured height of just `gtop`.
@@ -189,10 +188,10 @@ is drawn is decided at render time.
 `MKGUI_HSPLIT` (horizontal splitter -- children stacked vertically) and
 `MKGUI_VSPLIT` (vertical splitter -- children side-by-side).
 
-- Ratio comes from `find_split_data(ctx, w->id)->ratio`, default 0.5.
+- Ratio comes from `find_split_data(win, w->id)->ratio`, default 0.5.
 - Children are matched by `MKGUI_REGION_TOP/BOTTOM` (HSPLIT) or
   `MKGUI_REGION_LEFT/RIGHT` (VSPLIT).
-- Divider takes `ctx->split_thick` pixels out of the second region's
+- Divider takes `win->split_thick` pixels out of the second region's
   leading edge.
 
 ## 11. WINDOW chrome
@@ -200,17 +199,17 @@ is drawn is decided at render time.
 Window layout is a special case. Before any body child is positioned,
 chrome children are pulled out and placed around the edges in this order:
 
-1. **Menu** (`MKGUI_MENU`) -- full width, top, height `ctx->menu_height`.
+1. **Menu** (`MKGUI_MENU`) -- full width, top, height `win->menu_height`.
 2. **Toolbar** (`MKGUI_TOOLBAR`) -- full width, below menu. Height depends
    on mode:
-    - `TEXT_ONLY` -- `ctx->font_height + 10`
+    - `TEXT_ONLY` -- `win->font_height + 10`
     - `ICONS_ONLY` (with icons) -- `icon_size + 10`
     - mixed -- `max(icon_size, font_height) + 10`
-    - no icons available -- `ctx->font_height + 10`
+    - no icons available -- `win->font_height + 10`
 3. **Pathbar** (`MKGUI_PATHBAR`, only if `h == 0`) -- full width minus
-   L/R margins, height `ctx->pathbar_height`.
+   L/R margins, height `win->pathbar_height`.
 4. **Statusbar** (`MKGUI_STATUSBAR`) -- full width, bottom, height
-   `ctx->statusbar_height`.
+   `win->statusbar_height`.
 
 Whatever remains is the body region passed down to the rest of the tree.
 Widgets bigger than `chrome[16]` are silently dropped, so a window cannot
@@ -230,8 +229,7 @@ by design, but it surprises people.
 
 ## 13. Padding rule
 
-Padding (`ctx->box_pad` on each side) is applied at most **once** per
-nesting chain:
+Box placement applies `win->box_pad` on each side according to the parent type:
 
 - A VBOX/HBOX/FORM/PANEL gets padding unless its parent is also a
   VBOX/HBOX/FORM/GROUP/TABS/PANEL.
@@ -264,7 +262,7 @@ Algorithm:
 `natural_height` and `natural_width` are the fallback when a leaf widget
 did not declare a size. Everything here is run through `sc()` so it scales
 with DPI. The numeric values come from the `MKGUI_NAT_*` defines in
-[mkgui.h](../mkgui.h) -- override them at consumer build time if the
+[mkgui.h](../mkgui.h) -- override them when compiling the toolkit if the
 defaults do not suit your app.
 
 | Widget                                                          | Natural height                                |
@@ -305,11 +303,10 @@ calculation to grow the designed window when its contents no longer fit.
 
 ## 17. Global values (metric constants)
 
-Defined in [mkgui.h](../mkgui.h). All are scaled into `ctx` fields by
-`mkgui_recompute_metrics`. Consumers reading layout should always use the
-`ctx->` field, not the `MKGUI_*` constant.
+Defined in [mkgui.h](../mkgui.h). All are scaled into `win` fields by
+`mkgui_recompute_metrics`. Toolkit and editor implementation code uses the scaled `win->` fields. Shared-library applications use public geometry and sizing APIs; these private fields are not exposed.
 
-| Constant                        | Default | `ctx` field          |
+| Constant                        | Default | `win` field          |
 |---------------------------------|---------|----------------------|
 | `MKGUI_ROW_HEIGHT`              | 20      | `row_height`         |
 | `MKGUI_TAB_HEIGHT`              | 26      | `tab_height`         |
@@ -342,9 +339,9 @@ Checklist for a new widget:
    `lc_layout_node` (custom rules) or let the generic fallback distribute
    full-parent rects. Also add it to the padding predicate if it should
    suppress nested children's padding.
-5. Use `sc(ctx, N)` for every pixel constant so DPI scaling is automatic.
+5. Use `sc(win, N)` for every pixel constant so DPI scaling is automatic.
    Never write raw px.
-6. Use `ctx->box_gap` / `ctx->box_pad` / `ctx->row_height` etc. -- do not
+6. Use `win->box_gap` / `win->box_pad` / `win->row_height` etc. -- do not
    reference `MKGUI_BOX_GAP` etc. at runtime.
 7. If your widget has its own natural-size literals that might be tweaked
    or overridden by consumers, add them to the `MKGUI_NAT_*` block in

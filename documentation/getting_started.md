@@ -2,14 +2,14 @@
 
 ## Prerequisites
 
-**Linux:** GCC, FreeType2, Fontconfig, Xlib + XShm development headers.
+**Linux:** Git, Bash, GCC, binutils, pkg-config, Python 3, FreeType2, Fontconfig, and Xlib + XShm development headers. Python is needed to build the icon catalogue; applications do not need it at runtime.
 
 ```sh
 # Arch
-pacman -S gcc freetype2 fontconfig libx11 libxext
+pacman -S git base-devel python freetype2 fontconfig libx11 libxext
 
 # Debian/Ubuntu
-apt install gcc libfreetype-dev libfontconfig-dev libx11-dev libxext-dev
+apt install git build-essential pkg-config python3 libfreetype-dev libfontconfig-dev libx11-dev libxext-dev
 ```
 
 **Windows (cross-compile from Linux):** MinGW-w64. Font rendering goes through GDI on Windows, so FreeType and Fontconfig are not required.
@@ -24,18 +24,25 @@ apt install gcc-mingw-w64-x86-64
 
 **OpenGL is optional.** The core library, editor, static library, and all widgets except `MKGUI_GLVIEW` build and run without any OpenGL dependency. Only link `-lGL` (Linux) or `-lopengl32` (Windows) if your application actually uses the GL view widget. The bundled `demo` binary uses `MKGUI_GLVIEW`, so the demo build pulls in OpenGL; the editor and `libmkgui.so.1.0.0` do not.
 
+For the default build including the demo, also install `libglvnd` on Arch or `libgl-dev` on Debian/Ubuntu. Use `./build.sh library` or `./build.sh editor` to build without the demo's OpenGL dependency.
+
 ## Building mkgui
 
 ```sh
-git clone <mkgui-repo-url>
+git clone https://github.com/vtlmks/mkgui.git
 cd mkgui
+git checkout v1.0.0
+git submodule update --init --recursive
 ./build.sh           # default: library + icon catalogue + demo + editor + tests
 ./build.sh editor    # libraries + visual designer
 ./build.sh library   # shared/static toolkit libraries + icon catalogue
-./build.sh all       # build everything, including the editor
+./build.sh icons     # icon catalogue only
+./build.sh core      # libraries + demo + tests, without the editor
 ```
 
-The core targets produce:
+`mkwin/` is a source submodule pinned to the revision required by mkgui. Run `git submodule update --init --recursive` after changing the mkgui checkout too. mkwin is compiled into the toolkit; applications do not need a separate mkwin shared library. The Fluent source snapshot is already vendored in this repository.
+
+The default build produces:
 
 | Output | Description |
 |--------|-------------|
@@ -44,6 +51,7 @@ The core targets produce:
 | `out/linux/libmkgui.a` | Linux static library for linking |
 | `out/windows/libmkgui.a` | Windows static library (when MinGW is available) |
 | `out/linux/demo`, `out/windows/demo.exe` | Demo application |
+| `out/linux/editor`, `out/windows/editor.exe` | Visual GUI designer |
 | `out/linux/libmkguiicons.so.1` | Shared SVG catalogue |
 | `out/windows/mkguiicons.dll` | Windows SVG catalogue |
 | `out/linux/test_layout`, `test_widgets`, `test_events`, `test_events_ext`, `test_smoke`, `test_window_visibility`, `test_dynamic` | Unit tests |
@@ -51,11 +59,15 @@ The core targets produce:
 
 `-Lout/linux -lmkgui` or `-Lout/windows -lmkgui` selects the shared library. Link the explicit `libmkgui.a` path to select static linkage.
 
-`./build.sh editor` adds `out/linux/editor` (and `out/windows/editor.exe` when MinGW is present). `./build.sh all` builds both core and editor.
+`./build.sh` is a Linux build script. Windows outputs are cross-compiled when `x86_64-w64-mingw32-gcc` is available. See [native Windows builds](#native-windows-builds) for MSYS2 commands.
 
-Build modes: `./build.sh release` (stripped), `./build.sh debug` (no optimization), `./build.sh size` (`-Os`, ~26% smaller than release), `./build.sh asan` (AddressSanitizer + UBSan, Linux only), `./build.sh clean`. Modes and targets can be combined: `./build.sh release editor`.
+Build modes: `./build.sh release` (optimized and stripped), `./build.sh debug` (no optimization), `./build.sh size` (`-Os` and stripped), `./build.sh asan` (AddressSanitizer + UBSan, Linux only), `./build.sh clean`. The default `normal` mode uses `-O2` with debug symbols. Modes and targets can be combined: `./build.sh release editor`. Targets build executables but do not run the tests.
+
+The default build targets `x86-64-v2` for both Linux and Windows; the CPU target is set in `COMMON_CFLAGS` in `build.sh`.
 
 The library is compiled with `-DMKGUI_LIBRARY`. Public functions are exported; toolkit internals remain hidden. Icon metadata, hash slots, and custom SVG source records grow on demand. Applications do not need library-build definitions.
+
+For an overview of the changes from beta releases, see the [v1.0.0 migration guide](migration_v1.0.0.md).
 
 ## Option A: Shared library
 
@@ -64,29 +76,50 @@ Include `mkgui.h` and link the library from the selected release. Within a sourc
 **myapp.c:**
 ```c
 #include "mkgui.h"
+#include "mkguiicons_names.h"
 
-enum { ID_WINDOW = 1, ID_VBOX, ID_LABEL, ID_BUTTON };
+enum { ID_WIN = 1, ID_BOX, ID_BTN, ID_LBL };
 
+// [=]===^=[ on_event ]========================================================================[=]
 static void on_event(struct mkgui_window *win, struct mkgui_event *ev, void *userdata) {
-	if(ev->type == MKGUI_EVENT_CLICK && ev->id == ID_BUTTON) {
-		mkgui_label_set(win, ID_LABEL, "Clicked!");
+	(void)userdata;
+
+	if(ev->type == MKGUI_EVENT_CLOSE) {
+		mkgui_ctx_quit(mkgui_window_get_ctx(win));
+
+	} else if(ev->type == MKGUI_EVENT_CLICK && ev->id == ID_BTN) {
+		mkgui_label_set(win, ID_LBL, "Clicked!");
+
 	}
 }
 
+// [=]===^=[ main ]============================================================================[=]
 int main(void) {
 	struct mkgui_widget widgets[] = {
-		MKGUI_W(MKGUI_WINDOW, ID_WINDOW, "My App",    "", 0,         400, 300, 0, 0, 0),
-		MKGUI_W(MKGUI_VBOX,   ID_VBOX,   "",          "", ID_WINDOW, 0, 0, 0, 0, 0),
-		MKGUI_W(MKGUI_LABEL,  ID_LABEL,  "Hello",     "", ID_VBOX,   0, 0, 0, 0, 0),
-		MKGUI_W(MKGUI_BUTTON, ID_BUTTON, "Click me",  "search", ID_VBOX, 120, 0, MKGUI_FIXED, 0, 0),
+		MKGUI_W(MKGUI_WINDOW, ID_WIN, "Hello", "", 0, 400, 300, 0, 0, 0),
+		MKGUI_W(MKGUI_VBOX, ID_BOX, "", "", ID_WIN, 0, 0, 0, 0, 0),
+		MKGUI_W(MKGUI_BUTTON, ID_BTN, "Click", MKICON_CHECKMARK, ID_BOX, 120, 0, MKGUI_FIXED, 0, 0),
+		MKGUI_W(MKGUI_LABEL, ID_LBL, "Ready", "", ID_BOX, 0, 0, 0, 0, 0),
 	};
 	struct mkgui_ctx *ctx = mkgui_ctx_create();
-	mkgui_ctx_set_app_class(ctx, "myapp");
-	struct mkgui_window *win = mkgui_window_create(ctx, NULL, widgets, 4, NULL, 0, 0);
-	mkgui_ctx_run(ctx, on_event, NULL);
-	mkgui_window_destroy(win);
-	mkgui_ctx_destroy(ctx);
-	return 0;
+
+	if(ctx) {
+		struct mkgui_window *win = mkgui_window_create(ctx, NULL, widgets, sizeof(widgets) / sizeof(widgets[0]), NULL, 0, 0);
+
+		if(win) {
+			mkgui_ctx_run(ctx, on_event, NULL);
+			mkgui_window_destroy(win);
+			mkgui_ctx_destroy(ctx);
+			return 0;
+
+		}
+
+		mkgui_ctx_destroy(ctx);
+
+	}
+
+	return 1;
+
 }
 ```
 
@@ -159,6 +192,37 @@ For deployment beside an executable, keep `libmkgui.so.1.0.0` and `libmkguiicons
 Linux uses the full release in the toolkit SONAME: `libmkgui.so.1.0.0`. Choose a tag and keep using its matching headers and library; other tags may change the API or ABI. Different full releases can be installed together, including releases with the same major number. Windows uses `mkgui.dll`, shipped with `mkguiicons.dll` beside
 the executable. Its MinGW import library is `libmkgui.dll.a`.
 
+## Native Windows builds
+
+In the MSYS2 UCRT64 terminal, install Git, GCC, and Python:
+
+```sh
+pacman -S git mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-python
+```
+
+Clone/select the release and initialize mkwin as shown above. From the repository
+root, build the catalogue, toolkit DLL, demo, and editor with native GCC:
+
+```sh
+mkdir -p out/windows
+python3 tools/generate_icon_library.py
+gcc -std=c99 -O2 -DMKGUIICONS_BUILD -shared mkguiicons.c mkguiicons_data.S -Wl,--out-implib,out/windows/libmkguiicons.dll.a -static-libgcc -o out/windows/mkguiicons.dll
+gcc -std=c99 -O2 -march=x86-64-v2 -fwrapv -Imkwin -DMKGUI_LIBRARY -shared mkgui.c -Wl,--out-implib,out/windows/libmkgui.dll.a -static-libgcc -o out/windows/mkgui.dll -Lout/windows -lmkguiicons -lgdi32 -Wl,-Bstatic -lwinpthread -Wl,-Bdynamic
+gcc -std=c99 -O2 demo.c -Lout/windows -lmkgui -mwindows -lopengl32 -o out/windows/demo.exe
+gcc -std=c99 -O2 editor.c -Lout/windows -lmkgui -mwindows -o out/windows/editor.exe
+```
+
+Build an application with the same compiler:
+
+```sh
+gcc -std=c99 -O2 myapp.c -I. -Lout/windows -lmkgui -mwindows -o out/windows/myapp.exe
+```
+
+The import libraries (`*.dll.a`) are link-time inputs. Distribute the executable
+with `mkgui.dll` and `mkguiicons.dll`; the matching editor and toolkit should
+come from the same build because the editor uses the private rendering bridge.
+Applications calling `mkguiicons_*()` directly also link `-lmkguiicons`.
+
 ## Option B: Static library
 
 Include `mkgui.h`, define `MKGUI_STATIC`, and link the explicit archive:
@@ -178,6 +242,7 @@ For an installed release, use its matching header directory and static archive, 
 ```sh
 gcc -std=c99 -O2 -DMKGUI_STATIC myapp.c $(pkg-config --cflags mkgui1.0.0) "$(pkg-config --variable=libdir mkgui1.0.0)/libmkgui1.0.0.a" $(pkg-config --libs freetype2 fontconfig mkguiicons) -lX11 -lXext -lm -o myapp
 ```
+This embeds the toolkit in the application; the icon catalogue remains a shared-library dependency.
 
 ## Option C: Unity build
 
@@ -192,10 +257,12 @@ Include `mkgui.c` directly in your source file. The toolkit compiles as one tran
 
 **Compile:**
 ```sh
-gcc -std=c99 -O2 -Imkwin myapp.c $(pkg-config --cflags --libs freetype2 fontconfig) -lX11 -lXext -lm $(pkg-config --cflags --libs mkguiicons) -o myapp
+gcc -std=c99 -O2 -Imkwin myapp.c $(pkg-config --cflags --libs freetype2 fontconfig) -lX11 -lXext -lm -Lout/linux -lmkguiicons '-Wl,-rpath,$ORIGIN' -o out/linux/myapp
 ```
 
 Add `-lGL` only if your application uses `MKGUI_GLVIEW`. On Windows, the equivalent is `-lopengl32`.
+
+Unity builds need the complete source checkout, including mkwin. The installed public headers are sufficient for shared/static consumers but do not install toolkit implementation sources.
 
 ## Icons
 
@@ -241,18 +308,18 @@ struct mkgui_widget widgets[] = {
 };
 ```
 
-- `w=0, h=0`: widget takes its natural size from font height
+- `w=0, h=0`: automatic sizing according to the parent container and widget type; flexible children can fill the available space
 - `MKGUI_FIXED`: removed from box flex distribution; the main-axis size uses its positive hint or a measured/natural fallback. Cross-axis sizing follows the parent's alignment rules
 - `weight`: controls how flexible widgets share remaining space in a container
 
-See `documentation/doc.md` for the full API reference.
+See the [layout guide](layout.md) for sizing rules and the [API reference](doc.md) for widget functions.
 
 ## The editor
 
 The visual designer lets you create widget layouts interactively:
 
 ```sh
-./editor
+out/linux/editor
 ```
 
 - Click a palette entry, then click the canvas to place widgets; Escape ends placement mode

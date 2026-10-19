@@ -1,6 +1,6 @@
 # Security policy
 
-mkgui is a small GUI toolkit maintained by a single developer. There is no formal release cadence and no backport policy - the supported version is "latest `master`".
+mkgui is a small GUI toolkit maintained by a single developer. There is no fixed release cadence. Include the affected release or commit and, for shared-library builds, the installed toolkit and icon-library versions in reports.
 
 ## Reporting a vulnerability
 
@@ -19,4 +19,4 @@ You will get an acknowledgement within a reasonable time. Once a fix lands on `m
 
 In scope: memory safety bugs, undefined behaviour, and logic bugs in mkgui itself that can be triggered by untrusted input an application might plausibly feed to the toolkit.
 
-Out of scope: bugs in bundled third-party code (PlutoSVG, PlutoVG, incbin.h) - please report those upstream. Denial-of-service by simply allocating enough widgets to exhaust memory is also out of scope.
+Out of scope: bugs in bundled third-party code (PlutoSVG, PlutoVG) - please report those upstream. Denial-of-service by simply allocating enough widgets to exhaust memory is also out of scope.
