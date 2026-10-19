@@ -507,6 +507,7 @@ struct ed_state {
 	struct ed_snapshot undo[ED_MAX_UNDO];
 	uint32_t undo_pos;
 	uint32_t undo_count;
+	uint32_t undo_start;
 
 	char project_path[MKGUI_PATH_MAX + 260];
 	uint64_t required_widgets;
@@ -1474,74 +1475,107 @@ static void ed_remove_widget_data(uint32_t widget_id) {
 // Undo / redo
 // ---------------------------------------------------------------------------
 
-// [=]===^=[ ed_push_undo ]=======================================[=]
+// [=]===^=[ ed_push_undo ]=====================================================================[=]
 static void ed_push_undo(void) {
-	struct ed_snapshot *snap = &ed.undo[ed.undo_pos % ED_MAX_UNDO];
+	struct ed_snapshot *snapshot = &ed.undo[(ed.undo_start + ed.undo_pos) % ED_MAX_UNDO];
 
-	if(ed.widget_count > snap->widget_cap) {
-		struct ed_widget *widgets = (struct ed_widget *)malloc((size_t)ed.widget_count * sizeof(struct ed_widget));
+	if(ed.widget_count > snapshot->widget_cap) {
+		struct ed_widget *widgets = realloc(snapshot->widgets, (size_t)ed.widget_count * sizeof(*widgets));
 
 		if(!widgets) {
 			return;
 
 		}
 
-		free(snap->widgets);
-		snap->widgets = widgets;
-		snap->widget_cap = ed.widget_count;
+		snapshot->widgets = widgets;
+		snapshot->widget_cap = ed.widget_count;
 
 	}
 
 	if(ed.widget_count > 0) {
-		memcpy(snap->widgets, ed.widgets, sizeof(struct ed_widget) * ed.widget_count);
+		memcpy(snapshot->widgets, ed.widgets, (size_t)ed.widget_count * sizeof(*ed.widgets));
 
 	}
 
-	snap->widget_count = ed.widget_count;
-	snap->canvas_w = ed.canvas_w;
-	snap->canvas_h = ed.canvas_h;
-	++ed.undo_pos;
+	snapshot->widget_count = ed.widget_count;
+	snapshot->canvas_w = ed.canvas_w;
+	snapshot->canvas_h = ed.canvas_h;
 	ed.undo_count = ed.undo_pos;
 
+	if(ed.undo_count == ED_MAX_UNDO) {
+		ed.undo_start = (ed.undo_start + 1) % ED_MAX_UNDO;
+
+	} else {
+		++ed.undo_count;
+
+	}
+
+	ed.undo_pos = ed.undo_count;
+
 }
 
-// [=]===^=[ ed_undo ]============================================[=]
+// [=]===^=[ ed_swap_undo ]=====================================================================[=]
+static uint32_t ed_swap_undo(uint32_t position) {
+	struct ed_snapshot *snapshot = &ed.undo[(ed.undo_start + position) % ED_MAX_UNDO];
+
+	if(ed.widget_count > snapshot->widget_cap) {
+		struct ed_widget *widgets = realloc(snapshot->widgets, (size_t)ed.widget_count * sizeof(*widgets));
+
+		if(!widgets) {
+			return 0;
+
+		}
+
+		snapshot->widgets = widgets;
+		snapshot->widget_cap = ed.widget_count;
+
+	}
+
+	uint32_t count = ed.widget_count;
+	int32_t width = ed.canvas_w;
+	int32_t height = ed.canvas_h;
+	uint32_t overlap = count < snapshot->widget_count ? count : snapshot->widget_count;
+
+	for(uint32_t i = 0; i < overlap; ++i) {
+		struct ed_widget widget = ed.widgets[i];
+		ed.widgets[i] = snapshot->widgets[i];
+		snapshot->widgets[i] = widget;
+
+	}
+
+	if(count < snapshot->widget_count) {
+		memcpy(ed.widgets + overlap, snapshot->widgets + overlap, (size_t)(snapshot->widget_count - overlap) * sizeof(*ed.widgets));
+
+	} else if(count > snapshot->widget_count) {
+		memcpy(snapshot->widgets + overlap, ed.widgets + overlap, (size_t)(count - overlap) * sizeof(*ed.widgets));
+
+	}
+
+	ed.widget_count = snapshot->widget_count;
+	ed.canvas_w = snapshot->canvas_w;
+	ed.canvas_h = snapshot->canvas_h;
+	snapshot->widget_count = count;
+	snapshot->canvas_w = width;
+	snapshot->canvas_h = height;
+	ed.selected = -1;
+	return 1;
+
+}
+
+// [=]===^=[ ed_undo ]==========================================================================[=]
 static void ed_undo(void) {
-	if(ed.undo_pos == 0) {
-		return;
+	if(ed.undo_pos > 0 && ed_swap_undo(ed.undo_pos - 1)) {
+		--ed.undo_pos;
 
 	}
-
-	--ed.undo_pos;
-	struct ed_snapshot *snap = &ed.undo[ed.undo_pos % ED_MAX_UNDO];
-	memcpy(ed.widgets, snap->widgets, sizeof(struct ed_widget) * snap->widget_count);
-	ed.widget_count = snap->widget_count;
-	ed.canvas_w = snap->canvas_w;
-	ed.canvas_h = snap->canvas_h;
-	ed.selected = -1;
-
 }
 
-// [=]===^=[ ed_redo ]============================================[=]
+// [=]===^=[ ed_redo ]==========================================================================[=]
 static void ed_redo(void) {
-	if(ed.undo_pos >= ed.undo_count) {
-		return;
+	if(ed.undo_pos < ed.undo_count && ed_swap_undo(ed.undo_pos)) {
+		++ed.undo_pos;
 
 	}
-
-	++ed.undo_pos;
-
-	if(ed.undo_pos < ed.undo_count) {
-		struct ed_snapshot *snap = &ed.undo[ed.undo_pos % ED_MAX_UNDO];
-		memcpy(ed.widgets, snap->widgets, sizeof(struct ed_widget) * snap->widget_count);
-		ed.widget_count = snap->widget_count;
-		ed.canvas_w = snap->canvas_w;
-		ed.canvas_h = snap->canvas_h;
-
-	}
-
-	ed.selected = -1;
-
 }
 
 // ---------------------------------------------------------------------------

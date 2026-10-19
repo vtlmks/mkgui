@@ -90,7 +90,7 @@ struct mkgui_input_data {
 	struct mkgui_input_snap undo[MKGUI_UNDO_MAX];
 	uint32_t undo_pos;
 	uint32_t undo_count;
-	uint32_t undo_saved;
+	uint32_t undo_start;
 	uint32_t undo_last_ms;
 };
 
@@ -298,7 +298,7 @@ struct mkgui_textarea_data {
 	struct mkgui_textarea_snap undo[MKGUI_UNDO_MAX];
 	uint32_t undo_pos;
 	uint32_t undo_count;
-	uint32_t undo_saved;
+	uint32_t undo_start;
 	uint32_t undo_last_ms;
 };
 

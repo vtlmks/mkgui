@@ -103,6 +103,69 @@ static void test_editor_canvas_minimum(void) {
 	}
 }
 
+// [=]===^=[ editor_history_value ]============================================================[=]
+static void editor_history_value(uint32_t value) {
+	ed.widget_count = value % 3 + 1;
+	ed.widgets[0].id = value;
+	ed.canvas_w = 600 + (int32_t)value;
+	ed.canvas_h = 400 + (int32_t)value;
+
+}
+
+// [=]===^=[ check_editor_history ]============================================================[=]
+static void check_editor_history(uint32_t value) {
+	feature_check(ed.widgets[0].id == value && ed.widget_count == value % 3 + 1 && ed.canvas_w == 600 + (int32_t)value && ed.canvas_h == 400 + (int32_t)value, "editor history restores widgets and canvas");
+
+}
+
+// [=]===^=[ test_editor_history ]=============================================================[=]
+static void test_editor_history(void) {
+	memset(&ed, 0, sizeof(ed));
+
+	for(uint32_t i = 0; i < ED_MAX_UNDO * 2; ++i) {
+		editor_history_value(i);
+		ed_push_undo();
+
+	}
+
+	editor_history_value(ED_MAX_UNDO * 2);
+
+	for(uint32_t i = 0; i < ED_MAX_UNDO; ++i) {
+		ed_undo();
+		check_editor_history(ED_MAX_UNDO * 2 - i - 1);
+
+	}
+
+	ed_undo();
+	check_editor_history(ED_MAX_UNDO);
+
+	for(uint32_t i = 0; i < ED_MAX_UNDO; ++i) {
+		ed_redo();
+		check_editor_history(ED_MAX_UNDO + i + 1);
+
+	}
+
+	ed_redo();
+	check_editor_history(ED_MAX_UNDO * 2);
+	ed_undo();
+	ed_push_undo();
+	editor_history_value(9000);
+	ed_redo();
+	check_editor_history(9000);
+	ed_undo();
+	check_editor_history(ED_MAX_UNDO * 2 - 1);
+	ed_redo();
+	check_editor_history(9000);
+
+	for(uint32_t i = 0; i < ED_MAX_UNDO; ++i) {
+		free(ed.undo[i].widgets);
+
+	}
+
+	memset(&ed, 0, sizeof(ed));
+
+}
+
 // [=]===^=[ main ]================================================[=]
 int main(int argc, char **argv) {
 	ed.widget_count = 4;
@@ -186,6 +249,7 @@ int main(int argc, char **argv) {
 
 	}
 
+	test_editor_history();
 	test_editor_canvas_minimum();
 	fprintf(stderr, "editor features: %u checks, %u failures\n", feature_checks, feature_failures);
 	return feature_failures ? 1 : 0;
