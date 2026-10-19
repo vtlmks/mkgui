@@ -17,6 +17,14 @@
 #include "mkgui_editor.h"
 #endif
 
+#include <errno.h>
+#include <fcntl.h>
+#ifdef _WIN32
+#include <io.h>
+#else
+#include <unistd.h>
+#endif
+
 // ---------------------------------------------------------------------------
 // Editor-internal anchor flags (removed from public API, kept for editor design-time layout)
 // ---------------------------------------------------------------------------
@@ -1474,6 +1482,20 @@ static void ed_remove_widget_data(uint32_t widget_id) {
 // ---------------------------------------------------------------------------
 // Undo / redo
 // ---------------------------------------------------------------------------
+
+// [=]===^=[ ed_clear_undo ]====================================================================[=]
+static void ed_clear_undo(void) {
+	for(uint32_t i = 0; i < ED_MAX_UNDO; ++i) {
+		free(ed.undo[i].widgets);
+		memset(&ed.undo[i], 0, sizeof(ed.undo[i]));
+
+	}
+
+	ed.undo_pos = 0;
+	ed.undo_count = 0;
+	ed.undo_start = 0;
+
+}
 
 // [=]===^=[ ed_push_undo ]=====================================================================[=]
 static void ed_push_undo(void) {
@@ -3468,9 +3490,169 @@ static void ed_remove_toolbar_btn(struct mkgui_window *win) {
 // Project save / load
 // ---------------------------------------------------------------------------
 
+// [=]===^=[ ed_file_begin ]====================================================================[=]
+static FILE *ed_file_begin(char *path, char *temporary, size_t size) {
+	for(uint32_t attempt = 0; attempt < 16; ++attempt) {
+		int32_t length = snprintf(temporary, size, "%s.tmp.%016llx.%u", path, (unsigned long long)mkgui_now_ns(), attempt);
+
+		if(length < 0 || (size_t)length >= size) {
+			errno = ENAMETOOLONG;
+			return NULL;
+
+		}
+
+#ifdef _WIN32
+		int32_t descriptor = _open(temporary, _O_CREAT | _O_EXCL | _O_WRONLY | _O_BINARY, _S_IREAD | _S_IWRITE);
+#else
+		int32_t descriptor = open(temporary, O_CREAT | O_EXCL | O_WRONLY, 0666);
+#endif
+
+		if(descriptor >= 0) {
+#ifdef _WIN32
+			FILE *file = _fdopen(descriptor, "wb");
+#else
+			FILE *file = fdopen(descriptor, "w");
+#endif
+
+			if(file) {
+				return file;
+
+			}
+
+#ifdef _WIN32
+			_close(descriptor);
+#else
+			close(descriptor);
+#endif
+			remove(temporary);
+			return NULL;
+
+		}
+
+		if(errno != EEXIST) {
+			return NULL;
+
+		}
+	}
+
+	return NULL;
+
+}
+
+// [=]===^=[ ed_file_finish ]===================================================================[=]
+static uint32_t ed_file_finish(FILE *file, char *temporary, char *path) {
+	uint32_t written = !ferror(file) && fflush(file) == 0;
+
+	if(written) {
+#ifdef _WIN32
+		written = _commit(_fileno(file)) == 0;
+#else
+		written = fsync(fileno(file)) == 0;
+#endif
+
+	}
+
+	if(fclose(file) != 0) {
+		written = 0;
+
+	}
+
+	if(written) {
+#ifdef _WIN32
+		if(MoveFileExA(temporary, path, MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)) {
+#else
+		if(rename(temporary, path) == 0) {
+#endif
+			return 1;
+
+		}
+	}
+
+	remove(temporary);
+	return 0;
+
+}
+
+// [=]===^=[ ed_project_valid ]=================================================================[=]
+static uint32_t ed_project_valid(void) {
+	uint32_t parents[ED_MAX_WIDGETS];
+	uint8_t colors[ED_MAX_WIDGETS] = {0};
+	uint32_t roots = 0;
+
+	if(ed.widget_count == 0 || ed.canvas_w <= 0 || ed.canvas_h <= 0 || ed.grid_size <= 0) {
+		return 0;
+
+	}
+
+	for(uint32_t i = 0; i < ed.widget_count; ++i) {
+		struct ed_widget *widget = &ed.widgets[i];
+		parents[i] = UINT32_MAX;
+
+		if(widget->type >= MKGUI_WIDGET_COUNT) {
+			return 0;
+
+		}
+
+		for(uint32_t j = 0; j < ed.widget_count; ++j) {
+			if(i != j && widget->id == ed.widgets[j].id) {
+				return 0;
+
+			}
+
+			if(widget->parent_id == ed.widgets[j].id) {
+				parents[i] = j;
+
+			}
+		}
+
+		if(widget->type == MKGUI_WINDOW && widget->parent_id == 0) {
+			parents[i] = UINT32_MAX;
+			++roots;
+
+		} else if(parents[i] == UINT32_MAX) {
+			return 0;
+
+		}
+	}
+
+	for(uint32_t i = 0; i < ed.widget_count; ++i) {
+		uint32_t node = i;
+
+		while(node != UINT32_MAX && colors[node] == 0) {
+			colors[node] = 1;
+			node = parents[node];
+
+		}
+
+		if(node != UINT32_MAX && colors[node] == 1) {
+			return 0;
+
+		}
+
+		node = i;
+
+		while(node != UINT32_MAX && colors[node] == 1) {
+			colors[node] = 2;
+			node = parents[node];
+
+		}
+	}
+
+	return roots > 0;
+
+}
+
 // [=]===^=[ ed_save_project ]=====================================[=]
 static void ed_save_project(struct mkgui_window *win, uint32_t save_as) {
+	if(!ed_project_valid()) {
+		mkgui_statusbar_set(win, ED_STATUSBAR, 0, "Cannot save: invalid widget hierarchy");
+		return;
+
+	}
+
 	ed_fit_canvas_to_content(win);
+	char path[sizeof(ed.project_path)];
+	snprintf(path, sizeof(path), "%s", ed.project_path);
 
 	if(save_as || ed.project_path[0] == '\0') {
 		struct mkgui_file_filter save_filters[] = {
@@ -3484,13 +3666,15 @@ static void ed_save_project(struct mkgui_window *win, uint32_t save_as) {
 		if(!mkgui_dialog_save(win, &save_opts)) {
 			return;
 		}
-		const char *path = mkgui_dialog_get_path(win, 0);
-		snprintf(ed.project_path, sizeof(ed.project_path), "%s", path);
+		snprintf(path, sizeof(path), "%s", mkgui_dialog_get_path(win, 0));
 	}
 
-	FILE *f = fopen(ed.project_path, "w");
+	char temporary[sizeof(ed.project_path) + 64];
+	FILE *f = ed_file_begin(path, temporary, sizeof(temporary));
 	if(!f) {
+		mkgui_statusbar_set(win, ED_STATUSBAR, 0, "Cannot create project file");
 		return;
+
 	}
 
 	fprintf(f, "[mkgui 1]\n");
@@ -3540,8 +3724,13 @@ static void ed_save_project(struct mkgui_window *win, uint32_t save_as) {
 		fprintf(f, "\n");
 	}
 
-	fclose(f);
+	if(!ed_file_finish(f, temporary, path)) {
+		mkgui_statusbar_set(win, ED_STATUSBAR, 0, "Cannot save project: write or replacement failed");
+		return;
 
+	}
+
+	snprintf(ed.project_path, sizeof(ed.project_path), "%s", path);
 	char buf[MKGUI_PATH_MAX + 320];
 	char *fname = strrchr(ed.project_path, '/');
 	if(!fname) {
@@ -3558,10 +3747,37 @@ static void ed_save_project(struct mkgui_window *win, uint32_t save_as) {
 
 // [=]===^=[ ed_load_file ]========================================[=]
 static void ed_load_file(struct mkgui_window *win, const char *path) {
-	FILE *f = fopen(path, "r");
-	if(!f) {
+	char load_path[sizeof(ed.project_path)];
+	int32_t path_length = snprintf(load_path, sizeof(load_path), "%s", path);
+
+	if(path_length < 0 || (size_t)path_length >= sizeof(load_path)) {
+		mkgui_statusbar_set(win, ED_STATUSBAR, 0, "Project path is too long");
 		return;
+
 	}
+
+	path = load_path;
+	FILE *f = fopen(path, "r");
+
+	if(!f) {
+		mkgui_statusbar_set(win, ED_STATUSBAR, 0, "Cannot open project file");
+		return;
+
+	}
+
+	struct ed_state *previous = malloc(sizeof(*previous));
+
+	if(!previous) {
+		fclose(f);
+		mkgui_statusbar_set(win, ED_STATUSBAR, 0, "Cannot allocate project loading state");
+		return;
+
+	}
+
+	*previous = ed;
+	uint32_t valid = 1;
+	uint32_t header = 0;
+	uint8_t fields[ED_MAX_WIDGETS] = {0};
 
 	snprintf(ed.project_path, sizeof(ed.project_path), "%s", path);
 
@@ -3585,6 +3801,13 @@ static void ed_load_file(struct mkgui_window *win, const char *path) {
 
 	while(fgets(line, (int32_t)sizeof(line), f)) {
 		size_t len = strlen(line);
+
+		if(len == sizeof(line) - 1 && line[len - 1] != '\n') {
+			valid = 0;
+			break;
+
+		}
+
 		while(len > 0 && (line[len - 1] == '\n' || line[len - 1] == '\r')) {
 			line[--len] = '\0';
 		}
@@ -3595,7 +3818,8 @@ static void ed_load_file(struct mkgui_window *win, const char *path) {
 
 		if(line[0] == '[') {
 			uint32_t idx;
-			if(sscanf(line, "[mkgui %*d]") == 0 && strncmp(line, "[mkgui ", 7) == 0) {
+			if(strcmp(line, "[mkgui 1]") == 0) {
+				header = 1;
 				cur_widget = -1;
 				cur_data_id = 0;
 
@@ -3606,6 +3830,11 @@ static void ed_load_file(struct mkgui_window *win, const char *path) {
 					ed.widgets[cur_widget].label_tw = -1;
 					++ed.widget_count;
 					cur_data_id = 0;
+
+				} else {
+					valid = 0;
+					break;
+
 				}
 
 			} else if(strncmp(line, "[tab_state]", 11) == 0) {
@@ -3619,21 +3848,37 @@ static void ed_load_file(struct mkgui_window *win, const char *path) {
 							ed.tab_states[ed.tab_state_count].tabs_id = tid;
 							ed.tab_states[ed.tab_state_count].active_id = aid;
 							++ed.tab_state_count;
+
+						} else {
+							valid = 0;
+
 						}
+
+					} else {
+						valid = 0;
+
 					}
+
+				} else {
+					valid = 0;
+
 				}
+
+			} else {
+				valid = 0;
+
 			}
 			continue;
 		}
 
 		if(strncmp(line, "canvas ", 7) == 0) {
-			sscanf(line + 7, "%d %d", &ed.canvas_w, &ed.canvas_h);
+			valid &= sscanf(line + 7, "%d %d", &ed.canvas_w, &ed.canvas_h) == 2;
 
 		} else if(strncmp(line, "grid ", 5) == 0) {
-			sscanf(line + 5, "%d", &ed.grid_size);
+			valid &= sscanf(line + 5, "%d", &ed.grid_size) == 1;
 
 		} else if(strncmp(line, "next_id ", 8) == 0) {
-			sscanf(line + 8, "%u", &ed.next_id);
+			valid &= sscanf(line + 8, "%u", &ed.next_id) == 1;
 
 		} else if(strncmp(line, "build_features ", 15) == 0) {
 			unsigned long long widgets;
@@ -3643,19 +3888,24 @@ static void ed_load_file(struct mkgui_window *win, const char *path) {
 				ed.required_widgets = (uint64_t)widgets;
 				ed.required_dialogs = dialogs;
 
+			} else {
+				valid = 0;
+
 			}
 
 		} else if(cur_widget >= 0 && (uint32_t)cur_widget < ed.widget_count) {
 			struct ed_widget *w = &ed.widgets[cur_widget];
 
 			if(strncmp(line, "type ", 5) == 0) {
-				sscanf(line + 5, "%u", &w->type);
+				valid &= sscanf(line + 5, "%u", &w->type) == 1;
+				fields[cur_widget] |= 1;
 
 			} else if(strncmp(line, "id_name ", 8) == 0) {
 				snprintf(w->id_name, sizeof(w->id_name), "%.63s", line + 8);
 
 			} else if(strncmp(line, "id ", 3) == 0) {
-				sscanf(line + 3, "%u", &w->id);
+				valid &= sscanf(line + 3, "%u", &w->id) == 1;
+				fields[cur_widget] |= 2;
 
 			} else if(strncmp(line, "label ", 6) == 0) {
 				snprintf(w->label, sizeof(w->label), "%.255s", line + 6);
@@ -3670,43 +3920,44 @@ static void ed_load_file(struct mkgui_window *win, const char *path) {
 				w->icon[0] = '\0';
 
 			} else if(strncmp(line, "parent ", 7) == 0) {
-				sscanf(line + 7, "%u", &w->parent_id);
+				valid &= sscanf(line + 7, "%u", &w->parent_id) == 1;
+				fields[cur_widget] |= 4;
 
 			} else if(strncmp(line, "pos ", 4) == 0) {
-				sscanf(line + 4, "%d %d", &w->x, &w->y);
+				valid &= sscanf(line + 4, "%d %d", &w->x, &w->y) == 2;
 
 			} else if(strncmp(line, "size ", 5) == 0) {
-				sscanf(line + 5, "%d %d", &w->w, &w->h);
+				valid &= sscanf(line + 5, "%d %d", &w->w, &w->h) == 2;
 
 			} else if(strncmp(line, "flags ", 6) == 0) {
-				uint32_t fl;
-				sscanf(line + 6, "%x", &fl);
+				uint32_t fl = 0;
+				valid &= sscanf(line + 6, "%x", &fl) == 1;
 				w->flags = fl;
 
 			} else if(strncmp(line, "style ", 6) == 0) {
-				uint32_t st;
-				sscanf(line + 6, "%x", &st);
+				uint32_t st = 0;
+				valid &= sscanf(line + 6, "%x", &st) == 1;
 				w->style = st;
 
 			} else if(strncmp(line, "weight ", 7) == 0) {
-				sscanf(line + 7, "%u", &w->weight);
+				valid &= sscanf(line + 7, "%u", &w->weight) == 1;
 
 			} else if(strncmp(line, "tab_order ", 10) == 0) {
-				sscanf(line + 10, "%u", &w->tab_order);
+				valid &= sscanf(line + 10, "%u", &w->tab_order) == 1;
 
 			} else if(strncmp(line, "event_mask ", 11) == 0) {
-				unsigned long long em;
-				sscanf(line + 11, "%llx", &em);
+				unsigned long long em = 0;
+				valid &= sscanf(line + 11, "%llx", &em) == 1;
 				w->event_mask = (uint64_t)em;
 
 			} else if(strncmp(line, "margins ", 8) == 0) {
-				sscanf(line + 8, "%d %d %d %d", &w->margin_l, &w->margin_t, &w->margin_r, &w->margin_b);
+				valid &= sscanf(line + 8, "%d %d %d %d", &w->margin_l, &w->margin_t, &w->margin_r, &w->margin_b) == 4;
 
 			} else if(strncmp(line, "accel_mod ", 10) == 0) {
-				w->accel_keymod = (uint32_t)strtoul(line + 10, NULL, 0);
+				valid &= sscanf(line + 10, "%x", &w->accel_keymod) == 1;
 
 			} else if(strncmp(line, "accel_key ", 10) == 0) {
-				w->accel_keysym = (uint32_t)strtoul(line + 10, NULL, 0);
+				valid &= sscanf(line + 10, "%x", &w->accel_keysym) == 1;
 
 			} else if(strncmp(line, "item ", 5) == 0) {
 				if(!cur_data_id) {
@@ -3716,15 +3967,39 @@ static void ed_load_file(struct mkgui_window *win, const char *path) {
 				if(d && d->item_count < ED_MAX_DATA_ITEMS) {
 					snprintf(d->items[d->item_count], MKGUI_MAX_TEXT, "%.255s", line + 5);
 					++d->item_count;
+
+				} else {
+					valid = 0;
+
 				}
 			}
 		}
 	}
 
-	fclose(f);
+	valid = valid && !ferror(f);
 
+	for(uint32_t i = 0; i < ed.widget_count; ++i) {
+		valid &= fields[i] == 7;
+
+	}
+
+	if(fclose(f) != 0) {
+		valid = 0;
+
+	}
+
+	if(!valid || !header || !ed_project_valid()) {
+		ed = *previous;
+		free(previous);
+		mkgui_statusbar_set(win, ED_STATUSBAR, 0, "Cannot load: invalid or incomplete project");
+		return;
+
+	}
+
+	free(previous);
 	ed.undo_pos = 0;
 	ed.undo_count = 0;
+	ed.undo_start = 0;
 
 	ed_sync_tree(win);
 	ed_sync_props(win);
@@ -3739,7 +4014,7 @@ static void ed_load_file(struct mkgui_window *win, const char *path) {
 	} else {
 		++fname;
 	}
-	snprintf(buf, sizeof(buf), "Loaded: %s", fname);
+	snprintf(buf, sizeof(buf), "Loaded: %.247s", fname);
 	mkgui_statusbar_set(win, ED_STATUSBAR, 0, buf);
 }
 
@@ -4135,7 +4410,7 @@ static char *ed_style_to_str(uint32_t style, uint32_t widget_type, char *buf, ui
 		}
 	}
 
-	if(style & MKGUI_SLIDER_MIXER) {
+	if((widget_type == MKGUI_SLIDER || widget_type == MKGUI_METER) && (style & MKGUI_SLIDER_MIXER)) {
 		char *name = (widget_type == MKGUI_METER) ? "MKGUI_METER_TEXT" : "MKGUI_SLIDER_MIXER";
 		if(pos > 0) {
 			pos += (uint32_t)snprintf(buf + pos, buf_size - pos, " | ");
@@ -4145,7 +4420,7 @@ static char *ed_style_to_str(uint32_t style, uint32_t widget_type, char *buf, ui
 	}
 
 	uint32_t tbmode = style & MKGUI_TOOLBAR_MODE_MASK;
-	if(tbmode) {
+	if(widget_type == MKGUI_TOOLBAR && tbmode) {
 		char *name = NULL;
 		if(tbmode == MKGUI_TOOLBAR_ICONS_ONLY) {
 			name = "MKGUI_TOOLBAR_ICONS_ONLY";
@@ -4160,7 +4435,6 @@ static char *ed_style_to_str(uint32_t style, uint32_t widget_type, char *buf, ui
 		}
 	}
 
-	remaining &= ~MKGUI_TOOLBAR_MODE_MASK;
 	if(remaining) {
 		if(pos > 0) {
 			pos += (uint32_t)snprintf(buf + pos, buf_size - pos, " | ");
@@ -4284,7 +4558,7 @@ static void ed_build_feature_settings(struct mkgui_window *parent) {
 		}
 
 		while(running) {
-			while(mkgui_window_poll(win, &ev)) {
+			while(running && mkgui_window_poll(win, &ev)) {
 				if(ev.type == MKGUI_EVENT_GRID_CHECK) {
 					features.widgets = 0;
 					features.dialogs = 0;
@@ -4328,6 +4602,71 @@ static void ed_build_feature_settings(struct mkgui_window *parent) {
 	}
 }
 
+// [=]===^=[ ed_c_string ]======================================================================[=]
+static void ed_c_string(FILE *file, char *text) {
+	fputc('"', file);
+
+	for(uint32_t i = 0; text[i]; ++i) {
+		uint8_t ch = (uint8_t)text[i];
+
+		if(ch == '"' || ch == '\\') {
+			fputc('\\', file);
+			fputc(ch, file);
+
+		} else if(ch < 32 || ch >= 127) {
+			fprintf(file, "\\%03o", ch);
+
+		} else {
+			fputc(ch, file);
+
+		}
+	}
+
+	fputc('"', file);
+
+}
+
+// [=]===^=[ ed_write_widget ]==================================================================[=]
+static void ed_write_widget(FILE *file, uint32_t index, char *indent) {
+	struct ed_widget *widget = &ed.widgets[index];
+	int32_t x, y, width, height;
+	char flags[512];
+	char style[512];
+	char *parent = "0";
+	ed_convert_to_layout(index, &x, &y, &width, &height);
+
+	if(widget->parent_id != 0) {
+		int32_t parent_index = ed_find_widget(widget->parent_id);
+
+		if(parent_index >= 0) {
+			parent = ed.widgets[parent_index].id_name;
+
+		}
+	}
+
+	uint32_t margins = widget->margin_l || widget->margin_r || widget->margin_t || widget->margin_b;
+
+	if(margins) {
+		fprintf(file, "%s{ .type = %s, .id = %s, .label = ", indent, ed_type_name_upper(widget->type), widget->id_name);
+
+	} else {
+		fprintf(file, "%sMKGUI_W(%s, %s, ", indent, ed_type_name_upper(widget->type), widget->id_name);
+
+	}
+
+	ed_c_string(file, widget->label);
+	fputs(margins ? ", .icon = " : ", ", file);
+	ed_c_string(file, widget->icon);
+
+	if(margins) {
+		fprintf(file, ", .parent_id = %s, .w = %d, .h = %d, .flags = %s, .style = %s, .weight = %u, .margin_l = %d, .margin_r = %d, .margin_t = %d, .margin_b = %d },\n", parent, width, height, ed_flags_to_str(widget->flags & ~0xfu, flags, sizeof(flags)), ed_style_to_str(widget->style, widget->type, style, sizeof(style)), widget->weight, widget->margin_l, widget->margin_r, widget->margin_t, widget->margin_b);
+
+	} else {
+		fprintf(file, ", %s, %d, %d, %s, %s, %u),\n", parent, width, height, ed_flags_to_str(widget->flags & ~0xfu, flags, sizeof(flags)), ed_style_to_str(widget->style, widget->type, style, sizeof(style)), widget->weight);
+
+	}
+}
+
 // [=]===^=[ ed_generate_code ]===================================[=]
 static void ed_generate_code(struct mkgui_window *win) {
 	ed_fit_canvas_to_content(win);
@@ -4342,15 +4681,19 @@ static void ed_generate_code(struct mkgui_window *win) {
 	if(!mkgui_dialog_save(win, &gen_opts)) {
 		return;
 	}
-	const char *out_path = mkgui_dialog_get_path(win, 0);
-	FILE *f = fopen(out_path, "w");
+	char out_path[MKGUI_PATH_MAX + 260];
+	snprintf(out_path, sizeof(out_path), "%s", mkgui_dialog_get_path(win, 0));
+	char temporary[sizeof(out_path) + 64];
+	FILE *f = ed_file_begin(out_path, temporary, sizeof(temporary));
 	if(!f) {
+		mkgui_statusbar_set(win, ED_STATUSBAR, 0, "Cannot create generated file");
 		return;
+
 	}
 
 	char feature_path[MKGUI_PATH_MAX];
-	const char *file_name = strrchr(out_path, '/');
-	const char *windows_name = strrchr(out_path, '\\');
+	char *file_name = strrchr(out_path, '/');
+	char *windows_name = strrchr(out_path, '\\');
 
 	if(windows_name && (!file_name || windows_name > file_name)) {
 		file_name = windows_name;
@@ -4358,24 +4701,27 @@ static void ed_generate_code(struct mkgui_window *win) {
 	}
 
 	file_name = file_name ? file_name + 1 : out_path;
-	const char *extension = strrchr(file_name, '.');
+	char *extension = strrchr(file_name, '.');
 	size_t base_length = extension ? (size_t)(extension - out_path) : strlen(out_path);
 	int32_t feature_length = snprintf(feature_path, sizeof(feature_path), "%.*s_features.h", (int32_t)base_length, out_path);
 
 	if(feature_length < 0 || (size_t)feature_length >= sizeof(feature_path)) {
 		fclose(f);
+		remove(temporary);
 		mkgui_statusbar_set(win, ED_STATUSBAR, 0, "Generated feature path is too long");
 		return;
 
 	}
 
-	FILE *features = fopen(feature_path, "w");
+	char feature_temporary[sizeof(feature_path) + 64];
+	FILE *features = ed_file_begin(feature_path, feature_temporary, sizeof(feature_temporary));
 
 	if(features) {
 		ed_write_features(features);
 
-		if(fclose(features) != 0) {
+		if(!ed_file_finish(features, feature_temporary, feature_path)) {
 			fclose(f);
+			remove(temporary);
 			mkgui_statusbar_set(win, ED_STATUSBAR, 0, "Cannot write generated feature configuration");
 			return;
 
@@ -4383,6 +4729,7 @@ static void ed_generate_code(struct mkgui_window *win) {
 
 	} else {
 		fclose(f);
+		remove(temporary);
 		mkgui_statusbar_set(win, ED_STATUSBAR, 0, "Cannot create generated feature configuration");
 		return;
 
@@ -4524,30 +4871,11 @@ static void ed_generate_code(struct mkgui_window *win) {
 	fprintf(f, "int main(void) {\n");
 	fprintf(f, "\tstruct mkgui_widget widgets[] = {\n");
 	for(uint32_t i = 0; i < ed.widget_count; ++i) {
-		struct ed_widget *w = &ed.widgets[i];
-		int32_t lx, ly, lw, lh;
-		ed_convert_to_layout(i, &lx, &ly, &lw, &lh);
-		char *parent_name = "0";
-		if(w->parent_id != 0) {
-			int32_t pidx = ed_find_widget(w->parent_id);
-			if(pidx >= 0) {
-				parent_name = ed.widgets[pidx].id_name;
-			}
-		}
-		char flag_buf[512];
-		char style_buf[512];
-		uint32_t out_flags = w->flags & ~0xfu;
-		uint32_t out_style = w->style;
-		fprintf(f, "\t\tMKGUI_W(%s, %s, \"%s\", \"%s\", %s, %d, %d, %s, %s, %u),\n", ed_type_name_upper(w->type), w->id_name, w->label, w->icon, parent_name, lw, lh, ed_flags_to_str(out_flags, flag_buf, sizeof(flag_buf)), ed_style_to_str(out_style, w->type, style_buf, sizeof(style_buf)), w->weight);
-	}
-	fprintf(f, "\t};\n\n");
+		ed_write_widget(f, i, "\t\t");
 
-	for(uint32_t i = 0; i < ed.widget_count; ++i) {
-		struct ed_widget *w = &ed.widgets[i];
-		if(w->margin_l || w->margin_t || w->margin_r || w->margin_b) {
-			fprintf(f, "\twidgets[%u].margin_l = %d; widgets[%u].margin_r = %d; widgets[%u].margin_t = %d; widgets[%u].margin_b = %d;\n", i, w->margin_l, i, w->margin_r, i, w->margin_t, i, w->margin_b);
-		}
 	}
+
+	fprintf(f, "\t};\n\n");
 
 	{
 		fprintf(f, "\tuint32_t widget_count = sizeof(widgets) / sizeof(widgets[0]);\n");
@@ -4565,7 +4893,8 @@ static void ed_generate_code(struct mkgui_window *win) {
 				fprintf(f, "\t{\n");
 				fprintf(f, "\t\tconst char *%s_items[] = {", w->id_name);
 				for(uint32_t j = 0; j < d->item_count; ++j) {
-					fprintf(f, "%s\"%s\"", j ? ", " : " ", d->items[j]);
+					fputs(j ? ", " : " ", f);
+					ed_c_string(f, d->items[j]);
 				}
 				fprintf(f, " };\n");
 				fprintf(f, "\t\tmkgui_dropdown_setup(win, %s, %s_items, %u);\n", w->id_name, w->id_name, d->item_count);
@@ -4578,7 +4907,8 @@ static void ed_generate_code(struct mkgui_window *win) {
 				fprintf(f, "\t{\n");
 				fprintf(f, "\t\tconst char *%s_items[] = {", w->id_name);
 				for(uint32_t j = 0; j < d->item_count; ++j) {
-					fprintf(f, "%s\"%s\"", j ? ", " : " ", d->items[j]);
+					fputs(j ? ", " : " ", f);
+					ed_c_string(f, d->items[j]);
 				}
 				fprintf(f, " };\n");
 				fprintf(f, "\t\tmkgui_combobox_setup(win, %s, %s_items, %u);\n", w->id_name, w->id_name, d->item_count);
@@ -4671,7 +5001,11 @@ static void ed_generate_code(struct mkgui_window *win) {
 	fprintf(f, "\treturn 0;\n");
 	fprintf(f, "}\n");
 
-	fclose(f);
+	if(!ed_file_finish(f, temporary, out_path)) {
+		mkgui_statusbar_set(win, ED_STATUSBAR, 0, "Cannot finish generated file");
+		return;
+
+	}
 
 	char buf[MKGUI_PATH_MAX + 320];
 	const char *fname = strrchr(out_path, '/');
@@ -4698,15 +5032,19 @@ static void ed_generate_snippet(struct mkgui_window *win) {
 	if(!mkgui_dialog_save(win, &gen_opts)) {
 		return;
 	}
-	const char *out_path = mkgui_dialog_get_path(win, 0);
-	FILE *f = fopen(out_path, "w");
+	char out_path[MKGUI_PATH_MAX + 260];
+	snprintf(out_path, sizeof(out_path), "%s", mkgui_dialog_get_path(win, 0));
+	char temporary[sizeof(out_path) + 64];
+	FILE *f = ed_file_begin(out_path, temporary, sizeof(temporary));
 	if(!f) {
+		mkgui_statusbar_set(win, ED_STATUSBAR, 0, "Cannot create generated file");
 		return;
+
 	}
 
 	char feature_path[MKGUI_PATH_MAX];
-	const char *base = strrchr(out_path, '/');
-	const char *windows_base = strrchr(out_path, '\\');
+	char *base = strrchr(out_path, '/');
+	char *windows_base = strrchr(out_path, '\\');
 
 	if(windows_base && (!base || windows_base > base)) {
 		base = windows_base;
@@ -4714,24 +5052,27 @@ static void ed_generate_snippet(struct mkgui_window *win) {
 	}
 
 	base = base ? base + 1 : out_path;
-	const char *extension = strrchr(base, '.');
+	char *extension = strrchr(base, '.');
 	size_t prefix = extension ? (size_t)(extension - out_path) : strlen(out_path);
 	int32_t length = snprintf(feature_path, sizeof(feature_path), "%.*s_features.h", (int32_t)prefix, out_path);
 
 	if(length < 0 || (size_t)length >= sizeof(feature_path)) {
 		fclose(f);
+		remove(temporary);
 		mkgui_statusbar_set(win, ED_STATUSBAR, 0, "Generated feature path is too long");
 		return;
 
 	}
 
-	FILE *features = fopen(feature_path, "w");
+	char feature_temporary[sizeof(feature_path) + 64];
+	FILE *features = ed_file_begin(feature_path, feature_temporary, sizeof(feature_temporary));
 
 	if(features) {
 		ed_write_features(features);
 
-		if(fclose(features) != 0) {
+		if(!ed_file_finish(features, feature_temporary, feature_path)) {
 			fclose(f);
+			remove(temporary);
 			mkgui_statusbar_set(win, ED_STATUSBAR, 0, "Cannot write generated feature configuration");
 			return;
 
@@ -4739,6 +5080,7 @@ static void ed_generate_snippet(struct mkgui_window *win) {
 
 	} else {
 		fclose(f);
+		remove(temporary);
 		mkgui_statusbar_set(win, ED_STATUSBAR, 0, "Cannot create generated feature configuration");
 		return;
 
@@ -4755,32 +5097,17 @@ static void ed_generate_snippet(struct mkgui_window *win) {
 
 	fprintf(f, "static struct mkgui_widget widgets[] = {\n");
 	for(uint32_t i = 0; i < ed.widget_count; ++i) {
-		struct ed_widget *w = &ed.widgets[i];
-		int32_t lx, ly, lw, lh;
-		ed_convert_to_layout(i, &lx, &ly, &lw, &lh);
-		char *parent_name = "0";
-		if(w->parent_id != 0) {
-			int32_t pidx = ed_find_widget(w->parent_id);
-			if(pidx >= 0) {
-				parent_name = ed.widgets[pidx].id_name;
-			}
-		}
-		char flag_buf[512];
-		char style_buf[512];
-		uint32_t out_flags = w->flags & ~0xfu;
-		uint32_t out_style = w->style;
-		fprintf(f, "\tMKGUI_W(%s, %s, \"%s\", \"%s\", %s, %d, %d, %s, %s, %u),\n", ed_type_name_upper(w->type), w->id_name, w->label, w->icon, parent_name, lw, lh, ed_flags_to_str(out_flags, flag_buf, sizeof(flag_buf)), ed_style_to_str(out_style, w->type, style_buf, sizeof(style_buf)), w->weight);
+		ed_write_widget(f, i, "\t");
+
 	}
+
 	fprintf(f, "};\n");
 
-	for(uint32_t i = 0; i < ed.widget_count; ++i) {
-		struct ed_widget *w = &ed.widgets[i];
-		if(w->margin_l || w->margin_t || w->margin_r || w->margin_b) {
-			fprintf(f, "widgets[%u].margin_l = %d; widgets[%u].margin_r = %d; widgets[%u].margin_t = %d; widgets[%u].margin_b = %d;\n", i, w->margin_l, i, w->margin_r, i, w->margin_t, i, w->margin_b);
-		}
-	}
+	if(!ed_file_finish(f, temporary, out_path)) {
+		mkgui_statusbar_set(win, ED_STATUSBAR, 0, "Cannot finish generated file");
+		return;
 
-	fclose(f);
+	}
 
 	char buf[MKGUI_PATH_MAX + 320];
 	const char *fname = strrchr(out_path, '/');
@@ -4964,12 +5291,16 @@ static void ed_test_gui(struct mkgui_window *editor_ctx) {
 	struct mkgui_event ev;
 	uint32_t running = 1;
 	while(running) {
-		while(mkgui_window_poll(test, &ev)) {
+		while(running && mkgui_window_poll(test, &ev)) {
 			if(ev.type == MKGUI_EVENT_CLOSE) {
 				running = 0;
 			}
 		}
-		mkgui_ctx_wait(mkgui_window_get_ctx(test));
+
+		if(running) {
+			mkgui_ctx_wait(mkgui_window_get_ctx(test));
+
+		}
 	}
 
 	mkgui_window_destroy(test);
@@ -5322,7 +5653,7 @@ int main(void) {
 
 	while(running) {
 		char buf[128];
-		while(mkgui_window_poll(win, &ev)) {
+		while(running && mkgui_window_poll(win, &ev)) {
 			switch(ev.type) {
 				case MKGUI_EVENT_CLOSE: {
 					ed_cfg.window_w = win->win_w;
@@ -5333,6 +5664,7 @@ int main(void) {
 
 				case MKGUI_EVENT_CLICK: {
 					if(ev.id == ED_TB_NEW || ev.id == ED_MI_NEW) {
+						ed_clear_undo();
 						memset(&ed, 0, sizeof(ed));
 						ed.canvas_w = ED_CANVAS_DEF_W;
 						ed.canvas_h = ED_CANVAS_DEF_H;
@@ -5569,6 +5901,7 @@ int main(void) {
 						ed_sync_tree(win);
 						ed_sync_props(win);
 					} else if(ev.id == ED_MI_NEW) {
+						ed_clear_undo();
 						memset(&ed, 0, sizeof(ed));
 						ed.canvas_w = ED_CANVAS_DEF_W;
 						ed.canvas_h = ED_CANVAS_DEF_H;
@@ -6236,12 +6569,13 @@ int main(void) {
 			prev_press = win->press_id;
 		}
 
-		mkgui_ctx_wait(ctx);
+		if(running) {
+			mkgui_ctx_wait(ctx);
+
+		}
 	}
 
-	for(uint32_t i = 0; i < ED_MAX_UNDO; ++i) {
-		free(ed.undo[i].widgets);
-	}
+	ed_clear_undo();
 	mkgui_window_destroy(win);
 	mkgui_ctx_destroy(ctx);
 	return 0;
