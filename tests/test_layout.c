@@ -1197,6 +1197,12 @@ int main(void) {
 	test_hbox_fixed_zero_width();
 	test_generic_fixed_zero_size();
 
+	if(tests_run != tests_passed + tests_failed) {
+		fprintf(stderr, "FAIL: %u tests did not complete\n", tests_run - tests_passed - tests_failed);
+		tests_failed = tests_run - tests_passed;
+
+	}
+
 	fprintf(stderr, "\n========================\n");
 	fprintf(stderr, "%u tests: %u passed, %u failed\n", tests_run, tests_passed, tests_failed);
 	return tests_failed > 0 ? 1 : 0;

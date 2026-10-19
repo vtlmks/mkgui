@@ -180,8 +180,9 @@ static uint32_t clip_test_incr_roundtrip(void) {
 int main(void) {
 	Display *probe = XOpenDisplay(NULL);
 	if(!probe) {
-		printf("test_clipboard: no X display, SKIP\n");
-		return 0;
+		fprintf(stderr, "test_clipboard: FAIL: no X display\n");
+		return 1;
+
 	}
 	XCloseDisplay(probe);
 

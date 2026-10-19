@@ -1052,6 +1052,12 @@ int main(void) {
 
 	test_canvas_window_render();
 
+	if(tests_run != tests_passed + tests_failed) {
+		fprintf(stderr, "FAIL: %u tests did not complete\n", tests_run - tests_passed - tests_failed);
+		tests_failed = tests_run - tests_passed;
+
+	}
+
 	printf("\n=================================\n");
 	printf("%u tests: %u passed, %u failed\n", tests_run, tests_passed, tests_failed);
 	return tests_failed ? 1 : 0;
