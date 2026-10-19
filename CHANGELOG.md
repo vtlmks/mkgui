@@ -53,6 +53,20 @@ when updating a beta application.
 
 ### Fixed
 
+- Input, textarea, and editor undo histories stop at the oldest retained edit,
+  preserve the latest redo state, and discard redo correctly after branching.
+- File dialogs accept typed filenames and explicit paths. Typed directories
+  navigate, and save extensions are checked against the basename.
+- Editor saves preserve the existing project on write/close/replacement failure;
+  invalid loads preserve the current document. Starting a new project releases undo snapshots.
+- Generated C escapes labels/items, emits snippet margins in initializers, and
+  uses the widget's own style constants.
+- Modal dialogs and editor/preview loops return after dismissal without waiting
+  for another event. Escape cancels the colour picker.
+- Windows recurring timers wake idle waits and rearm at the next deadline.
+  NULL callbacks produce timer events; zero intervals are rejected.
+- GUI test harnesses report incomplete tests and unavailable displays as failures.
+
 - HBox children retain vertical expansion for flexible widgets and containers,
   while fixed single-line controls keep their natural height.
 - The editor canvas grows to the same content minimum as the running GUI.
